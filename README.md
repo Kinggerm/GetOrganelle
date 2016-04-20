@@ -9,12 +9,12 @@ That's the beginning of the story. Latter, I revised the script for several time
 
 Similar pipelines (I will post the differences I found when my boss is not pushing my project of phylogeny of Cannabaceae.):</p>
 1.<a href='https://github.com/chrishah/MITObim'>MITObim</a> is where the first realization of this idea.</p>
-2.<a href='http://metabarcoding.org/org-asm'>ORG.asm</a></p>
+2.<a href='http://metabarcoding.org/org-asm'>ORG.asm</a> is what I suggest be the best choice for normal samples.</p>
 3.<a href='http://metabarcoding.org/obitools'>IBOtools</a></p>
 4.<a href='http://ibest.github.io/ARC'>ARC</a></p>
 5.<a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
 
-Many thanks to Chaonan Fu, Hantao Qin, Dr Wenbin Yu!
+Many thanks to Chaonan Fu, Dr Wenbin Yu and Hantao Qin!
 
 ==========================================================================
 

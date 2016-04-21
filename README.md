@@ -7,7 +7,7 @@ At first, I was trying to follow <a href='http://onlinelibrary.wiley.com/doi/10.
 
 That's the beginning of the story. Latter, I revised the script for several times. As I tested my pipeline (bowtie2+script+SPAdes) with more data (120 samples including Fabaceae, Elaeagnaceae, Poaceae and Orobanchaceae species with fresh leave or specimen materials), I knew more about the associated priciples and the pros and cons of my pipeline. Now I post it here for fun even it's still memory exhausted with large data (Maybe I will optimize it someday, maybe not).
 
-Similar pipelines (I will post the differences I found when my boss is not pushing my project of phylogeny of Cannabaceae.):</p>
+Similar pipelines (I will post the differences latter.):</p>
 1.<a href='https://github.com/chrishah/MITObim'>MITObim</a> is where the first realization of this idea.</p>
 2.<a href='http://metabarcoding.org/org-asm'>ORG.asm</a> is what I suggest be the best choice for normal samples.</p>
 3.<a href='http://metabarcoding.org/obitools'>IBOtools</a></p>

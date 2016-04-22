@@ -6,21 +6,7 @@ import platform
 from optparse import OptionParser, OptionGroup
 
 
-# this version does not utilize the pair info to facilitate the extension process, differs from V1.9.8.1 and V1.9.8.3
-# 1.9.7.2 dump the reads to temp files to save memory
-# 1.9.7.3 gc.collect()
-# 1.9.9.1 store reads per round
-# 1.9.9.2 terminal version; remain bug with maximum words
-# 1.9.9.3 terminal version; disable maximum reads
-# 1.9.9.4 remove gc.collect(); add two options; del dynamic wait for memory
-# 1.9.9.5 remove maximum words
-# 1.9.9.6 compatible with unequal length
-
-
 word_size = int
-this_dir_split = '/'
-if 'Win' in platform.architecture()[1]:
-    this_dir_split = '\\'
 translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
 
@@ -141,6 +127,11 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, print_ou
     if print_out:
         print time.time() - time_line
         print "Writing cost", time.time()-time_write
+
+
+this_dir_split = '/'
+if 'Win' in platform.architecture()[1]:
+    this_dir_split = '\\'
 
 
 def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_size):

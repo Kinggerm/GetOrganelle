@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import string
+import sys
 import os
 
 translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
@@ -65,7 +66,10 @@ def read_gfa_as_fastg(gfa_file):
 
 
 def main():
-    gfa_file = raw_input('Please input gfa file:').strip()
+    if len(sys.argv) > 1:
+        gfa_file = sys.argv[1]
+    else:
+        gfa_file = raw_input('Please input gfa file:').strip()
     write_fasta(gfa_file+'.fastg', read_gfa_as_fastg(gfa_file), False)
 
 

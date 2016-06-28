@@ -4,6 +4,7 @@ import sys
 import os
 import string
 import commands, subprocess
+import logging
 from optparse import OptionParser, OptionGroup
 
 
@@ -487,6 +488,31 @@ def mapping_with_bowtie2(options):
     return (os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2))
 
 
+def assembly_with_spades(options):
+    if options.run_spades:
+        time0 = time.time()
+        parameters = options.other_spades_options
+        if '-k' in parameters:
+            kmer = ''
+        else:
+            kmer = '-k '+options.spades_kmer
+        if '-o' in parameters:
+            spades_out_put = ''
+        else:
+            spades_out_put = '-o '+os.path.join(options.output_base, "filtered_spades")
+        spades_command = ' '.join(['spades.py', parameters, '-1', os.path.join(options.output_base, "filtered_1.fq"), '-2', os.path.join(options.output_base, "filtered_2.fq"), kmer, spades_out_put]).strip()
+        spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = spades_running.communicate()
+        if "not recognized" in output:
+            if options.verbose_log:
+                print output
+                print "WARNING in SPAdes: unrecognized option in", options.other_spades_options
+        else:
+            if options.verbose_log:
+                print output
+            print 'Assembly with SPAdes cost', time.time() - time0
+
+
 def require_commands():
     usage = "python this_script.py -s seed.fasta -1 original1.fq -2 original2.fq -w 90"
     parser = OptionParser(usage=usage)
@@ -508,8 +534,8 @@ def require_commands():
                             help='Map original reads to pre-seed (or bowtie2 index) to acquire the initial seed. This option requires bowtie2 to be installed (and thus Linux/Unix only) and is suggested when the seed is too diversed from target.')
     group_result.add_option('-b', dest='bowtie2_index', help='Input bowtie2 index base name as pre-seed. This requires "-m" to activate the mapping process.')
     # group3
-    group_computational = OptionGroup(parser, "COMPUTATIONAL OPTIONS", "These options will NOT affect the final results. Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-A', dest='pre_assembled', type=int, default=200000,
+    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. Take easy to pick some according your computer's flavour")
+    group_computational.add_option('-A', dest='pre_assembled', type=int, default=300000,
                                    help='The maximum potential-organ reads to be pre assembled before extension. The default is 300,000. Choose a larger number to run faster but exhaust memory in the first few minutes, and choose 0 to disable.')
     group_computational.add_option('--no_out_per_round', dest='fg_out_per_round', action="store_false", default=True,
                                    help='Disable output per round. Choose to save time but exhaust memory all the whole running time')
@@ -517,6 +543,12 @@ def require_commands():
                                    help='By default this script use unique reads to extend. Choose to disable remove duplicates, which save memory but run more slow. Note that whether choose or not will not disable the calling of replicate reads.')
     group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
                                    help='Verbose output. Choose to enable verbose running log.')
+    group_computational.add_option('--no_spades', dest='run_spades', action="store_false", default=True,
+                                   help='Disable SPAdes.')
+    group_computational.add_option('-k', dest='spades_kmer', default='65,75,85',
+                                   help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
+    group_computational.add_option('--spades_options', dest='other_spades_options', default='--careful',
+                                   help='Other SPAdes options. Use double quotation marks to include all the arguments and parameters, such as "--careful -o test"')
     parser.add_option_group(group_need)
     parser.add_option_group(group_result)
     parser.add_option_group(group_computational)
@@ -543,6 +575,10 @@ def require_commands():
                 else:
                     print 'Error: bowtie2 not in the path!'
                     exit()
+        if options.run_spades:
+            spades_in_path = commands.getstatusoutput('spades.py -h')
+            if spades_in_path[0] == 32512:
+                options.run_spades = False
         if not options.rm_duplicates and options.pre_assembled:
             print "WARNING: remove duplicates was inactive, so that the pre-assembly was disabled."
             options.pre_assembled = False
@@ -553,19 +589,51 @@ def require_commands():
         return options
 
 
+def create_log_object(output_base):
+
+    log_title = logging.getLogger('GetOrganelle version 1.9.72')
+    log_title.setLevel(logging.NOTSET)
+    title_console = logging.StreamHandler(sys.stdout)
+    title_console.setFormatter('%(message)s')
+    title_console.setLevel(logging.NOTSET)
+    title_logfile = logging.FileHandler(os.path.join(output_base, 'get_org.log.txt'), mode='a')
+    title_logfile.setFormatter('%(message)s')
+    title_logfile.setLevel(logging.NOTSET)
+    log_title.addHandler(title_console)
+    log_title.addHandler(title_logfile)
+    log_title.info('test')
+
+    # log_timed = logging.getLogger('time , level, events')
+    # console = logging.StreamHandler(sys.stdout)
+    # console.setFormatter('%(asctime)s - %(levelname)s: %(message)s')
+    # console.setLevel(logging.NOTSET)
+    # logfile = logging.FileHandler(os.path.join(output_base, 'get_org.log.txt'), mode='a')
+    # logfile.setFormatter('%(asctime)s - %(levelname)s: %(message)s')
+    # logfile.setLevel(logging.NOTSET)
+    # log_timed.addHandler(console)
+    # log_timed.addHandler(logfile)
+    # log_timed.setLevel(logging.NOTSET)
+    return log_title# , log_timed
+
+
 def main():
     time0 = time.time()
-    global word_size
-    print "\nGetOrganelle version 1.9.70 released by Jianjun Jin on June 28 2016." \
-          "\n" \
-          "\nThis script filters out organelle reads from genome skimming data by extending." \
-          "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
-          "\n"
+    title = "\nGetOrganelle version 1.9.72 released by Jianjun Jin on June 28 2016." \
+            "\n" \
+            "\nThis script filters out organelle reads from genome skimming data by extending." \
+            "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
+            "\n"
     options = require_commands()
+    # log_title = create_log_object(options.output_base)
+    # log_title.info(title)
+    print title
+    global word_size
+    word_size = options.word_size
     original_fq_dir = (options.fastq_file_1, options.fastq_file_2)
 
     """reading seeds"""
-    print "\nReading seeds..."
+    # log_timed.info("Reading seeds...")
+    print "Reading seeds..."
     time_seed = time.time()
     if not options.utilize_mapping:
         initial_accepted_words = chop_seqs(read_fasta(options.seed_dir)[1], word_size)
@@ -577,8 +645,6 @@ def main():
     """reading fastq files"""
     print "\nPre-reading fastq ..."
     time_read = time.time()
-    # universal_len = True
-    word_size = options.word_size
     line_clusters, contig_seqs, contig_c_seqs = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out, options.rm_duplicates, options.output_base)
     len_indices = len(line_clusters)
     print "Reading fastq files cost", time.time()-time_read
@@ -597,11 +663,15 @@ def main():
     accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round, options.pre_assembled, groups_of_duplicate_lines, lines_with_duplicates, options.round_limit, options.output_base)
     write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out, True, os.path.join(options.output_base, "filtered"))
 
-    """end"""
+    """clear file"""
     os.remove(os.path.join(options.output_base, 'temp.indices.1'))
     os.remove(os.path.join(options.output_base, 'temp.indices.2'))
     if options.pair_end_out:
         os.remove(os.path.join(options.output_base, 'temp.indices.3'))
+
+    """assembly"""
+    assembly_with_spades(options)
+
     print 'Total Calc-cost', time.time() - time0
 
 

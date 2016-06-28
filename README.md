@@ -19,20 +19,22 @@ Many thanks to Chaonan Fu, Dr Wenbin Yu, Hantao Qin and Shuo Wang!
 ==========================================================================
 # Installation
 
-My script was written in python 2.7.6. No special python packages need to be installed. You need no third-party software to run it successfully to get organelle reads (*.fastq).
+My script was written in python 2.7.6. You could run the single script (filter_fq_with_probes.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
 
-But, to get a organ genome (such as a chloroplast genome) within a single command line, the following software are suggested, since they could be called automatically by this script:
+But, to get a complete organ genome (such as a chloroplast genome) rather than organ reads, the following software are suggested to be installed, since they could be called automatically by my script:
 
-<a href='http://bioinf.spbau.ru/spades'>SPAdes</a> and <a href='https://github.com/rrwick/Bandage'>Bandage</a>
+<a href='http://bioinf.spbau.ru/spades'>SPAdes</a>
 
 <a href='http://bowtie-bio.sourceforge.net/bowtie2/index.shtml'>bowtie2</a>
+
+Besides, <a href='https://github.com/rrwick/Bandage'>Bandage</a> is suggested to view the final contig graph (*.fastg).
 
 ==========================================================================
 # HowTo
 
 1. Preparing Data: Cut raw data into certain size (<2G per-end is enough for most normal angiosperm samples) if it is too large dataset. You could use the Linux or Mac OS build-in command to easily get a reduced file. Currently, this script was written for illumina pair-end data (fastq).
 
-2. Filtering by Extension in silica and do assembly with SPAdes: Take your input reference (fasta) or the default one as probe, and use script filter_fq_with_probes.py to extend more target reads. The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After extension, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
+2. Filtering and Assembly: Take your input reference (fasta or bowtie index) as probe, the script would extend target reads in successive rounds (iterations). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After extension, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
 
 3. Producing result: View contig graph and choose the path with Bandage. 
 

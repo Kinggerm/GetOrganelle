@@ -37,6 +37,6 @@ My script was written in python 2.7.*. No special python packages need to be ins
 ==========================================================================
 # Example
 
-<code>"python filter_fq_with_probes.py -w 93 -A -1 sample_cut_1.fq -2 sample_cut_2.fq --fastq -3 1.mapped.fq -4 2.mapped.fq"</code>
+<code>python filter_fq_with_probes.py -w 93 -A -1 sample_cut_1.fq -2 sample_cut_2.fq --fastq -3 1.mapped.fq -4 2.mapped.fq</code>
 
-<code>"spades.py --careful -k 65,75,85,95 -1 sample.filtered_1.fq -2 sample.filtered_2.fq -o sample_spades"</code>
+<code>spades.py --careful -k 65,75,85,95 -1 sample.filtered_1.fq -2 sample.filtered_2.fq -o sample_spades</code>

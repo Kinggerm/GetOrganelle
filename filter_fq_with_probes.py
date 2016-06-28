@@ -1,8 +1,9 @@
+#!/usr/bin/env python
 import time
 import sys
 import os
 import string
-import platform
+import commands, subprocess
 from optparse import OptionParser, OptionGroup
 
 
@@ -16,14 +17,14 @@ def complementary_seq(input_seq):
 
 def chop_seqs(seq_generator_or_list, word_size):
     return_words = set()
-    for primer in seq_generator_or_list:
-        this_seq_len = len(primer)
+    for seed in seq_generator_or_list:
+        this_seq_len = len(seed)
         if this_seq_len >= word_size:
-            cpt_primer = complementary_seq(primer)
+            cpt_seed = complementary_seq(seed)
             for i in xrange(0, this_seq_len-word_size+1):
-                forward = primer[i:i+word_size]
+                forward = seed[i:i+word_size]
                 return_words.add(forward)
-                reverse = cpt_primer[i:i+word_size]
+                reverse = cpt_seed[i:i+word_size]
                 return_words.add(reverse)
     return return_words
 
@@ -57,7 +58,7 @@ def read_self_fq_seq_generator(fq_dir_list):
             count += 1
 
 
-def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, print_out, out_file_name=""):
+def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, print_out, out_file_name):
     global temp3_pair_dir, temp2_clusters_dir
     if print_out:
         print "\nWriting ..."
@@ -71,7 +72,6 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, print_ou
         if this_index in accepted_contig_id:
             accepted_lines += [int(x) for x in line.strip().split('\t')]
         this_index += 1
-    # gc.collect()
     accepted_lines = set(accepted_lines)
     if print_out:
         print time.time()-time_indices
@@ -97,15 +97,12 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, print_ou
         del pair_to_each_other
         if print_out:
             print time.time() - time_pair
-    # gc.collect()
 
     # write by line
     if print_out:
         print "writing lines ..."
         time_line = time.time()
     post_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
-    if not out_file_name:
-        out_file_name = ''.join([original_fq_dir[0][x] for x in range(len(original_fq_dir[0])) if original_fq_dir[0][x] == original_fq_dir[1][x]]) + '.filteredV19.'
     file_out = [open(out_file_name+'_1.fq', 'wb'), open(out_file_name+'_2.fq', 'wb')]
     line_count = 0
     for i in range(2):
@@ -129,19 +126,14 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, print_ou
         print "Writing cost", time.time()-time_write
 
 
-this_dir_split = '/'
-if 'Win' in platform.architecture()[1]:
-    this_dir_split = '\\'
-
-
-def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_size):
+def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_base):
 
     global temp3_pair_dir, temp2_clusters_dir
     ##
     # read original reads
     # create pair list
-    # VAR: pair_to_each_other
-    # VAR: line_cluster (list) ~ contig_seqs ~ contig_c_seqs
+    # pair_to_each_other
+    # line_cluster (list) ~ contig_seqs ~ contig_c_seqs
     pre_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
     line_clusters = []
     seq_duplicates = {}
@@ -153,34 +145,33 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_si
     pair_to_each_other = {}
     name_to_line = {}
     #
-    if this_dir_split.join(original_fq_dir[0].split(this_dir_split)[:-1]):
-        temp1_contig_dir = this_dir_split.join(original_fq_dir[0].split(this_dir_split)[:-1])+this_dir_split+'temp.indices.1'
-    else:
-        temp1_contig_dir = 'temp.indices.1'
+    temp1_contig_dir = os.path.join(output_base, 'temp.indices.1')
     temp1_contig_out = open(temp1_contig_dir, 'wb')
     for file_in in pre_reading:
         line = file_in.readline()
         while line:
             if line.startswith("@"):
                 if pair_end_out:
-                    # take the line startswith @ as the seq name, skip the last char
-                    this_name = line[1:].split(' ')[0].split('#')[0]
-                    if this_name in name_to_line:
-                        pair_to_each_other[line_count] = name_to_line[this_name]
-                        pair_to_each_other[name_to_line[this_name]] = line_count
-                    else:
-                        name_to_line[this_name] = line_count
+                    try:
+                        # take the line startswith @ as the seq name, skip the last char
+                        this_name = line[1:].split(' ')[0].split('#')[0]
+                        if this_name in name_to_line:
+                            pair_to_each_other[line_count] = name_to_line[this_name]
+                            pair_to_each_other[name_to_line[this_name]] = line_count
+                        else:
+                            name_to_line[this_name] = line_count
+                    except KeyError:
+                        print 'Unknown error in format. Please try again with "--no_pair_end_out".'
+                        exit()
                 #
                 this_seq = file_in.readline().strip()
+                # drop illegal reads
+                if len(this_seq) < word_size:
+                    line_count += 4
+                    for i in range(3):
+                        line = file_in.readline()
+                    continue
                 this_c_seq = complementary_seq(this_seq)
-                # if seq_len:
-                #     if len(this_seq) != seq_len:
-                #         print 'Error: only accept equal length!'
-                #         os._exit(0)
-                #     else:
-                #         pass
-                # else:
-                #     seq_len = len(this_seq)
                 if rm_duplicates:
                     if this_seq in seq_duplicates:
                         line_clusters[seq_duplicates[this_seq]].append(line_count)
@@ -197,8 +188,8 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_si
                     line_clusters.append([line_count])
                     temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
             else:
-                print "\nWarning: illegal fq format in line", line_count, line
-                os._exit(0)
+                print "\nWARNING: illegal fq format in line", line_count, line
+                exit()
             if line_count % 3571 == 0:
                 back = len(str(line_count+4))
                 sys.stdout.write(str(line_count+4)+'\b'*back)
@@ -213,10 +204,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_si
 
     # dump line clusters
     len_indices = len(line_clusters)
-    if this_dir_split.join(original_fq_dir[0].split(this_dir_split)[:-1]):
-        temp2_clusters_dir = this_dir_split.join(original_fq_dir[0].split(this_dir_split)[:-1]) + this_dir_split + 'temp.indices.2'
-    else:
-        temp2_clusters_dir = 'temp.indices.2'
+    temp2_clusters_dir = os.path.join(output_base, 'temp.indices.2')
     temp2_indices_file_out = open(temp2_clusters_dir, 'wb')
     for this_index in xrange(len_indices):
         temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
@@ -226,17 +214,12 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_si
     if pair_end_out:
         # dump pair_to_each_other to file to save memory
         # read in again in the last
-        if this_dir_split.join(original_fq_dir[0].split(this_dir_split)[:-1]):
-            temp3_pair_dir = this_dir_split.join(original_fq_dir[0].split(this_dir_split)[:-1]) + this_dir_split + 'temp.indices.3'
-        else:
-            temp3_pair_dir = 'temp.indices.3'
+        temp3_pair_dir = os.path.join(output_base, 'temp.indices.3')
         temp3_pair_file_out = open(temp3_pair_dir, 'wb')
         for line_count_2 in xrange(0, line_count, 4):
             temp3_pair_file_out.write(str(pair_to_each_other[line_count_2])+'\n')
         temp3_pair_file_out.close()
         del pair_to_each_other
-        time_gc = time.time()
-        print 'gc collect cost', time.time()-time_gc
 
     del seq_duplicates
     del pre_reading
@@ -244,25 +227,26 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, word_si
     #     seq_len = len(contig_seqs[0])
     len_before_assembly = len(line_clusters)
     print len_before_assembly, "identical of", line_count/4
-    if pair_end_out:
-        return line_clusters, contig_seqs, contig_c_seqs, temp1_contig_dir, temp2_clusters_dir, temp3_pair_dir
-    else:
-        return line_clusters, contig_seqs, contig_c_seqs, temp1_contig_dir, temp2_clusters_dir
+
+    return line_clusters, contig_seqs, contig_c_seqs
 
 
-def pre_assembly(line_clusters, dul_threshold, contig_seqs, contig_c_seqs):
+def pre_assembly(line_clusters, dupli_threshold, contig_seqs, contig_c_seqs):
     global word_size
     print "\nPre-assembly reads..."
     time_assembly = time.time()
-    print "Duplicate threshold =", dul_threshold
     check_time = time.time()
     lines_with_duplicates = {}
+    count_dupli = 0
     for j in xrange(len(line_clusters)):
-        if len(line_clusters[j]) >= dul_threshold:
+        if len(line_clusters[j]) >= 2:
             lines_with_duplicates[j] = int
+            count_dupli += 1
+            if count_dupli == dupli_threshold:
+                break
     groups_of_duplicate_lines = {}
     count_groups = 0
-    print len(lines_with_duplicates), "duplicated", time.time() - check_time
+    print len(lines_with_duplicates), "duplicated"
     these_words = {}
     list_to_pre_assemble = list(lines_with_duplicates)
     len_pre_assemble = len(list_to_pre_assemble)
@@ -272,8 +256,6 @@ def pre_assembly(line_clusters, dul_threshold, contig_seqs, contig_c_seqs):
         this_c_seq = contig_c_seqs[this_identical_read_id]
         # if not universal_len:
         seq_len = len(this_seq)
-        if seq_len < word_size:
-            continue
         temp_length = seq_len - word_size
         these_group_id = set()
         this_words = []
@@ -346,13 +328,15 @@ def pre_assembly(line_clusters, dul_threshold, contig_seqs, contig_c_seqs):
     return groups_of_duplicate_lines, lines_with_duplicates
 
 
-def read_seqs_txt(seqs_dir):
-    file_in = open(seqs_dir, 'rU')
-    for line in file_in:
-        yield line.strip()
+class RoundLimitException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, temp1_contigs_dir, pre_assembled, groups_of_duplicate_lines, lines_with_duplicates):
+def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pre_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base):
     global word_size
     accepted_contig_id = set()
     accepted_contig_id_this_round = set()
@@ -361,30 +345,30 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
     line_to_stop = len_indices - 1
     time_last_round = time.time()
     if fg_out_per_round:
-        round_dir = ''.join([original_fq_dir[0][x] for x in range(len(original_fq_dir[0])) if original_fq_dir[0][x] == original_fq_dir[1][x]])+'.fq_per_Round'+this_dir_split
+        round_dir = os.path.join(output_base, "Reads_per_round")
         if not os.path.exists(round_dir):
             os.mkdir(round_dir)
     try:
-        def summarise_round(acc_words, acc_contig_id_this_round, r_count, time_last_point, by_fq=True):
+        def summarise_round(acc_words, acc_contig_id_this_round, r_count, time_last_point):
             if fg_out_per_round:
                 time_w_out = time.time()
                 len_aw = len(acc_words)
                 len_al = len(acc_contig_id_this_round)
-                write_fq_results(original_fq_dir, acc_contig_id_this_round, False, False, round_dir+"Round."+str(r_count))
-                acc_words = set()
-                if by_fq:
-                    acc_words = chop_seqs(read_self_fq_seq_generator([round_dir+"Round."+str(round_count)+'_1.fq', round_dir+"Round."+str(round_count)+'_2.fq']), word_size)
-                else:
-                    acc_words = chop_seqs(read_seqs_txt(round_dir+"Round."+str(round_count)+'.seqs'), word_size)
+                write_fq_results(original_fq_dir, acc_contig_id_this_round, False, False, os.path.join(round_dir, "Round."+str(r_count)))
+                # clear former accepted words from memory
+                del acc_words
+                # then add new accepted words into memory
+                acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)]), word_size)
                 acc_contig_id_this_round = set()
                 print "Round " + str(r_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AL " + str(len_al) + " AW " + str(len_aw) + ' write_out cost', time.time()-time_w_out, 'round cost', time.time() - time_last_point
             else:
                 print "Round " + str(r_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AL " + str(len(acc_contig_id_this_round)) + " AW " + str(len(acc_words)) + ' round cost', time.time() - time_last_point
+            if r_count == round_limit:
+                raise RoundLimitException(r_count)
             r_count += 1
             return acc_words, acc_contig_id_this_round, r_count, time.time()
         while True:
-            identical_reads_file = open(temp1_contigs_dir, 'rU')
-
+            identical_reads_file = open(os.path.join(output_base, 'temp.indices.1'), 'rU')
             if pre_assembled and groups_of_duplicate_lines:
                 for identical_read_id in xrange(len_indices):
                     if identical_read_id == line_to_stop:
@@ -394,8 +378,6 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                     if identical_read_id not in accepted_contig_id:
                         # if not universal_len:
                         seq_len = len(this_seq)
-                        if seq_len < word_size:
-                            continue
                         temp_length = seq_len - word_size
                         if identical_read_id in line_to_accept:
                             accepted_contig_id.add(identical_read_id)
@@ -449,8 +431,6 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                         this_words = []
                         # if not universal_len:
                         seq_len = len(this_seq)
-                        if seq_len < word_size:
-                            continue
                         temp_length = seq_len - word_size
                         for i in xrange(0, temp_length+1):
                             forward = this_seq[i:i+word_size]
@@ -477,53 +457,66 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
         identical_reads_file.close()
         print "Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AL " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)) + ' round cost', time.time() - time_last_round
         pass
+    except RoundLimitException as r_lim:
+        print "\nHit the round limit "+str(r_lim)+" and terminated ..."
     time_del_words = time.time()
     del accepted_words
     print "del words cost", time.time()-time_del_words
-    time_gc = time.time()
-    print "gc cost", time.time()-time_gc
     return accepted_contig_id
 
 
-def accumulate(input_n):
-    result = 1
-    for i in xrange(input_n):
-        result *= i+1
-    return result
-
-
-def accumulate_2(step, max_n):
-    result = 1
-    for i in xrange(max_n-step+1, max_n+1):
-        result *= i
-    return result
+def mapping_with_bowtie2(options):
+    if options.seed_dir:
+        build_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_dir+" "+options.seed_dir+'.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = build_index.communicate()
+        if "unrecognized option" in output:
+            build_index = subprocess.Popen("bowtie2-build " + options.seed_dir + " " + options.seed_dir + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            output, err = build_index.communicate()
+        index_base = options.seed_dir+'.index'
+        if options.verbose_log:
+            print output
+    else:
+        index_base = options.bowtie2_index
+    print "Mapping reads to bowtie2 index ..."
+    make_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local --al-conc "+os.path.join(options.output_base, "%.initial.mapped.fq")+" -q -x "+index_base+" -1 "+options.fastq_file_1+" -2 "+options.fastq_file_2+" -S "+os.path.join(options.output_base, "bowtie.sam")+" --no-unal -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output, err = make_bowtie2.communicate()
+    if options.verbose_log:
+        print output
+    print "Mapping finished."
+    os.remove(os.path.join(options.output_base,"bowtie.sam"))
+    return (os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2))
 
 
 def require_commands():
-    usage = "python2 this_script.py -p primer.fasta -1 original1.fq -2 original2.fq -w 90"
+    usage = "python this_script.py -s seed.fasta -1 original1.fq -2 original2.fq -w 90"
     parser = OptionParser(usage=usage)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
     group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
     group_need.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
-    group_need.add_option('-p', dest='primer_dir', help='Input fasta format file as primer, disabled you choose "--fastq"')
-    group_need.add_option('-w', dest='word_size',
-                      help='Word size for extension, which have to be smaller or equal to (read length - 1)', type=int)
+    group_need.add_option('-s', dest='seed_dir', help='Input fasta format file as initial seed or pre-seed (see "-m")')
+    group_need.add_option('-w', dest='word_size', type=int,
+                          help='Word size for extension, which have to be smaller or equal to (read length - 1)')
+    group_need.add_option('-o', dest='output_base', help='Out put directory. New directory recommended because this script overwrites existing files.')
     # group2
     group_result = OptionGroup(parser, "INFLUENTIAL OPTIONS", "These option will affect the final results or serve as an alternation of the required options")
-    group_result.add_option('--no_pair_end_out', dest='pair_end_out', action="store_false",
-                      help='Disable output result by pairs', default=True)
-    group_result.add_option('-3', dest='primer_1', help='Available and required only when "--fastq" was chosen')
-    group_result.add_option('-4', dest='primer_2', help='Available and required only when "--fastq" was chosen')
-    group_result.add_option('--fastq', dest='primer_fastq', help='Choose fastq format as primer', default=False, action="store_true")
+    group_result.add_option('--no_pair_end_out', dest='pair_end_out', action="store_false", default=True,
+                            help='Disable output result by pairs')
+    group_result.add_option('-R', dest='round_limit', type=int,
+                            help='Limit running rounds (>=2).')
+    group_result.add_option('-m', dest='utilize_mapping', action="store_true", default=False,
+                            help='Map original reads to pre-seed (or bowtie2 index) to acquire the initial seed. This option requires bowtie2 to be installed (and thus Linux/Unix only) and is suggested when the seed is too diversed from target.')
+    group_result.add_option('-b', dest='bowtie2_index', help='Input bowtie2 index base name as pre-seed. This requires "-m" to activate the mapping process.')
     # group3
     group_computational = OptionGroup(parser, "COMPUTATIONAL OPTIONS", "These options will NOT affect the final results. Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-A', '--pre_assembly', dest='pre_assembled', action="store_true",
-                      help='Utilize pre assembly based on duplicate reads before extension. Choose to run faster but exhaust memory in minutes', default=False)
-    group_computational.add_option('--no_out_per_round', dest='fg_out_per_round', action="store_false",
-                      help='Disable output per round. Choose to save time but exhaust memory all the whole running time', default=True)
-    group_computational.add_option('--no_remove_dulplicates', dest='rm_duplicates', action="store_false",
-                      help='By default this script use unique reads to extend. Choose to disable remove duplicates, which save memory but run more slow. Note that whether choose or not will not disable the calling of replicate reads.', default=True)    #
+    group_computational.add_option('-A', dest='pre_assembled', type=int, default=200000,
+                                   help='The maximum potential-organ reads to be pre assembled before extension. The default is 300,000. Choose a larger number to run faster but exhaust memory in the first few minutes, and choose 0 to disable.')
+    group_computational.add_option('--no_out_per_round', dest='fg_out_per_round', action="store_false", default=True,
+                                   help='Disable output per round. Choose to save time but exhaust memory all the whole running time')
+    group_computational.add_option('--no_remove_dulplicates', dest='rm_duplicates', action="store_false", default=True,
+                                   help='By default this script use unique reads to extend. Choose to disable remove duplicates, which save memory but run more slow. Note that whether choose or not will not disable the calling of replicate reads.')
+    group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
+                                   help='Verbose output. Choose to enable verbose running log.')
     parser.add_option_group(group_need)
     parser.add_option_group(group_result)
     parser.add_option_group(group_computational)
@@ -532,82 +525,86 @@ def require_commands():
     except Exception as e:
         print '\n######################################', e
         print '\n"-h" for more usage'
-        os._exit(0)
+        exit()
     else:
-        if options.primer_fastq and not (options.primer_1 and options.primer_2):
-            parser.print_help()
-            print '\n######################################\nERROR: "--fastq" must along with "-3" and "-4"!\n'
-            os._exit(0)
-        if not ((options.primer_dir or (options.primer_fastq and options.primer_1 and options.primer_2)) and options.fastq_file_1 and options.fastq_file_2 and options.word_size):
+        if not ((options.seed_dir or (options.utilize_mapping and options.bowtie2_index)) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
             parser.print_help()
             print '\n######################################\nERROR: Insufficient REQUIRED arguments!\n'
-            os._exit(0)
+            exit()
+        if options.seed_dir and options.bowtie2_index:
+            print 'Error: Simultaneously "-s" and "-m" is not allowed!'
+            exit()
+        if options.utilize_mapping:
+            bowtie2_in_path = commands.getstatusoutput('bowtie2')
+            if bowtie2_in_path[0] == 32512:
+                options.utilize_mapping = False
+                if options.seed_dir:
+                    print 'WARNING: bowtie2 not in the path!\nTake the seed file as initial seed.'
+                else:
+                    print 'Error: bowtie2 not in the path!'
+                    exit()
         if not options.rm_duplicates and options.pre_assembled:
-            print "Warning: remove duplicates was inactive, so that the pre-assembly was disabled."
+            print "WARNING: remove duplicates was inactive, so that the pre-assembly was disabled."
             options.pre_assembled = False
+        if options.round_limit and options.round_limit <= 2:
+            print "WARNING: illegal limit for rounds! Been set to default: unlimited."
+        if not os.path.isdir(options.output_base):
+            os.mkdir(options.output_base)
         return options
 
 
 def main():
     time0 = time.time()
     global word_size
-    print "\nThis is a script written by JJ for abstracting organ reads by extending\n"
+    print "\nGetOrganelle version 1.9.70 released by Jianjun Jin on June 28 2016." \
+          "\n" \
+          "\nThis script filters out organelle reads from genome skimming data by extending." \
+          "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
+          "\n"
     options = require_commands()
     original_fq_dir = (options.fastq_file_1, options.fastq_file_2)
+
+    """reading seeds"""
+    print "\nReading seeds..."
+    time_seed = time.time()
+    if not options.utilize_mapping:
+        initial_accepted_words = chop_seqs(read_fasta(options.seed_dir)[1], word_size)
+    else:
+        fastq_1, fastq_2 = mapping_with_bowtie2(options)
+        initial_accepted_words = chop_seqs(read_self_fq_seq_generator((fastq_1, fastq_2)), word_size)
+    print "reading seeds cost", time.time()-time_seed
 
     """reading fastq files"""
     print "\nPre-reading fastq ..."
     time_read = time.time()
     # universal_len = True
     word_size = options.word_size
-    ### rough estimate
-    whole_gemone_size = 2*10**9
-    data_size = os.path.getsize(original_fq_dir[0])
-    if options.pair_end_out:
-        line_clusters, contig_seqs, contig_c_seqs, temp1_contigs_dir, temp2_cluster_dir, temp3_pairs_dir = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out, options.rm_duplicates, options.word_size)
-    else:
-        line_clusters, contig_seqs, contig_c_seqs, temp1_contigs_dir, temp2_cluster_dir = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out, options.rm_duplicates, options.word_size)
+    line_clusters, contig_seqs, contig_c_seqs = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out, options.rm_duplicates, options.output_base)
     len_indices = len(line_clusters)
     print "Reading fastq files cost", time.time()-time_read
 
     """pre-assembly if asked"""
     # pre_assembly is suggested when the whole genome coverage is shallow but the organ genome coverage is deep
     if options.pre_assembled:
-        # for pre_assembly_threshold in xrange(2, 6):
-            # E (pre_assembled nuclear) = read_combines * overlap_combines * prob_of_read_combines * prob_of_overlap
-            # read_combines          = c(2*threshold, num_of_reads)
-            # overlap_combines       = c(threshold, 2*threshold)
-            # prob_of_read_combines  = (1/genome_size)**2
-            # prob_of_overlap        = (2*(seq_len-word_size)/genome_size)
-        #     if (1/float(whole_gemone_size))**(pre_assembly_threshold*2+1)*(seq_len-word_size)*2*accumulate_2(pre_assembly_threshold*2, int(data_size*2/float(seq_len)))/accumulate(pre_assembly_threshold*2)*accumulate_2(pre_assembly_threshold, pre_assembly_threshold*2)/accumulate(pre_assembly_threshold) < 5000:
-        #         break
-        pre_assembly_threshold = 2
-        groups_of_duplicate_lines, lines_with_duplicates = pre_assembly(line_clusters, pre_assembly_threshold, contig_seqs, contig_c_seqs)
+        groups_of_duplicate_lines, lines_with_duplicates = pre_assembly(line_clusters, options.pre_assembled, contig_seqs, contig_c_seqs)
     else:
         groups_of_duplicate_lines = None
         lines_with_duplicates = None
     del line_clusters, contig_seqs, contig_c_seqs
 
     """extending process"""
-    # read initial primers
-    print "\nReading primers..."
-    time_primer = time.time()
-    if not options.primer_fastq:
-        initial_accepted_words = chop_seqs(read_fasta(options.primer_dir)[1], word_size)
-    else:
-        initial_accepted_words = chop_seqs(read_self_fq_seq_generator([options.primer_1, options.primer_2]), word_size)
-    print "reading primers cost", time.time()-time_primer
     print "\nExtending ..."
-    accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round, temp1_contigs_dir, options.pre_assembled, groups_of_duplicate_lines, lines_with_duplicates)
-    write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out, True)
+    accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round, options.pre_assembled, groups_of_duplicate_lines, lines_with_duplicates, options.round_limit, options.output_base)
+    write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out, True, os.path.join(options.output_base, "filtered"))
 
     """end"""
-    os.remove(temp1_contigs_dir)
-    os.remove(temp2_cluster_dir)
+    os.remove(os.path.join(options.output_base, 'temp.indices.1'))
+    os.remove(os.path.join(options.output_base, 'temp.indices.2'))
     if options.pair_end_out:
-        os.remove(temp3_pairs_dir)
+        os.remove(os.path.join(options.output_base, 'temp.indices.3'))
     print 'Total Calc-cost', time.time() - time0
 
 
 if __name__ == '__main__':
     main()
+

@@ -562,6 +562,7 @@ def require_commands(print_title):
             exit()
         log = simple_log(logging.getLogger(), options.output_base)
         log.info(print_title)
+        log.info(' '.join(sys.argv)+'\n')
         log = complicated_log(log, options.output_base)
         if options.seed_dir and options.bowtie2_index:
             log.error('Simultaneously "-s" and "-b" is not allowed!')

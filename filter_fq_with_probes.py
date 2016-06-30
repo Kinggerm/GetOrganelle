@@ -560,6 +560,8 @@ def require_commands(print_title):
             parser.print_help()
             print '\n######################################\nERROR: Insufficient REQUIRED arguments!\n'
             exit()
+        if not os.path.isdir(options.output_base):
+            os.mkdir(options.output_base)
         log = simple_log(logging.getLogger(), options.output_base)
         log.info(print_title)
         log.info(' '.join(sys.argv)+'\n')
@@ -587,8 +589,6 @@ def require_commands(print_title):
             options.pre_assembled = False
         if options.round_limit and options.round_limit <= 2:
             log.warning("illegal limit for rounds! Been set to default: unlimited.")
-        if not os.path.isdir(options.output_base):
-            os.mkdir(options.output_base)
         return options, log
 
 

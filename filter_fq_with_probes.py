@@ -233,7 +233,6 @@ def pseudo_assembly(line_clusters, dupli_threshold, contig_seqs, contig_c_seqs, 
     log.info(str(len(lines_with_duplicates))+"/"+str(count_dupli)+" used/duplicated")
     these_words = {}
     list_to_pre_assemble = list(lines_with_duplicates)
-    len_pre_assemble = len(list_to_pre_assemble)
     for list_id in xrange(len(list_to_pre_assemble)):
         this_identical_read_id = list_to_pre_assemble[list_id]
         this_seq = contig_seqs[this_identical_read_id]
@@ -327,19 +326,19 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pre_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, verbose, log):
+def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pre_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, verbose, log):
     global word_size
     accepted_contig_id = set()
     accepted_contig_id_this_round = set()
     line_to_accept = set()
     round_count = 1
-    line_to_stop = len_indices - 1
+    previous_aw = 0
     if fg_out_per_round:
         round_dir = os.path.join(output_base, "Reads_per_round")
         if not os.path.exists(round_dir):
             os.mkdir(round_dir)
     try:
-        def summarise_round(acc_words, acc_contig_id_this_round, r_count):
+        def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count):
             len_aw = len(acc_words)
             len_al = len(acc_contig_id_this_round)
             if fg_out_per_round:
@@ -350,18 +349,21 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                 acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)]))
                 acc_contig_id_this_round = set()
             log.info("Round " + str(r_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw))
+            #
+            if len_aw == pre_aw:
+                raise NoMoreReads('')
+            pre_aw = len(acc_words)
+            #
             if r_count == round_limit:
                 raise RoundLimitException(r_count)
             r_count += 1
-            return acc_words, acc_contig_id_this_round, r_count
+            return acc_words, acc_contig_id_this_round, pre_aw, r_count
         while True:
             if verbose:
                 log.info("Round "+str(round_count)+": Start ...")
             identical_reads_file = open(os.path.join(output_base, 'temp.indices.1'), 'rU')
             if pre_assembled and groups_of_duplicate_lines:
                 for identical_read_id in xrange(len_indices):
-                    if identical_read_id == line_to_stop:
-                        raise KeyboardInterrupt
                     this_seq = identical_reads_file.readline().strip()
                     this_c_seq = identical_reads_file.readline().strip()
                     if identical_read_id not in accepted_contig_id:
@@ -373,28 +375,27 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                             accepted_contig_id_this_round.add(identical_read_id)
                             line_to_accept.remove(identical_read_id)
                             for i in xrange(0, temp_length+1):
-                                forward = this_seq[i:i+word_size]
-                                reverse = this_c_seq[temp_length-i:seq_len-i]
-                                if forward not in accepted_words:
-                                    accepted_words.add(forward)
-                                    accepted_words.add(reverse)
-                                    line_to_stop = identical_read_id
+                                # add forward
+                                accepted_words.add(this_seq[i:i + word_size])
+                                # add reverse
+                                accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                         else:
-                            this_words = []
                             accepted = False
-                            for i in xrange(0, temp_length+1):
-                                forward = this_seq[i:i+word_size]
-                                reverse = this_c_seq[temp_length-i:seq_len-i]
-                                if forward in accepted_words:
+                            for i in xrange(0, (temp_length+1)/2, jump_step):
+                                # from first kmer
+                                if this_seq[i:i + word_size] in accepted_words:
                                     accepted = True
-                                else:
-                                    this_words.append(forward)
-                                    this_words.append(reverse)
+                                    break
+                                # from last kmer
+                                if this_seq[temp_length-i:seq_len-i] in accepted_words:
+                                    accepted = True
+                                    break
                             if accepted:
-                                if this_words:
-                                    for this_word in this_words:
-                                        accepted_words.add(this_word)
-                                    line_to_stop = identical_read_id
+                                for i in xrange(0, temp_length + 1):
+                                    # add forward
+                                    accepted_words.add(this_seq[i:i + word_size])
+                                    # add reverse
+                                    accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                                 accepted_contig_id.add(identical_read_id)
                                 accepted_contig_id_this_round.add(identical_read_id)
                                 if identical_read_id in lines_with_duplicates:
@@ -405,42 +406,38 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                     line_to_accept.remove(identical_read_id)
                                     del groups_of_duplicate_lines[which_group]
                     if identical_read_id % 4321 == 0:
-                        this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)) + ' ST ' + str(line_to_stop)  # + ' cost ' + str(time.time() - time_last_round)
+                        this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, round_count)
+                accepted_words, accepted_contig_id_this_round, previous_aw, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw, round_count)
             else:
                 for identical_read_id in xrange(len_indices):
-                    if identical_read_id == line_to_stop:
-                        raise KeyboardInterrupt
                     this_seq = identical_reads_file.readline().strip()
                     this_c_seq = identical_reads_file.readline().strip()
                     if identical_read_id not in accepted_contig_id:
                         accepted = False
-                        this_words = []
-                        # if not universal_len:
                         seq_len = len(this_seq)
                         temp_length = seq_len - word_size
-                        for i in xrange(0, temp_length+1):
-                            forward = this_seq[i:i+word_size]
-                            reverse = this_c_seq[temp_length-i:seq_len-i]
-                            if forward in accepted_words:
+                        for i in xrange(0, (temp_length + 1) / 2, jump_step):
+                            # from first kmer
+                            if this_seq[i:i + word_size] in accepted_words:
                                 accepted = True
-                            else:
-                                this_words.append(forward)
-                                this_words.append(reverse)
+                                break
+                            # from last kmer
+                            if this_seq[temp_length - i:seq_len - i] in accepted_words:
+                                accepted = True
+                                break
                         if accepted:
-                            if this_words:
-                                for this_word in this_words:
-                                    accepted_words.add(this_word)
-                                line_to_stop = identical_read_id
+                            for i in xrange(0, temp_length + 1):
+                                accepted_words.add(this_seq[i:i + word_size])
+                                accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                             accepted_contig_id.add(identical_read_id)
                             accepted_contig_id_this_round.add(identical_read_id)
                     if identical_read_id % 4321 == 0:
-                        this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)) + ' ST ' + str(line_to_stop)  # + ' cost ' + str(time.time() - time_last_round)
+                        this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, round_count)
+                accepted_words, accepted_contig_id_this_round, previous_aw, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw, round_count)
             identical_reads_file.close()
     except KeyboardInterrupt:
         identical_reads_file.close()
@@ -481,7 +478,7 @@ def mapping_with_bowtie2(options, log):
     if options.verbose_log:
         log.info("\n"+output.strip())
     log.info("Mapping finished.")
-    os.remove(os.path.join(options.output_base,"bowtie.sam"))
+    os.remove(os.path.join(options.output_base, "bowtie.sam"))
     return (os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2))
 
 
@@ -511,41 +508,47 @@ def assembly_with_spades(options, log):
 
 
 def require_commands(print_title):
-    usage = "python this_script.py -s seed.fasta -1 original1.fq -2 original2.fq -w 90"
+    usage = "python this_script.py  -w 103 -A 500000 -1 sample_1.fq -2 sample_2.fq -m -s reference.fasta -o chloroplast -R 20 -k 75,85,95,105"
     parser = OptionParser(usage=usage)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
     group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
     group_need.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
-    group_need.add_option('-s', dest='seed_dir', help='Input fasta format file as initial seed or pre-seed (see "-m")')
+    group_need.add_option('-s', dest='seed_dir', help='Reference. Input fasta format file as initial seed or pre-seed (see "-m")')
     group_need.add_option('-w', dest='word_size', type=int,
                           help='Word size for extension, which have to be smaller or equal to (read length - 1)')
     group_need.add_option('-o', dest='output_base', help='Out put directory. New directory recommended because this script overwrites existing files.')
     # group2
     group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results or serve as an alternation of the required options")
-    group_result.add_option('--no_pair_end_out', dest='pair_end_out', action="store_false", default=True,
-                            help='Disable output result by pairs')
-    group_result.add_option('-R', dest='round_limit', type=int,
-                            help='Limit running rounds (>=2).')
     group_result.add_option('-m', dest='utilize_mapping', action="store_true", default=False,
                             help='Map original reads to pre-seed (or bowtie2 index) to acquire the initial seed. This option requires bowtie2 to be installed (and thus Linux/Unix only) and is suggested when the seed is too diversed from target.')
-    group_result.add_option('-b', dest='bowtie2_index', help='Input bowtie2 index base name as pre-seed. This will automatically turn on bowtie2 mapping process(-m).')
+    group_result.add_option('-b', dest='bowtie2_index',
+                            help='Input bowtie2 index base name as pre-seed. This will automatically turn on bowtie2 mapping process(-m).')
+    group_result.add_option('-R', dest='round_limit', type=int,
+                            help='Limit running rounds (>=2).')
+    group_result.add_option('--jump', dest='jump_step', type=int, default=1,
+                            help='The wide of steps of kmer in reads during extension (integer >= 1).'
+                                 'The larger the number is, the faster the extension will be, the more risk of missing reads in low coverage area.'
+                                 'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
+    group_result.add_option('--no_pair_end_out', dest='pair_end_out', action="store_false", default=True,
+                            help='Disable output result by pairs')
+    group_result.add_option('--no_spades', dest='run_spades', action="store_false", default=True,
+                                   help='Disable SPAdes.')
+
+    group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
+                               help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
+    group_result.add_option('--spades_options', dest='other_spades_options', default='--careful',
+                               help='Other SPAdes options. Use double quotation marks to include all the arguments and parameters, such as "--careful -o test"')
     # group3
     group_computational = OptionGroup(parser, "ADDITIONAI OPTIONS", "These options will NOT affect the final results. Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-A', dest='pre_assembled', type=int, default=300000,
-                                   help='The maximum potential-organ reads to be pre assembled before extension. The default is 300,000. Choose a larger number to run faster but exhaust memory in the first few minutes, and choose 0 to disable.')
+    group_computational.add_option('-A', dest='pre_assembled', type=int, default=30000,
+                                   help='The maximum potential-organ reads to be pre assembled before extension. The default is 30000. Choose a larger number (ex. 500000) to run faster but exhaust memory in the first few minutes, and choose 0 to disable.')
     group_computational.add_option('--no_out_per_round', dest='fg_out_per_round', action="store_false", default=True,
                                    help='Disable output per round. Choose to save time but exhaust memory all the whole running time')
     group_computational.add_option('--no_remove_dulplicates', dest='rm_duplicates', action="store_false", default=True,
                                    help='By default this script use unique reads to extend. Choose to disable remove duplicates, which save memory but run more slow. Note that whether choose or not will not disable the calling of replicate reads.')
     group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
                                    help='Verbose output. Choose to enable verbose running log.')
-    group_computational.add_option('--no_spades', dest='run_spades', action="store_false", default=True,
-                                   help='Disable SPAdes.')
-    group_computational.add_option('-k', dest='spades_kmer', default='65,75,85',
-                                   help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
-    group_computational.add_option('--spades_options', dest='other_spades_options', default='--careful',
-                                   help='Other SPAdes options. Use double quotation marks to include all the arguments and parameters, such as "--careful -o test"')
     parser.add_option_group(group_need)
     parser.add_option_group(group_result)
     parser.add_option_group(group_computational)
@@ -559,6 +562,9 @@ def require_commands(print_title):
         if not ((options.seed_dir or options.bowtie2_index) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
             parser.print_help()
             print '\n######################################\nERROR: Insufficient REQUIRED arguments!\n'
+            exit()
+        if options.jump_step < 1:
+            print '\n######################################\nERROR: Jump step MUST be an integer that >= 1'
             exit()
         if not os.path.isdir(options.output_base):
             os.mkdir(options.output_base)
@@ -625,63 +631,66 @@ def complicated_log(log, output_base):
 
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle version 1.9.73 released by Jianjun Jin on June 28 2016." \
+    title = "\nGetOrganelle version 1.9.75 released by Jianjun Jin on July 13 2016." \
             "\n" \
             "\nThis script filters out organelle reads from genome skimming data by extending." \
             "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
             "\n"
     options, log = require_commands(print_title=title)
-    global word_size
-    word_size = options.word_size
-    original_fq_dir = (options.fastq_file_1, options.fastq_file_2)
+    try:
+        global word_size
+        word_size = options.word_size
+        original_fq_dir = (options.fastq_file_1, options.fastq_file_2)
 
-    """reading seeds"""
-    log.info("Reading seeds...")
-    if not options.utilize_mapping:
-        initial_accepted_words = chop_seqs(read_fasta(options.seed_dir)[1])
-    else:
-        fastq_1, fastq_2 = mapping_with_bowtie2(options, log)
-        initial_accepted_words = chop_seqs(read_self_fq_seq_generator((fastq_1, fastq_2)))
-    log.info("Reading seeds finished.\n")
+        """reading seeds"""
+        log.info("Reading seeds...")
+        if not options.utilize_mapping:
+            initial_accepted_words = chop_seqs(read_fasta(options.seed_dir)[1])
+        else:
+            fastq_1, fastq_2 = mapping_with_bowtie2(options, log)
+            initial_accepted_words = chop_seqs(read_self_fq_seq_generator((fastq_1, fastq_2)))
+        log.info("Reading seeds finished.\n")
 
-    """reading fastq files"""
-    log.info("Pre-reading fastq ...")
-    line_clusters, contig_seqs, contig_c_seqs = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out,
-                                                                       options.rm_duplicates, options.output_base, log)
-    len_indices = len(line_clusters)
-    log.info("Pre-reading fastq finished.\n")
+        """reading fastq files"""
+        log.info("Pre-reading fastq ...")
+        line_clusters, contig_seqs, contig_c_seqs = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out,
+                                                                           options.rm_duplicates, options.output_base, log)
+        len_indices = len(line_clusters)
+        log.info("Pre-reading fastq finished.\n")
 
-    """pseudo-assembly if asked"""
-    # pseudo_assembly is suggested when the whole genome coverage is shallow but the organ genome coverage is deep
-    if options.pre_assembled:
-        groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(line_clusters, options.pre_assembled, contig_seqs, contig_c_seqs, log)
-    else:
-        groups_of_duplicate_lines = None
-        lines_with_duplicates = None
-    del line_clusters, contig_seqs, contig_c_seqs
+        """pseudo-assembly if asked"""
+        # pseudo_assembly is suggested when the whole genome coverage is shallow but the organ genome coverage is deep
+        if options.pre_assembled:
+            groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(line_clusters, options.pre_assembled, contig_seqs, contig_c_seqs, log)
+        else:
+            groups_of_duplicate_lines = None
+            lines_with_duplicates = None
+        del line_clusters, contig_seqs, contig_c_seqs
 
-    """extending process"""
-    log.info("Extending ...")
-    accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round,
-                                         options.pre_assembled, groups_of_duplicate_lines, lines_with_duplicates,
-                                         options.round_limit, options.output_base, options.verbose_log, log)
-    write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
-                     os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),
-                     os.path.join(options.output_base, 'temp.indices.3'), options.verbose_log, log)
-    os.remove(os.path.join(options.output_base, 'temp.indices.1'))
-    os.remove(os.path.join(options.output_base, 'temp.indices.2'))
-    if options.pair_end_out:
-        os.remove(os.path.join(options.output_base, 'temp.indices.3'))
-    log.info("Extending finished.\n")
+        """extending process"""
+        log.info("Extending ...")
+        accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round,
+                                             options.pre_assembled, groups_of_duplicate_lines, lines_with_duplicates,
+                                             options.round_limit, options.output_base, options.jump_step, options.verbose_log, log)
+        write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
+                         os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),
+                         os.path.join(options.output_base, 'temp.indices.3'), options.verbose_log, log)
+        os.remove(os.path.join(options.output_base, 'temp.indices.1'))
+        os.remove(os.path.join(options.output_base, 'temp.indices.2'))
+        if options.pair_end_out:
+            os.remove(os.path.join(options.output_base, 'temp.indices.3'))
+        log.info("Extending finished.\n")
 
-    """assembly"""
-    if options.run_spades:
-        log.info('Assembling with SPAdes ...')
-        assembly_with_spades(options, log)
+        """assembly"""
+        if options.run_spades:
+            log.info('Assembling with SPAdes ...')
+            assembly_with_spades(options, log)
 
-    log = simple_log(log, options.output_base)
-    log.info("\nTotal Calc-cost "+str(time.time() - time0))
-    log.info("Thanks you!")
+        log = simple_log(log, options.output_base)
+        log.info("\nTotal Calc-cost "+str(time.time() - time0))
+        log.info("Thanks you!")
+    except:
+        log.exception("")
     logging.shutdown()
 
 

@@ -338,9 +338,22 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
         if not os.path.exists(round_dir):
             os.mkdir(round_dir)
     try:
+        import psutil
+    except ImportError:
+        this_process = None
+        if verbose:
+            log.warning("Package psutil is not installed, so that memory usage will not be logged\n"
+                        "Don't worry. This will not affect the result.")
+    else:
+        this_process = psutil.Process(os.getgid())
+    try:
         def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count):
             len_aw = len(acc_words)
             len_al = len(acc_contig_id_this_round)
+            if this_process:
+                memory_usage = " Mem " + str(round(this_process.memory_info().rss / 1024 / 1024 / 1024, 3))
+            else:
+                memory_usage = ''
             if fg_out_per_round:
                 write_fq_results(original_fq_dir, acc_contig_id_this_round, False, os.path.join(round_dir, "Round."+str(r_count)), os.path.join(output_base, 'temp.indices.2'), os.path.join(output_base, 'temp.indices.2'), verbose, log)
                 # clear former accepted words from memory
@@ -348,7 +361,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                 # then add new accepted words into memory
                 acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)]))
                 acc_contig_id_this_round = set()
-            log.info("Round " + str(r_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw))
+            log.info("Round " + str(r_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw) + memory_usage)
             #
             if len_aw == pre_aw:
                 raise NoMoreReads('')

@@ -521,33 +521,33 @@ def assembly_with_spades(options, log):
         log.info('Assembling finished.\n')
 
 
-def filter_spades_result(options, log, depth_threshold=0):
+def slim_spades_result(options, log, depth_threshold=0):
     scheme_tranlation = {'1': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-no-con',
                          '2': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-no-con',
                          '3': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr') + ' --exclude-no-con',
                          '0': ''}
-    if options.scheme_for_filtering_spades_result.isdigit():
-        if options.scheme_for_filtering_spades_result in scheme_tranlation:
-            if int(options.scheme_for_filtering_spades_result):
-                run_command = scheme_tranlation[options.scheme_for_filtering_spades_result]
+    if options.scheme_for_slimming_spades_result.isdigit():
+        if options.scheme_for_slimming_spades_result in scheme_tranlation:
+            if int(options.scheme_for_slimming_spades_result):
+                run_command = scheme_tranlation[options.scheme_for_slimming_spades_result]
             else:
                 run_command = ''
         else:
-            log.warning('Illegal code of scheme for filtering spades result. Function disabled.')
+            log.warning('Illegal code of scheme for slimming spades result. Function disabled.')
             run_command = ''
     else:
-        run_command = options.scheme_for_filtering_spades_result
+        run_command = options.scheme_for_slimming_spades_result
     if run_command:
         if '-o' in options.other_spades_options:
             graph_file = os.path.join(options.other_spades_options.split('-o')[1].strip().split(' ')[0], "assembly_graph.fastg")
         else:
             graph_file = os.path.join(options.output_base, "filtered_spades", "assembly_graph.fastg")
-        run_command = os.path.join(path_of_this_script, 'filter_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
-        filter_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = filter_spades.communicate()
+        run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
+        slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = slim_spades.communicate()
         if "not recognized" in output:
             if options.verbose_log:
-                log.warning('Problem with filter_spades_fastg_by_blast:')
+                log.warning('Problem with slim_spades_fastg_by_blast:')
                 log.warning(output)
             log.warning('Processing assembly result failed.')
         else:
@@ -583,12 +583,12 @@ def require_commands(print_title):
                                  'The larger the number is, the faster the extension will be, '
                                  'the more risk of missing reads in low coverage area.'
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
-    group_result.add_option('-F', dest='scheme_for_filtering_spades_result', default='1',
+    group_result.add_option('-F', dest='scheme_for_slimming_spades_result', default='1',
                             help='followed with following integer (1, 2, 3, 0; corresponding to certain arguments) '
                                  'or custom arguments with double quotation marks. By default, this script calls '
-                                 'filter_spades_fastg_by_blast.py (should be under the same directory) '
+                                 'slim_spades_fastg_by_blast.py (should be under the same directory) '
                                  'with certain arguments after 1. With arguments after 1, '
-                                 'filter_spades_fastg_by_blast.py would keep contigs that match '
+                                 'slim_spades_fastg_by_blast.py would keep contigs that match '
                                  'given chloroplast index or have connection with such contigs'
                                  ', and exclude contigs that match mitochondrial index or irrelevant with'
                                  ' chloroplast. You can also make the index by your self.\t'
@@ -599,7 +599,7 @@ def require_commands(print_title):
                                  ' ------------------------------------------------------ '
                                  '\n3 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+' --exclude-no-con"'
                                  ' ------------------------------------------------------ '
-                                 '\n0 \t disable this filter function'
+                                 '\n0 \t disable this slimming function'
                                  ' ------------------------------------------------------ ')
     group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
                                help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
@@ -715,7 +715,7 @@ def main():
     time0 = time.time()
     title = "\nGetOrganelle version 1.9.76 released by Jianjun Jin on July 28 2016." \
             "\n" \
-            "\nThis script filters out organelle reads from genome skimming data by extending." \
+            "\nThis script get organelle reads from genome skimming data by extending." \
             "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
             "\n"
     options, log = require_commands(print_title=title)
@@ -767,8 +767,8 @@ def main():
         if options.run_spades:
             log.info('Assembling with SPAdes ...')
             assembly_with_spades(options, log)
-            if options.scheme_for_filtering_spades_result:
-                filter_spades_result(options, log)
+            if options.scheme_for_slimming_spades_result:
+                slim_spades_result(options, log)
 
         log = simple_log(log, options.output_base)
         log.info("\nTotal Calc-cost "+str(time.time() - time0))

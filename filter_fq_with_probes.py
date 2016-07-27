@@ -8,6 +8,7 @@ import logging
 from optparse import OptionParser, OptionGroup
 
 
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 word_size = int
 translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
@@ -520,46 +521,114 @@ def assembly_with_spades(options, log):
         log.info('Assembling finished.\n')
 
 
+def filter_spades_result(options, log, depth_threshold=0):
+    scheme_tranlation = {'1': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-no-con',
+                         '2': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-no-con',
+                         '3': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr') + ' --exclude-no-con',
+                         '0': ''}
+    if options.scheme_for_filtering_spades_result.isdigit():
+        if options.scheme_for_filtering_spades_result in scheme_tranlation:
+            if int(options.scheme_for_filtering_spades_result):
+                run_command = scheme_tranlation[options.scheme_for_filtering_spades_result]
+            else:
+                run_command = ''
+        else:
+            log.warning('Illegal code of scheme for filtering spades result. Function disabled.')
+            run_command = ''
+    else:
+        run_command = options.scheme_for_filtering_spades_result
+    if run_command:
+        if '-o' in options.other_spades_options:
+            graph_file = os.path.join(options.other_spades_options.split('-o')[1].strip().split(' ')[0], "assembly_graph.fastg")
+        else:
+            graph_file = os.path.join(options.output_base, "filtered_spades", "assembly_graph.fastg")
+        run_command = os.path.join(path_of_this_script, 'filter_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
+        filter_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = filter_spades.communicate()
+        if "not recognized" in output:
+            if options.verbose_log:
+                log.warning('Problem with filter_spades_fastg_by_blast:')
+                log.warning(output)
+            log.warning('Processing assembly result failed.')
+        else:
+            if options.verbose_log:
+                log.info(output)
+            log.info('Processing assembly result finished!')
+
+
 def require_commands(print_title):
-    usage = "python this_script.py  -w 103 -A 500000 -1 sample_1.fq -2 sample_2.fq -m -s reference.fasta -o chloroplast -R 20 -k 75,85,95,105"
+    usage = "\npython "+str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast -A 500000 -R 20 -k 75,85,95,105"
     parser = OptionParser(usage=usage)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
     group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
     group_need.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
-    group_need.add_option('-s', dest='seed_dir', help='Reference. Input fasta format file as initial seed or pre-seed (see "-m")')
+    group_need.add_option('-s', dest='seed_dir', help='Reference. Input fasta format file as initial seed '
+                                                      'or pre-seed (see flag "-b")')
     group_need.add_option('-w', dest='word_size', type=int,
                           help='Word size for extension, which have to be smaller or equal to (read length - 1)')
-    group_need.add_option('-o', dest='output_base', help='Out put directory. New directory recommended because this script overwrites existing files.')
+    group_need.add_option('-o', dest='output_base', help='Out put directory. Overwriting files if directory exists.')
     # group2
-    group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results or serve as an alternation of the required options")
-    group_result.add_option('-m', dest='utilize_mapping', action="store_true", default=False,
-                            help='Map original reads to pre-seed (or bowtie2 index) to acquire the initial seed. This option requires bowtie2 to be installed (and thus Linux/Unix only) and is suggested when the seed is too diversed from target.')
+    group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results"
+                                                              " or serve as alternations of the required options")
     group_result.add_option('-b', dest='bowtie2_index',
-                            help='Input bowtie2 index base name as pre-seed. This will automatically turn on bowtie2 mapping process(-m).')
+                            help='Input bowtie2 index base name as pre-seed. '
+                                 'This flag serves as an alternation of flag "-s". '
+                                 'This will forcedly turn on bowtie2 mapping process.')
     group_result.add_option('-R', dest='round_limit', type=int,
                             help='Limit running rounds (>=2).')
-    group_result.add_option('--jump', dest='jump_step', type=int, default=1,
+    group_result.add_option('-J', dest='jump_step', type=int, default=1,
                             help='The wide of steps of kmer in reads during extension (integer >= 1).'
-                                 'The larger the number is, the faster the extension will be, the more risk of missing reads in low coverage area.'
+                                 'The larger the number is, the faster the extension will be, '
+                                 'the more risk of missing reads in low coverage area.'
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
-    group_result.add_option('--no_pair_end_out', dest='pair_end_out', action="store_false", default=True,
-                            help='Disable output result by pairs')
-    group_result.add_option('--no_spades', dest='run_spades', action="store_false", default=True,
-                                   help='Disable SPAdes.')
-
+    group_result.add_option('-F', dest='scheme_for_filtering_spades_result', default='1',
+                            help='followed with following integer (1, 2, 3, 0; corresponding to certain arguments) '
+                                 'or custom arguments with double quotation marks. By default, this script calls '
+                                 'filter_spades_fastg_by_blast.py (should be under the same directory) '
+                                 'with certain arguments after 1. With arguments after 1, '
+                                 'filter_spades_fastg_by_blast.py would keep contigs that match '
+                                 'given chloroplast index or have connection with such contigs'
+                                 ', and exclude contigs that match mitochondrial index or irrelevant with'
+                                 ' chloroplast. You can also make the index by your self.\t'
+                                 ' ------------------------------------------------------ '
+                                 '\n1 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude-no-con"'
+                                 ' ------------------------------------------------------ '
+                                 '\n2 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude-no-con"'
+                                 ' ------------------------------------------------------ '
+                                 '\n3 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+' --exclude-no-con"'
+                                 ' ------------------------------------------------------ '
+                                 '\n0 \t disable this filter function'
+                                 ' ------------------------------------------------------ ')
     group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
                                help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
-    group_result.add_option('--spades_options', dest='other_spades_options', default='--careful',
-                               help='Other SPAdes options. Use double quotation marks to include all the arguments and parameters, such as "--careful -o test"')
+    group_result.add_option('--spades-options', dest='other_spades_options', default='--careful',
+                               help='Other SPAdes options. Use double quotation marks to include all the arguments and parameters,'
+                                    ' such as "--careful -o test"')
+    group_result.add_option('--no-pair-end-out', dest='pair_end_out', action="store_false", default=True,
+                            help='Disable output result by pairs')
+    group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
+                            help='Disable SPAdes.')
+    group_result.add_option('--no-mapping', dest='utilize_mapping', action="store_false", default=True,
+                            help='Choose to disable mapping process.'
+                                 'By default, this script would map original reads to pre-seed (or bowtie2 index) '
+                                 'to acquire the initial seed. This requires bowtie2 to be installed '
+                                 '(and thus Linux/Unix only). It is suggested to keep mapping as default '
+                                 'when the seed is too diversed from target.')
     # group3
-    group_computational = OptionGroup(parser, "ADDITIONAI OPTIONS", "These options will NOT affect the final results. Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-A', dest='pre_assembled', type=int, default=30000,
-                                   help='The maximum potential-organ reads to be pre assembled before extension. The default is 30000. Choose a larger number (ex. 500000) to run faster but exhaust memory in the first few minutes, and choose 0 to disable.')
-    group_computational.add_option('--no_out_per_round', dest='fg_out_per_round', action="store_false", default=True,
+    group_computational = OptionGroup(parser, "ADDITIONAI OPTIONS", "These options will NOT affect the final results."
+                                                                    " Take easy to pick some according your computer's flavour")
+    group_computational.add_option('-A', dest='pre_assembled', type=int, default=200000,
+                                   help='The maximum potential-organ reads to be pre assembled before extension.'
+                                        ' The default is 200000. Choose a larger number (ex. 500000) to run faster'
+                                        ' but exhaust memory in the first few minutes, and choose 0 to disable.')
+    group_computational.add_option('--no-out-per-round', dest='fg_out_per_round', action="store_false", default=True,
                                    help='Disable output per round. Choose to save time but exhaust memory all the whole running time')
-    group_computational.add_option('--no_remove_dulplicates', dest='rm_duplicates', action="store_false", default=True,
-                                   help='By default this script use unique reads to extend. Choose to disable remove duplicates, which save memory but run more slow. Note that whether choose or not will not disable the calling of replicate reads.')
+    group_computational.add_option('--no-remove-dulplicates', dest='rm_duplicates', action="store_false", default=True,
+                                   help='By default this script use unique reads to extend. Choose to disable remove duplicates,'
+                                        ' which save memory but run more slow. Note that whether choose or not will not disable '
+                                        'the calling of replicate reads.')
     group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
                                    help='Verbose output. Choose to enable verbose running log.')
     parser.add_option_group(group_need)
@@ -574,7 +643,7 @@ def require_commands(print_title):
     else:
         if not ((options.seed_dir or options.bowtie2_index) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
             parser.print_help()
-            print '\n######################################\nERROR: Insufficient REQUIRED arguments!\n'
+            print '\n######################################\nERROR: Insufficient arguments!\n'
             exit()
         if options.jump_step < 1:
             print '\n######################################\nERROR: Jump step MUST be an integer that >= 1'
@@ -644,7 +713,7 @@ def complicated_log(log, output_base):
 
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle version 1.9.75 released by Jianjun Jin on July 13 2016." \
+    title = "\nGetOrganelle version 1.9.76 released by Jianjun Jin on July 28 2016." \
             "\n" \
             "\nThis script filters out organelle reads from genome skimming data by extending." \
             "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
@@ -698,6 +767,8 @@ def main():
         if options.run_spades:
             log.info('Assembling with SPAdes ...')
             assembly_with_spades(options, log)
+            if options.scheme_for_filtering_spades_result:
+                filter_spades_result(options, log)
 
         log = simple_log(log, options.output_base)
         log.info("\nTotal Calc-cost "+str(time.time() - time0))

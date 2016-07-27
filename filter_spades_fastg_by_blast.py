@@ -2,6 +2,7 @@
 # coding: utf8
 import time
 import os
+import sys
 import commands
 from optparse import OptionParser, OptionGroup
 import copy
@@ -29,21 +30,21 @@ def require_commands():
     # filters
     parser.add_option('--depth-threshold', dest='depth_threshold',
                       help='Input a float or integer number. filter fastg file by depth. Default: no threshold.')
-    parser.add_option('--include-hits-index', dest='in_nc_base',
+    parser.add_option('--include-index', dest='in_nc_base',
                       help='followed by Blast index format')
-    parser.add_option('--include-hits-index-priority', dest='in_nc_base_priority',
-                      help='followed by Blast index format')  # ? Default:"./lib/cp.genomes.index"
-    parser.add_option('--exclude-hits-index', dest='ex_nc_base',
-                      help='followed by Blast index format')  # ? Default:"./lib/mt.genomes.index"
-    parser.add_option('--exclude-hits-index-priority', dest='ex_nc_base_priority',
+    parser.add_option('--include-index-priority', dest='in_nc_base_priority',
                       help='followed by Blast index format')
-    parser.add_option('--include-hits-fasta', dest='in_fa_base',
+    parser.add_option('--exclude-index', dest='ex_nc_base',
+                      help='followed by Blast index format')
+    parser.add_option('--exclude-index-priority', dest='ex_nc_base_priority',
+                      help='followed by Blast index format')
+    parser.add_option('--include-fasta', dest='in_fa_base',
                       help='followed by Fasta index format')
-    parser.add_option('--include-hits-fasta-priority', dest='in_fa_base_priority',
+    parser.add_option('--include-fasta-priority', dest='in_fa_base_priority',
                       help='followed by Fasta index format')
-    parser.add_option('--exclude-hits-fasta', dest='ex_fa_base',
+    parser.add_option('--exclude-fasta', dest='ex_fa_base',
                       help='followed by Fasta index format')
-    parser.add_option('--exclude-hits-fasta-priority', dest='ex_fa_base_priority',
+    parser.add_option('--exclude-fasta-priority', dest='ex_fa_base_priority',
                       help='followed by Fasta index format')
     parser.add_option('--exclude-no-hits', dest='ex_no_hits', default=False, action='store_true', help='Choose to exclude all contigs that mismatch the "include index"')
     parser.add_option('--exclude-no-con', dest='ex_no_connect', default=False, action='store_true', help='Choose to exclude all contigs that disconnect with "include index" contigs')
@@ -62,11 +63,11 @@ def require_commands():
             os._exit(0)
         in_chosen = int(bool(options.in_nc_base_priority))+int(bool(options.in_nc_base))+int(bool(options.in_fa_base_priority))+int(bool(options.in_fa_base))
         if in_chosen > 1:
-            print '\nOption Error: you can not simultaneously choose two "--include-hits-*" options!'
+            print '\nOption Error: you can not simultaneously choose two "--include-*" options!'
             os._exit(0)
         ex_chosen = int(bool(options.ex_nc_base_priority))+int(bool(options.ex_nc_base))+int(bool(options.ex_fa_base_priority))+int(bool(options.ex_fa_base))
         if ex_chosen > 1:
-            print '\nOption Error: you can not simultaneously choose two "--exclude-hits-*" options!'
+            print '\nOption Error: you can not simultaneously choose two "--exclude-*" options!'
             os._exit(0)
         if in_chosen == 1 and ex_chosen == 1 and priority_chosen == 0:
             print '\nOption Error: since you have include and exclude chosen, one of them should be assigned priority!'
@@ -92,26 +93,7 @@ def require_commands():
         #     options.in_nc_base_priority = './lib/cp.genomes.index'
         #     options.ex_nc_base = './lib/mt.genomes.index'
         # print user's choice
-
-        if options.in_fastg_file:
-            print 'Your command: python '+str(os.path.basename(__file__))+' -g '+options.in_fastg_file,
-        else:
-            print 'Your command: python '+str(os.path.basename(__file__))+' -f '+options.in_fasta_file
-        # if options.out_fastg_file: print ' -o '+options.out_fastg_file,
-        if options.in_nc_base: print ' --include-hits-index '+options.in_nc_base,
-        if options.in_nc_base_priority: print ' --include-hits-index-priority '+options.in_nc_base_priority,
-        if options.in_fa_base: print ' --include-hits-fasta '+options.in_fa_base,
-        if options.in_fa_base_priority: print ' --include-hits-fasta-priority '+options.in_fa_base_priority,
-        if options.ex_nc_base: print ' --exclude-hits-index '+options.ex_nc_base,
-        if options.ex_nc_base_priority: print ' --exclude-hits-index-priority '+options.ex_nc_base_priority,
-        if options.ex_fa_base: print ' --exclude-hits-fasta '+options.ex_fa_base,
-        if options.ex_fa_base_priority: print ' --exclude-hits-fasta-priority '+options.ex_fa_base_priority,
-        if options.depth_threshold: print ' --depth-threshold '+options.depth_threshold,
-        if options.no_csv: print '  --no_hits_labeled_csv',
-        if options.ex_no_hits: print ' --exclude-no-hits',
-        if options.ex_no_connect: print ' --exclude-no-con',
-        if options.keep_temp: print ' --keep_temp',
-        print ''
+        print ' '.join(sys.argv)+'\n'
 
 
 def check_db():
@@ -494,7 +476,7 @@ def remove_temp_files(fastg_file):
 
 def main():
     time0 = time.time()
-    print "\nThis is a script written by JJ dumping mito-contigs with blast\n"
+    print "\nThis is a script for filtering spades assembly_graph.fastg contigs by blast\n"
     require_commands()
     global options
     # prepare fasta file

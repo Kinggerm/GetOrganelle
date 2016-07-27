@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""This script converts gfa (Graphical Fragment Assembly) file into fastg file"""
 import string
 import sys
 import os

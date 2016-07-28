@@ -346,13 +346,13 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
             log.warning("Package psutil is not installed, so that memory usage will not be logged\n"
                         "Don't worry. This will not affect the result.")
     else:
-        this_process = psutil.Process(os.getgid())
+        this_process = psutil.Process(os.getpid())
     try:
         def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count):
             len_aw = len(acc_words)
             len_al = len(acc_contig_id_this_round)
             if this_process:
-                memory_usage = " Mem " + str(round(this_process.memory_info().rss / 1024 / 1024 / 1024, 3))
+                memory_usage = " Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3))
             else:
                 memory_usage = ''
             if fg_out_per_round:
@@ -467,7 +467,6 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                 len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)))
     except RoundLimitException as r_lim:
         log.info("Hit the round limit "+str(r_lim)+" and terminated ...")
-    log.info("Deleting words ...")
     del accepted_words
     return accepted_contig_id
 
@@ -557,7 +556,7 @@ def slim_spades_result(options, log, depth_threshold=0):
 
 
 def require_commands(print_title):
-    usage = "\npython "+str(os.path.basename(__file__)) + \
+    usage = "\n"+str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast -A 500000 -R 20 -k 75,85,95,105"
     parser = OptionParser(usage=usage)
     # group1
@@ -623,8 +622,8 @@ def require_commands(print_title):
                                    help='The maximum potential-organ reads to be pre assembled before extension.'
                                         ' The default is 200000. Choose a larger number (ex. 500000) to run faster'
                                         ' but exhaust memory in the first few minutes, and choose 0 to disable.')
-    group_computational.add_option('--no-out-per-round', dest='fg_out_per_round', action="store_false", default=True,
-                                   help='Disable output per round. Choose to save time but exhaust memory all the whole running time')
+    group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
+                                   help='Enable output per round. Choose to save memory but cost more time per round.')
     group_computational.add_option('--no-remove-dulplicates', dest='rm_duplicates', action="store_false", default=True,
                                    help='By default this script use unique reads to extend. Choose to disable remove duplicates,'
                                         ' which save memory but run more slow. Note that whether choose or not will not disable '
@@ -643,7 +642,8 @@ def require_commands(print_title):
     else:
         if not ((options.seed_dir or options.bowtie2_index) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
             parser.print_help()
-            print '\n######################################\nERROR: Insufficient arguments!\n'
+            print '\n######################################\nERROR: Insufficient arguments!'
+            print usage, '\n'
             exit()
         if options.jump_step < 1:
             print '\n######################################\nERROR: Jump step MUST be an integer that >= 1'
@@ -715,8 +715,8 @@ def main():
     time0 = time.time()
     title = "\nGetOrganelle version 1.9.76 released by Jianjun Jin on July 28 2016." \
             "\n" \
-            "\nThis script get organelle reads from genome skimming data by extending." \
-            "\nSee https://github.com/Kinggerm/GetOrganelle for more informations." \
+            "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
+            "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
     options, log = require_commands(print_title=title)
     try:

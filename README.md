@@ -27,6 +27,8 @@ But, to get a complete organ genome (such as a chloroplast genome) rather than o
 
 <a href='http://bowtie-bio.sourceforge.net/bowtie2/index.shtml'>bowtie2</a>
 
+<a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST</a>
+
 Besides, <a href='https://github.com/rrwick/Bandage'>Bandage</a> is suggested to view the final contig graph (*.fastg).
 
 ==========================================================================

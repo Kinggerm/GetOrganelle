@@ -419,7 +419,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                         del lines_with_duplicates[id_to_accept]
                                     line_to_accept.remove(identical_read_id)
                                     del groups_of_duplicate_lines[which_group]
-                    if identical_read_id % 4321 == 0:
+                    if identical_read_id % 14321 == 0:
                         this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
@@ -447,7 +447,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                 accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                             accepted_contig_id.add(identical_read_id)
                             accepted_contig_id_this_round.add(identical_read_id)
-                    if identical_read_id % 4321 == 0:
+                    if identical_read_id % 14321 == 0:
                         this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
@@ -463,9 +463,9 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
         log.info("")
     except NoMoreReads:
         identical_reads_file.close()
-        log.info("Round " + str(round_count) + ': ' + str(identical_read_id + 1) + '/' + str(len_indices) + " AI " + str(
-                len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)))
+        log.info("No more reads found and terminated ...")
     except RoundLimitException as r_lim:
+        identical_reads_file.close()
         log.info("Hit the round limit "+str(r_lim)+" and terminated ...")
     del accepted_words
     return accepted_contig_id
@@ -490,8 +490,9 @@ def mapping_with_bowtie2(options, log):
     output, err = make_bowtie2.communicate()
     if options.verbose_log:
         log.info("\n"+output.strip())
+    # coverage_statistics = get_coverage(os.path.join(options.output_base, "bowtie.sam"))
     log.info("Mapping finished.")
-    os.remove(os.path.join(options.output_base, "bowtie.sam"))
+    # os.remove(os.path.join(options.output_base, "bowtie.sam"))
     return (os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2))
 
 

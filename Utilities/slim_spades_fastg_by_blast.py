@@ -88,11 +88,6 @@ def require_commands():
             print '\nOption Warning: you can use depth threshold only when you input a fastg file!' \
                   '\nDepth threshold disabled.'
             options.depth_threshold = None
-        # disable the default
-        # if in_chosen+ex_chosen == 0:
-        #     options.in_nc_base_priority = './lib/cp.genomes.index'
-        #     options.ex_nc_base = './lib/mt.genomes.index'
-        # print user's choice
         print ' '.join(sys.argv)+'\n'
 
 
@@ -356,7 +351,7 @@ def filter_fastg_by_depth():
     else:
         in_fasta = options.in_fasta_file
     depth = options.depth_threshold
-    if depth:
+    if depth and float(depth):
         depth = float(depth)
         time0 = time.time()
         fastg_matrix = read_fasta(in_fasta)

@@ -1,5 +1,7 @@
+#!/usr/bin/env python
 # coding: utf8
 import os
+import sys
 import string
 import math
 from optparse import OptionParser
@@ -15,8 +17,8 @@ def require_commands():
     try:
         (options, args) = parser.parse_args()
     except Exception as e:
-        print '\n######################################', e
-        print '\n"-h" for more usage'
+        sys.stdout.write('\n\n######################################'+str(e))
+        sys.stdout.write('\n\n"-h" for more usage')
         os._exit(0)
 
 
@@ -49,9 +51,9 @@ def write_fasta(out_dir, matrix, overwrite):
     if not overwrite:
         while os.path.exists(out_dir):
             out_dir = '.'.join(out_dir.split('.')[:-1])+'_.'+out_dir.split('.')[-1]
-    fasta_file = open(out_dir, 'wb')
+    fasta_file = open(out_dir, 'w')
     if matrix[2]:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
@@ -59,7 +61,7 @@ def write_fasta(out_dir, matrix, overwrite):
                 j += matrix[2]
             fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
     else:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             fasta_file.write(matrix[1][i]+'\n')
     fasta_file.close()
@@ -77,7 +79,7 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
     len_str = len(this_string)
     len_ref = len(this_reference)
     if dynamic_span == 0:
-        difference = sum([not (this_string[i], this_reference[i]) in transfer for i in xrange(min(len_ref, len_str))])+abs(len_ref-len_str)
+        difference = sum([not (this_string[i], this_reference[i]) in transfer for i in range(min(len_ref, len_str))])+abs(len_ref-len_str)
         proper_end = this_string[-1] == this_reference[-1]
         return difference, proper_end
     else:
@@ -85,14 +87,14 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         this_match = int(not (this_string[0], this_reference[0]) in transfer)
         this_matrix = {(0, 0): {'state': this_match}}
         # calculate the first column
-        for i in xrange(1, min(int(math.ceil(dynamic_span))+1, len_str)):
+        for i in range(1, min(int(math.ceil(dynamic_span))+1, len_str)):
             this_matrix[(i, 0)] = {'right_out': this_match+i, 'state': this_match+i}
         # calculate the first line
-        for j in xrange(1, min(int(math.ceil(dynamic_span))+1, len_ref)):
+        for j in range(1, min(int(math.ceil(dynamic_span))+1, len_ref)):
             this_matrix[(0, j)] = {'right_out': this_match+j, 'state': this_match+j}
         # calculate iteratively
         start = 0
-        for i in xrange(1, len_str):
+        for i in range(1, len_str):
             start = max(1, int(i-dynamic_span))
             end = min(len_ref, int(math.ceil(i+dynamic_span)))
             # start: no right_in
@@ -101,7 +103,7 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
                                        'down_out': this_matrix[(i-1, start)]['state'] + 1}
             this_matrix[(i, start)]['state'] = min(this_matrix[(i, start)].values())
             # middle
-            for j in xrange(start+1, end-1):
+            for j in range(start+1, end-1):
                 this_match = not (this_string[i], this_reference[j]) in transfer
                 this_matrix[(i, j)] = {'diagonal_out': this_matrix[(i-1, j-1)]['state'] + this_match,
                                        'down_out': this_matrix[(i-1, j)]['state'] + 1,
@@ -117,11 +119,11 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         difference = this_matrix[(len_str-1, len_ref-1)]['state']
         proper_end = True
         try:
-            for j in xrange(start, len_ref):
+            for j in range(start, len_ref):
                 if this_matrix[(len_str-1, j)]['state'] < difference:
                     proper_end = False
                     break
-            for i in xrange(max(0, len_str-len_ref+start), len_str):
+            for i in range(max(0, len_str-len_ref+start), len_str):
                 if this_matrix[(i, len_ref-1)]['state'] < difference:
                     proper_end = False
                     break
@@ -136,8 +138,8 @@ def check_similarity_and_continuity(string1, string2):
     overlap_len = len(string1)
     # continuity
     k_mer = options.minimum_match
-    words_string1 = set([string1[x:x+k_mer] for x in xrange(overlap_len-k_mer+1)])
-    for i in xrange(overlap_len-k_mer+1):
+    words_string1 = set([string1[x:x+k_mer] for x in range(overlap_len-k_mer+1)])
+    for i in range(overlap_len-k_mer+1):
         if string2[i:i+k_mer] in words_string1:
             return True
     # similarity
@@ -151,8 +153,6 @@ def check_similarity_and_continuity(string1, string2):
 def main():
     require_commands()
     global options
-    if not options.in_fasta_file:
-        options.in_fasta_file = raw_input('Please input fasta file:')
     options.in_fasta_file = options.in_fasta_file.strip().strip('\'')
     fasta_matrix = read_fasta(options.in_fasta_file)
     first_seq = fasta_matrix[1][0]
@@ -162,7 +162,7 @@ def main():
     i = 0
     former_start = 0
     if first_seq[0] == '?' or first_seq[-1] == '?':
-        print 'Error: overlap cannot be in the two ends!'
+        sys.stdout.write('\nError: overlap cannot be in the two ends!')
         os._exit(0)
     while i < len(first_seq):
         if first_seq[i] == '?':
@@ -185,7 +185,7 @@ def main():
                 former_start += this_start - this_overlap_len
                 count_contig += 1
                 i = 0
-                print 'Unrecognized overlap at alignment!'  # ('+str(former_start+1)+'-'+str(former_start+this_overlap_len)+')!'
+                sys.stdout.write('\nUnrecognized overlap at alignment!')  # ('+str(former_start+1)+'-'+str(former_start+this_overlap_len)+')!'
                 pass
         else:
             i += 1

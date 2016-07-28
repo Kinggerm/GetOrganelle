@@ -1,9 +1,15 @@
-# coding: utf8
+#!/usr/bin/env python
+# coding:utf8
 import time
 import os
+import sys
 import platform
-import commands
-import string
+import subprocess
+try:
+    # python2
+    import commands
+except:
+    pass
 from optparse import OptionParser, OptionGroup
 
 
@@ -14,23 +20,41 @@ if 'Win' in platform.architecture()[1]:
     this_dir_split = '\\'
 options = ''
 short_candidates = {}
-translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+try:
+    # python2
+    import string
+    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
+    def complementary_seq(input_seq):
+        return string.translate(input_seq, translator)[::-1]
+except AttributeError:
+    # python3
+    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
-def complementary_seq(input_seq):
-    return string.translate(input_seq, translator)[::-1]
+    def complementary_seq(input_seq):
+        return str.translate(input_seq, translator)[::-1]
 
 
 def require_commands():
     global options
-    blast_in_path = commands.getstatusoutput('blastn')
-    if 'command not found' in blast_in_path[1]:
-        print 'Error: blast not in the path!'
-        os._exit(0)
-    makedb_in_path = commands.getstatusoutput('makeblastdb')
-    if 'command not found' in makedb_in_path[1]:
-        print 'Error: makeblastdb not in the path!'
-        os._exit(0)
+    try:
+        # python3
+        blast_in_path = subprocess.getstatusoutput('blastn')
+    except AttributeError:
+        # python2
+        blast_in_path = commands.getstatusoutput('blastn')
+    if blast_in_path[0] == 32512:
+        sys.stdout.write('\nError: blastn not in the path!')
+        exit()
+    try:
+        # python3
+        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
+    except AttributeError:
+        # python2
+        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
+    if makeblastdb_in_path[0] == 32512:
+        sys.stdout.write('\nError: makeblastdb not in the path!')
+        exit()
     usage = 'python '+str(os.path.basename(__file__))+' -g input.fastg -d refernce.fasta'
     parser = OptionParser(usage=usage)
     parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
@@ -46,9 +70,9 @@ def require_commands():
     try:
         (options, args) = parser.parse_args()
     except Exception as e:
-        print '\n######################################', e
-        print '\n"-h" for more usage'
-        os._exit(0)
+        sys.stdout.write('\n######################################'+str(e))
+        sys.stdout.write('\n"-h" for more usage')
+        exit()
 
 
 def check_db():
@@ -58,22 +82,27 @@ def check_db():
         ref_fasta = read_fasta(options.reference_fa_base)
         if len(ref_fasta[0]) > 1:
             options.reference_fa_base += '.1st.fasta'
-            write_fasta(out_dir=options.reference_fa_base, matrix=[ref_fasta[0][0], ref_fasta[1][0], ref_fasta[2]], overwrite=True)
-            print 'Warning: multi-seqs in reference file, only use the 1st sequence.'
+            write_fasta(out_dir=options.reference_fa_base, matrix=[[ref_fasta[0][0]], [ref_fasta[1][0]], ref_fasta[2]], overwrite=True)
+            sys.stdout.write('\nWarning: multi-seqs in reference file, only use the 1st sequence.')
         elif len(ref_fasta[0]) == 0:
-            print 'Error: illegal reference file!'
-            os._exit(0)
-        makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in '+options.reference_fa_base+' -out '+options.reference_fa_base+'.index')
-        if 'Error' in makedb_result[1] or 'error' in makedb_result[1] or '不是内部或外部命令' in makedb_result[1]:
+            sys.stdout.write('\nError: illegal reference file!')
+            exit()
+        try:
+            # python2
+            makedb_result = subprocess.getstatusoutput('makeblastdb -dbtype nucl -in '+options.reference_fa_base+' -out '+options.reference_fa_base+'.index')
+        except AttributeError:
+            # python3
+            makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in ' + options.reference_fa_base + ' -out ' + options.reference_fa_base + '.index')
+        if 'Error' in str(makedb_result[1]) or 'error' in str(makedb_result[1]) or '不是内部或外部命令' in str(makedb_result[1]):
             os.system('makeblastdb -dbtype nucl -in '+options.reference_fa_base+' -out '+options.reference_fa_base+'.index')
             if not os.path.exists(options.reference_fa_base+'.index.nhr'):
-                print 'Blast terminated with following info:\n'+makedb_result[1]
-                os._exit(0)
+                sys.stdout.write('Blast terminated with following info:\n'+str(makedb_result[1]))
+                exit()
         in_index = options.reference_fa_base+'.index'
-        print 'Making BLAST db cost', time.time()-time0
+        sys.stdout.write('\nMaking BLAST db cost '+str(time.time()-time0))
     else:
-        print 'Error: No reference input!'
-        os._exit(0)
+        sys.stdout.write('\nError: No reference input!')
+        exit()
     return in_index
 
 
@@ -106,9 +135,9 @@ def write_fasta(out_dir, matrix, overwrite):
     if not overwrite:
         while os.path.exists(out_dir):
             out_dir = '.'.join(out_dir.split('.')[:-1])+'_.'+out_dir.split('.')[-1]
-    fasta_file = open(out_dir, 'wb')
+    fasta_file = open(out_dir, 'w')
     if matrix[2]:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
@@ -116,7 +145,7 @@ def write_fasta(out_dir, matrix, overwrite):
                 j += matrix[2]
             fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
     else:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             fasta_file.write(matrix[1][i]+'\n')
     fasta_file.close()
@@ -125,18 +154,22 @@ def write_fasta(out_dir, matrix, overwrite):
 def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     global options
     time0 = time.time()
-    print 'Making BLAST ...'
+    sys.stdout.write('\nMaking BLAST ...')
     fasta_file += '.Temp'
-    blast_result = commands.getstatusoutput(
+    try:
+        blast_result = subprocess.getstatusoutput(
         'blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6')
-    if 'Error' in blast_result[1] or 'error' in blast_result[1] or '不是内部或外部命令' in blast_result[1]:
-        print 'Blast terminated with following info:\n'+blast_result[1]
-        os._exit(0)
+    except AttributeError:
+        blast_result = commands.getstatusoutput(
+            'blastn -num_threads 4 -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6')
+    if 'Error' in str(blast_result[1]) or 'error' in str(blast_result[1]) or '不是内部或外部命令' in str(blast_result[1]):
+        sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]))
+        exit()
     # windows
     if not os.path.exists(out_file):
         os.system('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6')
     time1 = time.time()
-    print 'BLAST to '+index_files.split(this_dir_split)[-1]+' cost', time1-time0
+    sys.stdout.write('\nBLAST to '+index_files.split(this_dir_split)[-1]+' cost '+str(time1-time0))
     # ----------------------------------------
     # find start and end points of query
     # initialize candidates: fastq topologies and sequences
@@ -144,13 +177,13 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     len_fastq = len(query_matrix[0])
     hits_candidates = {}
     short_names = []
-    for i in xrange(len_fastq):
+    for i in range(len_fastq):
         full_name = query_matrix[0][i]
         short_name = '_'.join(full_name.split()[0].split('_')[1:]).split('_length')[0]
         coverage = float(full_name.split('cov_')[1].split(';')[0].split('\'')[0].split(':')[0])
         hits_candidates[short_name] = {False: [], True: [], 'coverage': coverage}
         short_names.append(short_name)
-    for i in xrange(len_fastq):
+    for i in range(len_fastq):
         full_name = query_matrix[0][i]
         short_name = short_names[i]
         connected_edges = []
@@ -172,7 +205,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
         else:
             sequence = query_matrix[1][i]
             len_seq = len(sequence)
-            new_items = {'identity': [0 for j in xrange(len_seq)],
+            new_items = {'identity': [0 for j in range(len_seq)],
                          'start_block': {'q': (len_seq, len_seq), 'r':[]},
                          'end_block': {'q': (0, 0), 'r': []},
                          ('index', True): i,
@@ -193,7 +226,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
                         if hits_candidates[short_name][('seq', direction)][-k_mer:] != hits_candidates[next_edge_info[0]][('seq', next_edge_info[1])][:k_mer]:
                             raise ValueError
                     else:
-                        for k_mer in xrange(127, 19, -2):
+                        for k_mer in range(127, 19, -2):
                             if hits_candidates[short_name][('seq', direction)][-k_mer:] == hits_candidates[next_edge_info[0]][('seq', next_edge_info[1])][:k_mer]:
                                 break
                         else:
@@ -201,7 +234,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     except ValueError:
         k_mer = 0
         pass
-    print 'Detected k-mer:', k_mer
+    sys.stdout.write('\nDetected k-mer:'+str(k_mer))
 
     # calculate edge connections according to hits_candidates and max_gap
     def get_jointed_edges_within_distance(all_infos, this_edge, this_direction, length_left, jointed_edges, k_mer):
@@ -211,7 +244,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
                 try:
                     jointed_edges = get_jointed_edges_within_distance(all_infos, this_next_edge[0], this_direction==this_next_edge[1], this_length_left, jointed_edges, k_mer)
                 except RuntimeError:
-                    print 'Warning: RuntimeError!'
+                    sys.stdout.write('\nWarning: RuntimeError!')
                     pass
             jointed_edges.add(this_next_edge)
         return jointed_edges
@@ -228,7 +261,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
         q_start, q_end = int(line_split[6]), int(line_split[7])
         r_start, r_end = int(line_split[8]), int(line_split[9])
         identity = float(line_split[2])
-        for i in xrange(q_start-1, q_end):
+        for i in range(q_start-1, q_end):
             hits_candidates[query]['identity'][i] = max(identity, hits_candidates[query]['identity'][i])
         if q_start < hits_candidates[query]['start_block']['q'][0]:
             hits_candidates[query]['start_block']['q'] = (q_start, q_end)
@@ -250,7 +283,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
                 hits_candidates[query]['end_block']['r'].append((r_start, r_end))
     blast_out_lines.close()
     time2 = time.time()
-    print 'Parsing BLAST result cost', time2-time1
+    sys.stdout.write('\nParsing BLAST result cost '+str(time2-time1))
     # ------------------------------------
     # map terminal blocks of candidates to reference bases
     # workout points to connect
@@ -281,7 +314,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     # search for new connections
     used_edge_numbers = []
     for crazy_string in list(hits_candidates):
-        for numbers in filter(lambda ch: ch in '0123456789-_', crazy_string).split('_'):
+        for numbers in ''.join(filter(lambda ch: ch in '0123456789-_', crazy_string)).split('_'):
             for num in numbers.split('-'):
                 used_edge_numbers.append(int(num))
     used_edge_numbers.sort()
@@ -350,13 +383,13 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
 
     ref_bases_list = sorted(list(ref_bases_dict))
     len_ref_base = len(ref_bases_list)
-    for i in xrange(len_ref_base):
+    for i in range(len_ref_base):
         candidates = ref_bases_dict[ref_bases_list[i]]
         # the same base
         len_candidates = len(candidates)
         if len_candidates >= 2:
-            for k in xrange(len_candidates):
-                for l in xrange(1, len_candidates):
+            for k in range(len_candidates):
+                for l in range(1, len_candidates):
                     make_connections(candidates[k], ref_bases_list[i], candidates[l], ref_bases_list[i], k_mer)
         # next bases
         for candidate_infos in candidates:
@@ -367,7 +400,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
                     make_connections(candidate_infos, ref_bases_list[i], hit_infos, base, k_mer)
                 i_plus += 1
                 base = ref_bases_list[i_plus%len_ref_base]
-    print 'Redirecting contig path cost', time.time()-time2
+    sys.stdout.write('\nRedirecting contig path cost '+str(time.time()-time2))
     return query_matrix
 
 
@@ -384,7 +417,7 @@ def del_complementary(fastg_file):
         else:
             i += 1
     write_fasta(out_dir=fastg_file + '.Temp', matrix=temp_matrix, overwrite=True)
-    print 'Del complementary cost', time.time()-time0
+    sys.stdout.write('\nDel complementary cost'+str(time.time()-time0))
 
 
 def remove_temp_files(fastg_file):
@@ -406,12 +439,13 @@ def remove_temp_files(fastg_file):
 
 def main():
     time0 = time.time()
-    print "\nThis script would join the spades fastg contigs according to the reference." \
-          "\nIt would add extra gap nodes and/or overlap nodes in between the worth connecting nodes in a fastg file." \
-          "\n" \
-          "\nHowever, this is a BETA version:" \
-          "\nAlthough it will not produce error connections, it usually replicates the same right connection." \
-          "\nDon't be surprised if you find any other bugs.\n"
+    sys.stdout.write(
+        "\nThis script would join the spades fastg contigs according to the reference."
+        "\nIt would add extra gap nodes and/or overlap nodes in between the worth connecting nodes in a fastg file."
+        "\n"
+        "\nHowever, this is a BETA version:"
+        "\nAlthough it will not produce error connections, it usually replicates the same right connection."
+        "\nDon't be surprised if you find any other bugs.\n")
     require_commands()
     global options
     # fastg to fasta
@@ -425,7 +459,7 @@ def main():
     # write out fastg
     write_fasta(out_dir=fasta_file+'.Ncontigs_added.'+fasta_file.split('.')[-1], matrix=new_fasta_matrix, overwrite=False)
     remove_temp_files(fasta_file)
-    print '\nTotal cost:', time.time()-time0
+    sys.stdout.write('\n\nTotal cost: '+str(time.time()-time0)+'\n\n')
 
 
 if __name__ == '__main__':

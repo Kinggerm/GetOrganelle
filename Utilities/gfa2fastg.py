@@ -1,25 +1,33 @@
 #!/usr/bin/env python
 """This script converts a gfa (Graphical Fragment Assembly) file into a fastg file"""
-import string
 import sys
 import os
 
-translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+try:
+    # python2
+    import string
+    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+
+    def complementary_seq(input_seq):
+        return string.translate(input_seq, translator)[::-1]
+except AttributeError:
+    # python3
+    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+
+    def complementary_seq(input_seq):
+        return str.translate(input_seq, translator)[::-1]
+
 direction = {'+': True, '-': False}
-
-
-def complementary_seq(input_seq):
-    return string.translate(input_seq, translator)[::-1]
 
 
 def write_fasta(out_dir, matrix, overwrite):
     if not overwrite:
         while os.path.exists(out_dir):
             out_dir = '.'.join(out_dir.split('.')[:-1])+'_.'+out_dir.split('.')[-1]
-    fasta_file = open(out_dir, 'wb')
+    fasta_file = open(out_dir, 'w')
     # if interleaved
     if matrix[2]:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
@@ -27,7 +35,7 @@ def write_fasta(out_dir, matrix, overwrite):
                 j += matrix[2]
             fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
     else:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             fasta_file.write(matrix[1][i]+'\n')
     fasta_file.close()
@@ -70,7 +78,10 @@ def main():
     if len(sys.argv) > 1:
         gfa_file = sys.argv[1]
     else:
-        gfa_file = raw_input('Please input gfa file:').strip()
+        if type(2/1) == float:
+            gfa_file = input('Please input gfa file:').strip()
+        else:
+            gfa_file = raw_input('Please input gfa file:').strip()
     write_fasta(gfa_file+'.fastg', read_gfa_as_fastg(gfa_file), False)
 
 

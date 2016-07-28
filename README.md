@@ -19,7 +19,7 @@ Many thanks to Chaonan Fu, Dr Wenbin Yu, Hantao Qin and Shuo Wang!
 ==========================================================================
 # Installation
 
-My script was written in python 2.7.11. You could run the single script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
+My script was written in python 3.5.1, but compatible with 2.7.11. You could run the single script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
 
 But, to get a complete organ genome (such as a chloroplast genome) rather than organ reads, other files in GetOrganelle are needed in the original relative path. Also, the following software are suggested to be installed and configured in the path, since they could be called automatically by my script:
 
@@ -43,6 +43,6 @@ Besides, <a href='https://github.com/rrwick/Bandage'>Bandage</a> is suggested to
 ==========================================================================
 # Example
 
-<code>python get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast</code>
+<code>python get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 101 -o chloroplast</code>
 
 <code>python get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast -A 500000 -R 20 -k 75,85,95,105</code>

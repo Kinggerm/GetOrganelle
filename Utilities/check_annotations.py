@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 __author__ = 'Kinggerm'
 
 
@@ -5,17 +6,25 @@ import time
 import string
 import math
 import os
+import sys
 from optparse import OptionParser, OptionGroup
 
 # Local version 3.4
 
 stop_codons = {"TAA", "TAG", "TGA", 'taa', 'tag', 'tga'}
 initiation_codons = {"ATG", 'atg', "GTG", 'gtg', "ATT", 'att', "ATA", 'ata', "TTG", 'ttg', "ATC", 'atc', "CTG", 'ctg'}
-translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+try:
+    # python2
+    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
+    def complementary_seq(input_seq):
+        return string.translate(input_seq, translator)[::-1]
+except AttributeError:
+    # python3
+    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
-def complementary_seq(input_seq):
-    return string.translate(input_seq, translator)[::-1]
+    def complementary_seq(input_seq):
+        return str.translate(input_seq, translator)[::-1]
 
 
 def get_parentheses_pairs(tree_string, sign=('(', ')')):
@@ -117,9 +126,10 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
                     for base in range(region_parts[l][0], region_parts[l][1]+1):
                         annotation_list[base].append(separate_dict)
     if error_in_gb:
-        print 'Unrecognized annotations in '+gb_name+':'
+        sys.stdout.write('\nUnrecognized annotations in '+gb_name+':')
         for error_line in error_in_gb:
-            print error_line
+            sys.stdout.write('\n'+error_line)
+        sys.stdout.write('\n')
     # locate region that occupied by genes
     names = {}
     gene_regions = []
@@ -227,9 +237,9 @@ def write_fasta(out_dir, matrix, overwrite):
     if not overwrite:
         while os.path.exists(out_dir):
             out_dir = '.'.join(out_dir.split('.')[:-1])+'_.'+out_dir.split('.')[-1]
-    fasta_file = open(out_dir, 'wb')
+    fasta_file = open(out_dir, 'w')
     if matrix[2]:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
@@ -237,7 +247,7 @@ def write_fasta(out_dir, matrix, overwrite):
                 j += matrix[2]
             fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
     else:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             fasta_file.write(matrix[1][i]+'\n')
     fasta_file.close()
@@ -271,7 +281,7 @@ def read_gb_as_geneious_format_fasta_matrix(gb_dir):
     for region in annotations['by_unit']:
         #
         if (region[2]['gene'].startswith('trn') or region[2]['gene'].startswith('tRNA')) and len(region[1]) > 1:
-            for i in xrange(len(region[0])):
+            for i in range(len(region[0])):
                 if region[1][i] == 'reverse':
                     seqs.append(complementary_seq(sequence[region[0][i][0]-1:region[0][i][1]]))
                 else:
@@ -279,7 +289,7 @@ def read_gb_as_geneious_format_fasta_matrix(gb_dir):
                 names.append((sample_name+' - '+region[2]['gene']+' exon '+str(i)).replace(' ', '_'))
         else:
             this_seq = ''
-            for i in xrange(len(region[0])):
+            for i in range(len(region[0])):
                 if region[1][i] == 'reverse':
                     this_seq += complementary_seq(sequence[region[0][i][0]-1:region[0][i][1]])
                 else:
@@ -297,7 +307,7 @@ def read_gb_as_geneious_format_fasta_matrix(gb_dir):
 
 def parse_geneious_fasta(fasta_matrix):
     seq_dict = {}
-    for i in xrange(len(fasta_matrix[0])):
+    for i in range(len(fasta_matrix[0])):
         this_annotation = fasta_matrix[0][i].split('_-_')[-1]
         if this_annotation in seq_dict:
             if fasta_matrix[1][i] not in seq_dict[this_annotation]:
@@ -319,7 +329,7 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
     len_str = len(this_string)
     len_ref = len(this_reference)
     if dynamic_span == 0:
-        difference = sum([not (this_string[i], this_reference[i]) in transfer for i in xrange(min(len_ref, len_str))])+abs(len_ref-len_str)
+        difference = sum([not (this_string[i], this_reference[i]) in transfer for i in range(min(len_ref, len_str))])+abs(len_ref-len_str)
         proper_end = this_string[-1] == this_reference[-1]
         return difference, proper_end
     else:
@@ -327,14 +337,14 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         this_match = int(not (this_string[0], this_reference[0]) in transfer)
         this_matrix = {(0, 0): {'state': this_match}}
         # calculate the first column
-        for i in xrange(1, min(int(math.ceil(dynamic_span))+1, len_str)):
+        for i in range(1, min(int(math.ceil(dynamic_span))+1, len_str)):
             this_matrix[(i, 0)] = {'right_out': this_match+i, 'state': this_match+i}
         # calculate the first line
-        for j in xrange(1, min(int(math.ceil(dynamic_span))+1, len_ref)):
+        for j in range(1, min(int(math.ceil(dynamic_span))+1, len_ref)):
             this_matrix[(0, j)] = {'right_out': this_match+j, 'state': this_match+j}
         # calculate iteratively
         start = 0
-        for i in xrange(1, len_str):
+        for i in range(1, len_str):
             start = max(1, int(i-dynamic_span))
             end = min(len_ref, int(math.ceil(i+dynamic_span)))
             # start: no right_in
@@ -343,7 +353,7 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
                                        'down_out': this_matrix[(i-1, start)]['state'] + 1}
             this_matrix[(i, start)]['state'] = min(this_matrix[(i, start)].values())
             # middle
-            for j in xrange(start+1, end-1):
+            for j in range(start+1, end-1):
                 this_match = not (this_string[i], this_reference[j]) in transfer
                 this_matrix[(i, j)] = {'diagonal_out': this_matrix[(i-1, j-1)]['state'] + this_match,
                                        'down_out': this_matrix[(i-1, j)]['state'] + 1,
@@ -358,14 +368,14 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         # print time.time()-time0
         difference = this_matrix[(len_str-1, len_ref-1)]['state']
         proper_end = True
-        for j in xrange(start, len_ref):
+        for j in range(start, len_ref):
             try:
                 if this_matrix[(len_str-1, j)]['state'] < difference:
                     proper_end = False
                     break
             except KeyError:
                 pass
-        for i in xrange(max(0, len_str-len_ref+start), len_str):
+        for i in range(max(0, len_str-len_ref+start), len_str):
             try:
                 if this_matrix[(i, len_ref-1)]['state'] < difference:
                     proper_end = False
@@ -499,7 +509,7 @@ def main():
         try:
             q_matrix = read_fasta(options.query_fasta)
         except:
-            print "Error: No available query found!"
+            sys.stdout.write("Error: No available query found!\n")
             os._exit(0)
     q_dict, q_names = parse_geneious_fasta(q_matrix)
     """read reference"""
@@ -509,7 +519,7 @@ def main():
         try:
             ref_matrix = read_fasta(options.reference_fasta)
         except:
-            print "Error: No available reference found!"
+            sys.stdout.write("Error: No available reference found!")
             os._exit(0)
     ref_dict, ref_names = parse_geneious_fasta(ref_matrix)
     """check query annotations"""
@@ -567,10 +577,10 @@ def main():
     out_log.write(time_tag+'\n')
     for line in [pseudo_block[0]]+sorted(pseudo_block[1:])+[not_in_query[0]]+sorted(not_in_query[1:])\
             +[not_in_refer[0]]+not_in_refer[1:]+[alternations[0]]+alternations[1:]:
-        print line,
+        sys.stdout.write(line)
         out_log.write(line)
-    cost_time = '\nCost: '+str(round(time.time()-time0, 4))+'s\n'
-    print cost_time
+    cost_time = '\n\nCost: '+str(round(time.time()-time0, 4))+'s\n'
+    sys.stdout.write(cost_time)
     out_log.write(cost_time)
     out_log.close()
 

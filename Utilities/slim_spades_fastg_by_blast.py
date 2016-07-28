@@ -3,7 +3,12 @@
 import time
 import os
 import sys
-import commands
+try:
+    # python2
+    import commands
+except:
+    # python3
+    import subprocess
 from optparse import OptionParser, OptionGroup
 import copy
 
@@ -14,14 +19,24 @@ short_candidates = {}
 
 def require_commands():
     global options
-    blast_in_path = commands.getstatusoutput('blastn')
-    if 'command not found' in blast_in_path[1]:
-        print 'Error: blast not in the path!'
-        os._exit(0)
-    makedb_in_path = commands.getstatusoutput('makeblastdb')
-    if 'command not found' in makedb_in_path[1]:
-        print 'Error: makeblastdb not in the path!'
-        os._exit(0)
+    try:
+        # python3
+        blast_in_path = subprocess.getstatusoutput('blastn')
+    except AttributeError:
+        # python2
+        blast_in_path = commands.getstatusoutput('blastn')
+    if blast_in_path[0] == 32512:
+        sys.stdout.write('\nError: blastn not in the path!')
+        exit()
+    try:
+        # python3
+        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
+    except AttributeError:
+        # python2
+        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
+    if makeblastdb_in_path[0] == 32512:
+        sys.stdout.write('\nError: makeblastdb not in the path!')
+        exit()
     usage = 'python '+str(os.path.basename(__file__))
     parser = OptionParser(usage=usage)
     parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
@@ -53,42 +68,42 @@ def require_commands():
     try:
         (options, args) = parser.parse_args()
     except Exception as e:
-        print '\n######################################', e
-        print '\n"-h" for more usage'
-        os._exit(0)
+        sys.stdout.write('\n\n######################################'+str(e))
+        sys.stdout.write('\n\n"-h" for more usage')
+        exit()
     else:
         priority_chosen = int(bool(options.in_nc_base_priority))+int(bool(options.ex_nc_base_priority))+int(bool(options.in_fa_base_priority))+int(bool(options.ex_fa_base_priority))
         if priority_chosen > 1:
-            print '\nLogical Error: only one option with "-priority" allowed!'
-            os._exit(0)
+            sys.stdout.write('\n\nLogical Error: only one option with "-priority" allowed!')
+            exit()
         in_chosen = int(bool(options.in_nc_base_priority))+int(bool(options.in_nc_base))+int(bool(options.in_fa_base_priority))+int(bool(options.in_fa_base))
         if in_chosen > 1:
-            print '\nOption Error: you can not simultaneously choose two "--include-*" options!'
-            os._exit(0)
+            sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--include-*" options!')
+            exit()
         ex_chosen = int(bool(options.ex_nc_base_priority))+int(bool(options.ex_nc_base))+int(bool(options.ex_fa_base_priority))+int(bool(options.ex_fa_base))
         if ex_chosen > 1:
-            print '\nOption Error: you can not simultaneously choose two "--exclude-*" options!'
-            os._exit(0)
+            sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--exclude-*" options!')
+            exit()
         if in_chosen == 1 and ex_chosen == 1 and priority_chosen == 0:
-            print '\nOption Error: since you have include and exclude chosen, one of them should be assigned priority!'
-            os._exit(0)
+            sys.stdout.write('\n\nOption Error: since you have include and exclude chosen, one of them should be assigned priority!')
+            exit()
         if ex_chosen == 1 and in_chosen == 0 and (options.ex_no_hits or options.ex_no_connect):
-            print '\nOption Error: no contigs survive according to you choice!'
-            os._exit(0)
+            sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
+            exit()
         if options.ex_no_hits and options.ex_no_connect:
-            print '\nOption Error: you can not simultaneously choose --exclude-no-hits and --exclude-no-con!'
-            os._exit(0)
+            sys.stdout.write('\n\nOption Error: you can not simultaneously choose --exclude-no-hits and --exclude-no-con!')
+            exit()
         if not options.in_fastg_file and options.ex_no_connect:
-            print '\nOption Error: ex_no_connect is available only when you input a fastg file!'
-            os._exit(0)
+            sys.stdout.write('\n\nOption Error: ex_no_connect is available only when you input a fastg file!')
+            exit()
         if int(bool(options.in_fastg_file))+int(bool(options.in_fasta_file)) != 1:
-            print '\nInput Error: you must choose one input fasta or fastg file!'
-            os._exit(0)
+            sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!')
+            exit()
         if int(bool(options.depth_threshold))+int(bool(options.in_fasta_file)) > 1:
-            print '\nOption Warning: you can use depth threshold only when you input a fastg file!' \
-                  '\nDepth threshold disabled.'
+            sys.stdout.write('\n\nOption Warning: you can use depth threshold only when you input a fastg file!'
+                  '\nDepth threshold disabled.')
             options.depth_threshold = None
-        print ' '.join(sys.argv)+'\n'
+        sys.stdout.write('\n'+' '.join(sys.argv)+'\n')
 
 
 def check_db():
@@ -100,14 +115,17 @@ def check_db():
             fasta_file = options.in_fa_base_priority
         else:
             fasta_file = options.in_fa_base
-        makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in '+fasta_file+' -out '+fasta_file+'.index')
-        if 'Error' in makedb_result[1] or 'error' in makedb_result[1] or '不是内部或外部命令' in makedb_result[1]:
+        try:
+            makedb_result = subprocess.getstatusoutput('makeblastdb -dbtype nucl -in '+fasta_file+' -out '+fasta_file+'.index')
+        except AttributeError:
+            makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in ' + fasta_file + ' -out ' + fasta_file + '.index')
+        if 'Error' in str(makedb_result[1]) or 'error' in str(makedb_result[1]) or '不是内部或外部命令' in str(makedb_result[1]):
             os.system('makeblastdb -dbtype nucl -in '+fasta_file+' -out '+fasta_file+'.index')
             if not os.path.exists(fasta_file+'.index.nhr'):
-                print 'Blast terminated with following info:\n'+makedb_result[1]
-                os._exit(0)
+                sys.stdout.write('\nBlast terminated with following info:\n'+str(makedb_result[1]))
+                exit()
         in_index = fasta_file+'.index'
-        print 'make blast databse cost', time.time()-time0
+        sys.stdout.write('\nmake blast databse cost '+str(time.time()-time0))
     elif options.in_nc_base_priority:
         in_index = options.in_nc_base_priority
     elif options.in_nc_base:
@@ -119,12 +137,15 @@ def check_db():
             fasta_file = options.ex_fa_base_priority
         else:
             fasta_file = options.ex_fa_base
-        makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in '+fasta_file+' -out '+fasta_file+'.index')
-        if 'Error' in makedb_result[1] or 'error' in makedb_result[1]:
-            print 'Blast terminated with following info:\n'+makedb_result[1]
-            os._exit(0)
+        try:
+            makedb_result = subprocess.getstatusoutput('makeblastdb -dbtype nucl -in '+fasta_file+' -out '+fasta_file+'.index')
+        except AttributeError:
+            makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in ' + fasta_file + ' -out ' + fasta_file + '.index')
+        if 'Error' in str(makedb_result[1]) or 'error' in str(makedb_result[1]):
+            sys.stdout.write('\nBlast terminated with following info:\n'+str(makedb_result[1]))
+            exit()
         ex_index = fasta_file+'.index'
-        print 'make blast databse cost', time.time()-time0
+        sys.stdout.write('\nmake blast databse cost '+str(time.time()-time0))
     elif options.ex_nc_base_priority:
         ex_index = options.ex_nc_base_priority
     elif options.ex_nc_base:
@@ -161,9 +182,9 @@ def write_fasta(out_dir, matrix, overwrite):
     if not overwrite:
         while os.path.exists(out_dir):
             out_dir = '.'.join(out_dir.split('.')[:-1])+'_.'+out_dir.split('.')[-1]
-    fasta_file = open(out_dir, 'wb')
+    fasta_file = open(out_dir, 'w')
     if matrix[2]:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
@@ -171,7 +192,7 @@ def write_fasta(out_dir, matrix, overwrite):
                 j += matrix[2]
             fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
     else:
-        for i in xrange(len(matrix[0])):
+        for i in range(len(matrix[0])):
             fasta_file.write('>'+matrix[0][i]+'\n')
             fasta_file.write(matrix[1][i]+'\n')
     fasta_file.close()
@@ -192,28 +213,30 @@ def blast_and_call_names(fasta_file, index_files, out_file):
     global options
     if index_files:
         time0 = time.time()
-        print 'blast ...'
+        sys.stdout.write('\nblast ...')
         if options.in_fastg_file:
             fasta_file += '.Temp'
-        blast_result = commands.getstatusoutput(
-            'blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+        try:
+            blast_result = subprocess.getstatusoutput('blastn -num_threads 4 -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6 -evalue 1e-15')
+        except AttributeError:
+            blast_result = commands.getstatusoutput('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
         # blastn -num_threads 4 -query assembly_graph.fastg -db db_f -out out_f -outfmt 6
-        if 'Error' in blast_result[1] or 'error' in blast_result[1] or '不是内部或外部命令' in blast_result[1]:
+        if 'Error' in str(blast_result[1]) or 'error' in str(blast_result[1]) or '不是内部或外部命令' in str(blast_result[1]):
             os.system('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
             if not os.path.exists(out_file):
-                print 'Blast terminated with following info:\n'+blast_result[1]
-                os._exit(0)
+                sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]))
+                exit()
         # windows
         if not os.path.exists(out_file):
             os.system('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
         time1 = time.time()
-        print 'blast to '+os.path.split(index_files)[-1]+' cost', time1-time0
+        sys.stdout.write('\nblast to '+os.path.split(index_files)[-1]+' cost '+str(time1-time0))
         names = {}
         try:
             blast_out_lines = open(out_file, 'rU')
         except IOError:
-            print 'Blast was not properly installed or configurated.'
-            os._exit(0)
+            sys.stdout.write('\nBlast was not properly installed or configurated.')
+            exit()
         for line in blast_out_lines:
             line_split = line.split('\t')
             if options.in_fastg_file:
@@ -242,7 +265,7 @@ def blast_and_call_names(fasta_file, index_files, out_file):
             else:
                 names[query] = {}
                 names[query][template] = [(q_min, q_max)]
-        print 'parse blast result cost', time.time()-time1
+        sys.stdout.write('\nparse blast result cost'+str(time.time()-time1))
         return names
     else:
         return {}
@@ -340,7 +363,7 @@ def map_names(come_include, come_exclude, candidates):
                     accepted.add(name)
     else:
         accepted = set(candidates)
-    print 'map names cost', time.time()-time0
+    sys.stdout.write('\nmap names cost '+str(time.time()-time0))
     return accepted
 
 
@@ -356,13 +379,13 @@ def filter_fastg_by_depth():
         time0 = time.time()
         fastg_matrix = read_fasta(in_fasta)
         new_fastg_matrix = [[], [], fastg_matrix[2]]
-        for i in xrange(len(fastg_matrix[0])):
+        for i in range(len(fastg_matrix[0])):
             if float(fastg_matrix[0][i].split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0]) >= depth:
                 new_fastg_matrix[0].append(fastg_matrix[0][i])
                 new_fastg_matrix[1].append(fastg_matrix[1][i])
         out_fasta = ''.join(in_fasta.split('.')[:-1]) + '.depth' + str(depth) + '.' + in_fasta.split('.')[-1]
         write_fasta(out_dir=out_fasta, matrix=new_fastg_matrix, overwrite=True)
-        print 'filter by depth cost', time.time()-time0
+        sys.stdout.write('\nfilter by depth cost '+str(time.time()-time0))
         return out_fasta
     else:
         return in_fasta
@@ -381,7 +404,7 @@ def del_complementary(fastg_file):
             else:
                 i += 1
         write_fasta(out_dir=fastg_file + '.Temp', matrix=temp_matrix, overwrite=True)
-        print 'del complementary cost', time.time()-time0
+        sys.stdout.write('\ndel complementary cost '+str(time.time()-time0))
 
 
 def write_hits_csv_for_bandage(in_names, include_file, ex_names, exclude_file, out_file, overwrite):
@@ -450,8 +473,8 @@ def write_hits_csv_for_bandage(in_names, include_file, ex_names, exclude_file, o
             this_string += '\t'+'>>'.join([x[2]+'('+str(x[0])+'-'+str(x[1])+','+x[3]+')' for x in loci])+postfix
             this_string += '\n'
             out_lines.append(this_string)
-        open(out_file, 'wb').writelines(out_lines)
-        print 'create csv cost', time.time()-time0
+        open(out_file, 'w').writelines(out_lines)
+        sys.stdout.write('\ncreate csv cost '+str(time.time()-time0))
 
 
 def remove_temp_files(fastg_file):
@@ -471,7 +494,7 @@ def remove_temp_files(fastg_file):
 
 def main():
     time0 = time.time()
-    print "\nThis is a script for filtering spades assembly_graph.fastg contigs by blast\n"
+    sys.stdout.write("\nThis is a script for filtering spades assembly_graph.fastg contigs by blast\n")
     require_commands()
     global options
     # prepare fasta file
@@ -491,7 +514,7 @@ def main():
     # write out hits csv according to blast
     write_hits_csv_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names, exclude_file=exclude_index, out_file=fasta_file+'.'+in_ex_info+'.', overwrite=False)
     remove_temp_files(fasta_file)
-    print 'Total cost:', time.time()-time0
+    sys.stdout.write('\nTotal cost: '+str(time.time()-time0)+'\n\n')
 
 if __name__ == '__main__':
     main()

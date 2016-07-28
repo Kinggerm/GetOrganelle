@@ -1,3 +1,6 @@
+import sys
+
+
 def read_fasta(fasta_dir):
     fasta_file = open(fasta_dir, 'rU')
     names = []
@@ -17,9 +20,9 @@ def read_fasta(fasta_dir):
     fasta_file.close()
     return [names, seqs]
     
-in_fasta = raw_input('fasta:').strip()
+in_fasta = input('fasta:').strip()
 f_matrix = read_fasta(in_fasta)
-for i in xrange(len(f_matrix[0])):
+for i in range(len(f_matrix[0])):
     f_matrix[0][i] = 'noncoding '+f_matrix[0][i]
 i = 0
 del_count = 0
@@ -32,8 +35,8 @@ while i < len(f_matrix[0]):
     else:
         seq_sets.add(f_matrix[1][i])
         i += 1
-print 'delete', del_count
-out_fasta = open(in_fasta+'.new.fasta', 'wb')
-for i in xrange(len(f_matrix[0])):
+sys.stdout.write('delete '+str(del_count)+'\n')
+out_fasta = open(in_fasta+'.new.fasta', 'w')
+for i in range(len(f_matrix[0])):
     out_fasta.write('>'+f_matrix[0][i]+'\n'+f_matrix[1][i]+'\n')
 out_fasta.close()

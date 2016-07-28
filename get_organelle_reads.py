@@ -2,19 +2,29 @@
 import time, datetime
 import sys
 import os
-import string
-import commands, subprocess
+import subprocess
+try:
+    import commands
+except:
+    pass
 import logging
 from optparse import OptionParser, OptionGroup
 
-
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 word_size = int
-translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+try:
+    # python2
+    import string
+    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
+    def complementary_seq(input_seq):
+        return string.translate(input_seq, translator)[::-1]
+except AttributeError:
+    # python3
+    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
-def complementary_seq(input_seq):
-    return string.translate(input_seq, translator)[::-1]
+    def complementary_seq(input_seq):
+        return str.translate(input_seq, translator)[::-1]
 
 
 def chop_seqs(seq_generator_or_list):
@@ -23,7 +33,7 @@ def chop_seqs(seq_generator_or_list):
         this_seq_len = len(seed)
         if this_seq_len >= word_size:
             cpt_seed = complementary_seq(seed)
-            for i in xrange(0, this_seq_len-word_size+1):
+            for i in range(0, this_seq_len-word_size+1):
                 forward = seed[i:i+word_size]
                 return_words.add(forward)
                 reverse = cpt_seed[i:i+word_size]
@@ -98,7 +108,7 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file
     if verbose:
         log.info("writing fastq lines ...")
     post_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
-    file_out = [open(out_file_name+'_1.fq', 'wb'), open(out_file_name+'_2.fq', 'wb')]
+    file_out = [open(out_file_name+'_1.fq', 'w'), open(out_file_name+'_2.fq', 'w')]
     line_count = 0
     for i in range(2):
         line = post_reading[i].readline()
@@ -136,7 +146,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     name_to_line = {}
     #
     temp1_contig_dir = os.path.join(output_base, 'temp.indices.1')
-    temp1_contig_out = open(temp1_contig_dir, 'wb')
+    temp1_contig_out = open(temp1_contig_dir, 'w')
     for file_in in pre_reading:
         line = file_in.readline()
         while line:
@@ -180,8 +190,9 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             else:
                 log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
                 exit()
+                exit()
             if line_count % 54321 == 0:
-                to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)/4)+" reads"
+                to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
                 sys.stdout.write(to_print+'\b'*len(to_print))
                 sys.stdout.flush()
             line_count += 1
@@ -195,8 +206,8 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     # dump line clusters
     len_indices = len(line_clusters)
     temp2_clusters_dir = os.path.join(output_base, 'temp.indices.2')
-    temp2_indices_file_out = open(temp2_clusters_dir, 'wb')
-    for this_index in xrange(len_indices):
+    temp2_indices_file_out = open(temp2_clusters_dir, 'w')
+    for this_index in range(len_indices):
         temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
         temp2_indices_file_out.write('\n')
     temp2_indices_file_out.close()
@@ -205,8 +216,8 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
         # dump pair_to_each_other to file to save memory
         # read in again in the last
         temp3_pair_dir = os.path.join(output_base, 'temp.indices.3')
-        temp3_pair_file_out = open(temp3_pair_dir, 'wb')
-        for line_count_2 in xrange(0, line_count, 4):
+        temp3_pair_file_out = open(temp3_pair_dir, 'w')
+        for line_count_2 in range(0, line_count, 4):
             temp3_pair_file_out.write(str(pair_to_each_other[line_count_2])+'\n')
         temp3_pair_file_out.close()
         del pair_to_each_other
@@ -214,7 +225,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     del seq_duplicates
     del pre_reading
     len_before_assembly = len(line_clusters)
-    log.info(str(len_before_assembly)+" unique in all "+str(line_count/4)+" reads")
+    log.info(str(len_before_assembly)+" unique in all "+str(line_count//4)+" reads")
 
     return line_clusters, contig_seqs, contig_c_seqs
 
@@ -224,7 +235,7 @@ def pseudo_assembly(line_clusters, dupli_threshold, contig_seqs, contig_c_seqs, 
     log.info("Pseudo-assembly reads...")
     lines_with_duplicates = {}
     count_dupli = 0
-    for j in xrange(len(line_clusters)):
+    for j in range(len(line_clusters)):
         if len(line_clusters[j]) >= 2:
             if count_dupli < dupli_threshold:
                 lines_with_duplicates[j] = int
@@ -234,7 +245,7 @@ def pseudo_assembly(line_clusters, dupli_threshold, contig_seqs, contig_c_seqs, 
     log.info(str(len(lines_with_duplicates))+"/"+str(count_dupli)+" used/duplicated")
     these_words = {}
     list_to_pre_assemble = list(lines_with_duplicates)
-    for list_id in xrange(len(list_to_pre_assemble)):
+    for list_id in range(len(list_to_pre_assemble)):
         this_identical_read_id = list_to_pre_assemble[list_id]
         this_seq = contig_seqs[this_identical_read_id]
         this_c_seq = contig_c_seqs[this_identical_read_id]
@@ -242,7 +253,7 @@ def pseudo_assembly(line_clusters, dupli_threshold, contig_seqs, contig_c_seqs, 
         temp_length = seq_len - word_size
         these_group_id = set()
         this_words = []
-        for i in xrange(0, temp_length+1):
+        for i in range(0, temp_length+1):
             forward = this_seq[i:i+word_size]
             reverse = this_c_seq[temp_length-i:seq_len-i]
             if forward in these_words:
@@ -273,7 +284,7 @@ def pseudo_assembly(line_clusters, dupli_threshold, contig_seqs, contig_c_seqs, 
             these_group_id.sort()
             this_group_to_keep = these_group_id[0]
             # for related group to merge
-            for to_merge in xrange(1, len_groups):
+            for to_merge in range(1, len_groups):
                 this_group_to_merge = these_group_id[to_merge]
                 lines_to_merge, words_to_merge = groups_of_duplicate_lines[this_group_to_merge]
                 for line_to_merge in lines_to_merge:
@@ -327,7 +338,7 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pre_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, verbose, log):
+def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, verbose, log):
     global word_size
     accepted_contig_id = set()
     accepted_contig_id_this_round = set()
@@ -376,8 +387,8 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
             if verbose:
                 log.info("Round "+str(round_count)+": Start ...")
             identical_reads_file = open(os.path.join(output_base, 'temp.indices.1'), 'rU')
-            if pre_assembled and groups_of_duplicate_lines:
-                for identical_read_id in xrange(len_indices):
+            if pseudo_assembled and groups_of_duplicate_lines:
+                for identical_read_id in range(len_indices):
                     this_seq = identical_reads_file.readline().strip()
                     this_c_seq = identical_reads_file.readline().strip()
                     if identical_read_id not in accepted_contig_id:
@@ -388,14 +399,14 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                             accepted_contig_id.add(identical_read_id)
                             accepted_contig_id_this_round.add(identical_read_id)
                             line_to_accept.remove(identical_read_id)
-                            for i in xrange(0, temp_length+1):
+                            for i in range(0, temp_length+1):
                                 # add forward
                                 accepted_words.add(this_seq[i:i + word_size])
                                 # add reverse
                                 accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                         else:
                             accepted = False
-                            for i in xrange(0, (temp_length+1)/2, jump_step):
+                            for i in range(0, (temp_length+1)//2, jump_step):
                                 # from first kmer
                                 if this_seq[i:i + word_size] in accepted_words:
                                     accepted = True
@@ -405,7 +416,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                     accepted = True
                                     break
                             if accepted:
-                                for i in xrange(0, temp_length + 1):
+                                for i in range(0, temp_length + 1):
                                     # add forward
                                     accepted_words.add(this_seq[i:i + word_size])
                                     # add reverse
@@ -425,14 +436,14 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                         sys.stdout.flush()
                 accepted_words, accepted_contig_id_this_round, previous_aw, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw, round_count)
             else:
-                for identical_read_id in xrange(len_indices):
+                for identical_read_id in range(len_indices):
                     this_seq = identical_reads_file.readline().strip()
                     this_c_seq = identical_reads_file.readline().strip()
                     if identical_read_id not in accepted_contig_id:
                         accepted = False
                         seq_len = len(this_seq)
                         temp_length = seq_len - word_size
-                        for i in xrange(0, (temp_length + 1) / 2, jump_step):
+                        for i in range(0, (temp_length + 1) // 2, jump_step):
                             # from first kmer
                             if this_seq[i:i + word_size] in accepted_words:
                                 accepted = True
@@ -442,7 +453,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                 accepted = True
                                 break
                         if accepted:
-                            for i in xrange(0, temp_length + 1):
+                            for i in range(0, temp_length + 1):
                                 accepted_words.add(this_seq[i:i + word_size])
                                 accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                             accepted_contig_id.add(identical_read_id)
@@ -476,12 +487,12 @@ def mapping_with_bowtie2(options, log):
         log.info("Making bowtie2 index ...")
         build_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_dir+" "+options.seed_dir+'.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = build_index.communicate()
-        if "unrecognized option" in output:
+        if "unrecognized option" in str(output):
             build_index = subprocess.Popen("bowtie2-build " + options.seed_dir + " " + options.seed_dir + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_index.communicate()
         index_base = options.seed_dir+'.index'
         if options.verbose_log:
-            log.info("\n"+output.strip())
+            log.info("\n"+str(output).strip())
         log.info("Making bowtie2 index finished.")
     else:
         index_base = options.bowtie2_index
@@ -489,7 +500,7 @@ def mapping_with_bowtie2(options, log):
     make_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local --al-conc "+os.path.join(options.output_base, "%.initial.mapped.fq")+" -q -x "+index_base+" -1 "+options.fastq_file_1+" -2 "+options.fastq_file_2+" -S "+os.path.join(options.output_base, "bowtie.sam")+" --no-unal -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = make_bowtie2.communicate()
     if options.verbose_log:
-        log.info("\n"+output.strip())
+        log.info("\n"+str(output).strip())
     # coverage_statistics = get_coverage(os.path.join(options.output_base, "bowtie.sam"))
     log.info("Mapping finished.")
     # os.remove(os.path.join(options.output_base, "bowtie.sam"))
@@ -509,15 +520,15 @@ def assembly_with_spades(options, log):
     spades_command = ' '.join(['spades.py', parameters, '-1', os.path.join(options.output_base, "filtered_1.fq"), '-2', os.path.join(options.output_base, "filtered_2.fq"), kmer, spades_out_put]).strip()
     spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
-    if "not recognized" in output:
+    if "not recognized" in str(output):
         if options.verbose_log:
             log.warning('Problem with running SPAdes:')
-            log.warning(output)
+            log.warning(str(output))
         log.warning("WAINING in SPAdes: unrecognized option in "+options.other_spades_options)
         log.warning('Assembling failed.')
     else:
         if options.verbose_log:
-            log.info(output)
+            log.info(str(output))
         log.info('Assembling finished.\n')
 
 
@@ -545,14 +556,14 @@ def slim_spades_result(options, log, depth_threshold=0):
         run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
         slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = slim_spades.communicate()
-        if "not recognized" in output:
+        if "not recognized" in str(output):
             if options.verbose_log:
                 log.warning('Problem with slim_spades_fastg_by_blast:')
-                log.warning(output)
+                log.warning(str(output))
             log.warning('Processing assembly result failed.')
         else:
             if options.verbose_log:
-                log.info(output)
+                log.info(str(output))
             log.info('Processing assembly result finished!')
 
 
@@ -619,16 +630,19 @@ def require_commands(print_title):
     # group3
     group_computational = OptionGroup(parser, "ADDITIONAI OPTIONS", "These options will NOT affect the final results."
                                                                     " Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-A', dest='pre_assembled', type=int, default=200000,
-                                   help='The maximum potential-organ reads to be pre assembled before extension.'
-                                        ' The default is 200000. Choose a larger number (ex. 500000) to run faster'
-                                        ' but exhaust memory in the first few minutes, and choose 0 to disable.')
+    group_computational.add_option('-A', dest='pseudo_assembled', type=int, default=200000,
+                                   help='The maximum potential-organ reads to be pseudo-assembled before extension.'
+                                        ' The default value is 200000.'
+                                        ' For personal computer with 8G memory, we suggest no more than 300000.'
+                                        ' A larger number (ex. 600000) would run faster but exhaust memory'
+                                        ' in the first few minutes. Choose 0 to disable this process.')
     group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
                                    help='Enable output per round. Choose to save memory but cost more time per round.')
     group_computational.add_option('--no-remove-dulplicates', dest='rm_duplicates', action="store_false", default=True,
-                                   help='By default this script use unique reads to extend. Choose to disable remove duplicates,'
-                                        ' which save memory but run more slow. Note that whether choose or not will not disable '
-                                        'the calling of replicate reads.')
+                                   help='By default this script use unique reads to extend. Choose to disable'
+                                        ' removing duplicates, which save memory but run more slow.'
+                                        ' Note that whether choose or not will not disable'
+                                        ' the calling of replicate reads.')
     group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
                                    help='Verbose output. Choose to enable verbose running log.')
     parser.add_option_group(group_need)
@@ -637,17 +651,19 @@ def require_commands(print_title):
     try:
         (options, args) = parser.parse_args()
     except Exception as e:
-        print '\n######################################', e
-        print '\n"-h" for more usage'
+        sys.stdout.write('\n############################################################################'+str(e))
+        sys.stdout.write('\n"-h" for more usage')
         exit()
     else:
         if not ((options.seed_dir or options.bowtie2_index) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
             parser.print_help()
-            print '\n######################################\nERROR: Insufficient arguments!'
-            print usage, '\n'
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: Insufficient arguments!\nUsage:')
+            sys.stdout.write(usage+'\n\n')
             exit()
         if options.jump_step < 1:
-            print '\n######################################\nERROR: Jump step MUST be an integer that >= 1'
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: Jump step MUST be an integer that >= 1')
             exit()
         if not os.path.isdir(options.output_base):
             os.mkdir(options.output_base)
@@ -661,7 +677,12 @@ def require_commands(print_title):
         if options.bowtie2_index:
             options.utilize_mapping = True
         if options.utilize_mapping:
-            bowtie2_in_path = commands.getstatusoutput('bowtie2')
+            try:
+                # python3
+                bowtie2_in_path = subprocess.getstatusoutput('bowtie2')
+            except:
+                # python2
+                bowtie2_in_path = commands.getstatusoutput('bowtie2')
             if bowtie2_in_path[0] == 32512:
                 options.utilize_mapping = False
                 if options.seed_dir:
@@ -670,12 +691,17 @@ def require_commands(print_title):
                     log.error('bowtie2 not in the path!')
                     exit()
         if options.run_spades:
-            spades_in_path = commands.getstatusoutput('spades.py -h')
+            try:
+                # python3
+                spades_in_path = subprocess.getstatusoutput('spades.py -h')
+            except:
+                # python2
+                spades_in_path = commands.getstatusoutput('spades.py -h')
             if spades_in_path[0] == 32512:
                 options.run_spades = False
-        if not options.rm_duplicates and options.pre_assembled:
+        if not options.rm_duplicates and options.pseudo_assembled:
             log.warning("remove duplicates was inactive, so that the pseudo-assembly was disabled.")
-            options.pre_assembled = False
+            options.pseudo_assembled = False
         if options.round_limit and options.round_limit <= 2:
             log.warning("illegal limit for rounds! Been set to default: unlimited.")
         return options, log
@@ -743,8 +769,8 @@ def main():
 
         """pseudo-assembly if asked"""
         # pseudo_assembly is suggested when the whole genome coverage is shallow but the organ genome coverage is deep
-        if options.pre_assembled:
-            groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(line_clusters, options.pre_assembled, contig_seqs, contig_c_seqs, log)
+        if options.pseudo_assembled:
+            groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(line_clusters, options.pseudo_assembled, contig_seqs, contig_c_seqs, log)
         else:
             groups_of_duplicate_lines = None
             lines_with_duplicates = None
@@ -753,7 +779,7 @@ def main():
         """extending process"""
         log.info("Extending ...")
         accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round,
-                                             options.pre_assembled, groups_of_duplicate_lines, lines_with_duplicates,
+                                             options.pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates,
                                              options.round_limit, options.output_base, options.jump_step, options.verbose_log, log)
         write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
                          os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),

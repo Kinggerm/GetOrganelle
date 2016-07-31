@@ -533,6 +533,24 @@ def assembly_with_spades(options, log):
 
 
 def slim_spades_result(options, log, depth_threshold=0):
+    try:
+        # python3
+        blast_in_path = subprocess.getstatusoutput('blastn')
+    except AttributeError:
+        # python2
+        blast_in_path = commands.getstatusoutput('blastn')
+    if blast_in_path[0] == 32512:
+        log.warning('blastn not in the path!\nSkip slimming assembly result ...')
+        return
+    try:
+        # python3
+        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
+    except AttributeError:
+        # python2
+        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
+    if makeblastdb_in_path[0] == 32512:
+        log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
+        return
     scheme_tranlation = {'1': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-no-con',
                          '2': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-no-con',
                          '3': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr') + ' --exclude-no-con',
@@ -590,7 +608,7 @@ def require_commands(print_title):
     group_result.add_option('-R', dest='round_limit', type=int,
                             help='Limit running rounds (>=2).')
     group_result.add_option('-J', dest='jump_step', type=int, default=1,
-                            help='The wide of steps of kmer in reads during extension (integer >= 1).'
+                            help='The wide of steps of word in reads during extension (integer >= 1).'
                                  'The larger the number is, the faster the extension will be, '
                                  'the more risk of missing reads in low coverage area.'
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')

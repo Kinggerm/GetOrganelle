@@ -7,12 +7,12 @@ sys.stdout.write("\nThis is a script for making batch file for "
                  "iteratively mapping with bowtie2 and assemblying with SPAdes.\n\n")
 
 usage = "\n" + str(os.path.basename(__file__)) + \
-        " -1 original_1.fq -2 original_2.fq -s seed.fasta -R 5 -k 65,75,85"
+        " -1 original_1.fq -2 original_2.fq -s seed.fasta -R 5 -k 65,75,85 -o output_base"
 parser = Option(usage=usage)
 parser.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
 parser.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
 parser.add_option('-s', dest='seed_dir', help='Input fasta format file as initial seed')
-parser.add_option('-R', dest='rounds', default=3,
+parser.add_option('-R', dest='rounds', default=3, type=int,
                   help='How many iterations would you like to have? Default=3')
 parser.add_option('-k', dest='spades_kmer', default='65,75,85',
                   help='SPAdes k-mer settings. Use the same format as in SPAdes. Default=65,75,85')

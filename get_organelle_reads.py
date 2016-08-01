@@ -508,7 +508,7 @@ def mapping_with_bowtie2(options, log):
 
 
 def assembly_with_spades(options, log):
-    parameters = options.other_spades_options
+    parameters = options.other_spades_options.strip('"')
     if '-k' in parameters:
         kmer = ''
     else:
@@ -720,8 +720,9 @@ def require_commands(print_title):
         if not options.rm_duplicates and options.pseudo_assembled:
             log.warning("remove duplicates was inactive, so that the pseudo-assembly was disabled.")
             options.pseudo_assembled = False
-        if options.round_limit and options.round_limit <= 2:
+        if options.round_limit and options.round_limit < 2:
             log.warning("illegal limit for rounds! Been set to default: unlimited.")
+            options.round_limit = None
         return options, log
 
 

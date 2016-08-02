@@ -48,10 +48,10 @@ def require_commands():
                       help='Input a float or integer number. filter fastg file by depth. Default: no threshold.')
     parser.add_option('--include-index', dest='in_nc_base',
                       help='followed by Blast index format')
-    parser.add_option('--include-index-priority', dest='in_nc_base_priority', default=os.path.join(path_of_this_script.split()[0], 'Library', 'Reference', 'cp'),
-                      help='followed by Blast index format. Default='+str(os.path.join(path_of_this_script.split()[0], 'Library', 'Reference', 'cp')))
-    parser.add_option('--exclude-index', dest='ex_nc_base', default=os.path.join(path_of_this_script.split()[0], 'Library', 'Reference', 'mt'),
-                      help='followed by Blast index format. Default='+str(os.path.join(path_of_this_script.split()[0], 'Library', 'Reference', 'mt')))
+    parser.add_option('--include-index-priority', dest='in_nc_base_priority', default=os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp'),
+                      help='followed by Blast index format. Default='+str(os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')))
+    parser.add_option('--exclude-index', dest='ex_nc_base', default=os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt'),
+                      help='followed by Blast index format. Default='+str(os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')))
     parser.add_option('--exclude-index-priority', dest='ex_nc_base_priority',
                       help='followed by Blast index format')
     parser.add_option('--include-fasta', dest='in_fa_base',

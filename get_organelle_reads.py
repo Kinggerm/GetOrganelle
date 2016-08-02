@@ -174,7 +174,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                                     name_to_line[this_name] = line_count
                                 if this_name in anti_lines:
                                     line_count += 4
-                                    for i in range(3):
+                                    for i in range(4):
                                         line = file_in.readline()
                                     continue
                             except KeyError:

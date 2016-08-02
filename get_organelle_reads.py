@@ -677,7 +677,7 @@ def mapping_with_bowtie2(options, log):
         if options.verbose_log:
             log.info("\n" + str(output).strip())
         log.info("Parsing bowtie2 result ...")
-        anti_lines = get_anti_lines_from_sam(os.path.join(options.output_base, "anti_seed_bowtie.sam"))
+        anti_lines = get_anti_lines_from_sam(os.path.join(options.output_base, "anti_seed_bowtie.sam"), options.pair_end_out)
         log.info("Parsing bowtie2 result finished ...")
     else:
         anti_lines = set()
@@ -767,7 +767,7 @@ def slim_spades_result(options, log, depth_threshold=0):
 def require_commands(print_title):
     usage = "\n"+str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast " \
-            "[-P 500000 -R 20 -k 75,85,95,105 -J 2]"
+            "[-a mitochondria.fasta -P 500000 -R 20 -k 75,85,95,105 -J 2]"
     parser = OptionParser(usage=usage)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")

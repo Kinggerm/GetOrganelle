@@ -149,7 +149,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     temp1_contig_out = open(temp1_contig_dir, 'w')
     for file_in in pre_reading:
         line = file_in.readline()
-        if options.anti_bowtie2_seed or options.anti_seed:
+        if options.bowtie2_anti_seed or options.anti_seed:
             while line:
                 if line.startswith("@"):
                     try:
@@ -588,7 +588,7 @@ def get_anti_lines_via_built_in_mapping(anti_words, options, log):
 
     for file_in in pre_reading:
         line = file_in.readline()
-        if options.anti_bowtie2_seed or options.anti_seed:
+        if options.bowtie2_anti_seed or options.anti_seed:
             while line:
                 if line.startswith("@"):
                     this_head = line[1:].strip()
@@ -657,7 +657,7 @@ def mapping_with_bowtie2(options, log):
     if options.verbose_log:
         log.info("\n"+str(output).strip())
     # coverage_statistics = get_coverage(os.path.join(options.output_base, "bowtie.sam"))
-    if options.anti_seed or options.anti_bowtie2_seed:
+    if options.anti_seed or options.bowtie2_anti_seed:
         if options.anti_seed:
             log.info("Making anti-seed bowtie2 index ...")
             build_anti_index = subprocess.Popen("bowtie2-build --large-index " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -670,7 +670,7 @@ def mapping_with_bowtie2(options, log):
                 log.info("\n" + str(output).strip())
             log.info("Making anti-seed bowtie2 index finished.")
         else:
-            anti_index_base = options.anti_bowtie2_seed
+            anti_index_base = options.bowtie2_anti_seed
         log.info("Mapping reads to anti-seed bowtie2 index ...")
         make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -q -x " + anti_index_base + " -1 " + options.fastq_file_1 + " -2 " + options.fastq_file_2 + " -S " + os.path.join(options.output_base, "anti_seed_bowtie.sam") + " --no-unal --no-hd --no-sq -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_anti_seed_bowtie2.communicate()
@@ -681,7 +681,7 @@ def mapping_with_bowtie2(options, log):
         log.info("Parsing bowtie2 result finished ...")
     else:
         anti_lines = set()
-    log.info("Mapping finished.")
+    # log.info("Mapping finished.")
     # os.remove(os.path.join(options.output_base, "*bowtie.sam"))
     return [os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2)]+[anti_lines]
 

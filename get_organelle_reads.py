@@ -639,43 +639,56 @@ def get_anti_lines_from_sam(bowtie_sam_file, pair_end_out):
 
 def mapping_with_bowtie2(options, log):
     if options.seed_file:
-        log.info("Making seed bowtie2 index ...")
-        build_seed_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_file+" "+options.seed_file+'.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = build_seed_index.communicate()
-        if "unrecognized option" in str(output):
-            build_seed_index = subprocess.Popen("bowtie2-build " + options.seed_file + " " + options.seed_file + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        if os.path.exists(options.seed_file+'.index.1.bt2l'):
+            log.info("seed bowtie2 index exist!")
+        else:
+            log.info("Making seed bowtie2 index ...")
+            build_seed_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_file+" "+options.seed_file+'.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
-        seed_index_base = options.seed_file+'.index'
-        if options.verbose_log:
-            log.info("\n"+str(output).strip())
-        log.info("Making seed bowtie2 index finished.")
+            if "unrecognized option" in str(output):
+                build_seed_index = subprocess.Popen("bowtie2-build " + options.seed_file + " " + options.seed_file + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                output, err = build_seed_index.communicate()
+            if options.verbose_log:
+                log.info("\n"+str(output).strip())
+            log.info("Making seed bowtie2 index finished.")
+        seed_index_base = options.seed_file + '.index'
     else:
         seed_index_base = options.bowtie2_seed
-    log.info("Mapping reads to seed bowtie2 index ...")
-    make_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local --al-conc "+os.path.join(options.output_base, "%.initial.mapped.fq")+" -q -x "+seed_index_base+" -1 "+options.fastq_file_1+" -2 "+options.fastq_file_2+" -S "+os.path.join(options.output_base, "seed_bowtie.sam")+" --no-unal -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    output, err = make_seed_bowtie2.communicate()
-    if options.verbose_log:
-        log.info("\n"+str(output).strip())
+    if options.script_resume and os.path.exists(os.path.join(options.output_base, "1.initial.mapped.fq")):
+        log.info("Initial seeds exist!")
+    else:
+        log.info("Mapping reads to seed bowtie2 index ...")
+        make_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local --al-conc "+os.path.join(options.output_base, "%.initial.mapped.fq")+" -q -x "+seed_index_base+" -1 "+options.fastq_file_1+" -2 "+options.fastq_file_2+" -S "+os.path.join(options.output_base, "seed_bowtie.sam")+" --no-unal -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = make_seed_bowtie2.communicate()
+        if options.verbose_log:
+            log.info("\n"+str(output).strip())
     # coverage_statistics = get_coverage(os.path.join(options.output_base, "bowtie.sam"))
     if options.anti_seed or options.bowtie2_anti_seed:
         if options.anti_seed:
-            log.info("Making anti-seed bowtie2 index ...")
-            build_anti_index = subprocess.Popen("bowtie2-build --large-index " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            output, err = build_anti_index.communicate()
-            if "unrecognized option" in str(output):
-                build_anti_index = subprocess.Popen("bowtie2-build " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            if os.path.exists(options.anti_seed + '.index.1.bt2l'):
+                log.info("anti-seed bowtie2 index exist!")
+            else:
+                log.info("Making anti-seed bowtie2 index ...")
+                build_anti_index = subprocess.Popen("bowtie2-build --large-index " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_anti_index.communicate()
+                if "unrecognized option" in str(output):
+                    build_anti_index = subprocess.Popen("bowtie2-build " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                    output, err = build_anti_index.communicate()
+                if options.verbose_log:
+                    log.info("\n" + str(output).strip())
+                log.info("Making anti-seed bowtie2 index finished.")
             anti_index_base = options.anti_seed + '.index'
-            if options.verbose_log:
-                log.info("\n" + str(output).strip())
-            log.info("Making anti-seed bowtie2 index finished.")
         else:
             anti_index_base = options.bowtie2_anti_seed
-        log.info("Mapping reads to anti-seed bowtie2 index ...")
-        make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -q -x " + anti_index_base + " -1 " + options.fastq_file_1 + " -2 " + options.fastq_file_2 + " -S " + os.path.join(options.output_base, "anti_seed_bowtie.sam") + " --no-unal --no-hd --no-sq -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = make_anti_seed_bowtie2.communicate()
-        if options.verbose_log:
-            log.info("\n" + str(output).strip())
+
+        if options.script_resume and os.path.exists(os.path.join(options.output_base, "anti_seed_bowtie.sam")):
+            log.info("Anti-seed mapping information exist!")
+        else:
+            log.info("Mapping reads to anti-seed bowtie2 index ...")
+            make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -q -x " + anti_index_base + " -1 " + options.fastq_file_1 + " -2 " + options.fastq_file_2 + " -S " + os.path.join(options.output_base, "anti_seed_bowtie.sam") + " --no-unal --no-hd --no-sq -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            output, err = make_anti_seed_bowtie2.communicate()
+            if options.verbose_log:
+                log.info("\n" + str(output).strip())
         log.info("Parsing bowtie2 result ...")
         anti_lines = get_anti_lines_from_sam(os.path.join(options.output_base, "anti_seed_bowtie.sam"), options.pair_end_out)
         log.info("Parsing bowtie2 result finished ...")
@@ -805,6 +818,8 @@ def require_commands(print_title):
                                  'When you have reads of high quality, the larger the number is, '
                                  'the faster the extension will be, '
                                  'the more risk of missing reads in low coverage area. '
+                                 'Another usage of this mesh size is to choose a larger mesh size coupled with '
+                                 'a smaller word size, which makes smaller word size feasible when memory is limited.'
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
     group_result.add_option('-F', dest='scheme_for_slimming_spades_result', default='1',
                             help='followed with following integer (1, 2, 3, 0; corresponding to certain arguments) '
@@ -825,10 +840,10 @@ def require_commands(print_title):
                                  '\n0 \t disable this slimming function'
                                  ' ------------------------------------------------------ ')
     group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
-                               help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
+                            help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
     group_result.add_option('--spades-options', dest='other_spades_options', default='--careful',
-                               help='Other SPAdes options. Use double quotation marks to include all the arguments and parameters,'
-                                    ' such as "--careful -o test"')
+                            help='Other SPAdes options. Use double quotation marks to include all the arguments '
+                                 'and parameters, such as "--careful -o test"')
     group_result.add_option('--no-pair-end-out', dest='pair_end_out', action="store_false", default=True,
                             help='Disable output result by pairs')
     group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
@@ -848,9 +863,11 @@ def require_commands(print_title):
                                         ' For personal computer with 8G memory, we suggest no more than 300000.'
                                         ' A larger number (ex. 600000) would run faster but exhaust memory'
                                         ' in the first few minutes. Choose 0 to disable this process.')
+    group_computational.add_option('--continue', dest='script_resume', default=False, action="store_true",
+                                   help='limited function in this version. Only help you skip mapping process.')
     group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
                                    help='Enable output per round. Choose to save memory but cost more time per round.')
-    group_computational.add_option('--no-remove-dulplicates', dest='rm_duplicates', action="store_false", default=True,
+    group_computational.add_option('--no-remove-duplicates', dest='rm_duplicates', action="store_false", default=True,
                                    help='By default this script use unique reads to extend. Choose to disable'
                                         ' removing duplicates, which save memory but run more slow.'
                                         ' Note that whether choose or not will not disable'

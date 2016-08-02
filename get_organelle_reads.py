@@ -130,7 +130,7 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file
         log.info("writing fastq lines finished.")
 
 
-def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_base, log):
+def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_base, anti_lines, options, log):
     # read original reads
     # pair_to_each_other
     # line_cluster (list) ~ contig_seqs ~ contig_c_seqs
@@ -149,56 +149,137 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     temp1_contig_out = open(temp1_contig_dir, 'w')
     for file_in in pre_reading:
         line = file_in.readline()
-        while line:
-            if line.startswith("@"):
-                if pair_end_out:
+        if options.anti_bowtie2_seed or options.anti_seed:
+            while line:
+                if line.startswith("@"):
                     try:
-                        # take the line startswith @ as the seq name, skip the last char
-                        this_name = line[1:].split(' ')[0].split('#')[0]
-                        if this_name in name_to_line:
-                            pair_to_each_other[line_count] = name_to_line[this_name]
-                            pair_to_each_other[name_to_line[this_name]] = line_count
+                        if ' ' in line:
+                            this_head = line[1:].split(' ')
+                            this_name, direction = this_head[0], int(this_head[1][0])
+                        elif '#' in line:
+                            this_head = line[1:].split('#')
+                            this_name, direction = this_head[0], int(this_head[1][0])
                         else:
-                            name_to_line[this_name] = line_count
-                    except KeyError:
-                        log.error('Unknown error in format. Please try again with "--no_pair_end_out".')
+                            this_name, direction = line[1:].strip(), 1
+                    except (ValueError, IndexError):
+                        log.error('Unrecognized fq format.')
                         exit()
-                #
-                this_seq = file_in.readline().strip()
-                # drop illegal reads
-                if len(this_seq) < word_size:
-                    line_count += 4
-                    for i in range(3):
-                        line = file_in.readline()
-                    continue
-                this_c_seq = complementary_seq(this_seq)
-                if rm_duplicates:
-                    if this_seq in seq_duplicates:
-                        line_clusters[seq_duplicates[this_seq]].append(line_count)
-                    elif this_c_seq in seq_duplicates:
-                        line_clusters[seq_duplicates[this_c_seq]].append(line_count)
                     else:
-                        contig_seqs.append(this_seq)
-                        contig_c_seqs.append(this_c_seq)
-                        temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
-                        seq_duplicates[this_seq] = this_index
+                        if pair_end_out:
+                            try:
+                                if this_name in name_to_line:
+                                    pair_to_each_other[line_count] = name_to_line[this_name]
+                                    pair_to_each_other[name_to_line[this_name]] = line_count
+                                else:
+                                    name_to_line[this_name] = line_count
+                                if this_name in anti_lines:
+                                    line_count += 4
+                                    for i in range(3):
+                                        line = file_in.readline()
+                                    continue
+                            except KeyError:
+                                log.error('Unknown error in format. Please try again with "--no_pair_end_out".')
+                                exit()
+                        else:
+                            if (this_name, direction) in anti_lines:
+                                line_count += 4
+                                for i in range(3):
+                                    line = file_in.readline()
+                                continue
+                    this_seq = file_in.readline().strip()
+                    # drop illegal reads
+                    if len(this_seq) < word_size:
+                        line_count += 4
+                        for i in range(3):
+                            line = file_in.readline()
+                        continue
+                    this_c_seq = complementary_seq(this_seq)
+                    if rm_duplicates:
+                        if this_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_seq]].append(line_count)
+                        elif this_c_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                        else:
+                            contig_seqs.append(this_seq)
+                            contig_c_seqs.append(this_c_seq)
+                            temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                            seq_duplicates[this_seq] = this_index
+                            line_clusters.append([line_count])
+                            this_index += 1
+                    else:
                         line_clusters.append([line_count])
-                        this_index += 1
+                        temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
                 else:
-                    line_clusters.append([line_count])
-                    temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
-            else:
-                log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
-                exit()
-                exit()
-            if line_count % 54321 == 0:
-                to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
-                sys.stdout.write(to_print+'\b'*len(to_print))
-                sys.stdout.flush()
-            line_count += 1
-            for i in range(3):
-                line = file_in.readline()
+                    log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
+                    exit()
+                if line_count % 54321 == 0:
+                    to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
+                    sys.stdout.write(to_print+'\b'*len(to_print))
+                    sys.stdout.flush()
                 line_count += 1
+                for i in range(3):
+                    line = file_in.readline()
+                    line_count += 1
+        else:
+            while line:
+                if line.startswith("@"):
+                    if pair_end_out:
+                        try:
+                            if ' ' in line:
+                                this_head = line[1:].split(' ')
+                                this_name, direction = this_head[0], int(this_head[1][0])
+                            elif '#' in line:
+                                this_head = line[1:].split('#')
+                                this_name, direction = this_head[0], int(this_head[1][0])
+                            else:
+                                this_name, direction = line[1:].strip(), 1
+                        except (ValueError, IndexError):
+                            log.error('Unrecognized fq format.')
+                            exit()
+                        else:
+                            try:
+                                if this_name in name_to_line:
+                                    pair_to_each_other[line_count] = name_to_line[this_name]
+                                    pair_to_each_other[name_to_line[this_name]] = line_count
+                                else:
+                                    name_to_line[this_name] = line_count
+                            except KeyError:
+                                log.error('Unknown error in format. Please try again with "--no_pair_end_out".')
+                                exit()
+                    this_seq = file_in.readline().strip()
+                    # drop illegal reads
+                    if len(this_seq) < word_size:
+                        line_count += 4
+                        for i in range(3):
+                            line = file_in.readline()
+                        continue
+                    this_c_seq = complementary_seq(this_seq)
+                    if rm_duplicates:
+                        if this_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_seq]].append(line_count)
+                        elif this_c_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                        else:
+                            contig_seqs.append(this_seq)
+                            contig_c_seqs.append(this_c_seq)
+                            temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                            seq_duplicates[this_seq] = this_index
+                            line_clusters.append([line_count])
+                            this_index += 1
+                    else:
+                        line_clusters.append([line_count])
+                        temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                else:
+                    log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
+                    exit()
+                if line_count % 54321 == 0:
+                    to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
+                    sys.stdout.write(to_print+'\b'*len(to_print))
+                    sys.stdout.flush()
+                line_count += 1
+                for i in range(3):
+                    line = file_in.readline()
+                    line_count += 1
         file_in.close()
     temp1_contig_out.close()
     del name_to_line
@@ -338,7 +419,7 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, verbose, log):
+def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, mesh_size, verbose, log):
     global word_size
     accepted_contig_id = set()
     accepted_contig_id_this_round = set()
@@ -399,7 +480,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                             accepted_contig_id.add(identical_read_id)
                             accepted_contig_id_this_round.add(identical_read_id)
                             line_to_accept.remove(identical_read_id)
-                            for i in range(0, temp_length+1):
+                            for i in range(0, temp_length+1, mesh_size):
                                 # add forward
                                 accepted_words.add(this_seq[i:i + word_size])
                                 # add reverse
@@ -416,7 +497,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                     accepted = True
                                     break
                             if accepted:
-                                for i in range(0, temp_length + 1):
+                                for i in range(0, temp_length + 1, mesh_size):
                                     # add forward
                                     accepted_words.add(this_seq[i:i + word_size])
                                     # add reverse
@@ -453,7 +534,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                                 accepted = True
                                 break
                         if accepted:
-                            for i in range(0, temp_length + 1):
+                            for i in range(0, temp_length + 1, mesh_size):
                                 accepted_words.add(this_seq[i:i + word_size])
                                 accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                             accepted_contig_id.add(identical_read_id)
@@ -482,29 +563,127 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
     return accepted_contig_id
 
 
+def get_anti_lines_via_built_in_mapping(anti_words, options, log):
+    anti_lines = set()
+    pre_reading = [open(options.fastq_file_1, 'rU'), open(options.fastq_file_2, 'rU')]
+    line_count = 0
+
+    def add_to_anti_lines(here_head):
+        try:
+            if ' ' in here_head:
+                here_head_split = here_head.split(' ')
+                this_name, direction = here_head_split[0], int(here_head_split[1][0])
+            elif '#' in here_head:
+                here_head_split = here_head.split('#')
+                this_name, direction = here_head_split[0], int(here_head_split[1][0])
+            else:
+                this_name, direction = here_head, 1
+        except (ValueError, IndexError):
+            log.error('Unrecognized fq format.')
+            exit()
+        if options.pair_end_out:
+            anti_lines.add(this_name)
+        else:
+            anti_lines.add((this_name, direction))
+
+    for file_in in pre_reading:
+        line = file_in.readline()
+        if options.anti_bowtie2_seed or options.anti_seed:
+            while line:
+                if line.startswith("@"):
+                    this_head = line[1:].strip()
+                    this_seq = file_in.readline().strip()
+                    # drop illegal reads
+                    seq_len = len(this_seq)
+                    if seq_len < word_size:
+                        line_count += 4
+                        for i in range(3):
+                            line = file_in.readline()
+                        add_to_anti_lines(this_head)
+                        continue
+                    this_c_seq = complementary_seq(this_seq)
+                    temp_length = seq_len - word_size
+                    for i in range(0, temp_length+1):
+                        if this_seq[i:i + word_size] in anti_words:
+                            add_to_anti_lines(this_head)
+                            break
+                        if this_c_seq[i:i + word_size] in anti_words:
+                            add_to_anti_lines(this_head)
+                            break
+                else:
+                    log.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                    exit()
+                line_count += 1
+                for i in range(3):
+                    line = file_in.readline()
+                    line_count += 1
+    return anti_lines
+
+
+def get_anti_lines_from_sam(bowtie_sam_file, pair_end_out):
+    anti_lines = set()
+    if pair_end_out:
+        for line in open(bowtie_sam_file, 'rU'):
+            # if line.strip() and not line.startswith('@'):
+            anti_lines.add(line.strip().split('\t')[0])
+    else:
+        for line in open(bowtie_sam_file, 'rU'):
+            # if line.strip() and not line.startswith('@'):
+            line_split = line.strip().split('\t')
+            this_name = line_split[0]
+            flag = int(line_split[1])
+            direction = 1 if flag % 32 < 16 else 2
+            anti_lines.add((this_name, direction))
+    return anti_lines
+
+
 def mapping_with_bowtie2(options, log):
-    if options.seed_dir:
-        log.info("Making bowtie2 index ...")
-        build_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_dir+" "+options.seed_dir+'.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = build_index.communicate()
+    if options.seed_file:
+        log.info("Making seed bowtie2 index ...")
+        build_seed_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_file+" "+options.seed_file+'.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = build_seed_index.communicate()
         if "unrecognized option" in str(output):
-            build_index = subprocess.Popen("bowtie2-build " + options.seed_dir + " " + options.seed_dir + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            output, err = build_index.communicate()
-        index_base = options.seed_dir+'.index'
+            build_seed_index = subprocess.Popen("bowtie2-build " + options.seed_file + " " + options.seed_file + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            output, err = build_seed_index.communicate()
+        seed_index_base = options.seed_file+'.index'
         if options.verbose_log:
             log.info("\n"+str(output).strip())
-        log.info("Making bowtie2 index finished.")
+        log.info("Making seed bowtie2 index finished.")
     else:
-        index_base = options.bowtie2_index
-    log.info("Mapping reads to bowtie2 index ...")
-    make_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local --al-conc "+os.path.join(options.output_base, "%.initial.mapped.fq")+" -q -x "+index_base+" -1 "+options.fastq_file_1+" -2 "+options.fastq_file_2+" -S "+os.path.join(options.output_base, "bowtie.sam")+" --no-unal -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    output, err = make_bowtie2.communicate()
+        seed_index_base = options.bowtie2_seed
+    log.info("Mapping reads to seed bowtie2 index ...")
+    make_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local --al-conc "+os.path.join(options.output_base, "%.initial.mapped.fq")+" -q -x "+seed_index_base+" -1 "+options.fastq_file_1+" -2 "+options.fastq_file_2+" -S "+os.path.join(options.output_base, "seed_bowtie.sam")+" --no-unal -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output, err = make_seed_bowtie2.communicate()
     if options.verbose_log:
         log.info("\n"+str(output).strip())
     # coverage_statistics = get_coverage(os.path.join(options.output_base, "bowtie.sam"))
+    if options.anti_seed or options.anti_bowtie2_seed:
+        if options.anti_seed:
+            log.info("Making anti-seed bowtie2 index ...")
+            build_anti_index = subprocess.Popen("bowtie2-build --large-index " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            output, err = build_anti_index.communicate()
+            if "unrecognized option" in str(output):
+                build_anti_index = subprocess.Popen("bowtie2-build " + options.anti_seed + " " + options.anti_seed + '.index', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                output, err = build_anti_index.communicate()
+            anti_index_base = options.anti_seed + '.index'
+            if options.verbose_log:
+                log.info("\n" + str(output).strip())
+            log.info("Making anti-seed bowtie2 index finished.")
+        else:
+            anti_index_base = options.anti_bowtie2_seed
+        log.info("Mapping reads to anti-seed bowtie2 index ...")
+        make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -q -x " + anti_index_base + " -1 " + options.fastq_file_1 + " -2 " + options.fastq_file_2 + " -S " + os.path.join(options.output_base, "anti_seed_bowtie.sam") + " --no-unal --no-hd --no-sq -t", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = make_anti_seed_bowtie2.communicate()
+        if options.verbose_log:
+            log.info("\n" + str(output).strip())
+        log.info("Parsing bowtie2 result ...")
+        anti_lines = get_anti_lines_from_sam(os.path.join(options.output_base, "anti_seed_bowtie.sam"))
+        log.info("Parsing bowtie2 result finished ...")
+    else:
+        anti_lines = set()
     log.info("Mapping finished.")
-    # os.remove(os.path.join(options.output_base, "bowtie.sam"))
-    return (os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2))
+    # os.remove(os.path.join(options.output_base, "*bowtie.sam"))
+    return [os.path.join(options.output_base, str(x+1)+".initial.mapped.fq") for x in range(2)]+[anti_lines]
 
 
 def assembly_with_spades(options, log):
@@ -587,30 +766,45 @@ def slim_spades_result(options, log, depth_threshold=0):
 
 def require_commands(print_title):
     usage = "\n"+str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast -A 500000 -R 20 -k 75,85,95,105"
+            " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast " \
+            "[-P 500000 -R 20 -k 75,85,95,105 -J 2]"
     parser = OptionParser(usage=usage)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
-    group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
-    group_need.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
-    group_need.add_option('-s', dest='seed_dir', help='Reference. Input fasta format file as initial seed '
-                                                      'or pre-seed (see flag "-b")')
+    group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool.')
+    group_need.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool.')
+    group_need.add_option('-s', dest='seed_file', help='Reference. Input fasta format file as initial seed '
+                                                       'or input bowtie index base name as pre-seed (see flag "--bs")')
     group_need.add_option('-w', dest='word_size', type=int,
                           help='Word size for extension, which have to be smaller or equal to (read length - 1)')
     group_need.add_option('-o', dest='output_base', help='Out put directory. Overwriting files if directory exists.')
     # group2
     group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results"
                                                               " or serve as alternations of the required options")
-    group_result.add_option('-b', dest='bowtie2_index',
-                            help='Input bowtie2 index base name as pre-seed. '
-                                 'This flag serves as an alternation of flag "-s". '
-                                 'This will forcedly turn on bowtie2 mapping process.')
     group_result.add_option('-R', dest='round_limit', type=int,
                             help='Limit running rounds (>=2).')
+    group_result.add_option('--bs', dest='bowtie2_seed',
+                            help='Input bowtie2 index base name as pre-seed. '
+                                 'This flag serves as an alternation of flag "-s".')
+    group_result.add_option('-a', dest='anti_seed', help='Anti-reference. Input fasta format file as anti-seed, '
+                                                         'where the extension process stop. Typically serves as '
+                                                         'excluding chloroplast reads when extending mitochondrial '
+                                                         'reads, or the other way around.')
+    group_result.add_option('--ba', dest='bowtie2_anti_seed',
+                            help='Input bowtie2 index base name as pre-anti-seed. '
+                                 'This flag serves as an alternation of flag "-a".')
     group_result.add_option('-J', dest='jump_step', type=int, default=1,
-                            help='The wide of steps of word in reads during extension (integer >= 1).'
-                                 'The larger the number is, the faster the extension will be, '
-                                 'the more risk of missing reads in low coverage area.'
+                            help='The wide of steps of checking words in reads during extension (integer >= 1). '
+                                 'When you have reads of high quality, the larger the number is, '
+                                 'the faster the extension will be, '
+                                 'the more risk of missing reads in low coverage area. '
+                                 'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
+    group_result.add_option('-M', dest='mesh_size', type=int, default=1,
+                            help='(Beta parameter) '
+                                 'The wide of steps of building words from seeds during extension (integer >= 1). '
+                                 'When you have reads of high quality, the larger the number is, '
+                                 'the faster the extension will be, '
+                                 'the more risk of missing reads in low coverage area. '
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
     group_result.add_option('-F', dest='scheme_for_slimming_spades_result', default='1',
                             help='followed with following integer (1, 2, 3, 0; corresponding to certain arguments) '
@@ -646,9 +840,9 @@ def require_commands(print_title):
                                  '(and thus Linux/Unix only). It is suggested to keep mapping as default '
                                  'when the seed is too diversed from target.')
     # group3
-    group_computational = OptionGroup(parser, "ADDITIONAI OPTIONS", "These options will NOT affect the final results."
+    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results."
                                                                     " Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-A', dest='pseudo_assembled', type=int, default=200000,
+    group_computational.add_option('-P', dest='pseudo_assembled', type=int, default=200000,
                                    help='The maximum potential-organ reads to be pseudo-assembled before extension.'
                                         ' The default value is 200000.'
                                         ' For personal computer with 8G memory, we suggest no more than 300000.'
@@ -673,7 +867,7 @@ def require_commands(print_title):
         sys.stdout.write('\n"-h" for more usage')
         exit()
     else:
-        if not ((options.seed_dir or options.bowtie2_index) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
+        if not ((options.seed_file or options.bowtie2_seed) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
             parser.print_help()
             sys.stdout.write('\n############################################################################'
                              '\nERROR: Insufficient arguments!\nUsage:')
@@ -683,16 +877,23 @@ def require_commands(print_title):
             sys.stdout.write('\n############################################################################'
                              '\nERROR: Jump step MUST be an integer that >= 1')
             exit()
+        if options.mesh_size < 1:
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: Mesh size MUST be an integer that >= 1')
+            exit()
         if not os.path.isdir(options.output_base):
             os.mkdir(options.output_base)
         log = simple_log(logging.getLogger(), options.output_base)
         log.info(print_title)
         log.info(' '.join(sys.argv)+'\n')
         log = complicated_log(log, options.output_base)
-        if options.seed_dir and options.bowtie2_index:
-            log.error('Simultaneously "-s" and "-b" is not allowed!')
+        if options.seed_file and options.bowtie2_seed:
+            log.error('Simultaneously "-s" and "--bs" is not allowed!')
             exit()
-        if options.bowtie2_index:
+        if options.anti_seed and options.bowtie2_anti_seed:
+            log.error('Simultaneously "-a" and "--as" is not allowed!')
+            exit()
+        if options.bowtie2_seed or options.bowtie2_anti_seed:
             options.utilize_mapping = True
         if options.utilize_mapping:
             try:
@@ -703,11 +904,15 @@ def require_commands(print_title):
                 bowtie2_in_path = commands.getstatusoutput('bowtie2')
             if bowtie2_in_path[0] == 32512:
                 options.utilize_mapping = False
-                if options.seed_dir:
+                if options.seed_file:
                     log.warning('bowtie2 not in the path! Take the seed file as initial seed.')
                 else:
                     log.error('bowtie2 not in the path!')
                     exit()
+                if options.anti_seed:
+                    log.warning('bowtie2 not in the path! Take the anti-seed file as initial anti-seed.')
+                else:
+                    log.warning('bowtie2 not in the path! Anti-seed disabled!')
         if options.run_spades:
             try:
                 # python3
@@ -759,7 +964,7 @@ def complicated_log(log, output_base):
 
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle version 1.9.76 released by Jianjun Jin on July 28 2016." \
+    title = "\nGetOrganelle version 1.9.77 released by Jianjun Jin on Aug 2 2016." \
             "\n" \
             "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
@@ -773,23 +978,26 @@ def main():
         """reading seeds"""
         log.info("Reading seeds...")
         if not options.utilize_mapping:
-            initial_accepted_words = chop_seqs(read_fasta(options.seed_dir)[1])
+            initial_accepted_words = chop_seqs(read_fasta(options.seed_file)[1])
+            anti_lines = get_anti_lines_via_built_in_mapping(chop_seqs(read_fasta(options.anti_seed)[1]), options, log) if options.anti_seed else set()
         else:
-            fastq_1, fastq_2 = mapping_with_bowtie2(options, log)
-            initial_accepted_words = chop_seqs(read_self_fq_seq_generator((fastq_1, fastq_2)))
+            seed_fastq_1, seed_fastq_2, anti_lines = mapping_with_bowtie2(options, log)
+            initial_accepted_words = chop_seqs(read_self_fq_seq_generator((seed_fastq_1, seed_fastq_2)))
         log.info("Reading seeds finished.\n")
 
         """reading fastq files"""
         log.info("Pre-reading fastq ...")
         line_clusters, contig_seqs, contig_c_seqs = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out,
-                                                                           options.rm_duplicates, options.output_base, log)
+                                                                           options.rm_duplicates, options.output_base,
+                                                                           anti_lines, options, log)
         len_indices = len(line_clusters)
         log.info("Pre-reading fastq finished.\n")
 
         """pseudo-assembly if asked"""
         # pseudo_assembly is suggested when the whole genome coverage is shallow but the organ genome coverage is deep
         if options.pseudo_assembled:
-            groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(line_clusters, options.pseudo_assembled, contig_seqs, contig_c_seqs, log)
+            groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(line_clusters, options.pseudo_assembled,
+                                                                               contig_seqs, contig_c_seqs, log)
         else:
             groups_of_duplicate_lines = None
             lines_with_duplicates = None
@@ -799,7 +1007,8 @@ def main():
         log.info("Extending ...")
         accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round,
                                              options.pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates,
-                                             options.round_limit, options.output_base, options.jump_step, options.verbose_log, log)
+                                             options.round_limit, options.output_base, options.jump_step, options.mesh_size,
+                                             options.verbose_log, log)
         write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
                          os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),
                          os.path.join(options.output_base, 'temp.indices.3'), options.verbose_log, log)

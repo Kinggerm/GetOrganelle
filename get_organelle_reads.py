@@ -162,7 +162,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                         else:
                             this_name, direction = line[1:].strip(), 1
                     except (ValueError, IndexError):
-                        log.error('Unrecognized fq format.')
+                        log.error('Unrecognized fq format in '+str(line_count)+' '+str(line))
                         exit()
                     else:
                         if pair_end_out:
@@ -183,7 +183,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                         else:
                             if (this_name, direction) in anti_lines:
                                 line_count += 4
-                                for i in range(3):
+                                for i in range(4):
                                     line = file_in.readline()
                                 continue
                     this_seq = file_in.readline().strip()
@@ -579,7 +579,7 @@ def get_anti_lines_via_built_in_mapping(anti_words, options, log):
             else:
                 this_name, direction = here_head, 1
         except (ValueError, IndexError):
-            log.error('Unrecognized fq format.')
+            log.error('Unrecognized fq format in '+str(line_count))
             exit()
         if options.pair_end_out:
             anti_lines.add(this_name)

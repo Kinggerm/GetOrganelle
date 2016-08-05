@@ -55,7 +55,7 @@ def require_commands():
     if makeblastdb_in_path[0] == 32512:
         sys.stdout.write('\nError: makeblastdb not in the path!')
         exit()
-    usage = 'python '+str(os.path.basename(__file__))+' -g input.fastg -d refernce.fasta'
+    usage = 'python '+str(os.path.basename(__file__))+' -g input.fastg -f refernce.fasta'
     parser = OptionParser(usage=usage)
     parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
     parser.add_option('-f', dest='reference_fa_base', help='followed by Fasta index format')

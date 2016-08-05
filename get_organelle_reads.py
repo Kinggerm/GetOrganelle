@@ -419,7 +419,7 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, mesh_size, verbose, log):
+def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, round_limit, output_base, jump_step, mesh_size, verbose, resume, log):
     global word_size
     accepted_contig_id = set()
     accepted_contig_id_this_round = set()
@@ -743,45 +743,38 @@ def slim_spades_result(options, log, depth_threshold=0):
     if makeblastdb_in_path[0] == 32512:
         log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
         return
-    scheme_tranlation = {'1': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-no-con',
-                         '2': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-no-con',
-                         '3': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr') + ' --exclude-no-con',
-                         '0': ''}
-    if options.scheme_for_slimming_spades_result.isdigit():
-        if options.scheme_for_slimming_spades_result in scheme_tranlation:
-            if int(options.scheme_for_slimming_spades_result):
-                run_command = scheme_tranlation[options.scheme_for_slimming_spades_result]
-            else:
-                run_command = ''
-        else:
-            log.warning('Illegal code of scheme for slimming spades result. Function disabled.')
-            run_command = ''
+    scheme_tranlation = {'cp': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt'),
+                         'mt': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp'),
+                         'nr': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')}
+    if options.scheme_for_slimming_spades_result in scheme_tranlation:
+        run_command = scheme_tranlation[options.scheme_for_slimming_spades_result]
     else:
         run_command = options.scheme_for_slimming_spades_result
-    if run_command:
-        if '-o' in options.other_spades_options:
-            graph_file = os.path.join(options.other_spades_options.split('-o')[1].strip().split(' ')[0], "assembly_graph.fastg")
-        else:
-            graph_file = os.path.join(options.output_base, "filtered_spades", "assembly_graph.fastg")
-        run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
-        slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = slim_spades.communicate()
-        if "not recognized" in str(output):
-            if options.verbose_log:
-                log.warning('Problem with slim_spades_fastg_by_blast:')
-                log.warning(str(output))
-            log.warning('Processing assembly result failed.')
-        else:
-            if options.verbose_log:
-                log.info(str(output))
-            log.info('Processing assembly result finished!')
+    if '-o' in options.other_spades_options:
+        graph_file = os.path.join(options.other_spades_options.split('-o')[1].strip().split(' ')[0], "assembly_graph.fastg")
+    else:
+        graph_file = os.path.join(options.output_base, "filtered_spades", "assembly_graph.fastg")
+    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
+    slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output, err = slim_spades.communicate()
+    if "not recognized" in str(output) or "command not found" in str(output):
+        if options.verbose_log:
+            log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py")+' not found!')
+            log.warning(str(output))
+        log.warning('Processing assembly result failed.')
+    else:
+        if options.verbose_log:
+            log.info(str(output))
+        log.info('Processing assembly result finished!')
 
 
-def require_commands(print_title):
+def require_commands(print_title, version):
+    version = version
     usage = "\n"+str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast " \
             "[-a mitochondria.fasta -P 500000 -R 20 -k 75,85,95,105 -J 2]"
-    parser = OptionParser(usage=usage)
+    description = print_title
+    parser = OptionParser(usage=usage, version=version, description=description)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
     group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool.')
@@ -821,21 +814,17 @@ def require_commands(print_title):
                                  'Another usage of this mesh size is to choose a larger mesh size coupled with '
                                  'a smaller word size, which makes smaller word size feasible when memory is limited.'
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
-    group_result.add_option('-F', dest='scheme_for_slimming_spades_result', default='1',
-                            help='followed with following integer (1, 2, 3, 0; corresponding to certain arguments) '
+    group_result.add_option('-F', dest='scheme_for_slimming_spades_result', default='cp',
+                            help='followed with cp, mt, nr, 0 (corresponding to certain arguments as following listed) '
                                  'or custom arguments with double quotation marks. By default, this script calls '
                                  'slim_spades_fastg_by_blast.py (should be under the same directory) '
-                                 'with certain arguments after 1. With arguments after 1, '
-                                 'slim_spades_fastg_by_blast.py would keep contigs that match '
-                                 'given chloroplast index or have connection with such contigs'
-                                 ', and exclude contigs that match mitochondrial index or irrelevant with'
-                                 ' chloroplast. You can also make the index by your self.\t'
+                                 'with "cp". You can also make the index by your self.\t'
                                  ' ------------------------------------------------------ '
-                                 '\n1 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude-no-con"'
+                                 '\ncp \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+'"'
                                  ' ------------------------------------------------------ '
-                                 '\n2 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude-no-con"'
+                                 '\nmt \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+'"'
                                  ' ------------------------------------------------------ '
-                                 '\n3 \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+' --exclude-no-con"'
+                                 '\nnr \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+'"'
                                  ' ------------------------------------------------------ '
                                  '\n0 \t disable this slimming function'
                                  ' ------------------------------------------------------ ')
@@ -855,8 +844,8 @@ def require_commands(print_title):
                                  '(and thus Linux/Unix only). It is suggested to keep mapping as default '
                                  'when the seed is too diversed from target.')
     # group3
-    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results."
-                                                                    " Take easy to pick some according your computer's flavour")
+    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
+                                                                    "Take easy to pick some according your computer's flavour")
     group_computational.add_option('-P', dest='pseudo_assembled', type=int, default=200000,
                                    help='The maximum potential-organ reads to be pseudo-assembled before extension.'
                                         ' The default value is 200000.'
@@ -979,14 +968,17 @@ def complicated_log(log, output_base):
     return log_timed
 
 
+__version__ = "1.9.78"
+
+
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle version 1.9.77 released by Jianjun Jin on Aug 2 2016." \
+    title = "\nGetOrganelle released by Jianjun Jin on Aug 5 2016." \
             "\n" \
             "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
-    options, log = require_commands(print_title=title)
+    options, log = require_commands(print_title=title, version=__version__)
     try:
         global word_size
         word_size = options.word_size
@@ -1025,7 +1017,7 @@ def main():
         accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round,
                                              options.pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates,
                                              options.round_limit, options.output_base, options.jump_step, options.mesh_size,
-                                             options.verbose_log, log)
+                                             options.verbose_log, options.script_resume, log)
         write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
                          os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),
                          os.path.join(options.output_base, 'temp.indices.3'), options.verbose_log, log)
@@ -1039,7 +1031,7 @@ def main():
         if options.run_spades:
             log.info('Assembling with SPAdes ...')
             assembly_with_spades(options, log)
-            if options.scheme_for_slimming_spades_result:
+            if options.scheme_for_slimming_spades_result != '0':
                 slim_spades_result(options, log)
 
         log = simple_log(log, options.output_base)

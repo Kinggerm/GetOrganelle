@@ -47,4 +47,4 @@ Besides, <a href='https://github.com/rrwick/Bandage'>Bandage</a> is suggested to
 
 <code>python get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 101 -o chloroplast -a mitochondrial.fasta</code>
 
-<code>python get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast -P 500000 -R 20 -k 75,85,95,105</code>
+<code>python get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq --bs reference.fasta.index -w 103 -o chloroplast -P 500000 -R 20 -k 75,85,95,105</code>

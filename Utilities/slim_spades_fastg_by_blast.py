@@ -9,7 +9,8 @@ try:
     import commands
 except:
     pass
-from optparse import OptionParser, OptionGroup
+from optparse import OptionParser
+import optparse
 import copy
 
 
@@ -38,20 +39,41 @@ def require_commands():
     if makeblastdb_in_path[0] == 32512:
         sys.stdout.write('\nError: makeblastdb not in the path!')
         exit()
-    usage = 'python '+str(os.path.basename(__file__))
+    usage = 'python '+str(os.path.basename(__file__)+' -g your_fastg_file -m cp')
     parser = OptionParser(usage=usage)
     parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
     parser.add_option('-f', dest='in_fasta_file', help='followed by your input fasta file')
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters
+    parser.add_option('-m', dest='builtin_mode', default='cp',
+                      help='followed with mode cp, mt, nr (which means chloroplast, mitochondria, nrDNA'
+                           'separately; corresponding to certain arguments as following listed). '
+                           'Modify the arguments activated by this flag with your more custom options.'
+                           '\t'
+                           ' ------------------------------------------------------ '
+                           '\ncp \t " --include-index-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')+' --exclude-index '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')+'"'
+                           ' ------------------------------------------------------ '
+                           '\nmt \t " --include-index-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')+' --exclude-index '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')+'"'
+                           ' ------------------------------------------------------ '
+                           '\nnr \t " --include-index-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'nr')+'"'
+                           ' ------------------------------------------------------ ')
+    parser.add_option('--no-hits', dest='treat_no_hits', default='ex_no_con',
+                      help='Provide treatment for non-hitting contigs.\t'
+                           ' ------------------------------------------------------ '
+                           '\nex_no_con \t keep those connect with hitting-include contigs. (Default)'
+                           ' ------------------------------------------------------ '
+                           '\nex_no_hit \t exclude all.'
+                           ' ------------------------------------------------------ '
+                           '\nkeep_all \t keep all'
+                           ' ------------------------------------------------------ ')
     parser.add_option('--depth-threshold', dest='depth_threshold',
                       help='Input a float or integer number. filter fastg file by depth. Default: no threshold.')
     parser.add_option('--include-index', dest='in_nc_base',
                       help='followed by Blast index format')
-    parser.add_option('--include-index-priority', dest='in_nc_base_priority', default=os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp'),
-                      help='followed by Blast index format. Default='+str(os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')))
-    parser.add_option('--exclude-index', dest='ex_nc_base', default=os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt'),
-                      help='followed by Blast index format. Default='+str(os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')))
+    parser.add_option('--include-index-priority', dest='in_nc_base_priority',
+                      help='followed by Blast index format.')
+    parser.add_option('--exclude-index', dest='ex_nc_base',
+                      help='followed by Blast index format.')
     parser.add_option('--exclude-index-priority', dest='ex_nc_base_priority',
                       help='followed by Blast index format')
     parser.add_option('--include-fasta', dest='in_fa_base',
@@ -62,39 +84,58 @@ def require_commands():
                       help='followed by Fasta index format')
     parser.add_option('--exclude-fasta-priority', dest='ex_fa_base_priority',
                       help='followed by Fasta index format')
-    parser.add_option('--exclude-no-hits', dest='ex_no_hits', default=False, action='store_true', help='Choose to exclude all contigs that mismatch the "include index"')
-    parser.add_option('--exclude-no-con', dest='ex_no_connect', default=False, action='store_true', help='Choose to exclude all contigs that disconnect with "include index" contigs')
-    parser.add_option('--no-hits-labeled-csv', dest='no_csv', default=False, action='store_true', help='Choose to disable producing csv file')
-    parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true', help='Choose to disable deleting temp files produced by blast and this script')
+    parser.add_option('--no-hits-labeled-csv', dest='no_csv', default=False, action='store_true',
+                      help='Choose to disable producing csv file')
+    parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
+                      help='Choose to disable deleting temp files produced by blast and this script')
     try:
         (options, args) = parser.parse_args()
-    except Exception as e:
+    except optparse.OptionConflictError as e:
         sys.stdout.write('\n\n######################################'+str(e))
         sys.stdout.write('\n\n"-h" for more usage')
         exit()
     else:
-        priority_chosen = int(bool(options.in_nc_base_priority))+int(bool(options.ex_nc_base_priority))+int(bool(options.in_fa_base_priority))+int(bool(options.ex_fa_base_priority))
-        if priority_chosen > 1:
-            sys.stdout.write('\n\nLogical Error: only one option with "-priority" allowed!')
+        if options.treat_no_hits not in {"ex_no_con", "ex_no_hit", "keep_all"}:
+            sys.stdout.write('\n\nOption Error: you should choose assign one of "ex_no_con", "ex_no_hit"'
+                             ' and "keep_all" to variable treat_no_hits')
             exit()
-        in_chosen = int(bool(options.in_nc_base_priority))+int(bool(options.in_nc_base))+int(bool(options.in_fa_base_priority))+int(bool(options.in_fa_base))
-        if in_chosen > 1:
-            sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--include-*" options!')
+        priority_chosen = int(bool(options.in_nc_base_priority)) + int(bool(options.ex_nc_base_priority)) + int(
+            bool(options.in_fa_base_priority)) + int(bool(options.ex_fa_base_priority))
+        secondary_chosen = int(bool(options.in_nc_base)) + int(bool(options.ex_nc_base)) + int(
+            bool(options.in_fa_base)) + int(bool(options.ex_fa_base))
+        if priority_chosen + secondary_chosen > 0:
+            sys.stdout.write("\nbuiltin_mode is disabled since you assign the custom index/indices.")
+            if priority_chosen > 1:
+                sys.stdout.write('\n\nLogical Error: only one option with "-priority" allowed!')
+                exit()
+            in_chosen = int(bool(options.in_nc_base_priority)) + int(bool(options.in_nc_base)) + int(
+                bool(options.in_fa_base_priority)) + int(bool(options.in_fa_base))
+            if in_chosen > 1:
+                sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--include-*" options!')
+                exit()
+            ex_chosen = int(bool(options.ex_nc_base_priority)) + int(bool(options.ex_nc_base)) + int(
+                bool(options.ex_fa_base_priority)) + int(bool(options.ex_fa_base))
+            if ex_chosen > 1:
+                sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--exclude-*" options!')
+                exit()
+            if in_chosen == 1 and ex_chosen == 1 and priority_chosen == 0:
+                sys.stdout.write('\n\nOption Error: since you have include and exclude chosen, one of them should be assigned priority!')
+                exit()
+            if ex_chosen == 1 and in_chosen == 0 and (options.treat_no_hits in {"ex_no_con", "ex_no_hit"}):
+                sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
+                exit()
+        elif options.builtin_mode == 'cp':
+            options.in_nc_base_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')
+            options.ex_nc_base = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')
+        elif options.builtin_mode == 'mt':
+            options.in_nc_base_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')
+            options.ex_nc_base = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')
+        elif options.builtin_mode == 'nr':
+            options.in_nc_base_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'nr')
+        else:
+            sys.stdout.write('\n\nOption Error: illegal value for builtin mode!')
             exit()
-        ex_chosen = int(bool(options.ex_nc_base_priority))+int(bool(options.ex_nc_base))+int(bool(options.ex_fa_base_priority))+int(bool(options.ex_fa_base))
-        if ex_chosen > 1:
-            sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--exclude-*" options!')
-            exit()
-        if in_chosen == 1 and ex_chosen == 1 and priority_chosen == 0:
-            sys.stdout.write('\n\nOption Error: since you have include and exclude chosen, one of them should be assigned priority!')
-            exit()
-        if ex_chosen == 1 and in_chosen == 0 and (options.ex_no_hits or options.ex_no_connect):
-            sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
-            exit()
-        if options.ex_no_hits and options.ex_no_connect:
-            sys.stdout.write('\n\nOption Error: you can not simultaneously choose --exclude-no-hits and --exclude-no-con!')
-            exit()
-        if not options.in_fastg_file and options.ex_no_connect:
+        if not options.in_fastg_file and (options.treat_no_hits == "ex_no_con"):
             sys.stdout.write('\n\nOption Error: ex_no_connect is available only when you input a fastg file!')
             exit()
         if int(bool(options.in_fastg_file))+int(bool(options.in_fasta_file)) != 1:
@@ -102,7 +143,7 @@ def require_commands():
             exit()
         if int(bool(options.depth_threshold))+int(bool(options.in_fasta_file)) > 1:
             sys.stdout.write('\n\nOption Warning: you can use depth threshold only when you input a fastg file!'
-                  '\nDepth threshold disabled.')
+                             '\nDepth threshold disabled.')
             options.depth_threshold = None
         sys.stdout.write('\n'+' '.join(sys.argv)+'\n')
 
@@ -278,7 +319,7 @@ def map_names(come_include, come_exclude, candidates):
     here_include = copy.deepcopy(come_include)
     here_exclude = copy.deepcopy(come_exclude)
     if options.in_fastg_file:
-        if options.ex_no_connect:
+        if options.treat_no_hits == 'ex_no_con':
             short_connections = {}
             for candidate in candidates:
                 this_short = candidate.split('_')[1]
@@ -323,7 +364,7 @@ def map_names(come_include, come_exclude, candidates):
                 short_candidates[this_short] = [candidate]
     accepted = set()
     if options.ex_nc_base_priority or options.ex_fa_base_priority:
-        if options.ex_no_hits or options.ex_no_connect:
+        if options.treat_no_hits in {"ex_no_con", "ex_no_hit"}:
             for this_short, full_name in short_candidates.items():
                 if this_short in here_exclude:
                     pass
@@ -340,7 +381,7 @@ def map_names(come_include, come_exclude, candidates):
                     for name in full_name:
                         accepted.add(name)
     elif options.in_nc_base_priority or options.in_fa_base_priority or options.in_nc_base or options.in_fa_base:
-        if options.ex_no_hits or options.ex_no_connect:
+        if options.treat_no_hits in {"ex_no_con", "ex_no_hit"}:
             for this_short, full_name in short_candidates.items():
                 if this_short in here_include:
                     for name in full_name:
@@ -493,6 +534,9 @@ def remove_temp_files(fastg_file):
             pass
 
 
+__version__ = "1.7.01"
+
+
 def main():
     time0 = time.time()
     sys.stdout.write("\nThis is a script for filtering spades assembly_graph.fastg contigs by blast\n")
@@ -509,7 +553,7 @@ def main():
     # write out fasta according to blast
     fasta_matrix = read_fasta(fasta_dir=fasta_file)
     accept_names = map_names(come_include=set(in_names), come_exclude=set(ex_names), candidates=fasta_matrix[0])
-    in_ex_info = 'only'*int(options.ex_no_hits)+'extend'*int(options.ex_no_connect)+'+'+os.path.split(include_index)[-1]+'-'+os.path.split(exclude_index)[-1]
+    in_ex_info = 'only'*int(options.treat_no_hits=='ex_no_hit')+'extend'*int(options.treat_no_hits=='ex_no_con')+'+'+os.path.split(include_index)[-1]+'-'+os.path.split(exclude_index)[-1]
     fasta_matrix = make_new_matrix_with_names(names=accept_names, old_matrix=fasta_matrix)
     write_fasta(out_dir=fasta_file+'.'+in_ex_info+'.'+fasta_file.split('.')[-1], matrix=fasta_matrix, overwrite=False)
     # write out hits csv according to blast

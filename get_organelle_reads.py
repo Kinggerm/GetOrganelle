@@ -158,8 +158,8 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     # read original reads
     # pair_to_each_other
     # line_cluster (list) ~ forward_reverse_reads
-    pre_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
-    line_clusters = []
+
+    line_clusters = {}
     seq_duplicates = {}
     forward_reverse_reads = []
     line_count = 0
@@ -168,91 +168,45 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     pair_to_each_other = {}
     name_to_line = {}
     #
-    if not options.index_in_memory:
-        temp1_contig_dir = os.path.join(output_base, 'temp.indices.1')
-        temp1_contig_out = open(temp1_contig_dir, 'w')
-    for file_in in pre_reading:
-        line = file_in.readline()
-        if options.bowtie2_anti_seed or options.anti_seed:
-            while line:
-                if line.startswith("@"):
-                    try:
-                        if ' ' in line:
-                            this_head = line[1:].split(' ')
-                            this_name, direction = this_head[0], int(this_head[1][0])
-                        elif '#' in line:
-                            this_head = line[1:].split('#')
-                            this_name, direction = this_head[0], int(this_head[1][0])
-                        else:
-                            this_name, direction = line[1:].strip(), 1
-                    except (ValueError, IndexError):
-                        log.error('Unrecognized fq format in '+str(line_count)+' '+str(line))
-                        exit()
-                    else:
-                        if pair_end_out:
-                            try:
-                                if this_name in name_to_line:
-                                    pair_to_each_other[line_count] = name_to_line[this_name]
-                                    pair_to_each_other[name_to_line[this_name]] = line_count
-                                else:
-                                    name_to_line[this_name] = line_count
-                                if this_name in anti_lines:
-                                    line_count += 4
-                                    for i in range(4):
-                                        line = file_in.readline()
-                                    continue
-                            except KeyError:
-                                log.error('Unknown error in format. Please try again with "--no_pair_end_out".')
-                                exit()
-                        else:
-                            if (this_name, direction) in anti_lines:
-                                line_count += 4
-                                for i in range(4):
-                                    line = file_in.readline()
-                                continue
-                    this_seq = file_in.readline().strip()
-                    # drop illegal reads
-                    if len(this_seq) < word_size:
-                        line_count += 4
-                        for i in range(3):
-                            line = file_in.readline()
-                        continue
-                    this_c_seq = complementary_seq(this_seq)
-                    if rm_duplicates:
-                        if this_seq in seq_duplicates:
-                            line_clusters[seq_duplicates[this_seq]].append(line_count)
-                        elif this_c_seq in seq_duplicates:
-                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
-                        else:
-                            forward_reverse_reads.append(this_seq)
-                            forward_reverse_reads.append(this_c_seq)
-                            if not options.index_in_memory:
-                                temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
-                            seq_duplicates[this_seq] = this_index
-                            line_clusters.append([line_count])
-                            this_index += 1
-                    else:
-                        line_clusters.append([line_count])
-                        if options.index_in_memory:
-                            forward_reverse_reads.append(this_seq)
-                            forward_reverse_reads.append(this_c_seq)
-                        else:
-                            temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
-                else:
-                    log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
-                    exit()
-                if line_count % 54321 == 0:
-                    to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
-                    sys.stdout.write(to_print+'\b'*len(to_print))
-                    sys.stdout.flush()
-                line_count += 1
-                for i in range(3):
-                    line = file_in.readline()
-                    line_count += 1
+    temp1_contig_dir = [os.path.join(output_base, k+'temp.indices.1') for k in ("_", "")]
+    temp2_clusters_dir = [os.path.join(output_base, k+'temp.indices.2') for k in ("_", "")]
+    temp3_pair_dir = [os.path.join(output_base, k+'temp.indices.3') for k in ("_", "")]
+    if options.script_resume and os.path.exists(temp1_contig_dir[1]) and os.path.exists(temp2_clusters_dir[1]) and (os.path.exists(temp3_pair_dir[1]) or not options.pair_end_out):
+        if options.pseudo_assembled or options.index_in_memory:
+            log.info("Reading existed indices for fastq ...")
+            #
+            forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'rU')]
+            #
+            cluster_count = 0
+            for y in open(temp2_clusters_dir[1], 'rU'):
+                line_clusters[cluster_count] = [int(x) for x in y.split('\t')]
+                cluster_count += 1
+            # read pair infos
+            if options.pair_end_out:
+                line_count = 0
+                for line in open(temp3_pair_dir[1], 'rU'):
+                    pair_to_each_other[line_count] = int(line)
+                    line_count += 4
+            else:
+                line_count = sum([len(line_clusters[x]) for x in line_clusters])*4
+            # log
+            len_indices = len(line_clusters)
+            if this_process:
+                memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + ", "
+            else:
+                memory_usage = ''
+            log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
         else:
-            while line:
-                if line.startswith("@"):
-                    if pair_end_out:
+            log.info("indices for fastq existed!")
+    else:
+        if not options.index_in_memory:
+            temp1_contig_out = open(temp1_contig_dir[0], 'w')
+        pre_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
+        for file_in in pre_reading:
+            line = file_in.readline()
+            if options.bowtie2_anti_seed or options.anti_seed:
+                while line:
+                    if line.startswith("@"):
                         try:
                             if ' ' in line:
                                 this_head = line[1:].split(' ')
@@ -263,92 +217,170 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                             else:
                                 this_name, direction = line[1:].strip(), 1
                         except (ValueError, IndexError):
-                            log.error('Unrecognized fq format.')
+                            log.error('Unrecognized fq format in '+str(line_count)+' '+str(line))
                             exit()
                         else:
-                            try:
-                                if this_name in name_to_line:
-                                    pair_to_each_other[line_count] = name_to_line[this_name]
-                                    pair_to_each_other[name_to_line[this_name]] = line_count
-                                else:
-                                    name_to_line[this_name] = line_count
-                            except KeyError:
-                                log.error('Unknown error in format. Please try again with "--no_pair_end_out".')
-                                exit()
-                    this_seq = file_in.readline().strip()
-                    # drop illegal reads
-                    if len(this_seq) < word_size:
-                        line_count += 4
-                        for i in range(3):
-                            line = file_in.readline()
-                        continue
-                    this_c_seq = complementary_seq(this_seq)
-                    if rm_duplicates:
-                        if this_seq in seq_duplicates:
-                            line_clusters[seq_duplicates[this_seq]].append(line_count)
-                        elif this_c_seq in seq_duplicates:
-                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                            if pair_end_out:
+                                try:
+                                    if this_name in name_to_line:
+                                        pair_to_each_other[line_count] = name_to_line[this_name]
+                                        pair_to_each_other[name_to_line[this_name]] = line_count
+                                    else:
+                                        name_to_line[this_name] = line_count
+                                    if this_name in anti_lines:
+                                        line_count += 4
+                                        for i in range(4):
+                                            line = file_in.readline()
+                                        continue
+                                except KeyError:
+                                    log.error('Unknown error in format. Please try to disable "--pair_end_out".')
+                                    exit()
+                            else:
+                                if (this_name, direction) in anti_lines:
+                                    line_count += 4
+                                    for i in range(4):
+                                        line = file_in.readline()
+                                    continue
+                        this_seq = file_in.readline().strip()
+                        # drop illegal reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+                        this_c_seq = complementary_seq(this_seq)
+                        if rm_duplicates:
+                            if this_seq in seq_duplicates:
+                                line_clusters[seq_duplicates[this_seq]].append(line_count)
+                            elif this_c_seq in seq_duplicates:
+                                line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                            else:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                                if not options.index_in_memory:
+                                    temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                                seq_duplicates[this_seq] = this_index
+                                line_clusters.append([line_count])
+                                this_index += 1
                         else:
-                            forward_reverse_reads.append(this_seq)
-                            forward_reverse_reads.append(this_c_seq)
-                            if not options.index_in_memory:
-                                temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
-                            seq_duplicates[this_seq] = this_index
                             line_clusters.append([line_count])
-                            this_index += 1
+                            if options.index_in_memory:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                            else:
+                                temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
                     else:
-                        line_clusters.append([line_count])
-                        if options.index_in_memory:
-                            forward_reverse_reads.append(this_seq)
-                            forward_reverse_reads.append(this_c_seq)
-                        else:
-                            temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
-                else:
-                    log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
-                    exit()
-                if line_count % 54321 == 0:
-                    to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
-                    sys.stdout.write(to_print+'\b'*len(to_print))
-                    sys.stdout.flush()
-                line_count += 1
-                for i in range(3):
-                    line = file_in.readline()
+                        log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
+                        exit()
+                    if line_count % 54321 == 0:
+                        to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
+                        sys.stdout.write(to_print+'\b'*len(to_print))
+                        sys.stdout.flush()
                     line_count += 1
-        file_in.close()
-    if not options.index_in_memory:
-        temp1_contig_out.close()
+                    for i in range(3):
+                        line = file_in.readline()
+                        line_count += 1
+            else:
+                while line:
+                    if line.startswith("@"):
+                        if pair_end_out:
+                            try:
+                                if ' ' in line:
+                                    this_head = line[1:].split(' ')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                elif '#' in line:
+                                    this_head = line[1:].split('#')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                else:
+                                    this_name, direction = line[1:].strip(), 1
+                            except (ValueError, IndexError):
+                                log.error('Unrecognized fq format.')
+                                exit()
+                            else:
+                                try:
+                                    if this_name in name_to_line:
+                                        pair_to_each_other[line_count] = name_to_line[this_name]
+                                        pair_to_each_other[name_to_line[this_name]] = line_count
+                                    else:
+                                        name_to_line[this_name] = line_count
+                                except KeyError:
+                                    log.error('Unknown error in format. Please try to disable "--pair_end_out".')
+                                    exit()
+                        this_seq = file_in.readline().strip()
+                        # drop illegal reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+                        this_c_seq = complementary_seq(this_seq)
+                        if rm_duplicates:
+                            if this_seq in seq_duplicates:
+                                line_clusters[seq_duplicates[this_seq]].append(line_count)
+                            elif this_c_seq in seq_duplicates:
+                                line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                            else:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                                if not options.index_in_memory:
+                                    temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                                seq_duplicates[this_seq] = this_index
+                                line_clusters.append([line_count])
+                                this_index += 1
+                        else:
+                            line_clusters.append([line_count])
+                            if options.index_in_memory:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                            else:
+                                temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                    else:
+                        log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
+                        exit()
+                    if line_count % 54321 == 0:
+                        to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
+                        sys.stdout.write(to_print+'\b'*len(to_print))
+                        sys.stdout.flush()
+                    line_count += 1
+                    for i in range(3):
+                        line = file_in.readline()
+                        line_count += 1
+            file_in.close()
+        if not options.index_in_memory:
+            temp1_contig_out.close()
+            os.rename(temp1_contig_dir[0], temp1_contig_dir[1])
 
-    if this_process:
-        memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + ", "
-    else:
-        memory_usage = ''
+        if this_process:
+            memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + ", "
+        else:
+            memory_usage = ''
 
-    del name_to_line
+        del name_to_line
 
-    if not options.index_in_memory:
-        # dump line clusters
+        if not options.index_in_memory:
+            # dump line clusters
+            len_indices = len(line_clusters)
+            temp2_indices_file_out = open(temp2_clusters_dir[0], 'w')
+            for this_index in range(len_indices):
+                temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
+                temp2_indices_file_out.write('\n')
+            temp2_indices_file_out.close()
+            os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
+
+            if pair_end_out:
+                # dump pair_to_each_other to file to save memory
+                # read in again in the last
+                temp3_pair_file_out = open(temp3_pair_dir[0], 'w')
+                for line_count_2 in range(0, line_count, 4):
+                    temp3_pair_file_out.write(str(pair_to_each_other[line_count_2])+'\n')
+                temp3_pair_file_out.close()
+                os.rename(temp3_pair_dir[0], temp3_pair_dir[1])
+                pair_to_each_other = None
+
+        del seq_duplicates
+        del pre_reading
         len_indices = len(line_clusters)
-        temp2_clusters_dir = os.path.join(output_base, 'temp.indices.2')
-        temp2_indices_file_out = open(temp2_clusters_dir, 'w')
-        for this_index in range(len_indices):
-            temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
-            temp2_indices_file_out.write('\n')
-        temp2_indices_file_out.close()
-
-        if pair_end_out:
-            # dump pair_to_each_other to file to save memory
-            # read in again in the last
-            temp3_pair_dir = os.path.join(output_base, 'temp.indices.3')
-            temp3_pair_file_out = open(temp3_pair_dir, 'w')
-            for line_count_2 in range(0, line_count, 4):
-                temp3_pair_file_out.write(str(pair_to_each_other[line_count_2])+'\n')
-            temp3_pair_file_out.close()
-            pair_to_each_other = None
-
-    del seq_duplicates
-    del pre_reading
-    len_before_assembly = len(line_clusters)
-    log.info(memory_usage+str(len_before_assembly)+" unique in all "+str(line_count//4)+" reads")
+        log.info(memory_usage+str(len_indices)+" unique in all "+str(line_count//4)+" reads")
 
     return forward_reverse_reads, line_clusters, pair_to_each_other
 
@@ -470,7 +502,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
     accepted_contig_id_this_round = set()
     line_to_accept = set()
     round_count = 1
-    previous_aw = 0
+    previous_aw_count = 0
     if fg_out_per_round:
         round_dir = os.path.join(output_base, "Reads_per_round")
         if not os.path.exists(round_dir):
@@ -559,7 +591,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                         this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw, round_count)
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count)
             else:
                 for unique_read_id in range(len_indices):
                     this_seq = next(reads_generator)
@@ -587,7 +619,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                         this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw, round_count)
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count)
             reads_generator.close()
     except KeyboardInterrupt:
         reads_generator.close()
@@ -604,6 +636,8 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
         log.info("Hit the round limit "+str(r_lim)+" and terminated ...")
     del reads_generator
     del accepted_words
+    del accepted_contig_id_this_round
+    del lines_with_duplicates
     return accepted_contig_id
 
 
@@ -1102,6 +1136,8 @@ def main():
         write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
                          os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),
                          os.path.join(options.output_base, 'temp.indices.3'), fastq_indices_in_memory, options.verbose_log, options, log)
+        del accepted_contig_id, fastq_indices_in_memory, groups_of_duplicate_lines, \
+            anti_lines, initial_accepted_words, lines_with_duplicates
         if not options.keep_temp_files:
             try:
                 os.remove(os.path.join(options.output_base, 'temp.indices.1'))
@@ -1123,6 +1159,9 @@ def main():
         log.info("Thanks you!")
     except:
         log.exception("")
+        log = simple_log(log, options.output_base)
+        log.info("\nTotal Calc-cost " + str(time.time() - time0))
+        log.info("Please email me if you find bugs!")
     logging.shutdown()
 
 

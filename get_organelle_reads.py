@@ -193,6 +193,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                 memory_usage = ''
             log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
         else:
+            len_indices = len([x for x in open(temp1_contig_dir[1], 'rU')]) // 2
             log.info("indices for fastq existed!")
     else:
         if not options.index_in_memory:

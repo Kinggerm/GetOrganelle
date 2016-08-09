@@ -378,12 +378,12 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
         len_indices = len(line_clusters)
         log.info(memory_usage+str(len_indices)+" unique in all "+str(line_count//4)+" reads")
 
-    return forward_reverse_reads, line_clusters, pair_to_each_other
+    return forward_reverse_reads, line_clusters, pair_to_each_other, len_indices
 
 
 def pseudo_assembly(fastq_indices_in_memory, dupli_threshold, log):
     global word_size
-    forward_and_reverse_reads, line_clusters, pairs = fastq_indices_in_memory
+    forward_and_reverse_reads, line_clusters, pairs, len_indices = fastq_indices_in_memory
     log.info("Pseudo-assembly reads...")
     lines_with_duplicates = {}
     count_dupli = 0
@@ -540,6 +540,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                 reads_generator = (this_read for this_read in fastq_indices_in_memory[0])
             else:
                 reads_generator = (this_read.strip() for this_read in open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
+            unique_read_id = 0
             if pseudo_assembled and groups_of_duplicate_lines:
                 for unique_read_id in range(len_indices):
                     this_seq = next(reads_generator)
@@ -1109,7 +1110,7 @@ def main():
         fastq_indices_in_memory = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out,
                                                          options.rm_duplicates, options.output_base,
                                                          anti_lines, options, log)
-        len_indices = len(fastq_indices_in_memory[1])
+        len_indices = fastq_indices_in_memory[3]
         log.info("Pre-reading fastq finished.\n")
 
         """pseudo-assembly if asked"""

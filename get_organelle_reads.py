@@ -1107,7 +1107,7 @@ def main():
                 os.remove(os.path.join(options.output_base, 'temp.indices.1'))
                 os.remove(os.path.join(options.output_base, 'temp.indices.2'))
                 os.remove(os.path.join(options.output_base, 'temp.indices.3'))
-            except FileNotFoundError:
+            except OSError:
                 pass
         log.info("Extending finished.\n")
 

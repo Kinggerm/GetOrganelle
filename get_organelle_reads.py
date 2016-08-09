@@ -668,16 +668,16 @@ def get_heads_from_sam(bowtie_sam_file, pair_end_out):
     hit_heads = set()
     if pair_end_out:
         for line in open(bowtie_sam_file, 'rU'):
-            # if line.strip() and not line.startswith('@'):
-            hit_heads.add(line.strip().split('\t')[0])
+            if line.strip() and not line.startswith('@'):
+                hit_heads.add(line.strip().split('\t')[0])
     else:
         for line in open(bowtie_sam_file, 'rU'):
-            # if line.strip() and not line.startswith('@'):
-            line_split = line.strip().split('\t')
-            this_name = line_split[0]
-            flag = int(line_split[1])
-            direction = 1 if flag % 32 < 16 else 2
-            hit_heads.add((this_name, direction))
+            if line.strip() and not line.startswith('@'):
+                line_split = line.strip().split('\t')
+                this_name = line_split[0]
+                flag = int(line_split[1])
+                direction = 1 if flag % 32 < 16 else 2
+                hit_heads.add((this_name, direction))
     return hit_heads
 
 
@@ -708,7 +708,7 @@ def mapping_with_bowtie2(options, log):
         log.info("Mapping reads to seed bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
             "bowtie2 -p 4 --very-fast-local --al " + total_seed_file + " -x " + seed_index_base + " -U " +
-            options.fastq_file_1 + "," + options.fastq_file_2 + " -S " + total_seed_sam[0] + " --no-unal -t",
+            options.fastq_file_1 + "," + options.fastq_file_2 + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
         if options.verbose_log:
@@ -764,7 +764,7 @@ def mapping_with_bowtie2(options, log):
         log.info("Parsing bowtie2 result finished ...")
     else:
         anti_lines = set()
-    if not options.keep_temp_files:
+    if False and not options.keep_temp_files:
         os.remove(total_seed_sam[1])
         if options.anti_seed or options.bowtie2_anti_seed:
             os.remove(anti_seed_sam[1])

@@ -507,7 +507,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
         log.warning("Package psutil is not installed, so that memory usage will not be logged\n"
                     "Don't worry. This will not affect the result.")
     try:
-        def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count):
+        def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count, unique_id):
             len_aw = len(acc_words)
             len_al = len(acc_contig_id_this_round)
             if this_process:
@@ -521,7 +521,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                 # then add new accepted words into memory
                 acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)]))
                 acc_contig_id_this_round = set()
-            log.info("Round " + str(r_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw) + memory_usage)
+            log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw) + memory_usage)
             #
             if len_aw == pre_aw:
                 raise NoMoreReads('')
@@ -587,7 +587,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                         this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count)
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
             else:
                 for unique_read_id in range(len_indices):
                     this_seq = next(reads_generator)
@@ -615,7 +615,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                         this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count)
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
             reads_generator.close()
     except KeyboardInterrupt:
         reads_generator.close()

@@ -158,8 +158,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     # read original reads
     # pair_to_each_other
     # line_cluster (list) ~ forward_reverse_reads
-
-    line_clusters = {}
+    line_clusters = []
     seq_duplicates = {}
     forward_reverse_reads = []
     line_count = 0
@@ -177,10 +176,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             #
             forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'rU')]
             #
-            cluster_count = 0
-            for y in open(temp2_clusters_dir[1], 'rU'):
-                line_clusters[cluster_count] = [int(x) for x in y.split('\t')]
-                cluster_count += 1
+            line_clusters = [[int(x) for x in y.split('\t')] for y in open(temp2_clusters_dir[1], 'rU')]
             # read pair infos
             if options.pair_end_out:
                 line_count = 0
@@ -188,7 +184,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                     pair_to_each_other[line_count] = int(line)
                     line_count += 4
             else:
-                line_count = sum([len(line_clusters[x]) for x in line_clusters])*4
+                line_count = sum([len(x) for x in line_clusters])*4
             # log
             len_indices = len(line_clusters)
             if this_process:

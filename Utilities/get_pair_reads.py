@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import sys
+import time
+time0 = time.time()
 if len(sys.argv) == 3:
     try:
         fq1 = sys.argv[1].strip().strip("\"").strip("\'")
@@ -24,6 +26,7 @@ if len(sys.argv) == 3:
             this_name = file1[i].split()[0]
             if this_name in names:
                 outu_1.writelines(file1[i:i+4])
+        sys.stdout.write("\nCost"+str(round(time.time()-time0, 3))+"\nThank you!\n\n")
     except IOError:
         sys.stdout.write("\nUsage: get_pair_reads.py *_1.fq *_2.fq\n\n")
         exit()

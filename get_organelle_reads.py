@@ -183,7 +183,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                 for line in open(temp3_pair_dir[1], 'rU'):
                     pair_to_each_other[line_count] = int(line)
                     line_count += 4
-            else:
+            elif rm_duplicates:
                 line_count = sum([len(x) for x in line_clusters])*4
             # log
             len_indices = len(line_clusters)
@@ -191,10 +191,13 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                 memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + ", "
             else:
                 memory_usage = ''
-            log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
+            if rm_duplicates:
+                log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
+            else:
+                log.info(memory_usage + str(len_indices) + " reads")
         else:
-            len_indices = len([x for x in open(temp1_contig_dir[1], 'rU')]) // 2
             log.info("indices for fastq existed!")
+            len_indices = len([x for x in open(temp2_clusters_dir[1], 'rU')])
     else:
         if not options.index_in_memory:
             temp1_contig_out = open(temp1_contig_dir[0], 'w')
@@ -238,7 +241,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                                     for i in range(4):
                                         line = file_in.readline()
                                     continue
-                        this_seq = file_in.readline().strip()
+                        this_seq = file_in.readline().strip().strip("N")
                         # drop illegal reads
                         if len(this_seq) < word_size:
                             line_count += 4
@@ -335,7 +338,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                         log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
                         exit()
                     if line_count % 54321 == 0:
-                        to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
+                        to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count + 4) // 4)+" reads"
                         sys.stdout.write(to_print+'\b'*len(to_print))
                         sys.stdout.flush()
                     line_count += 1
@@ -377,8 +380,10 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
         del seq_duplicates
         del pre_reading
         len_indices = len(line_clusters)
-        log.info(memory_usage+str(len_indices)+" unique in all "+str(line_count//4)+" reads")
-
+        if rm_duplicates:
+            log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
+        else:
+            log.info(memory_usage + str(len_indices) + " reads")
     return forward_reverse_reads, line_clusters, pair_to_each_other, len_indices
 
 

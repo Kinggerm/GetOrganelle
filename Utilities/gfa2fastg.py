@@ -76,13 +76,20 @@ def read_gfa_as_fastg(gfa_file):
 
 def main():
     if len(sys.argv) > 1:
-        gfa_file = sys.argv[1]
+        for i in sys.argv:
+            if '-h' in i or 'help' in i:
+                print("gfa.py *.fastg")
+                break
+        else:
+            gfa_file = sys.argv[1]
+            write_fasta(gfa_file + '.fastg', read_gfa_as_fastg(gfa_file), False)
     else:
         if type(2/1) == float:
             gfa_file = input('Please input gfa file:').strip()
         else:
             gfa_file = raw_input('Please input gfa file:').strip()
-    write_fasta(gfa_file+'.fastg', read_gfa_as_fastg(gfa_file), False)
+        if gfa_file.strip():
+            write_fasta(gfa_file+'.fastg', read_gfa_as_fastg(gfa_file), False)
 
 
 if __name__ == '__main__':

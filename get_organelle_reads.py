@@ -68,15 +68,33 @@ def read_fasta(fasta_dir):
     return [names, seqs]
 
 
-def read_self_fq_seq_generator(fq_dir_list):
+def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
     if not ((type(fq_dir_list) is list) or (type(fq_dir_list) is tuple)):
         fq_dir_list = [fq_dir_list]
     for fq_dir in fq_dir_list:
         count = 0
-        for fq_line in open(fq_dir, 'rU'):
-            if count % 4 == 1:
-                yield fq_line
-            count += 1
+        if this_trim_values:
+            trim1, trim2 = [int(trim_value) for trim_value in this_trim_values.split(',')]
+            if trim2:
+                for fq_line in open(fq_dir, 'rU'):
+                    if count % 4 == 1:
+                        yield fq_line[trim1:(len(fq_line)-trim2)]
+                    count += 1
+            elif trim1:
+                for fq_line in open(fq_dir, 'rU'):
+                    if count % 4 == 1:
+                        yield fq_line[trim1:]
+                    count += 1
+            else:
+                for fq_line in open(fq_dir, 'rU'):
+                    if count % 4 == 1:
+                        yield fq_line
+                    count += 1
+        else:
+            for fq_line in open(fq_dir, 'rU'):
+                if count % 4 == 1:
+                    yield fq_line
+                count += 1
 
 
 def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file_name, temp2_clusters_dir, temp3_pair_dir, fastq_indices_in_memory, verbose, options, log):
@@ -529,7 +547,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
                 # clear former accepted words from memory
                 del acc_words
                 # then add new accepted words into memory
-                acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)]))
+                acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)], options.trim_values))
                 acc_contig_id_this_round = set()
             log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw) + memory_usage)
             #
@@ -1105,12 +1123,12 @@ def complicated_log(log, output_base):
     return log_timed
 
 
-__version__ = "1.9.79"
+__version__ = "1.9.80"
 
 
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle released by Jianjun Jin on Aug 8 2016." \
+    title = "\nGetOrganelle released by Jianjun Jin on Aug 13 2016." \
             "\n" \
             "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
@@ -1128,7 +1146,7 @@ def main():
             anti_lines = get_anti_lines_via_built_in_mapping(chop_seqs(read_fasta(options.anti_seed)[1]), options, log) if options.anti_seed else set()
         else:
             seed_fastq, anti_lines = mapping_with_bowtie2(options, log)
-            initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq))
+            initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, options.trim_values))
         log.info("Reading seeds finished.\n")
 
         """reading fastq files"""

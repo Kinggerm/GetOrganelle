@@ -155,6 +155,8 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file
 
 
 def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_base, anti_lines, options, log):
+    if options.trim_values:
+        trim1, trim2 = [int(trim_value) for trim_value in options.trim_values.split(',')]
     # read original reads
     # pair_to_each_other
     # line_cluster (list) ~ forward_reverse_reads
@@ -192,7 +194,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             else:
                 memory_usage = ''
             if rm_duplicates:
-                log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
+                log.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
             else:
                 log.info(memory_usage + str(len_indices) + " reads")
         else:
@@ -241,7 +243,9 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                                     for i in range(4):
                                         line = file_in.readline()
                                     continue
-                        this_seq = file_in.readline().strip().strip("N")
+                        this_seq = file_in.readline().strip()
+                        if options.trim_values:
+                            this_seq = this_seq[trim1:(len(this_seq)-trim2)].strip("N")
                         # drop illegal reads
                         if len(this_seq) < word_size:
                             line_count += 4
@@ -381,7 +385,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
         del pre_reading
         len_indices = len(line_clusters)
         if rm_duplicates:
-            log.info(memory_usage + str(len_indices) + " unique in all " + str(line_count // 4) + " reads")
+            log.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
         else:
             log.info(memory_usage + str(len_indices) + " reads")
     return forward_reverse_reads, line_clusters, pair_to_each_other, len_indices
@@ -949,6 +953,10 @@ def require_commands(print_title, version):
                                  ' ------------------------------------------------------ '
                                  '\n0 \t disable this slimming function'
                                  ' ------------------------------------------------------ ')
+    group_result.add_option('--trim', dest='trim_values',
+                            help='Assign the number of bases in the ends to trim in extending process. '
+                                 'This function will not change the length of the out put reads. '
+                                 'Input format: int,int (Example: 4,4). Default: 0,0')
     group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
                             help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
     group_result.add_option('--spades-options', dest='other_spades_options', default='--careful',

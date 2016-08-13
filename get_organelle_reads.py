@@ -731,6 +731,9 @@ def mapping_with_bowtie2(options, log):
                 build_seed_index = subprocess.Popen("bowtie2-build " + options.seed_file + " " + options.seed_file + '.index',
                                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_seed_index.communicate()
+            if "(ERR)" in str(output) or "Error:" in str(output):
+                log.error('\n'+str(output))
+                exit()
             if options.verbose_log:
                 log.info("\n"+str(output).strip())
             log.info("Making seed bowtie2 index finished.")
@@ -748,6 +751,9 @@ def mapping_with_bowtie2(options, log):
             options.fastq_file_1 + "," + options.fastq_file_2 + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
+        if "(ERR)" in str(output) or "Error:" in str(output):
+            log.error('\n' + str(output))
+            exit()
         if options.verbose_log:
             log.info("\n"+str(output).strip())
         if os.path.exists(total_seed_sam[0]):
@@ -770,6 +776,9 @@ def mapping_with_bowtie2(options, log):
                     build_anti_index = subprocess.Popen("bowtie2-build " + options.anti_seed + " " + options.anti_seed + '.index',
                                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                     output, err = build_anti_index.communicate()
+                if "(ERR)" in str(output) or "Error:" in str(output):
+                    log.error('\n' + str(output))
+                    exit()
                 if options.verbose_log:
                     log.info("\n" + str(output).strip())
                 log.info("Making anti-seed bowtie2 index finished.")
@@ -787,6 +796,9 @@ def mapping_with_bowtie2(options, log):
                                                       anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
                                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = make_anti_seed_bowtie2.communicate()
+            if "(ERR)" in str(output) or "Error:" in str(output):
+                log.error('\n'+str(output))
+                exit()
             if options.verbose_log:
                 log.info("\n" + str(output).strip())
             if os.path.exists(anti_seed_sam[0]):

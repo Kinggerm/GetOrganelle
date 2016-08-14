@@ -506,10 +506,13 @@ def write_hits_csv_for_bandage(in_names, include_file, ex_names, exclude_file, o
             if options.in_fastg_file:
                 full_name = short_candidates[edge]
                 full_name.sort()
-                if ':' in full_name[1]:
-                    next_edges = [x.rstrip('\'').split('_') for x in full_name[1].split(':')[1].split(',')]
-                    next_edges.sort(key=lambda x: -float(x[5].rstrip(';').rstrip('\'')))
-                    postfix = '>>' + next_edges[0][1]
+                try:
+                    if ':' in full_name[1]:
+                        next_edges = [x.rstrip('\'').split('_') for x in full_name[1].split(':')[1].split(',')]
+                        next_edges.sort(key=lambda x: -float(x[5].rstrip(';').rstrip('\'')))
+                        postfix = '>>' + next_edges[0][1]
+                except IndexError:
+                    pass
             this_string += '\t'+'>>'.join([x[2] for x in loci if x[2] != 'noncoding'])+postfix
             this_string += '\t'+'>>'.join([x[2] for x in loci])+postfix
             this_string += '\t'+'>>'.join([x[2]+'('+str(x[0])+'-'+str(x[1])+','+x[3]+')' for x in loci])+postfix

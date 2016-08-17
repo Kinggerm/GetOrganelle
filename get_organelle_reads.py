@@ -97,7 +97,7 @@ def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
                 count += 1
 
 
-def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file_name, temp2_clusters_dir, temp3_pair_dir, fastq_indices_in_memory, verbose, options, log):
+def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fastq_indices_in_memory, verbose, index_in_memory, log):
 
     if verbose:
         sys.stdout.write(' ' * 100 + '\b' * 100)
@@ -105,19 +105,12 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file
         log.info("Producing output ...")
         log.info("reading indices ...")
     accepted_lines = []
-    if options.index_in_memory:
+    if index_in_memory:
         # read cluster indices
         for this_index in accepted_contig_id:
             accepted_lines += fastq_indices_in_memory[1][this_index]
         # produce the pair-end output
         accepted_lines = set(accepted_lines)
-        if pair_end_out:
-            dump_candidates = set()
-            for candidate in accepted_lines:
-                if fastq_indices_in_memory[2][candidate] not in accepted_lines:
-                    dump_candidates.add(candidate)
-            accepted_lines -= dump_candidates
-
     else:
         # read cluster indices
         temp2_indices_file_in = open(temp2_clusters_dir, 'rU')
@@ -128,36 +121,19 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file
             this_index += 1
         accepted_lines = set(accepted_lines)
 
-        # produce the pair-end output
-        if pair_end_out:
-            pair_to_each_other = dict()
-            temp3_indices_file_in = open(temp3_pair_dir, 'rU')
-            line_count = 0
-            for line in temp3_indices_file_in:
-                if line_count in accepted_lines:
-                    pair_to_each_other[line_count] = int(line.strip())
-                line_count += 4
-            temp3_indices_file_in.close()
-            dump_candidates = set()
-            for candidate in accepted_lines:
-                if pair_to_each_other[candidate] not in accepted_lines:
-                    dump_candidates.add(candidate)
-            accepted_lines -= dump_candidates
-            del pair_to_each_other
-
     # write by line
     if verbose:
         log.info("writing fastq lines ...")
-    post_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
-    file_out = [open(out_file_name+'_1.fq', 'w'), open(out_file_name+'_2.fq', 'w')]
+    post_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
+    files_out = [open(out_file_name+'_'+str(i+1)+'.temp', 'w') for i in range(len(original_fq_files))]
     line_count = 0
-    for i in range(2):
+    for i in range(len(original_fq_files)):
         line = post_reading[i].readline()
         while line:
             if line_count in accepted_lines:
-                file_out[i].write(line)
+                files_out[i].write(line)
                 for j in range(3):
-                    file_out[i].write(post_reading[i].readline())
+                    files_out[i].write(post_reading[i].readline())
                     line_count += 1
                 line = post_reading[i].readline()
                 line_count += 1
@@ -165,18 +141,19 @@ def write_fq_results(original_fq_dir, accepted_contig_id, pair_end_out, out_file
                 for j in range(4):
                     line = post_reading[i].readline()
                     line_count += 1
-        file_out[i].close()
+        files_out[i].close()
         post_reading[i].close()
     del accepted_lines
+    for i in range(len(original_fq_files)):
+        os.rename(out_file_name + '_' + str(i + 1) + '.temp', out_file_name + '_' + str(i + 1) + '.fq')
     if verbose:
         log.info("writing fastq lines finished.")
 
 
-def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_base, anti_lines, options, log):
-    if options.trim_values:
-        trim1, trim2 = [int(trim_value) for trim_value in options.trim_values.split(',')]
+def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pseudo_assembled, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
+    if trim_values:
+        trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
     # read original reads
-    # pair_to_each_other
     # line_cluster (list) ~ forward_reverse_reads
     line_clusters = []
     seq_duplicates = {}
@@ -184,26 +161,18 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
     line_count = 0
     this_index = 0
     #
-    pair_to_each_other = {}
     name_to_line = {}
     #
     temp1_contig_dir = [os.path.join(output_base, k+'temp.indices.1') for k in ("_", "")]
     temp2_clusters_dir = [os.path.join(output_base, k+'temp.indices.2') for k in ("_", "")]
-    temp3_pair_dir = [os.path.join(output_base, k+'temp.indices.3') for k in ("_", "")]
-    if options.script_resume and os.path.exists(temp1_contig_dir[1]) and os.path.exists(temp2_clusters_dir[1]) and (os.path.exists(temp3_pair_dir[1]) or not options.pair_end_out):
-        if options.pseudo_assembled or options.index_in_memory:
+    if resume and os.path.exists(temp1_contig_dir[1]) and os.path.exists(temp2_clusters_dir[1]):
+        if pseudo_assembled or index_in_memory:
             log.info("Reading existed indices for fastq ...")
             #
             forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'rU')]
             #
             line_clusters = [[int(x) for x in y.split('\t')] for y in open(temp2_clusters_dir[1], 'rU')]
-            # read pair infos
-            if options.pair_end_out:
-                line_count = 0
-                for line in open(temp3_pair_dir[1], 'rU'):
-                    pair_to_each_other[line_count] = int(line)
-                    line_count += 4
-            elif rm_duplicates:
+            if rm_duplicates:
                 line_count = sum([len(x) for x in line_clusters])*4
             # log
             len_indices = len(line_clusters)
@@ -219,12 +188,12 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             log.info("indices for fastq existed!")
             len_indices = len([x for x in open(temp2_clusters_dir[1], 'rU')])
     else:
-        if not options.index_in_memory:
+        if not index_in_memory:
             temp1_contig_out = open(temp1_contig_dir[0], 'w')
-        pre_reading = [open(original_fq_dir[0], 'rU'), open(original_fq_dir[1], 'rU')]
+        pre_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
         for file_in in pre_reading:
             line = file_in.readline()
-            if options.bowtie2_anti_seed or options.anti_seed:
+            if bowtie2_anti_seed or anti_seed:
                 while line:
                     if line.startswith("@"):
                         try:
@@ -240,29 +209,13 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                             log.error('Unrecognized fq format in '+str(line_count)+' '+str(line))
                             exit()
                         else:
-                            if pair_end_out:
-                                try:
-                                    if this_name in name_to_line:
-                                        pair_to_each_other[line_count] = name_to_line[this_name]
-                                        pair_to_each_other[name_to_line[this_name]] = line_count
-                                    else:
-                                        name_to_line[this_name] = line_count
-                                    if this_name in anti_lines:
-                                        line_count += 4
-                                        for i in range(4):
-                                            line = file_in.readline()
-                                        continue
-                                except KeyError:
-                                    log.error('Unknown error in format. Please try to disable "--pair_end_out".')
-                                    exit()
-                            else:
-                                if (this_name, direction) in anti_lines:
-                                    line_count += 4
-                                    for i in range(4):
-                                        line = file_in.readline()
-                                    continue
+                            if (this_name, direction) in anti_lines:
+                                line_count += 4
+                                for i in range(4):
+                                    line = file_in.readline()
+                                continue
                         this_seq = file_in.readline().strip()
-                        if options.trim_values:
+                        if trim_values:
                             this_seq = this_seq[trim1:(len(this_seq)-trim2)].strip("N")
                         # drop illegal reads
                         if len(this_seq) < word_size:
@@ -279,14 +232,14 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                             else:
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
-                                if not options.index_in_memory:
+                                if not index_in_memory:
                                     temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
                         else:
                             line_clusters.append([line_count])
-                            if options.index_in_memory:
+                            if index_in_memory:
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                             else:
@@ -305,29 +258,6 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             else:
                 while line:
                     if line.startswith("@"):
-                        if pair_end_out:
-                            try:
-                                if ' ' in line:
-                                    this_head = line[1:].split(' ')
-                                    this_name, direction = this_head[0], int(this_head[1][0])
-                                elif '#' in line:
-                                    this_head = line[1:].split('#')
-                                    this_name, direction = this_head[0], int(this_head[1][0])
-                                else:
-                                    this_name, direction = line[1:].strip(), 1
-                            except (ValueError, IndexError):
-                                log.error('Unrecognized fq format.')
-                                exit()
-                            else:
-                                try:
-                                    if this_name in name_to_line:
-                                        pair_to_each_other[line_count] = name_to_line[this_name]
-                                        pair_to_each_other[name_to_line[this_name]] = line_count
-                                    else:
-                                        name_to_line[this_name] = line_count
-                                except KeyError:
-                                    log.error('Unknown error in format. Please try to disable "--pair_end_out".')
-                                    exit()
                         this_seq = file_in.readline().strip()
                         # drop illegal reads
                         if len(this_seq) < word_size:
@@ -344,14 +274,14 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                             else:
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
-                                if not options.index_in_memory:
+                                if not index_in_memory:
                                     temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
                         else:
                             line_clusters.append([line_count])
-                            if options.index_in_memory:
+                            if index_in_memory:
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                             else:
@@ -368,7 +298,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
                         line = file_in.readline()
                         line_count += 1
             file_in.close()
-        if not options.index_in_memory:
+        if not index_in_memory:
             temp1_contig_out.close()
             os.rename(temp1_contig_dir[0], temp1_contig_dir[1])
 
@@ -379,7 +309,7 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
 
         del name_to_line
 
-        if not options.index_in_memory:
+        if not index_in_memory:
             # dump line clusters
             len_indices = len(line_clusters)
             temp2_indices_file_out = open(temp2_clusters_dir[0], 'w')
@@ -389,16 +319,6 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             temp2_indices_file_out.close()
             os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
 
-            if pair_end_out:
-                # dump pair_to_each_other to file to save memory
-                # read in again in the last
-                temp3_pair_file_out = open(temp3_pair_dir[0], 'w')
-                for line_count_2 in range(0, line_count, 4):
-                    temp3_pair_file_out.write(str(pair_to_each_other[line_count_2])+'\n')
-                temp3_pair_file_out.close()
-                os.rename(temp3_pair_dir[0], temp3_pair_dir[1])
-                pair_to_each_other = None
-
         del seq_duplicates
         del pre_reading
         len_indices = len(line_clusters)
@@ -406,12 +326,12 @@ def read_fq_and_pair_infos(original_fq_dir, pair_end_out, rm_duplicates, output_
             log.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
         else:
             log.info(memory_usage + str(len_indices) + " reads")
-    return forward_reverse_reads, line_clusters, pair_to_each_other, len_indices
+    return forward_reverse_reads, line_clusters, len_indices
 
 
 def pseudo_assembly(fastq_indices_in_memory, dupli_threshold, log):
     global word_size
-    forward_and_reverse_reads, line_clusters, pairs, len_indices = fastq_indices_in_memory
+    forward_and_reverse_reads, line_clusters, len_indices = fastq_indices_in_memory
     log.info("Pseudo-assembly reads...")
     lines_with_duplicates = {}
     count_dupli = 0
@@ -520,7 +440,7 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_round, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, round_limit, output_base, jump_step, mesh_size, verbose, resume, options, log):
+def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base, round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, log):
     global word_size
     accepted_contig_id = set()
     accepted_contig_id_this_round = set()
@@ -543,11 +463,11 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
             else:
                 memory_usage = ''
             if fg_out_per_round:
-                write_fq_results(original_fq_dir, acc_contig_id_this_round, False, os.path.join(round_dir, "Round."+str(r_count)), os.path.join(output_base, 'temp.indices.2'), os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, verbose, options, log)
+                write_fq_results(original_fq_dir, acc_contig_id_this_round, os.path.join(round_dir, "Round."+str(r_count)), os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, verbose, bool(fastq_indices_in_memory), log)
                 # clear former accepted words from memory
                 del acc_words
                 # then add new accepted words into memory
-                acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(2)], options.trim_values))
+                acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(len(original_fq_dir))], trim_values))
                 acc_contig_id_this_round = set()
             log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw) + memory_usage)
             #
@@ -564,7 +484,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
             if verbose:
                 log.info("Round "+str(round_count)+": Start ...")
 
-            if options.index_in_memory:
+            if fastq_indices_in_memory:
                 reads_generator = (this_read for this_read in fastq_indices_in_memory[0])
             else:
                 reads_generator = (this_read.strip() for this_read in open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
@@ -666,9 +586,9 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, fg_out_per_rou
     return accepted_contig_id
 
 
-def get_anti_lines_via_built_in_mapping(anti_words, options, log):
+def get_anti_built_in_mapping(anti_words, anti_input, original_fq_files, log):
     anti_lines = set()
-    pre_reading = [open(options.fastq_file_1, 'rU'), open(options.fastq_file_2, 'rU')]
+    pre_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
     line_count = 0
 
     def add_to_anti_lines(here_head):
@@ -684,14 +604,11 @@ def get_anti_lines_via_built_in_mapping(anti_words, options, log):
         except (ValueError, IndexError):
             log.error('Unrecognized fq format in '+str(line_count))
             exit()
-        if options.pair_end_out:
-            anti_lines.add(this_name)
-        else:
-            anti_lines.add((this_name, direction))
+        anti_lines.add((this_name, direction))
 
     for file_in in pre_reading:
         line = file_in.readline()
-        if options.bowtie2_anti_seed or options.anti_seed:
+        if anti_input:
             while line:
                 if line.startswith("@"):
                     this_head = line[1:].strip()
@@ -720,108 +637,104 @@ def get_anti_lines_via_built_in_mapping(anti_words, options, log):
                 for i in range(3):
                     line = file_in.readline()
                     line_count += 1
+        file_in.close()
     return anti_lines
 
 
-def get_heads_from_sam(bowtie_sam_file, pair_end_out):
+def get_heads_from_sam(bowtie_sam_file):
     hit_heads = set()
-    if pair_end_out:
-        for line in open(bowtie_sam_file, 'rU'):
-            if line.strip() and not line.startswith('@'):
-                hit_heads.add(line.strip().split('\t')[0])
-    else:
-        for line in open(bowtie_sam_file, 'rU'):
-            if line.strip() and not line.startswith('@'):
-                line_split = line.strip().split('\t')
-                this_name = line_split[0]
-                flag = int(line_split[1])
-                direction = 1 if flag % 32 < 16 else 2
-                hit_heads.add((this_name, direction))
+    for line in open(bowtie_sam_file, 'rU'):
+        if line.strip() and not line.startswith('@'):
+            line_split = line.strip().split('\t')
+            this_name = line_split[0]
+            flag = int(line_split[1])
+            direction = 1 if flag % 32 < 16 else 2
+            hit_heads.add((this_name, direction))
     return hit_heads
 
 
-def mapping_with_bowtie2(options, log):
-    if options.seed_file:
-        if os.path.exists(options.seed_file+'.index.1.bt2l'):
+def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume, verbose_log, log):
+    if seed_file:
+        if os.path.exists(seed_file+'.index.1.bt2l'):
             log.info("seed bowtie2 index existed!")
         else:
             log.info("Making seed bowtie2 index ...")
-            build_seed_index = subprocess.Popen("bowtie2-build --large-index "+options.seed_file+" " + options.seed_file+'.index',
+            build_seed_index = subprocess.Popen("bowtie2-build --large-index "+seed_file+" " + seed_file+'.index',
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
             if "unrecognized option" in str(output):
-                build_seed_index = subprocess.Popen("bowtie2-build " + options.seed_file + " " + options.seed_file + '.index',
+                build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
                                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_seed_index.communicate()
             if "(ERR)" in str(output) or "Error:" in str(output):
                 log.error('\n'+str(output))
                 exit()
-            if options.verbose_log:
+            if verbose_log:
                 log.info("\n"+str(output).strip())
             log.info("Making seed bowtie2 index finished.")
-        seed_index_base = options.seed_file + '.index'
+        seed_index_base = seed_file + '.index'
     else:
-        seed_index_base = options.bowtie2_seed
-    total_seed_file = os.path.join(options.output_base, "Initial.mapped.fq")
-    total_seed_sam = [os.path.join(options.output_base, x+"seed_bowtie.sam") for x in ("temp.", "")]
-    if options.script_resume and os.path.exists(total_seed_sam[1]):
+        seed_index_base = bowtie2_seed
+    total_seed_file = [os.path.join(out_base, x + "Initial.mapped.fq") for x in ("temp.", "")]
+    total_seed_sam = [os.path.join(out_base, x + "seed_bowtie.sam") for x in ("temp.", "")]
+    if resume and os.path.exists(total_seed_file[1]):
         log.info("Initial seeds existed!")
     else:
         log.info("Mapping reads to seed bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 -p 4 --very-fast-local --al " + total_seed_file + " -x " + seed_index_base + " -U " +
-            options.fastq_file_1 + "," + options.fastq_file_2 + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
+            "bowtie2 -p 4 --very-fast-local --al " + total_seed_file[0] + " -x " + seed_index_base + " -U " +
+            ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
         if "(ERR)" in str(output) or "Error:" in str(output):
             log.error('\n' + str(output))
             exit()
-        if options.verbose_log:
+        if verbose_log:
             log.info("\n"+str(output).strip())
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
+            os.rename(total_seed_file[0], total_seed_file[1])
             log.info("Mapping finished.")
         else:
             log.error("Cannot find bowtie2 result!")
             exit()
-    # coverage_statistics = get_coverage(os.path.join(options.output_base, "bowtie.sam"))
-    if options.anti_seed or options.bowtie2_anti_seed:
-        if options.anti_seed:
-            if os.path.exists(options.anti_seed + '.index.1.bt2l'):
+    if anti_seed or bowtie2_anti_seed:
+        if anti_seed:
+            if os.path.exists(anti_seed + '.index.1.bt2l'):
                 log.info("anti-seed bowtie2 index existed!")
             else:
                 log.info("Making anti-seed bowtie2 index ...")
-                build_anti_index = subprocess.Popen("bowtie2-build --large-index " + options.anti_seed + " " + options.anti_seed + '.index',
+                build_anti_index = subprocess.Popen("bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
                                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_anti_index.communicate()
                 if "unrecognized option" in str(output):
-                    build_anti_index = subprocess.Popen("bowtie2-build " + options.anti_seed + " " + options.anti_seed + '.index',
+                    build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_seed + '.index',
                                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                     output, err = build_anti_index.communicate()
                 if "(ERR)" in str(output) or "Error:" in str(output):
                     log.error('\n' + str(output))
                     exit()
-                if options.verbose_log:
+                if verbose_log:
                     log.info("\n" + str(output).strip())
                 log.info("Making anti-seed bowtie2 index finished.")
-            anti_index_base = options.anti_seed + '.index'
+            anti_index_base = anti_seed + '.index'
         else:
-            anti_index_base = options.bowtie2_anti_seed
+            anti_index_base = bowtie2_anti_seed
 
-        anti_seed_sam = [os.path.join(options.output_base, x+"anti_seed_bowtie.sam") for x in ("temp.", "")]
-        if options.script_resume and os.path.exists(anti_seed_sam[1]):
+        anti_seed_sam = [os.path.join(out_base, x+"anti_seed_bowtie.sam") for x in ("temp.", "")]
+        if resume and os.path.exists(anti_seed_sam[1]):
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed bowtie2 index ...")
-            make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -x " + anti_index_base + " -1 " +
-                                                      options.fastq_file_1 + " -2 " + options.fastq_file_2 + " -S " +
+            make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -x " + anti_index_base + " -U " +
+                                                      ",".join(original_fq_files) + " -S " +
                                                       anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
                                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = make_anti_seed_bowtie2.communicate()
             if "(ERR)" in str(output) or "Error:" in str(output):
                 log.error('\n'+str(output))
                 exit()
-            if options.verbose_log:
+            if verbose_log:
                 log.info("\n" + str(output).strip())
             if os.path.exists(anti_seed_sam[0]):
                 os.rename(anti_seed_sam[0], anti_seed_sam[1])
@@ -830,44 +743,53 @@ def mapping_with_bowtie2(options, log):
                 log.error("Cannot find bowtie2 result!")
                 exit()
         log.info("Parsing bowtie2 result ...")
-        anti_lines = get_heads_from_sam(anti_seed_sam[1], options.pair_end_out) - \
-                     get_heads_from_sam(total_seed_sam[1], options.pair_end_out)
+        anti_lines = get_heads_from_sam(anti_seed_sam[1]) - get_heads_from_sam(total_seed_sam[1])
         log.info("Parsing bowtie2 result finished ...")
     else:
         anti_lines = set()
-    if False and not options.keep_temp_files:
-        os.remove(total_seed_sam[1])
-        if options.anti_seed or options.bowtie2_anti_seed:
-            os.remove(anti_seed_sam[1])
-    return total_seed_file, anti_lines
+    return total_seed_file[1], anti_lines
 
 
-def assembly_with_spades(options, log):
-    parameters = options.other_spades_options.strip('"')
+def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired, verbose_log, log):
     if '-k' in parameters:
         kmer = ''
     else:
-        kmer = '-k '+options.spades_kmer
-    if '-o' in parameters:
-        spades_out_put = ''
+        kmer = '-k '+spades_kmer
+    spades_out_put = '-o '+spades_out_put
+    if reads_paired['input'] and reads_paired['pair_out']:
+        spades_command = ' '.join(
+            ['spades.py', parameters, '-1', os.path.join(out_base, "filtered_1_paired.fq"), '-2',
+             os.path.join(out_base, "filtered_2_paired.fq"), '--s1', os.path.join(out_base, "filtered_1_unpaired.fq")] +
+            ['--s' + str(i + 3) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 3) + ".fq")) for i in
+             range(len(original_fq_files)-2)] +
+            ['--s2', os.path.join(out_base, "filtered_2_unpaired.fq"), kmer, spades_out_put]).strip()
     else:
-        spades_out_put = '-o '+os.path.join(options.output_base, "filtered_spades")
-    spades_command = ' '.join(['spades.py', parameters, '-1', os.path.join(options.output_base, "filtered_1.fq"), '-2', os.path.join(options.output_base, "filtered_2.fq"), kmer, spades_out_put]).strip()
+        spades_command = ' '.join(
+            ['spades.py', parameters] +
+            ['--s' + str(i + 1) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 1) + ".fq")) for i in
+             range(len(original_fq_files))] +
+            [kmer, spades_out_put]).strip()
     spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
     if "not recognized" in str(output):
-        if options.verbose_log:
-            log.warning('Problem with running SPAdes:')
-            log.warning(str(output))
-        log.warning("WAINING in SPAdes: unrecognized option in "+options.other_spades_options)
-        log.warning('Assembling failed.')
+        if verbose_log:
+            log.error('Problem with running SPAdes:')
+            log.error(str(output))
+        log.error("WAINING in SPAdes: unrecognized option in "+parameters)
+        log.error('Assembling failed.')
+        return False
+    elif "== Error ==" in str(output):
+        log.error("Error in SPAdes: \n== Error =="+str(output).split("== Error ==")[-1].split("In case you")[0])
+        log.error('Assembling failed.')
+        return False
     else:
-        if options.verbose_log:
+        if verbose_log:
             log.info(str(output))
         log.info('Assembling finished.\n')
+        return True
 
 
-def slim_spades_result(options, log, depth_threshold=0):
+def slim_spades_result(scheme, spades_output, verbose_log, log, depth_threshold=0):
     try:
         # python3
         blast_in_path = subprocess.getstatusoutput('blastn')
@@ -889,26 +811,43 @@ def slim_spades_result(options, log, depth_threshold=0):
     scheme_tranlation = {'cp': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt'),
                          'mt': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp'),
                          'nr': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')}
-    if options.scheme_for_slimming_spades_result in scheme_tranlation:
-        run_command = scheme_tranlation[options.scheme_for_slimming_spades_result]
+    if scheme in scheme_tranlation:
+        run_command = scheme_tranlation[scheme]
     else:
-        run_command = options.scheme_for_slimming_spades_result
-    if '-o' in options.other_spades_options:
-        graph_file = os.path.join(options.other_spades_options.split('-o')[1].strip().split(' ')[0], "assembly_graph.fastg")
-    else:
-        graph_file = os.path.join(options.output_base, "filtered_spades", "assembly_graph.fastg")
+        run_command = scheme
+    graph_file = os.path.join(spades_output, "assembly_graph.fastg")
     run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in str(output) or "command not found" in str(output):
-        if options.verbose_log:
+        if verbose_log:
             log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py")+' not found!')
             log.warning(str(output))
-        log.warning('Processing assembly result failed.')
+        log.warning("Processing assembly result failed.")
     else:
-        if options.verbose_log:
+        if verbose_log:
             log.info(str(output))
-        log.info('Processing assembly result finished!')
+        log.info("Processing assembly result finished!")
+
+
+def separate_fq_by_pair(out_base, verbose_log, log):
+    log.info("Separating filtered fastq file ... ")
+    run_command = os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py")\
+                  + ' ' + os.path.join(out_base, "filtered_1.fq")\
+                  + ' ' + os.path.join(out_base, "filtered_2.fq")
+    separating = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output, err = separating.communicate()
+    if "not recognized" in str(output) or "command not found" in str(output):
+        if verbose_log:
+            log.warning(os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py") + "not found!")
+            log.warning(str(output))
+        log.warning("Separating filtered fastq file failed.")
+        return False
+    else:
+        if verbose_log:
+            log.info(str(output))
+        log.info("Separating filtered fastq file finished!")
+        return True
 
 
 def require_commands(print_title, version):
@@ -920,8 +859,8 @@ def require_commands(print_title, version):
     parser = OptionParser(usage=usage, version=version, description=description)
     # group1
     group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
-    group_need.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool.')
-    group_need.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool.')
+    group_need.add_option('-1', dest='fastq_file_1', help='Input file with forward paired-end reads as pool.')
+    group_need.add_option('-2', dest='fastq_file_2', help='Input file with reverse paired-end reads as pool.')
     group_need.add_option('-s', dest='seed_file', help='Reference. Input fasta format file as initial seed '
                                                        'or input bowtie index base name as pre-seed (see flag "--bs")')
     group_need.add_option('-w', dest='word_size', type=int,
@@ -932,6 +871,9 @@ def require_commands(print_title, version):
                                                               " or serve as alternations of the required options")
     group_result.add_option('-R', dest='round_limit', type=int,
                             help='Limit running rounds (>=2).')
+    group_result.add_option('-u', dest='unpaired_fastq_files',
+                            help='Input file(s) with unpaired reads as pool. '
+                                 'files could be comma-separated lists such as "seq1,seq2".')
     group_result.add_option('--bs', dest='bowtie2_seed',
                             help='Input bowtie2 index base name as pre-seed. '
                                  'This flag serves as an alternation of flag "-s".')
@@ -980,8 +922,6 @@ def require_commands(print_title, version):
     group_result.add_option('--spades-options', dest='other_spades_options', default='--careful',
                             help='Other SPAdes options. Use double quotation marks to include all the arguments '
                                  'and parameters, such as "--careful -o test"')
-    group_result.add_option('--pair-end-out', dest='pair_end_out', action="store_true", default=False,
-                            help='Only accept reads with both sides of a pair been extended.')
     group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
                             help='Disable SPAdes.')
     group_result.add_option('--no-mapping', dest='utilize_mapping', action="store_false", default=True,
@@ -994,13 +934,17 @@ def require_commands(print_title, version):
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
                                                                     "Take easy to pick some according your computer's flavour")
     group_computational.add_option('-P', dest='pseudo_assembled', type=int, default=200000,
-                                   help='The maximum potential-organ reads to be pseudo-assembled before extension.'
-                                        ' The default value is 200000.'
-                                        ' For personal computer with 8G memory, we suggest no more than 300000.'
-                                        ' A larger number (ex. 600000) would run faster but exhaust memory'
-                                        ' in the first few minutes. Choose 0 to disable this process.')
+                                   help='The maximum potential-organ reads to be pseudo-assembled before extension. '
+                                        'pseudo_assembly is suggested when the whole genome coverage is shallow but '
+                                        'the organ genome coverage is deep.'
+                                        'The default value is 200000. '
+                                        'For personal computer with 8G memory, we suggest no more than 300000. '
+                                        'A larger number (ex. 600000) would run faster but exhaust memory '
+                                        'in the first few minutes. Choose 0 to disable this process.')
     group_computational.add_option('--continue', dest='script_resume', default=False, action="store_true",
-                                   help='limited function in this version. Only help you skip mapping process.')
+                                   help='Several check point based on files produced, rather than log, '
+                                        'so keep in mind that this script will not detect the difference '
+                                        'between this input parameters and the previous ones.')
     group_computational.add_option('--index-in-memory', dest='index_in_memory', action="store_true", default=False,
                                    help="Keep index in memory. Choose save index in memory than disk.")
     group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
@@ -1024,12 +968,31 @@ def require_commands(print_title, version):
         sys.stdout.write('\n"-h" for more usage')
         exit()
     else:
-        if not ((options.seed_file or options.bowtie2_seed) and options.fastq_file_1 and options.fastq_file_2 and options.word_size and options.output_base):
+        if not ((options.seed_file or options.bowtie2_seed) and ((options.fastq_file_1 and options.fastq_file_2) or options.unpaired_fastq_files) and options.word_size and options.output_base):
             parser.print_help()
             sys.stdout.write('\n############################################################################'
                              '\nERROR: Insufficient arguments!\nUsage:')
             sys.stdout.write(usage+'\n\n')
             exit()
+        if int(bool(options.fastq_file_1)) + int(bool(options.fastq_file_2)) == 1:
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: unbalanced paired reads!\n\n')
+            exit()
+        for check_file in (options.fastq_file_1, options.fastq_file_2, options.seed_file, options.anti_seed):
+            if check_file:
+                if not os.path.exists(check_file):
+                    sys.stdout.write('\n############################################################################'
+                                     '\nERROR: ' + check_file + ' not found!\n\n')
+                    exit()
+        if options.unpaired_fastq_files:
+            options.unpaired_fastq_files = options.unpaired_fastq_files.split(',')
+            for fastq_file in options.unpaired_fastq_files:
+                if not os.path.exists(fastq_file):
+                    sys.stdout.write('\n############################################################################'
+                                     '\nERROR: ' + fastq_file + ' not found!\n\n')
+                    exit()
+        else:
+            options.unpaired_fastq_files = []
         if options.jump_step < 1:
             sys.stdout.write('\n############################################################################'
                              '\nERROR: Jump step MUST be an integer that >= 1')
@@ -1047,7 +1010,7 @@ def require_commands(print_title, version):
         log = simple_log(logging.getLogger(), options.output_base)
         log.info(print_title)
         log.info(' '.join(sys.argv)+'\n')
-        log = complicated_log(log, options.output_base)
+        log = timed_log(log, options.output_base)
         if options.seed_file and options.bowtie2_seed:
             log.error('Simultaneously "-s" and "--bs" is not allowed!')
             exit()
@@ -1108,7 +1071,7 @@ def simple_log(log, output_base):
     return log_simple
 
 
-def complicated_log(log, output_base):
+def timed_log(log, output_base):
     log_timed = log
     for handler in list(log_timed.handlers):
         log_timed.removeHandler(handler)
@@ -1135,72 +1098,129 @@ def main():
             "\n"
     options, log = require_commands(print_title=title, version=__version__)
     try:
+        """ initialization """
         global word_size
         word_size = options.word_size
-        original_fq_dir = (options.fastq_file_1, options.fastq_file_2)
-
-        """reading seeds"""
-        log.info("Reading seeds...")
-        if not options.utilize_mapping:
-            initial_accepted_words = chop_seqs(read_fasta(options.seed_file)[1])
-            anti_lines = get_anti_lines_via_built_in_mapping(chop_seqs(read_fasta(options.anti_seed)[1]), options, log) if options.anti_seed else set()
+        if options.fastq_file_1 and options.fastq_file_2:
+            reads_paired = {'input': True, 'pair_out': bool}
+            original_fq_files = [options.fastq_file_1, options.fastq_file_2] + \
+                                [fastq_file for fastq_file in options.unpaired_fastq_files]
         else:
-            seed_fastq, anti_lines = mapping_with_bowtie2(options, log)
-            initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, options.trim_values))
-        log.info("Reading seeds finished.\n")
+            reads_paired = {'input': False, 'pair_out': False}
+            original_fq_files = [fastq_file for fastq_file in options.unpaired_fastq_files]
 
-        """reading fastq files"""
-        log.info("Pre-reading fastq ...")
-        fastq_indices_in_memory = read_fq_and_pair_infos(original_fq_dir, options.pair_end_out,
-                                                         options.rm_duplicates, options.output_base,
-                                                         anti_lines, options, log)
-        len_indices = fastq_indices_in_memory[3]
-        log.info("Pre-reading fastq finished.\n")
-
-        """pseudo-assembly if asked"""
-        # pseudo_assembly is suggested when the whole genome coverage is shallow but the organ genome coverage is deep
-        if options.pseudo_assembled:
-            groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(fastq_indices_in_memory,
-                                                                               options.pseudo_assembled, log)
+        resume = options.script_resume
+        verb_out = options.verbose_log
+        out_base = options.output_base
+        other_options = options.other_spades_options.split(' ')
+        if '-o' in other_options:
+            which_out = other_options.index('-o')
+            spades_output = other_options[which_out+1]
+            del other_options[which_out: which_out+2]
         else:
-            groups_of_duplicate_lines = None
-            lines_with_duplicates = None
-        if not options.index_in_memory:
-            fastq_indices_in_memory = None
+            spades_output = os.path.join(out_base, "filtered_spades")
+        other_options = ' '.join(other_options)
 
-        """extending process"""
-        log.info("Extending ...")
-        accepted_contig_id = extending_reads(initial_accepted_words, original_fq_dir, len_indices, options.fg_out_per_round,
-                                             options.pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates,
-                                             fastq_indices_in_memory, options.round_limit, options.output_base, options.jump_step,
-                                             options.mesh_size, options.verbose_log, options.script_resume, options, log)
-        write_fq_results(original_fq_dir, accepted_contig_id, options.pair_end_out,
-                         os.path.join(options.output_base, "filtered"), os.path.join(options.output_base, 'temp.indices.2'),
-                         os.path.join(options.output_base, 'temp.indices.3'), fastq_indices_in_memory, options.verbose_log, options, log)
-        del accepted_contig_id, fastq_indices_in_memory, groups_of_duplicate_lines, \
-            anti_lines, initial_accepted_words, lines_with_duplicates
-        if not options.keep_temp_files:
-            try:
-                os.remove(os.path.join(options.output_base, 'temp.indices.1'))
-                os.remove(os.path.join(options.output_base, 'temp.indices.2'))
-                os.remove(os.path.join(options.output_base, 'temp.indices.3'))
-            except OSError:
-                pass
-        log.info("Extending finished.\n")
+        """get reads"""
+        if not (resume and min([os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in range(len(original_fq_files))])):
+
+            seed_file = options.seed_file
+            bowt_seed = options.bowtie2_seed
+            anti_seed = options.anti_seed
+            b_at_seed = options.bowtie2_anti_seed
+            pseudoasm = options.pseudo_assembled
+            trim_ends = options.trim_values
+            in_memory = options.index_in_memory
+
+            """reading seeds"""
+            log.info("Reading seeds...")
+            if not options.utilize_mapping:
+                initial_accepted_words = chop_seqs(read_fasta(seed_file)[1])
+                anti_lines = get_anti_built_in_mapping(chop_seqs(read_fasta(anti_seed)[1]),
+                                                       (anti_seed or b_at_seed),
+                                                       original_fq_files, log) if anti_seed else set()
+            else:
+                seed_fastq, anti_lines = mapping_with_bowtie2(seed_file, bowt_seed, anti_seed,
+                                                              b_at_seed, original_fq_files,
+                                                              out_base, resume,
+                                                              verb_out, log)
+                initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, trim_ends))
+            log.info("Reading seeds finished.\n")
+
+            """reading fastq files"""
+            log.info("Pre-reading fastq ...")
+            fastq_indices_in_memory = read_fq_infos(original_fq_files, options.rm_duplicates, out_base,
+                                                    anti_lines, pseudoasm, in_memory,
+                                                    b_at_seed, anti_seed, trim_ends,
+                                                    resume, log)
+            len_indices = fastq_indices_in_memory[2]
+            log.info("Pre-reading fastq finished.\n")
+
+            """pseudo-assembly if asked"""
+            if pseudoasm:
+                groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(fastq_indices_in_memory,
+                                                                                   pseudoasm, log)
+            else:
+                groups_of_duplicate_lines = None
+                lines_with_duplicates = None
+            if not in_memory:
+                fastq_indices_in_memory = None
+
+            """extending process"""
+            log.info("Extending ...")
+            accepted_contig_id = extending_reads(initial_accepted_words, original_fq_files, len_indices,
+                                                 pseudoasm, groups_of_duplicate_lines, lines_with_duplicates,
+                                                 fastq_indices_in_memory, out_base, options.round_limit,
+                                                 options.fg_out_per_round,
+                                                 options.jump_step,
+                                                 options.mesh_size, verb_out, resume,
+                                                 trim_ends, log)
+            write_fq_results(original_fq_files, accepted_contig_id,
+                             os.path.join(out_base, "filtered"), os.path.join(out_base, 'temp.indices.2'),
+                             fastq_indices_in_memory, verb_out, in_memory, log)
+            del accepted_contig_id, fastq_indices_in_memory, groups_of_duplicate_lines, \
+                anti_lines, initial_accepted_words, lines_with_duplicates
+
+            if not options.keep_temp_files:
+                try:
+                    os.remove(os.path.join(out_base, 'temp.indices.1'))
+                    os.remove(os.path.join(out_base, 'temp.indices.2'))
+                except OSError:
+                    pass
+
+            log.info("Extending finished.\n")
+        else:
+            log.info("Extending ... skipped.")
+
+        if reads_paired['input']:
+            if not (resume and min([os.path.exists(x) for x in (os.path.join(out_base, "filtered_"+y+"_"+z+"paired.fq") for y in ('1', '2') for z in ('', 'un'))])):
+                resume = False
+                reads_paired['pair_out'] = separate_fq_by_pair(out_base, verb_out, log)
+            else:
+                log.info("Separating filtered fastq file ... skipped.")
 
         """assembly"""
         if options.run_spades:
-            log.info('Assembling with SPAdes ...')
-            assembly_with_spades(options, log)
-            if options.scheme_for_slimming_spades_result != '0':
-                slim_spades_result(options, log)
+            if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
+                # resume = False
+                log.info('Assembling with SPAdes ...')
+                assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
+                                     original_fq_files, reads_paired, options.verbose_log, log)
+            else:
+                log.info('Assembling with SPAdes ... skipped.')
 
-        log = simple_log(log, options.output_base)
+        """slim"""
+        if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))\
+                and options.scheme_for_slimming_spades_result != '0':
+            slim_spades_result(options.scheme_for_slimming_spades_result, spades_output,
+                               options.verbose_log, log)
+
+        log = simple_log(log, out_base)
         log.info("\nTotal Calc-cost "+str(time.time() - time0))
         log.info("Thanks you!")
     except:
         log.exception("")
-        log = simple_log(log, options.output_base)
+        log = simple_log(log, out_base)
         log.info("\nTotal Calc-cost " + str(time.time() - time0))
         log.info("Please email me if you find bugs!")
     logging.shutdown()

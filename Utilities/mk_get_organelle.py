@@ -15,6 +15,9 @@ parser.add_option('-p', dest='other_arguments',
 parser.add_option('--all', dest='skip_done', default=True, action='store_false',
                   help='Choose to make command for all samples including samples with results.'
                        'Default: skip those with results.')
+parser.add_option('--annotated', dest='ano_skip', default=False, action='store_true',
+                  help='Choose to make annotated command for skipped commands.'
+                       'Default: False.')
 parser.add_option('--strict', dest='strict_name', default=False, action='store_true',
                   help='Choose to only search for the fastq with the same base name with the directory '
                        '(*/*_1.fq). Default: relaxed searching.')
@@ -47,8 +50,11 @@ for dire in dirs:
             continue
     if options.skip_done and os.path.isdir(os.path.join(dire, options.output_base)):
         print('Warning: '+os.path.join(dire, options.output_base)+' already exists. Annotated!')
-        lines.append('# get_organelle_reads.py -1 '+these_files[0]+' -2 '+these_files[1]+' -o ' +
-                     os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')
+        if options.ano_skip:
+            lines.append('# get_organelle_reads.py -1 '+these_files[0]+' -2 '+these_files[1]+' -o ' +
+                         os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')
+        else:
+            pass
     else:
         lines.append('get_organelle_reads.py -1 ' + these_files[0] + ' -2 ' + these_files[1] + ' -o ' +
                      os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')

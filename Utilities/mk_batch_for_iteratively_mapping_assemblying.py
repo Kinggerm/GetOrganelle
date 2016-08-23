@@ -53,3 +53,18 @@ else:
         out_f_h.write('spades.py --careful -k ' + options.spades_kmer + ' -1 ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/1.mapped.fq -2 ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/2.mapped.fq -o ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/spades\n')
 out_f_h.close()
 os.system('chmod 777 ' + options.output_sh_file+'.sh')
+
+
+"""Copyright 2016 Jianjun Jin
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License."""

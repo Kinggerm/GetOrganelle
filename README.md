@@ -22,7 +22,7 @@ Many thanks to Chaonan Fu, Dr Wenbin Yu, Hantao Qin and Shuo Wang!
 
 My script was written in python 3.5.1, but compatible with 2.7.11.
 
-Execute following simple git command to download and keep update:
+Execute following simple git commands to download and keep update:
 
     git clone "https://github.com/Kinggerm/GetOrganelle"
 

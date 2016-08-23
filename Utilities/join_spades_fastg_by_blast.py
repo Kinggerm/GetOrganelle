@@ -174,27 +174,27 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     # find start and end points of query
     # initialize candidates: fastq topologies and sequences
     query_matrix = read_fasta(options.in_fastg_file)
-    len_fastq = len(query_matrix[0])
+    len_fastg = len(query_matrix[0])
     hits_candidates = {}
     short_names = []
-    for i in range(len_fastq):
+    for i in range(len_fastg):
         full_name = query_matrix[0][i]
         short_name = '_'.join(full_name.split()[0].split('_')[1:]).split('_length')[0]
         coverage = float(full_name.split('cov_')[1].split(';')[0].split('\'')[0].split(':')[0])
-        hits_candidates[short_name] = {False: [], True: [], 'coverage': coverage}
+        hits_candidates[short_name] = {False: set(), True: set(), 'coverage': coverage}
         short_names.append(short_name)
-    for i in range(len_fastq):
+    for i in range(len_fastg):
         full_name = query_matrix[0][i]
         short_name = short_names[i]
-        connected_edges = []
+        connected_edges = set()
         if ':' in full_name:
             for edge in full_name.rstrip(';').split(':')[1].split(','):
                 edge_short_name = '_'.join(edge.split('_')[1:]).split('_length')[0]
                 if edge_short_name in hits_candidates:
                     if edge.endswith('\''):
-                        connected_edges.append((edge_short_name, False))
+                        connected_edges.add((edge_short_name, False))
                     else:
-                        connected_edges.append((edge_short_name, True))
+                        connected_edges.add((edge_short_name, True))
         if full_name.split(';')[0].split(':')[0].endswith('\''):
             sequence = query_matrix[1][i]
             new_items = {('index', False): i,
@@ -237,6 +237,9 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     sys.stdout.write('\nDetected k-mer:'+str(k_mer))
 
     # calculate edge connections according to hits_candidates and max_gap
+    #
+    # wait to improve:
+    # miss the directions for jointed edges!
     def get_jointed_edges_within_distance(all_infos, this_edge, this_direction, length_left, jointed_edges, k_mer):
         for this_next_edge in all_infos[this_edge][this_direction]:
             this_length_left = length_left - all_infos[this_next_edge[0]]['len_seq'] + k_mer
@@ -318,7 +321,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
             for num in numbers.split('-'):
                 used_edge_numbers.append(int(num))
     used_edge_numbers.sort()
-    variances_to_pass = {'edge': used_edge_numbers[-1]+1, 'index': len_fastq}
+    variances_to_pass = {'edge': used_edge_numbers[-1]+1, 'index': len_fastg}
 
     def make_connections(edge1, base1, edge2, base2, k_mer):
         # if end to end and disable self-connection
@@ -373,8 +376,8 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
                                               True: [(edge2[0], edge2[2])],
                                               False: [(edge1[0], edge1[2])]}
                 variances_to_pass['index'] += 2
-                hits_candidates[edge1[0]][not edge1[2]].append((edge_name, True))
-                hits_candidates[edge2[0]][not edge2[2]].append((edge_name, False))
+                hits_candidates[edge1[0]][not edge1[2]].add((edge_name, True))
+                hits_candidates[edge2[0]][not edge2[2]].add((edge_name, False))
                 # add new edge to edge_connections (update)
                 edge_connections[(edge1[0], not edge1[2])] = get_jointed_edges_within_distance(hits_candidates, edge1[0], not edge1[2], options.max_gap_to_add+k_mer, set(), k_mer)
                 edge_connections[(edge2[0], not edge2[2])] = get_jointed_edges_within_distance(hits_candidates, edge2[0], not edge2[2], options.max_gap_to_add+k_mer, set(), k_mer)

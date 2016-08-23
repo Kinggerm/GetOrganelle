@@ -43,6 +43,8 @@ for dire in dirs:
             if len(these_files) != 2:
                 print('Warning: Undetermined fq file in '+dire+'. Omitted!')
                 continue
+        else:
+            continue
     if options.skip_done and os.path.isdir(os.path.join(dire, options.output_base)):
         print('Warning: '+os.path.join(dire, options.output_base)+' already exists. Annotated!')
         lines.append('# get_organelle_reads.py -1 '+these_files[0]+' -2 '+these_files[1]+' -o ' +

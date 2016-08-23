@@ -20,9 +20,19 @@ Many thanks to Chaonan Fu, Dr Wenbin Yu, Hantao Qin and Shuo Wang!
 ==========================================================================
 # Installation
 
-My script was written in python 3.5.1, but compatible with 2.7.11. You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
+My script was written in python 3.5.1, but compatible with 2.7.11.
 
-But, to get a complete organ genome (such as a chloroplast genome) rather than organ reads, other files in GetOrganelle are needed in the original relative path. Also, the following software are suggested to be installed and configured in the path, since they could be called automatically by my script:
+Execute following simple git command to download and keep update:
+
+    git clone "https://github.com/Kinggerm/GetOrganelle"
+
+    git pull
+
+It would be convenient to use my script if you add */GetOrganelle and */GetOrganelle/Utilities to the path.
+
+You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
+
+However, to get a complete organ genome (such as a chloroplast genome) rather than organ reads, other files in GetOrganelle are needed in the original relative path. Also, the following software are suggested to be installed and configured in the path, since they could be called automatically by my script:
 
 <a href='http://bioinf.spbau.ru/spades'>SPAdes</a>
 

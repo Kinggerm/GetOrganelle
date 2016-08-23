@@ -13,7 +13,7 @@ Similar pipelines (I will post the differences latter.):</p>
 3.<a href='http://metabarcoding.org/obitools'>OBItools</a> is no more suggested to do the same thing.</p>
 4.<a href='http://ibest.github.io/ARC'>ARC</a></p>
 5.<a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
-6.<a href='https://github.com/quxiaojian/PERR'>PERR</a> is my senior's perl practising work, which implements similar strategy but takes a different recruiting method and usually have a constant memory cost.</p>
+6.<a href='https://github.com/quxiaojian/PERR'>PERR</a> is my senior of the same group, Xiaojian Qu's perl version work, which implements similar strategy but takes a different recruiting method and usually have a constant memory cost.</p>
 
 Many thanks to Chaonan Fu, Dr Wenbin Yu, Hantao Qin and Shuo Wang!
 

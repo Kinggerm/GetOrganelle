@@ -8,21 +8,28 @@ if len(sys.argv) == 3:
         fq1 = sys.argv[1].strip().strip("\"").strip("\'")
         fq2 = sys.argv[2].strip().strip("\"").strip("\'")
         file1 = open(fq1, 'rU').readlines()
-        file2 = open(fq2, 'rU').readlines()
+        file2 = open(fq2, 'rU')
         names = {file1[i].split()[0].split('#')[0]: i for i in range(0, len(file1), 4)}
         outp_1 = open(fq1.rstrip('.fq')+'_paired.temp', 'w')
         outp_2 = open(fq2.rstrip('.fq')+'_paired.temp', 'w')
         outu_1 = open(fq1.rstrip('.fq')+'_unpaired.temp', 'w')
         outu_2 = open(fq2.rstrip('.fq')+'_unpaired.temp', 'w')
-        for i in range(0, len(file2), 4):
-            this_name = file2[i].split()[0]
+        this_line = file2.readline()
+        while this_line:
+            this_name = this_line.split()[0].split('#')[0]
             if this_name in names:
                 id = names[this_name]
                 outp_1.writelines(file1[id:id+4])
-                outp_2.writelines(file2[i:i+4])
+                outp_2.write(this_line)
+                for k in range(3):
+                    outp_2.write(file2.readline())
+                this_line = file2.readline()
                 del names[this_name]
             else:
-                outu_2.writelines(file2[i:i+4])
+                outu_2.write(this_line)
+                for k in range(3):
+                    outu_2.write(file2.readline())
+                this_line = file2.readline()
         for i in range(0, len(file1), 4):
             this_name = file1[i].split()[0]
             if this_name in names:

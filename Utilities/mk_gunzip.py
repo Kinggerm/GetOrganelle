@@ -13,6 +13,8 @@ parser.add_option('-o', dest='batch_file', default=os.path.join(os.getcwd(), 'gu
 parser.add_option('-n', dest='first_reads', type=int,
                         help='Only keep the first n (n >= 1) reads if the file is too large. '
                              'For get_organelle_reads.py and angiosperm cp genome, 7500000 is typically enough.')
+parser.add_option('-f', dest='overwrite', default=False, action='store_true',
+                        help='Overwrite even the fastq file exists.')
 options, args = parser.parse_args()
 
 if args:
@@ -33,7 +35,7 @@ for dire in dirs:
         except IndexError:
             print('Error: Unbalanced file in '+dire+'. Omitted!')
             continue
-        if os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_1.fq')) or os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_2.fq')):
+        if options.overwrite and os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_1.fq')) and os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_2.fq')):
             print('Warning: '+os.path.join(dire, dire+'_*.fq')+' already exists. Omitted!')
         else:
             new_files = [os.path.join(dire, os.path.split(dire)[1]+'_'+str(k)+'.fq') for k in (1, 2)]

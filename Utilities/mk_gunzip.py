@@ -10,6 +10,9 @@ parser.add_option('-e', dest='execute', action='store_true', default=False,
                              'Default: False. Mainly create the batch file and wait for user\'s command.')
 parser.add_option('-o', dest='batch_file', default=os.path.join(os.getcwd(), 'gunzip.bash.sh'),
                         help='Output file.')
+parser.add_option('-n', dest='first_reads', type=int,
+                        help='Only keep the first n (n >= 1) reads if the file is too large. '
+                             'For get_organelle_reads.py and angiosperm cp genome, 7500000 is typically enough.')
 options, args = parser.parse_args()
 
 if args:
@@ -40,6 +43,9 @@ for dire in dirs:
             else:
                 lines.append('echo -n "gunzip -c '+' '.join(file_1)+' > '+new_files[0]+' ..."\n')
             lines.append('gunzip -c '+' '.join(file_1)+' > '+new_files[0]+'\n')
+            if options.first_reads:
+                lines.append('head -n '+str(4*options.first_reads)+' '+new_files[0]+' > '+new_files[0]+'.temp\n')
+                lines.append('mv '+new_files[0]+'.temp '+new_files[0]+'\n')
             lines.append('echo " finished!"\n')
             
             if options.execute:
@@ -47,6 +53,9 @@ for dire in dirs:
             else:
                 lines.append('echo -n "gunzip -c '+' '.join(file_2)+' > '+new_files[1]+' ..."\n')
             lines.append('gunzip -c '+' '.join(file_2)+' > '+new_files[1]+'\n')
+            if options.first_reads:
+                lines.append('head -n '+str(4*options.first_reads)+' '+new_files[1]+' > '+new_files[1]+'.temp\n')
+                lines.append('mv '+new_files[1]+'.temp '+new_files[1]+'\n')
             lines.append('echo " finished!"\n')
 
 if options.execute:

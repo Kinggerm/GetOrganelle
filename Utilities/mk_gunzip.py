@@ -35,7 +35,7 @@ for dire in dirs:
         except IndexError:
             print('Error: Unbalanced file in '+dire+'. Omitted!')
             continue
-        if options.overwrite and os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_1.fq')) and os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_2.fq')):
+        if (not options.overwrite) and os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_1.fq')) and os.path.exists(os.path.join(dire, os.path.split(dire)[1]+'_2.fq')):
             print('Warning: '+os.path.join(dire, dire+'_*.fq')+' already exists. Omitted!')
         else:
             new_files = [os.path.join(dire, os.path.split(dire)[1]+'_'+str(k)+'.fq') for k in (1, 2)]

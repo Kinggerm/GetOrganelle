@@ -49,12 +49,12 @@ for dire in dirs:
         else:
             continue
     if options.skip_done and os.path.isdir(os.path.join(dire, options.output_base)):
-        print('Warning: '+os.path.join(dire, options.output_base)+' already exists. Annotated!')
         if options.ano_skip:
             lines.append('# get_organelle_reads.py -1 '+these_files[0]+' -2 '+these_files[1]+' -o ' +
                          os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')
+            print('Warning: ' + os.path.join(dire, options.output_base) + ' already exists. Annotated!')
         else:
-            pass
+            print('Warning: ' + os.path.join(dire, options.output_base) + ' already exists. Skipped!')
     else:
         lines.append('get_organelle_reads.py -1 ' + these_files[0] + ' -2 ' + these_files[1] + ' -o ' +
                      os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')

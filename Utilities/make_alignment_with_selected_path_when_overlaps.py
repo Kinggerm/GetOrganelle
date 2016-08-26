@@ -144,7 +144,7 @@ def check_similarity_and_continuity(string1, string2):
             return True
     # similarity
     minimum_dif = (1-options.similarity)*overlap_len
-    if find_string_difference(string1, string2, math.ceil(minimum_dif)) > minimum_dif:
+    if find_string_difference(string1, string2, math.ceil(minimum_dif))[0] > minimum_dif:
         return False
     else:
         return True

@@ -36,10 +36,14 @@ lines = []
 for dire in dirs:
     if options.strict_name:
         these_files = [os.path.join(dire, str(os.path.split(dire)[1])+'_'+str(y)+'.fq') for y in (1, 2)]
+        not_exist = False
         for this_file in these_files:
             if not os.path.exists(this_file):
+                not_exist = True
                 print('Warning: '+this_file+' not found! Omitted!')
-                continue
+                break
+        if not_exist:
+            continue
     else:
         these_files = [os.path.join(dire, y) for y in os.listdir(dire) if y.endswith('.fq') or y.endswith('.fastq')]
         if these_files:

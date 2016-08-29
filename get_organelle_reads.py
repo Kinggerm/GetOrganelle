@@ -1196,6 +1196,9 @@ def main():
             if not (resume and min([os.path.exists(x) for x in (os.path.join(out_base, "filtered_"+y+"_"+z+"paired.fq") for y in ('1', '2') for z in ('', 'un'))])):
                 resume = False
                 reads_paired['pair_out'] = separate_fq_by_pair(out_base, verb_out, log)
+                if reads_paired['pair_out'] and not options.keep_temp_files:
+                    os.remove(os.path.join(out_base, "filtered_1.fq"))
+                    os.remove(os.path.join(out_base, "filtered_2.fq"))
             else:
                 log.info("Separating filtered fastq file ... skipped.")
 

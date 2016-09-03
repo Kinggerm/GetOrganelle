@@ -1122,7 +1122,13 @@ def main():
         other_options = ' '.join(other_options)
 
         """get reads"""
-        if not (resume and min([os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in range(len(original_fq_files))])):
+        if reads_paired:
+            filtered_files_exist = min(
+                [os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '_unpaired.fq') for i in range(2)] +
+                [os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in range(2, len(original_fq_files))])
+        else:
+            filtered_files_exist = min([os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in range(len(original_fq_files))])
+        if not (resume and filtered_files_exist):
 
             seed_file = options.seed_file
             bowt_seed = options.bowtie2_seed

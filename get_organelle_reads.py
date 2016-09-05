@@ -750,22 +750,26 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     return total_seed_file[1], anti_lines
 
 
-def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired, verbose_log, log):
+def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired, verbose_log, resume, log):
     if '-k' in parameters:
         kmer = ''
     else:
         kmer = '-k '+spades_kmer
+    if resume:
+        continue_command = '--continue'
+    else:
+        continue_command = ''
     spades_out_put = '-o '+spades_out_put
     if reads_paired['input'] and reads_paired['pair_out']:
         spades_command = ' '.join(
-            ['spades.py', parameters, '-1', os.path.join(out_base, "filtered_1_paired.fq"), '-2',
+            ['spades.py', continue_command, parameters, '-1', os.path.join(out_base, "filtered_1_paired.fq"), '-2',
              os.path.join(out_base, "filtered_2_paired.fq"), '--s1', os.path.join(out_base, "filtered_1_unpaired.fq")] +
             ['--s' + str(i + 3) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 3) + ".fq")) for i in
              range(len(original_fq_files)-2)] +
             ['--s2', os.path.join(out_base, "filtered_2_unpaired.fq"), kmer, spades_out_put]).strip()
     else:
         spades_command = ' '.join(
-            ['spades.py', parameters] +
+            ['spades.py', continue_command, parameters] +
             ['--s' + str(i + 1) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 1) + ".fq")) for i in
              range(len(original_fq_files))] +
             [kmer, spades_out_put]).strip()
@@ -1215,7 +1219,7 @@ def main():
                 # resume = False
                 log.info('Assembling with SPAdes ...')
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
-                                     original_fq_files, reads_paired, options.verbose_log, log)
+                                     original_fq_files, reads_paired, options.verbose_log, resume, log)
             else:
                 log.info('Assembling with SPAdes ... skipped.')
 

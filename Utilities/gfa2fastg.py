@@ -81,8 +81,8 @@ def main():
                 print("Usage: gfa.py *.fastg")
                 break
         else:
-            gfa_file = sys.argv[1]
-            write_fasta(gfa_file + '.fastg', read_gfa_as_fastg(gfa_file), False)
+            for gfa_file in sys.argv[1:]:
+                write_fasta(gfa_file + '.fastg', read_gfa_as_fastg(gfa_file), False)
     else:
         if type(2/1) == float:
             gfa_file = input('Please input gfa file:').strip()

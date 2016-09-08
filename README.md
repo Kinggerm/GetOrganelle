@@ -40,7 +40,7 @@ However, to get a complete organ genome (such as a chloroplast genome) rather th
 
 <a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST</a>
 
-Besides, <a href='https://github.com/rrwick/Bandage'>Bandage</a> is suggested to view the final contig graph (*.fastg). And if you install python library psutil, the memory cost of get_organelle_reads.py will be automatically logged.
+Besides, <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (*.fastg). And if you install python library psutil, the memory cost of get_organelle_reads.py will be automatically logged.
 
 ==========================================================================
 # HowTo

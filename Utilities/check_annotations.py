@@ -386,7 +386,7 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
 
 
 def require_commands():
-    usage = "python this_script.py -q Query.gb -r Reference.gb" \
+    usage = "python this_script.py -g Query.gb -r Reference.gb" \
             "\n\nThis script only checks the mainly check the reliability of automatically annotated tRNA and CDS." \
             "\nBy jinjianjun@mail.kib.ac.cn"
     parser = OptionParser(usage=usage)

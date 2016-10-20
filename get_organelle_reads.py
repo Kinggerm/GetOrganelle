@@ -1049,6 +1049,7 @@ def require_commands(print_title, version):
                 # python2
                 spades_in_path = commands.getstatusoutput('spades.py -h')
             if spades_in_path[0] == 32512:
+                log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
                 options.run_spades = False
         if not options.rm_duplicates and options.pseudo_assembled:
             log.warning("remove duplicates was inactive, so that the pseudo-assembly was disabled.")

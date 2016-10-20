@@ -1090,7 +1090,7 @@ def timed_log(log, output_base):
     return log_timed
 
 
-__version__ = "1.9.80"
+__version__ = "1.9.81"
 
 
 def main():

@@ -541,7 +541,7 @@ def remove_temp_files(fastg_file):
             pass
 
 
-__version__ = "1.7.01"
+__version__ = "1.7.02"
 
 
 def main():

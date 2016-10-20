@@ -297,7 +297,7 @@ def blast_and_call_names(fasta_file, index_files, out_file):
                     # if overlap, then merge
                     i = 0
                     while i < len(names[query][template]):
-                        this_min, this_max = names[query][template][i]
+                        this_min, this_max, trans_query_score = names[query][template][i]
                         if q_max < this_min:
                             break
                         elif q_min > this_max:

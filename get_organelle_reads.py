@@ -1095,7 +1095,7 @@ __version__ = "1.9.80"
 
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle released by Jianjun Jin on Aug 13 2016." \
+    title = "\nGetOrganelle released by Jianjun Jin on Oct 19 2016." \
             "\n" \
             "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \

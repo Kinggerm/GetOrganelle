@@ -31,7 +31,7 @@ def check_db(reference_fa_base):
 def execute_blast(query, blast_db, output, outfmt):
     print("Executing BLAST ...")
     make_blast = subprocess.Popen(
-        'blastn -evalue 1E-10 -num_threads 4 -word_size 10 -query ' + query + ' -db ' + blast_db + ' -out ' + output + ' -outfmt '+str(outfmt),
+        'blastn -evalue 1E-30 -num_threads 4 -word_size 10 -query ' + query + ' -db ' + blast_db + ' -out ' + output + ' -outfmt '+str(outfmt),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = make_blast.communicate()
     if "(ERR)" in str(output) or "Error:" in str(output) or 'error' in str(output):
@@ -114,6 +114,8 @@ def require_options():
                            'the query would be exposed to discarded. Default: 0.9')
     parser.add_option('--blur', dest='blur_bases', default=False, action='store_true',
                       help='Replace hit low-coverage bases with N.')
+    parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
+                      help='Keep temp blast files.')
     options, args = parser.parse_args()
     if not args:
         parser.print_help()
@@ -122,7 +124,7 @@ def require_options():
     return options, args
 
 
-def purify_fastg(fastg_file, cov_threshold, len_threshold, blur):
+def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp):
     index_base = check_db(fastg_file)
     execute_blast(fastg_file, index_base, fastg_file + '.blast', 7)
     blast_result = open(fastg_file + '.blast', 'rU')
@@ -157,12 +159,17 @@ def purify_fastg(fastg_file, cov_threshold, len_threshold, blur):
         i += 1
     write_fasta_with_list(fastg_file+'.purified.fastg', fastg_matrix, True)
     blast_result.close()
+    if not keep_temp:
+        os.remove(fastg_file + '.blast')
+        for postfix in ('.nhr', '.nin', '.nsq'):
+            os.remove(fastg_file + '.index' + postfix)
 
 
 def main():
     options, args = require_options()
     for fastg_file in args:
-        purify_fastg(fastg_file, options.coverage_threshold, options.length_threshold, options.blur_bases)
+        purify_fastg(fastg_file, options.coverage_threshold, options.length_threshold,
+                     options.blur_bases, options.keep_temp)
 
 
 if __name__ == '__main__':

@@ -45,7 +45,7 @@ def require_commands():
     parser.add_option('-f', dest='in_fasta_file', help='followed by your input fasta file')
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters
-    parser.add_option('-m', dest='builtin_mode', default='cp',
+    parser.add_option('-F', dest='builtin_mode', default='cp',
                       help='followed with mode cp, mt, nr (which means chloroplast, mitochondria, nrDNA'
                            'separately; corresponding to certain arguments as following listed). '
                            'Modify the arguments activated by this flag with your more custom options.'
@@ -88,6 +88,8 @@ def require_commands():
                       help='Choose to disable producing csv file')
     parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
                       help='Choose to disable deleting temp files produced by blast and this script')
+    parser.add_option('--continue', dest='resume', default=False, action='store_true',
+                      help='Specified for calling from get_organelle_reads.py')
     try:
         (options, args) = parser.parse_args()
     except optparse.OptionConflictError as e:
@@ -285,12 +287,14 @@ def blast_and_call_names(fasta_file, index_files, out_file):
                 query, template = line_split[0].split('_')[1], line_split[1]
             else:
                 query, template = line_split[0], line_split[1]
-            q_start, q_end = int(line_split[6]), int(line_split[7])
+            q_start, q_end, q_score = int(line_split[6]), int(line_split[7]), float(line_split[2])
             q_min, q_max = min(q_start, q_end), max(q_start, q_end)
+            trans_q_score = (q_max - q_min + 1)*q_score
             if query in names:
                 if template not in names[query]:
-                    names[query][template] = [(q_min, q_max)]
+                    names[query][template] = [(q_min, q_max, trans_q_score)]
                 else:
+                    # if overlap, then merge
                     i = 0
                     while i < len(names[query][template]):
                         this_min, this_max = names[query][template][i]
@@ -303,10 +307,10 @@ def blast_and_call_names(fasta_file, index_files, out_file):
                             q_min = min(q_min, this_min)
                             q_max = min(q_max, this_max)
                             del names[query][template][i]
-                    names[query][template].insert(i, (q_min, q_max))
+                    names[query][template].insert(i, (q_min, q_max, trans_q_score))
             else:
                 names[query] = {}
-                names[query][template] = [(q_min, q_max)]
+                names[query][template] = [(q_min, q_max, trans_q_score)]
         sys.stdout.write('\nparse blast result cost'+str(time.time()-time1))
         return names
     else:
@@ -550,13 +554,15 @@ def main():
     del_complementary(fasta_file)
     # make blast database if not made
     include_index, exclude_index = check_db()
+    in_ex_info = 'only' * int(options.treat_no_hits == 'ex_no_hit') + 'extend' * int(
+        options.treat_no_hits == 'ex_no_con') + '+' + os.path.split(include_index)[-1] + '-' + \
+        os.path.split(exclude_index)[-1]
     # make blast
     in_names = blast_and_call_names(fasta_file=fasta_file, index_files=include_index, out_file=fasta_file+'.blast_in')
     ex_names = blast_and_call_names(fasta_file=fasta_file, index_files=exclude_index, out_file=fasta_file+'.blast_ex')
     # write out fasta according to blast
     fasta_matrix = read_fasta(fasta_dir=fasta_file)
     accept_names = map_names(come_include=set(in_names), come_exclude=set(ex_names), candidates=fasta_matrix[0])
-    in_ex_info = 'only'*int(options.treat_no_hits=='ex_no_hit')+'extend'*int(options.treat_no_hits=='ex_no_con')+'+'+os.path.split(include_index)[-1]+'-'+os.path.split(exclude_index)[-1]
     fasta_matrix = make_new_matrix_with_names(names=accept_names, old_matrix=fasta_matrix)
     write_fasta(out_dir=fasta_file+'.'+in_ex_info+'.'+fasta_file.split('.')[-1], matrix=fasta_matrix, overwrite=False)
     # write out hits csv according to blast

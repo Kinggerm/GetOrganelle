@@ -928,7 +928,7 @@ def require_commands(print_title, version):
                                  'and parameters, such as "--careful -o test"')
     group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
                             help='Disable SPAdes.')
-    group_result.add_option('--no-mapping', dest='utilize_mapping', action="store_false", default=True,
+    group_result.add_option('--no-bowtie2', dest='utilize_mapping', action="store_false", default=True,
                             help='Choose to disable mapping process.'
                                  'By default, this script would map original reads to pre-seed (or bowtie2 index) '
                                  'to acquire the initial seed. This requires bowtie2 to be installed '

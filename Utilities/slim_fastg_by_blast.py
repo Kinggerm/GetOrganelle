@@ -243,7 +243,7 @@ def blast_and_call_names(fasta_file, index_files, out_file, is_fastg):
                 query, hit = line_split[0], line_split[1]
             q_start, q_end, q_score = int(line_split[6]), int(line_split[7]), float(line_split[2])
             q_min, q_max = min(q_start, q_end), max(q_start, q_end)
-            # trans_q_score = (q_max - q_min + 1)*q_score
+            # q_score = abs(q_max - q_min + 1)*q_score
             if query in names:
                 if hit not in names[query]:
                     names[query][hit] = [(q_min, q_max, q_score)]
@@ -283,6 +283,32 @@ def get_coverages(matrix, is_fastg):
         return []
 
 
+def summarize_q_score(hits):
+    all_loci = []
+    for hit in hits:
+        for locus in hit:
+            all_loci.append(list(locus))
+    all_loci.sort(key=lambda x: (x[0], x[1]))
+    i = 0
+    while i < len(all_loci) - 1:
+        if all_loci[i][1] >= all_loci[i+1][0]:
+            if all_loci[i][2] > all_loci[i+1][2]:
+                all_loci[i+1][0] = all_loci[i][1] + 1
+                if all_loci[i+1][0] > all_loci[i+1][1]:
+                    del all_loci[i+1]
+                else:
+                    i += 1
+            else:
+                all_loci[i][1] = all_loci[i+1][0] - 1
+                if all_loci[i][0] > all_loci[i][1]:
+                    del all_loci[i]
+                else:
+                    i += 1
+        else:
+            i += 1
+    return sum([this_locus[2]*(this_locus[1]-this_locus[0]+1) for this_locus in all_loci])
+
+
 def modify_in_ex(in_names, ex_names, significant, coverages, depth_cutoff):
     here_in_names, here_ex_names = copy.deepcopy(in_names), copy.deepcopy(ex_names)
     if coverages:
@@ -294,52 +320,52 @@ def modify_in_ex(in_names, ex_names, significant, coverages, depth_cutoff):
         for query_name in list(ex_names):
             if query_name not in in_names:
                 training_ex.add(query_name)
-        test_sets = []
+
         for query_name in list(in_names):
             if query_name in ex_names:
-                in_name_score = sum([locus[2] for hit in in_names[query_name].values() for locus in hit])
-                ex_name_score = sum([locus[2] for hit in ex_names[query_name].values() for locus in hit])
+                in_name_score = summarize_q_score(list(in_names[query_name].values()))
+                ex_name_score = summarize_q_score(list(ex_names[query_name].values()))
                 if in_name_score / float(ex_name_score) > significant:
                     training_in.add(query_name)
                 elif ex_name_score / float(in_name_score) > significant:
                     training_ex.add(query_name)
-                else:
-                    test_sets.append(query_name)
-        if training_in and training_ex:
-            def get_average_coverage(here_q_list, here_info):
-                total_in_base = 0
-                total_in_len = 0
-                for here_q_name in here_q_list:
-                    this_coverage = coverages[here_q_name]
-                    for hit in here_info[here_q_name].values():
-                        for q_min, q_max, q_score in hit:
-                            this_len = abs(q_max - q_min) + 1
-                            total_in_len += this_len
-                            total_in_base += this_len*this_coverage
-                return total_in_base/float(total_in_len)
+
+        def get_average_coverage(here_q_list, here_info):
+            total_in_base = 0
+            total_in_len = 0
+            for here_q_name in here_q_list:
+                this_coverage = coverages[here_q_name]
+                for hit in here_info[here_q_name].values():
+                    for q_min, q_max, q_score in hit:
+                        this_len = abs(q_max - q_min) + 1
+                        total_in_len += this_len
+                        total_in_base += this_len * this_coverage
+            return total_in_base / float(total_in_len)
+
+        def combine_coverage_to_check():
             aver_in_coverage = get_average_coverage(training_in, in_names)
             aver_ex_coverage = get_average_coverage(training_ex, ex_names)
             sys.stdout.write('\naverage in coverage: '+str(aver_in_coverage))
             sys.stdout.write('\naverage ex coverage: '+str(aver_ex_coverage))
-            for query_name in list(here_in_names):
-                if query_name in here_ex_names:
-                    in_name_score = sum([locus[2] for hit in here_in_names[query_name].values() for locus in hit]) / \
-                                    (1+abs(math.log(coverages[query_name]/aver_in_coverage)))
-                    ex_name_score = sum([locus[2] for hit in here_ex_names[query_name].values() for locus in hit]) / \
-                                    (1+abs(math.log(coverages[query_name]/aver_ex_coverage)))
-                    if in_name_score / float(ex_name_score) > significant:
-                        del here_ex_names[query_name]
-                        training_in.add(query_name)
-                        training_ex.discard(query_name)
-                        # sys.stdout.write('\n' + ' ' * 4 + query_name + ' included: '
+            for q_name in list(here_in_names):
+                if q_name in here_ex_names:
+                    in_score = summarize_q_score(list(here_in_names[q_name].values())) / \
+                               (1+abs(math.log(coverages[q_name]/aver_in_coverage)))
+                    ex_score = summarize_q_score(list(here_ex_names[q_name].values())) / \
+                               (1+abs(math.log(coverages[q_name]/aver_ex_coverage)))
+                    if in_score / float(ex_score) > significant:
+                        del here_ex_names[q_name]
+                        training_in.add(q_name)
+                        training_ex.discard(q_name)
+                        # sys.stdout.write('\n' + ' ' * 4 + q_name + ' included: '
                         #                  + str(round(in_name_score, 2)) + '~' + str(round(ex_name_score, 2)))
-                    elif ex_name_score / float(in_name_score) > significant:
-                        del here_in_names[query_name]
-                        training_in.discard(query_name)
-                        training_ex.add(query_name)
-                        if 2 ** abs(math.log(coverages[query_name]/aver_in_coverage, 2)) <= 5:
-                            sys.stdout.write('\n' + ' ' * 4 + query_name + ' excluded: '
-                                             + str(round(in_name_score, 2)) + '~' + str(round(ex_name_score, 2)))
+                    elif ex_score / float(in_score) > significant:
+                        del here_in_names[q_name]
+                        training_in.discard(q_name)
+                        training_ex.add(q_name)
+                        if 2 ** abs(math.log(coverages[q_name]/aver_in_coverage, 2)) <= 5:
+                            sys.stdout.write('\n' + ' ' * 4 + q_name + ' excluded: '
+                                             + str(round(in_score, 2)) + '~' + str(round(ex_score, 2)))
                     else:
                         pass
                         # sys.stdout.write('\n' + ' ' * 4 + query_name + ' with both hits: '
@@ -348,18 +374,34 @@ def modify_in_ex(in_names, ex_names, significant, coverages, depth_cutoff):
             aver_ex_coverage = get_average_coverage(training_ex, ex_names)
             sys.stdout.write('\naverage in coverage: ' + str(aver_in_coverage))
             sys.stdout.write('\naverage ex coverage: ' + str(aver_ex_coverage))
-            for query_name in list(here_in_names):
-                if 2 ** abs(math.log(coverages[query_name] / aver_in_coverage, 2)) >= depth_cutoff:
-                    del here_in_names[query_name]
+            for q_name in list(here_in_names):
+                if 2 ** abs(math.log(coverages[q_name] / aver_in_coverage, 2)) >= depth_cutoff:
+                    del here_in_names[q_name]
             return here_in_names, here_ex_names, aver_in_coverage
+
+        if training_in and training_ex:
+            combine_coverage_to_check()
         else:
-            sys.stdout.write('\nNot enough coverage information found.')
+            for query_name in list(here_in_names):
+                if query_name in here_ex_names:
+                    in_name_score = summarize_q_score(list(here_in_names[query_name].values()))
+                    ex_name_score = summarize_q_score(list(here_ex_names[query_name].values()))
+                    if in_name_score / float(ex_name_score) > significant:
+                        training_in.add(query_name)
+                        training_ex.discard(query_name)
+                    elif ex_name_score / float(in_name_score) > significant:
+                        training_in.discard(query_name)
+                        training_ex.add(query_name)
+            if training_in and training_ex:
+                combine_coverage_to_check()
+            else:
+                sys.stdout.write('\nNot enough coverage information found.')
     else:
         sys.stdout.write('\nNo coverage information found.')
     for query_name in list(here_in_names):
         if query_name in here_ex_names:
-            in_name_score = sum([locus[2] for hit in here_in_names[query_name].values() for locus in hit])
-            ex_name_score = sum([locus[2] for hit in here_ex_names[query_name].values() for locus in hit])
+            in_name_score = summarize_q_score(list(here_in_names[query_name].values()))
+            ex_name_score = summarize_q_score(list(here_ex_names[query_name].values()))
             if in_name_score/float(ex_name_score) > significant:
                 del here_ex_names[query_name]
                 # sys.stdout.write('\n'+' ' * 4 + query_name + ' included: '

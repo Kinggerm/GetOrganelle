@@ -41,10 +41,8 @@ def require_commands():
     if makeblastdb_in_path[0] == 32512:
         sys.stdout.write('\nError: makeblastdb not in the path!')
         exit()
-    usage = 'python '+str(os.path.basename(__file__)+' -g your_fastg_file -m cp')
+    usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -m cp')
     parser = OptionParser(usage=usage)
-    parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
-    parser.add_option('-f', dest='in_fasta_file', help='followed by your input fasta file')
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters
     parser.add_option('-F', dest='builtin_mode', default='cp',
@@ -76,7 +74,7 @@ def require_commands():
                       help='Remove redundant low-coverage contigs that largely overlap some high-coverage contigs.')
     parser.add_option('--depth-cutoff', dest='depth_cutoff', default=100.0, type=float,
                       help='After detection for target coverage, those beyond certain times (depth cutoff) of the'
-                           ' detected coverage would be excluded. Default: 10.0')
+                           ' detected coverage would be excluded. Default: 100.0')
     parser.add_option('--depth-threshold', dest='depth_threshold',
                       help='Input a float or integer number. filter fastg file by depth. Default: no threshold.')
     parser.add_option('--include', dest='include',
@@ -139,10 +137,6 @@ def require_commands():
         if not len(args):
             sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!')
             exit()
-        if int(bool(options.depth_threshold))+int(bool(options.in_fasta_file)) > 1:
-            sys.stdout.write('\n\nOption Warning: you can use depth threshold only when you input a fastg file!'
-                             '\nDepth threshold disabled.')
-            options.depth_threshold = None
         sys.stdout.write('\n'+' '.join(sys.argv)+'\n')
 
 
@@ -389,7 +383,7 @@ def map_names(in_names, ex_names, candidates, is_fastg, aver_in_dep, coverages, 
             short_connections = {}
             for candidate in candidates:
                 this_short = candidate.split('_')[1]
-                if 2 ** abs(math.log(coverages[this_short] / aver_in_dep, 2)) >= depth_cutoff:
+                if aver_in_dep and 2 ** abs(math.log(coverages[this_short] / aver_in_dep, 2)) >= depth_cutoff:
                     continue
                 #
                 if this_short in short_candidates:
@@ -613,6 +607,7 @@ def main():
     require_commands()
     global options, args
     for i in range(len(args)):
+        sys.stdout.write('\nRound '+str(i+1)+'/'+str(len(args))+': '+args[i]+'\n')
         fas_file = args[i]
         is_fastg = fas_file.endswith('.fastg')
         # prepare fasta file
@@ -648,6 +643,9 @@ def main():
                                    exclude_file=exclude_index, out_file=fas_file+'.'+in_ex_info+'.', overwrite=False,
                                    is_fastg=is_fastg)
         remove_temp_files(fas_file, options.keep_temp, is_fastg)
+        os.remove(fas_file)
+        os.remove(args[i])
+        sys.stdout.write('\nRound ' + str(i+1) + '/' + str(len(args)) + ': ' + args[i] + ' finished!\n')
     sys.stdout.write('\nTotal cost: '+str(time.time()-time0)+'\n\n')
 
 

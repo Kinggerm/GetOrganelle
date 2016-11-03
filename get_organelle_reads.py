@@ -812,15 +812,15 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, depth_threshold=
     if makeblastdb_in_path[0] == 32512:
         log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
         return
-    scheme_tranlation = {'cp': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt'),
-                         'mt': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude-index ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp'),
-                         'nr': ' --include-index-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')}
+    scheme_tranlation = {'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt'),
+                         'mt': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp'),
+                         'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')}
     if scheme in scheme_tranlation:
         run_command = scheme_tranlation[scheme]
     else:
         run_command = scheme
     graph_file = os.path.join(spades_output, "assembly_graph.fastg")
-    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_spades_fastg_by_blast.py')+' -g '+ graph_file + run_command+' --depth-threshold '+str(depth_threshold)
+    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg_by_blast.py')+' ' + graph_file + run_command+' --depth-threshold '+str(depth_threshold)
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in str(output) or "command not found" in str(output):
@@ -909,11 +909,11 @@ def require_commands(print_title, version):
                                  'slim_spades_fastg_by_blast.py (should be under the same directory) '
                                  'with "cp". You can also make the index by your self.\t'
                                  ' ------------------------------------------------------ '
-                                 '\ncp \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+'"'
+                                 '\ncp \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+'"'
                                  ' ------------------------------------------------------ '
-                                 '\nmt \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude-index '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+'"'
+                                 '\nmt \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+'"'
                                  ' ------------------------------------------------------ '
-                                 '\nnr \t " --include-index-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+'"'
+                                 '\nnr \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+'"'
                                  ' ------------------------------------------------------ '
                                  '\n0 \t disable this slimming function'
                                  ' ------------------------------------------------------ ')

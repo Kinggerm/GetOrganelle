@@ -643,8 +643,8 @@ def main():
                                    exclude_file=exclude_index, out_file=fas_file+'.'+in_ex_info+'.', overwrite=False,
                                    is_fastg=is_fastg)
         remove_temp_files(fas_file, options.keep_temp, is_fastg)
-        os.remove(fas_file)
-        os.remove(args[i])
+        # os.remove(fas_file)
+        # os.remove(args[i])
         sys.stdout.write('\nRound ' + str(i+1) + '/' + str(len(args)) + ': ' + args[i] + ' finished!\n')
     sys.stdout.write('\nTotal cost: '+str(time.time()-time0)+'\n\n')
 

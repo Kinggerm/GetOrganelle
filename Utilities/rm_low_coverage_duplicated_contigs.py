@@ -21,7 +21,7 @@ def check_db(reference_fa_base):
         if 'Error' in str(output) or 'error' in str(output):
             print('ERROR: Blast terminated with following info:\n'+output.decode('utf-8'))
             exit()
-        print('Making BLAST db finished.\n')
+        print('Making BLAST db finished.')
     else:
         print('ERROR: No reference input!')
         exit()
@@ -116,6 +116,8 @@ def require_options():
                       help='Replace hit low-coverage bases with N.')
     parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
                       help='Keep temp blast files.')
+    parser.add_option('-o', dest='output',
+                      help='Output file. Default: *.purified.fastg')
     options, args = parser.parse_args()
     if not args:
         parser.print_help()
@@ -124,7 +126,7 @@ def require_options():
     return options, args
 
 
-def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp):
+def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, output):
     index_base = check_db(fastg_file)
     execute_blast(fastg_file, index_base, fastg_file + '.blast', 7)
     blast_result = open(fastg_file + '.blast', 'rU')
@@ -157,7 +159,10 @@ def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp):
                 for base_to_blur in suspicious_nodes[node_name]:
                     fastg_matrix[1][i][base_to_blur-1] = 'N'
         i += 1
-    write_fasta_with_list(fastg_file+'.purified.fastg', fastg_matrix, True)
+    if output:
+        write_fasta_with_list(output, fastg_matrix, True)
+    else:
+        write_fasta_with_list(fastg_file+'.purified.fastg', fastg_matrix, True)
     blast_result.close()
     if not keep_temp:
         os.remove(fastg_file + '.blast')
@@ -169,7 +174,7 @@ def main():
     options, args = require_options()
     for fastg_file in args:
         purify_fastg(fastg_file, options.coverage_threshold, options.length_threshold,
-                     options.blur_bases, options.keep_temp)
+                     options.blur_bases, options.keep_temp, options.output)
 
 
 if __name__ == '__main__':

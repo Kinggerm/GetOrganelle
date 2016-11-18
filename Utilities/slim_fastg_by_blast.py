@@ -72,7 +72,7 @@ def require_commands():
                            'rather than both.')
     parser.add_option('--keep-low-dup', dest='remove_low_duplicated', default=True, action='store_false',
                       help='Remove redundant low-coverage contigs that largely overlap some high-coverage contigs.')
-    parser.add_option('--depth-cutoff', dest='depth_cutoff', default=100.0, type=float,
+    parser.add_option('--depth-cutoff', dest='depth_cutoff', default=10000.0, type=float,
                       help='After detection for target coverage, those beyond certain times (depth cutoff) of the'
                            ' detected coverage would be excluded. Default: 100.0')
     parser.add_option('--depth-threshold', dest='depth_threshold',

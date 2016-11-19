@@ -137,10 +137,10 @@ def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, outp
             query_id = records[0]
             subject_id = records[1]
             if query_id != subject_id:
-                query_cov = float(query_id.split(':')[0].rstrip('\'').split('cov_')[1])
-                subject_cov = float(subject_id.split(':')[0].rstrip('\'').split('cov_')[1])
+                query_cov = float(query_id.split(':')[0].split(';')[0].rstrip('\'').split('cov_')[1])
+                subject_cov = float(subject_id.split(':')[0].split(';')[0].rstrip('\'').split('cov_')[1])
                 node_name = query_id.split(':')[0]
-                if query_cov/subject_cov < cov_threshold:
+                if subject_cov and query_cov/subject_cov < cov_threshold:
                     if node_name in suspicious_nodes:
                         for base in range(int(records[6]), int(records[7]) + 1):
                             suspicious_nodes[node_name].add(base)

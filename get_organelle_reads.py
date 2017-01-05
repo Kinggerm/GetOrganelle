@@ -1005,7 +1005,7 @@ def require_commands(print_title, version):
             sys.stdout.write('\n############################################################################'
                              '\nERROR: Mesh size MUST be an integer that >= 1')
             exit()
-        if options.fastq_file_1 == options.fastq_file_2:
+        if options.fastq_file_1 == options.fastq_file_2 and options.fastq_file_1:
             sys.stdout.write('\n############################################################################'
                              '\nERROR: 1st fastq file is the same with 2nd fastq file!')
             exit()

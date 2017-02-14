@@ -202,7 +202,7 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                                 this_name, direction = this_head[0], int(this_head[1][0])
                             elif '#' in line:
                                 this_head = line[1:].split('#')
-                                this_name, direction = this_head[0], int(this_head[1][0].strip("/"))
+                                this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
                             else:
                                 this_name, direction = line[1:].strip(), 1
                         except (ValueError, IndexError):
@@ -598,7 +598,7 @@ def get_anti_built_in_mapping(anti_words, anti_input, original_fq_files, log):
                 this_name, direction = here_head_split[0], int(here_head_split[1][0])
             elif '#' in here_head:
                 here_head_split = here_head.split('#')
-                this_name, direction = here_head_split[0], int(here_head_split[1][0].strip("/"))
+                this_name, direction = here_head_split[0], int(here_head_split[1].strip("/")[0])
             else:
                 this_name, direction = here_head, 1
         except (ValueError, IndexError):

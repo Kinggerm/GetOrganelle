@@ -202,7 +202,7 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                                 this_name, direction = this_head[0], int(this_head[1][0])
                             elif '#' in line:
                                 this_head = line[1:].split('#')
-                                this_name, direction = this_head[0], int(this_head[1][0])
+                                this_name, direction = this_head[0], int(this_head[1][0].strip("/"))
                             else:
                                 this_name, direction = line[1:].strip(), 1
                         except (ValueError, IndexError):
@@ -598,13 +598,14 @@ def get_anti_built_in_mapping(anti_words, anti_input, original_fq_files, log):
                 this_name, direction = here_head_split[0], int(here_head_split[1][0])
             elif '#' in here_head:
                 here_head_split = here_head.split('#')
-                this_name, direction = here_head_split[0], int(here_head_split[1][0])
+                this_name, direction = here_head_split[0], int(here_head_split[1][0].strip("/"))
             else:
                 this_name, direction = here_head, 1
         except (ValueError, IndexError):
             log.error('Unrecognized fq format in '+str(line_count))
             exit()
-        anti_lines.add((this_name, direction))
+        else:
+            anti_lines.add((this_name, direction))
 
     for file_in in pre_reading:
         line = file_in.readline()
@@ -884,7 +885,11 @@ def require_commands(print_title, version):
     group_result.add_option('-a', dest='anti_seed', help='Anti-reference. Input fasta format file as anti-seed, '
                                                          'where the extension process stop. Typically serves as '
                                                          'excluding chloroplast reads when extending mitochondrial '
-                                                         'reads, or the other way around.')
+                                                         'reads, or the other way around. You should be cautious about '
+                                                         'using this option, because if the anti-seed includes '
+                                                         'some word in the target but not in the seed, the result '
+                                                         'would have gaps. Typically, use the mt and cp from the same '
+                                                         'species as seed and anti-seed.')
     group_result.add_option('--ba', dest='bowtie2_anti_seed',
                             help='Input bowtie2 index base name as pre-anti-seed. '
                                  'This flag serves as an alternation of flag "-a".')

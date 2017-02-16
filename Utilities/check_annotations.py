@@ -74,6 +74,7 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
             error_in_gb.append('\t'.join(annotation_lines[i]))
         elif annotation_lines[i][0] in utilize_types and 'gene=' in ''.join(annotation_lines[i][2:]):
             if ".." not in annotation_lines[i][1]:
+                sys.stdout.write(gb_name+":\n"+str(annotation_lines[i])+"\n")
                 raise IndexError
                 # error_in_gb.append('\t'.join(annotation_lines[i]))
             else:
@@ -511,13 +512,13 @@ def main():
                 q_matrix = read_fasta(query_gb)
             except:
                 sys.stdout.write("Error: No available query found!\n")
-                os._exit(0)
+                continue
         else:
             try:
                 q_matrix = read_gb_as_geneious_format_fasta_matrix(query_gb)
             except:
                 sys.stdout.write("Error: No available query found!\n")
-                os._exit(0)
+                continue
         q_dict, q_names = parse_geneious_fasta(q_matrix)
         """read reference"""
         try:

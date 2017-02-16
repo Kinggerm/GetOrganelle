@@ -394,7 +394,7 @@ def require_commands():
             "\nBy jinjianjun@mail.kib.ac.cn"
     parser = OptionParser(usage=usage)
     group_need = OptionGroup(parser, "NECESSARY OPTIONS")
-    group_need.add_option('-r', dest='reference_gb', help='input reference *.gb file')  # , default='Reference.gb'
+    group_need.add_option('-r', dest='reference_gb', help='input reference *.gb file')
     group_alternation = OptionGroup(parser, "ALTERNATION of NECESSARY OPTIONS")
     group_alternation.add_option('-d', dest='reference_fasta', help='input reference fasta file exported exported by "Extract Annotations"-"Export"-"Selected Documents"-fasta in Geneious, remember to choose "Replace spaces in sequence name with underscores"')
     group_optional = OptionGroup(parser, "OPTIONAL OPTIONS")
@@ -408,6 +408,8 @@ def require_commands():
     parser.add_option_group(group_alternation)
     parser.add_option_group(group_optional)
     options, args = parser.parse_args()
+    if not (len(args) and options.reference_gb or options.reference_fasta):
+        parser.print_help()
     return options, args
 
 

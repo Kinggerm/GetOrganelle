@@ -73,58 +73,62 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
         if annotation_lines[i][0] in utilize_types and 'gene=' not in ''.join(annotation_lines[i][2:]):
             error_in_gb.append('\t'.join(annotation_lines[i]))
         elif annotation_lines[i][0] in utilize_types and 'gene=' in ''.join(annotation_lines[i][2:]):
-            # delete join() and order()
-            while 'join' in annotation_lines[i][1]:
-                join_loc = annotation_lines[i][1].index('join')
-                pairs = get_parentheses_pairs(annotation_lines[i][1])
-                right = pairs[1][pairs[0].index(join_loc+4)]
-                annotation_lines[i][1] = annotation_lines[i][1][:right]+annotation_lines[i][1][right+1:]
-                annotation_lines[i][1] = annotation_lines[i][1][:join_loc]+annotation_lines[i][1][join_loc+5:]
-            while 'order' in annotation_lines[i][1]:
-                order_loc = annotation_lines[i][1].index('order')
-                pairs = get_parentheses_pairs(annotation_lines[i][1])
-                right = pairs[1][pairs[0].index(order_loc+5)]
-                annotation_lines[i][1] = annotation_lines[i][1][:right]+annotation_lines[i][1][right+1:]
-                annotation_lines[i][1] = annotation_lines[i][1][:order_loc]+annotation_lines[i][1][order_loc+6:]
-            # assume all parentheses left are complements
-            # find out all complements
-            annotation_lines[i][1] = annotation_lines[i][1].replace('complement', '')
-            complements = get_parentheses_pairs(annotation_lines[i][1])
-            # find out all region pairs
-            ellipsis = {}
-            for l in range(0, len(annotation_lines[i][1])-1):
-                if annotation_lines[i][1][l:l+2] == '..':
-                    ellipsis[l] = 'forward'
-                    # and find out the directions according to the position of complement tag -- left parentheses
-                    for m in range(0, len(complements[0])):
-                        if complements[0][m] < l < complements[1][m]:
-                            ellipsis[l] = 'reverse'
-                            break
-            ellipsis_key = [x for x in ellipsis]
-            ellipsis_key.sort()
-            # read into regions_separate
-            unit_dict = {'type': annotation_lines[i][0]}
-            for j in range(2, len(annotation_lines[i])):
-                unit_dict[annotation_lines[i][j].split('=')[0]] = '='.join(annotation_lines[i][j].split('=')[1:]).strip('"').strip('\'')
-            regions_units.append([[], [], unit_dict])
-            #
-            region_parts = [[int(y.replace('>', '').replace('<', '')) for y in x.split('..')] for x in annotation_lines[i][1].replace('(', '').replace(')', '').split(',')]
-            for l in range(0, len(region_parts)):
-                this_direction = ellipsis[ellipsis_key[l]]
-                this_start = region_parts[l][0]
-                this_end = region_parts[l][1]
-                #
-                separate_dict = {'type': annotation_lines[i][0], 'direction': this_direction}
+            if ".." not in annotation_lines[i][1]:
+                raise IndexError
+                # error_in_gb.append('\t'.join(annotation_lines[i]))
+            else:
+                # delete join() and order()
+                while 'join' in annotation_lines[i][1]:
+                    join_loc = annotation_lines[i][1].index('join')
+                    pairs = get_parentheses_pairs(annotation_lines[i][1])
+                    right = pairs[1][pairs[0].index(join_loc+4)]
+                    annotation_lines[i][1] = annotation_lines[i][1][:right]+annotation_lines[i][1][right+1:]
+                    annotation_lines[i][1] = annotation_lines[i][1][:join_loc]+annotation_lines[i][1][join_loc+5:]
+                while 'order' in annotation_lines[i][1]:
+                    order_loc = annotation_lines[i][1].index('order')
+                    pairs = get_parentheses_pairs(annotation_lines[i][1])
+                    right = pairs[1][pairs[0].index(order_loc+5)]
+                    annotation_lines[i][1] = annotation_lines[i][1][:right]+annotation_lines[i][1][right+1:]
+                    annotation_lines[i][1] = annotation_lines[i][1][:order_loc]+annotation_lines[i][1][order_loc+6:]
+                # assume all parentheses left are complements
+                # find out all complements
+                annotation_lines[i][1] = annotation_lines[i][1].replace('complement', '')
+                complements = get_parentheses_pairs(annotation_lines[i][1])
+                # find out all region pairs
+                ellipsis = {}
+                for l in range(0, len(annotation_lines[i][1])-1):
+                    if annotation_lines[i][1][l:l+2] == '..':
+                        ellipsis[l] = 'forward'
+                        # and find out the directions according to the position of complement tag -- left parentheses
+                        for m in range(0, len(complements[0])):
+                            if complements[0][m] < l < complements[1][m]:
+                                ellipsis[l] = 'reverse'
+                                break
+                ellipsis_key = [x for x in ellipsis]
+                ellipsis_key.sort()
+                # read into regions_separate
+                unit_dict = {'type': annotation_lines[i][0]}
                 for j in range(2, len(annotation_lines[i])):
-                    separate_dict[annotation_lines[i][j].split('=')[0]] = '='.join(annotation_lines[i][j].split('=')[1:]).strip('"').strip('\'')
+                    unit_dict[annotation_lines[i][j].split('=')[0]] = '='.join(annotation_lines[i][j].split('=')[1:]).strip('"').strip('\'')
+                regions_units.append([[], [], unit_dict])
                 #
-                regions_separate.append([this_start, this_end, separate_dict])
-                #
-                regions_units[-1][0].append((this_start, this_end))
-                regions_units[-1][1].append(this_direction)
-                if by_site:
-                    for base in range(region_parts[l][0], region_parts[l][1]+1):
-                        annotation_list[base].append(separate_dict)
+                region_parts = [[int(y.replace('>', '').replace('<', '')) for y in x.split('..')] for x in annotation_lines[i][1].replace('(', '').replace(')', '').split(',')]
+                for l in range(0, len(region_parts)):
+                    this_direction = ellipsis[ellipsis_key[l]]
+                    this_start = region_parts[l][0]
+                    this_end = region_parts[l][1]
+                    #
+                    separate_dict = {'type': annotation_lines[i][0], 'direction': this_direction}
+                    for j in range(2, len(annotation_lines[i])):
+                        separate_dict[annotation_lines[i][j].split('=')[0]] = '='.join(annotation_lines[i][j].split('=')[1:]).strip('"').strip('\'')
+                    #
+                    regions_separate.append([this_start, this_end, separate_dict])
+                    #
+                    regions_units[-1][0].append((this_start, this_end))
+                    regions_units[-1][1].append(this_direction)
+                    if by_site:
+                        for base in range(region_parts[l][0], region_parts[l][1]+1):
+                            annotation_list[base].append(separate_dict)
     if error_in_gb:
         sys.stdout.write('\nUnrecognized annotations in '+gb_name+':')
         for error_line in error_in_gb:
@@ -386,16 +390,14 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
 
 
 def require_commands():
-    usage = "python this_script.py -g Query.gb -r Reference.gb" \
+    usage = "python this_script.py Query.gb -r Reference.gb" \
             "\n\nThis script only checks the mainly check the reliability of automatically annotated tRNA and CDS." \
             "\nBy jinjianjun@mail.kib.ac.cn"
     parser = OptionParser(usage=usage)
     group_need = OptionGroup(parser, "NECESSARY OPTIONS")
-    group_need.add_option('-g', dest='query_gb', help='input query *.gb file')
     group_need.add_option('-r', dest='reference_gb', help='input reference *.gb file')  # , default='Reference.gb'
     group_alternation = OptionGroup(parser, "ALTERNATION of NECESSARY OPTIONS")
-    group_alternation.add_option('-q', dest='query_fasta', help='input query fasta file exported by "Extract Annotations"-"Export"-"Selected Documents"-fasta in Geneious, remember to choose "Replace spaces in sequence name with underscores"')
-    group_alternation.add_option('-d', dest='reference_fasta', help='input reference fasta file exported in the same way as above')
+    group_alternation.add_option('-d', dest='reference_fasta', help='input reference fasta file exported exported by "Extract Annotations"-"Export"-"Selected Documents"-fasta in Geneious, remember to choose "Replace spaces in sequence name with underscores"')
     group_optional = OptionGroup(parser, "OPTIONAL OPTIONS")
     group_optional.add_option('--t-ends', dest='ends_trna', help='Default=10. The length to check at the both ends of tRNA.', type=int, default=10)
     group_optional.add_option('--c-ends', dest='ends_cds', help='Default:not activated. Activate this calculation and assign the length to check at the both ends of CDS.', type=int)
@@ -406,8 +408,8 @@ def require_commands():
     parser.add_option_group(group_need)
     parser.add_option_group(group_alternation)
     parser.add_option_group(group_optional)
-    (options, args) = parser.parse_args()
-    return options
+    options, args = parser.parse_args()
+    return options, args
 
 
 def check_stop(sequences):
@@ -494,95 +496,97 @@ def length_similarity(query_seqs, refer_seqs):
 
 
 def main():
-    time0 = time.time()
-    options = require_commands()
-    time_tag = '='*35+'\nKinggerm @ '+time.asctime(time.localtime(time.time()))+'\n'+'='*35
-    print(time_tag)
-    pseudo_block = ['\nABNORMAL GENES:\n']
-    not_in_query = ['\nNOT IN QUERY ERROR:\n']
-    not_in_refer = ['\nNOT IN REFER ERROR:\n']
-    alternations = ['\nALTERNATION CHOICE:\n']
-    """read query"""
-    try:
-        q_matrix = read_gb_as_geneious_format_fasta_matrix(options.query_gb)
-    except:
-        try:
-            q_matrix = read_fasta(options.query_fasta)
-        except:
-            sys.stdout.write("Error: No available query found!\n")
-            os._exit(0)
-    q_dict, q_names = parse_geneious_fasta(q_matrix)
-    """read reference"""
-    try:
-        ref_matrix = read_gb_as_geneious_format_fasta_matrix(options.reference_gb)
-    except:
-        try:
-            ref_matrix = read_fasta(options.reference_fasta)
-        except:
-            sys.stdout.write("Error: No available reference found!")
-            os._exit(0)
-    ref_dict, ref_names = parse_geneious_fasta(ref_matrix)
-    """check query annotations"""
-    for annotation in q_names:
-        # print annotation
-        if ';_' in annotation:
-            for q_seq in q_dict[annotation]:
-                scores = []
-                for sub_annotation in annotation.split(';_'):
-                    if sub_annotation not in ref_dict:
-                        not_in_refer.append('  '+sub_annotation+' of _'+annotation+'\n')
-                        scores.append([0, sub_annotation])
-                    else:
-                        ratios = []
-                        for r_seq in ref_dict[sub_annotation]:
-                            seq_len = float(len(r_seq))
-                            ratios.append((seq_len-find_string_difference(q_seq, r_seq, 0)[0])/seq_len)
-                        scores.append([max(ratios), sub_annotation])
-                scores.sort(key=lambda x: -x[0])
-                alternations.append('  >'+'; '.join([x[1]+':'+str(round(x[0], 2)) for x in scores])+'\n  '+q_seq+'\n')
+    options, args = require_commands()
+    for query_gb in args:
+        time0 = time.time()
+        time_tag = '='*35+'\nKinggerm @ '+time.asctime(time.localtime(time.time()))+'\n'+'='*35
+        print(time_tag)
+        pseudo_block = ['\nABNORMAL GENES:\n']
+        not_in_query = ['\nNOT IN QUERY ERROR:\n']
+        not_in_refer = ['\nNOT IN REFER ERROR:\n']
+        alternations = ['\nALTERNATION CHOICE:\n']
+        """read query"""
+        if query_gb.endswith(".fasta"):
+            try:
+                q_matrix = read_fasta(query_gb)
+            except:
+                sys.stdout.write("Error: No available query found!\n")
+                os._exit(0)
         else:
-            if annotation not in ref_dict:
-                not_in_refer.append('  '+annotation+'\n')
+            try:
+                q_matrix = read_gb_as_geneious_format_fasta_matrix(query_gb)
+            except:
+                sys.stdout.write("Error: No available query found!\n")
+                os._exit(0)
+        q_dict, q_names = parse_geneious_fasta(q_matrix)
+        """read reference"""
+        try:
+            ref_matrix = read_gb_as_geneious_format_fasta_matrix(options.reference_gb)
+        except:
+            try:
+                ref_matrix = read_fasta(options.reference_fasta)
+            except:
+                sys.stdout.write("Error: No available reference found!")
+                os._exit(0)
+        ref_dict, ref_names = parse_geneious_fasta(ref_matrix)
+        """check query annotations"""
+        for annotation in q_names:
+            # print annotation
+            if ';_' in annotation:
+                for q_seq in q_dict[annotation]:
+                    scores = []
+                    for sub_annotation in annotation.split(';_'):
+                        if sub_annotation not in ref_dict:
+                            not_in_refer.append('  '+sub_annotation+' of _'+annotation+'\n')
+                            scores.append([0, sub_annotation])
+                        else:
+                            ratios = []
+                            for r_seq in ref_dict[sub_annotation]:
+                                seq_len = float(len(r_seq))
+                                ratios.append((seq_len-find_string_difference(q_seq, r_seq, 0)[0])/seq_len)
+                            scores.append([max(ratios), sub_annotation])
+                    scores.sort(key=lambda x: -x[0])
+                    alternations.append('  >'+'; '.join([x[1]+':'+str(round(x[0], 2)) for x in scores])+'\n  '+q_seq+'\n')
             else:
-                if not min([len(x.strip()) for x in q_dict[annotation]]):
-                    pseudo_block.append('  Losing entire '+annotation+'\n')
-                elif annotation.endswith('_CDS') or annotation.endswith('_cds'):
-                    if not check_stop(q_dict[annotation]):
-                        pseudo_block.append('  Stop codon of '+annotation+'\n')
-                    elif not check_start(q_dict[annotation]):
-                        pseudo_block.append('  Initiation of '+annotation+'\n')
-                    elif not check_length(q_dict[annotation], ref_dict[annotation], options.length):
-                        pseudo_block.append('  Length of '+annotation+'\n')
-                    elif options.enable_similarity and not check_similarity(q_dict[annotation], ref_dict[annotation], options.similarity, options.length):
-                        pseudo_block.append('  Similarity of '+annotation+'\n')
-                    elif options.ends_cds and not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_cds):
-                        pseudo_block.append('  Start/&End of '+annotation+'\n')
-                elif annotation.endswith('_trna') or annotation.endswith('_tRNA'):
-                    if not check_length(q_dict[annotation], ref_dict[annotation], options.length):
-                        pseudo_block.append('  Length of '+annotation+'\n')
-                    elif not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_trna):
-                        pseudo_block.append('  Start/&End of '+annotation+'\n')
-                    elif options.enable_similarity and not check_similarity(q_dict[annotation], ref_dict[annotation], options.similarity, options.length):
-                        pseudo_block.append('  Similarity of '+annotation+'\n')
+                if annotation not in ref_dict:
+                    not_in_refer.append('  '+annotation+'\n')
                 else:
-                    if options.ends_all and not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_all):
-                        pseudo_block.append('  Start/&End of '+annotation+'\n')
-    for annotation in ref_names:
-        if annotation not in q_dict:
-            not_in_query.append('  '+annotation+'\n')
-    if options.query_gb:
-        out_log = open(options.query_gb+'.check.log', 'a')
-    else:
-        out_log = open(options.query_fasta+'.check.log', 'a')
-    out_log.write(time_tag+'\n')
-    for line in [pseudo_block[0]]+sorted(pseudo_block[1:])+[not_in_query[0]]+sorted(not_in_query[1:])\
-            +[not_in_refer[0]]+not_in_refer[1:]+[alternations[0]]+alternations[1:]:
-        sys.stdout.write(line)
-        out_log.write(line)
-    cost_time = '\n\nCost: '+str(round(time.time()-time0, 4))+'s\n'
-    sys.stdout.write(cost_time)
-    out_log.write(cost_time)
-    out_log.close()
+                    if not min([len(x.strip()) for x in q_dict[annotation]]):
+                        pseudo_block.append('  Losing entire '+annotation+'\n')
+                    elif annotation.endswith('_CDS') or annotation.endswith('_cds'):
+                        if not check_stop(q_dict[annotation]):
+                            pseudo_block.append('  Stop codon of '+annotation+'\n')
+                        elif not check_start(q_dict[annotation]):
+                            pseudo_block.append('  Initiation of '+annotation+'\n')
+                        elif not check_length(q_dict[annotation], ref_dict[annotation], options.length):
+                            pseudo_block.append('  Length of '+annotation+'\n')
+                        elif options.enable_similarity and not check_similarity(q_dict[annotation], ref_dict[annotation], options.similarity, options.length):
+                            pseudo_block.append('  Similarity of '+annotation+'\n')
+                        elif options.ends_cds and not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_cds):
+                            pseudo_block.append('  Start/&End of '+annotation+'\n')
+                    elif annotation.endswith('_trna') or annotation.endswith('_tRNA'):
+                        if not check_length(q_dict[annotation], ref_dict[annotation], options.length):
+                            pseudo_block.append('  Length of '+annotation+'\n')
+                        elif not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_trna):
+                            pseudo_block.append('  Start/&End of '+annotation+'\n')
+                        elif options.enable_similarity and not check_similarity(q_dict[annotation], ref_dict[annotation], options.similarity, options.length):
+                            pseudo_block.append('  Similarity of '+annotation+'\n')
+                    else:
+                        if options.ends_all and not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_all):
+                            pseudo_block.append('  Start/&End of '+annotation+'\n')
+        for annotation in ref_names:
+            if annotation not in q_dict:
+                not_in_query.append('  '+annotation+'\n')
+        out_log = open(query_gb+'.check.log', 'a')
+        out_log.write(time_tag+'\n')
+        for line in [pseudo_block[0]]+sorted(pseudo_block[1:])+[not_in_query[0]]+sorted(not_in_query[1:])\
+                +[not_in_refer[0]]+not_in_refer[1:]+[alternations[0]]+alternations[1:]:
+            sys.stdout.write(line)
+            out_log.write(line)
+        cost_time = '\n\nCost: '+str(round(time.time()-time0, 4))+'s\n'
+        sys.stdout.write(cost_time)
+        out_log.write(cost_time)
+        out_log.close()
 
 
 if __name__ == '__main__':

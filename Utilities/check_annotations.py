@@ -74,9 +74,7 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
             error_in_gb.append('\t'.join(annotation_lines[i]))
         elif annotation_lines[i][0] in utilize_types and 'gene=' in ''.join(annotation_lines[i][2:]):
             if ".." not in annotation_lines[i][1]:
-                sys.stdout.write(gb_name+":\n"+str(annotation_lines[i])+"\n")
-                raise IndexError
-                # error_in_gb.append('\t'.join(annotation_lines[i]))
+                error_in_gb.append("Direction not defined in "+str(annotation_lines[i][2]))
             else:
                 # delete join() and order()
                 while 'join' in annotation_lines[i][1]:
@@ -131,7 +129,7 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
                         for base in range(region_parts[l][0], region_parts[l][1]+1):
                             annotation_list[base].append(separate_dict)
     if error_in_gb:
-        sys.stdout.write('\nUnrecognized annotations in '+gb_name+':')
+        sys.stdout.write('\nProblematic annotations in '+gb_name+':')
         for error_line in error_in_gb:
             sys.stdout.write('\n'+error_line)
         sys.stdout.write('\n')

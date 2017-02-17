@@ -56,7 +56,7 @@ def get_parentheses_pairs(tree_string, sign=('(', ')')):
 # get_parentheses_pairs('th((i))s')
 # get_parentheses_pairs('this')
 # if long string, make this dict
-utilize_types = {'gene', 'tRNA', 'rRNA', 'exon', 'intron', 'CDS'}
+utilize_types = {'gene', 'tRNA', 'rRNA', 'exon', 'intron', 'CDS', 'cds', 'trna', 'rrna'}
 
 
 def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
@@ -136,16 +136,16 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
     # locate region that occupied by genes
     names = {}
     gene_regions = []
-    gene_regions += [x for x in regions_separate if x[2]['type'] == 'CDS']
+    gene_regions += [x for x in regions_separate if x[2]['type'] in ('CDS', 'cds')]
     for x in gene_regions:
         names[x[2]['gene']] = 0
-    gene_regions += [x for x in regions_separate if x[2]['type'] == 'tRNA' and x[2]['gene'] not in names]
+    gene_regions += [x for x in regions_separate if x[2]['type'] in ('tRNA', 'trna') and x[2]['gene'] not in names]
     for x in gene_regions:
         names[x[2]['gene']] = 0
-    gene_regions += [x for x in regions_separate if x[2]['type'] == 'rRNA' and x[2]['gene'] not in names]
+    gene_regions += [x for x in regions_separate if x[2]['type'] in ('rRNA', 'rrna') and x[2]['gene'] not in names]
     for x in gene_regions:
         names[x[2]['gene']] = 0
-    gene_regions += [x for x in regions_separate if x[2]['type'] == 'intron' and x[2]['gene'] not in names]
+    gene_regions += [x for x in regions_separate if x[2]['type'] in ('intron', ) and x[2]['gene'] not in names]
     gene_regions.sort(key=lambda x:x[0])
     gene_regions_last = gene_regions[:]
     gene_regions_last.sort(key=lambda x:x[1])
@@ -311,7 +311,7 @@ def read_gb_as_geneious_format_fasta_matrix(gb_dir):
 def parse_geneious_fasta(fasta_matrix):
     seq_dict = {}
     for i in range(len(fasta_matrix[0])):
-        this_annotation = fasta_matrix[0][i].split('_-_')[-1].replace("_cds", "_CDS").replace("_trna", "_tRNA")
+        this_annotation = fasta_matrix[0][i].split('_-_')[-1].replace("_cds", "_CDS").replace("_trna", "_tRNA").replace("_rrna", "rRNA")
         if this_annotation in seq_dict:
             if fasta_matrix[1][i] not in seq_dict[this_annotation]:
                 seq_dict[this_annotation].append(fasta_matrix[1][i])

@@ -311,7 +311,7 @@ def read_gb_as_geneious_format_fasta_matrix(gb_dir):
 def parse_geneious_fasta(fasta_matrix):
     seq_dict = {}
     for i in range(len(fasta_matrix[0])):
-        this_annotation = fasta_matrix[0][i].split('_-_')[-1]
+        this_annotation = fasta_matrix[0][i].split('_-_')[-1].replace("_cds", "_CDS").replace("_trna", "_tRNA")
         if this_annotation in seq_dict:
             if fasta_matrix[1][i] not in seq_dict[this_annotation]:
                 seq_dict[this_annotation].append(fasta_matrix[1][i])
@@ -554,7 +554,7 @@ def main():
                 else:
                     if not min([len(x.strip()) for x in q_dict[annotation]]):
                         pseudo_block.append('  Losing entire '+annotation+'\n')
-                    elif annotation.endswith('_CDS') or annotation.endswith('_cds'):
+                    elif annotation.endswith('_CDS'):
                         if not check_stop(q_dict[annotation]):
                             pseudo_block.append('  Stop codon of '+annotation+'\n')
                         elif not check_start(q_dict[annotation]):
@@ -565,7 +565,7 @@ def main():
                             pseudo_block.append('  Similarity of '+annotation+'\n')
                         elif options.ends_cds and not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_cds):
                             pseudo_block.append('  Start/&End of '+annotation+'\n')
-                    elif annotation.endswith('_trna') or annotation.endswith('_tRNA'):
+                    elif annotation.endswith('_tRNA'):
                         if not check_length(q_dict[annotation], ref_dict[annotation], options.length):
                             pseudo_block.append('  Length of '+annotation+'\n')
                         elif not check_ends(q_dict[annotation], ref_dict[annotation], options.length, options.ends_trna):

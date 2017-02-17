@@ -580,6 +580,8 @@ def main():
                 not_in_query.append('  '+annotation+'\n')
         out_log = open(query_gb+'.check.log', 'a')
         out_log.write(time_tag+'\n')
+        sys.stdout.write("File " + query_gb + "\n")
+        out_log.write("File " + query_gb + "\n")
         for line in [pseudo_block[0]]+sorted(pseudo_block[1:])+[not_in_query[0]]+sorted(not_in_query[1:])\
                 +[not_in_refer[0]]+not_in_refer[1:]+[alternations[0]]+alternations[1:]:
             sys.stdout.write(line)

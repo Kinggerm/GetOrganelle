@@ -1,25 +1,41 @@
 #!/usr/bin/env python
-import time, datetime
+import time
+import datetime
 import sys
 import os
-import subprocess
-try:
-    import commands
-except:
-    pass
 import logging
 from optparse import OptionParser, OptionGroup
 
+
+major_version, minor_version = sys.version_info[:2]
+if major_version == 2 and minor_version >= 7:
+    python_version = "2.7+"
+elif major_version == 3 and minor_version >= 5:
+    python_version = "3.5+"
+else:
+    sys.stdout.write("Python version have to be 2.7+ or 3.5+")
+    sys.exit(0)
+if python_version == "2.7+":
+    import commands
+else:
+    import subprocess
+dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 word_size = int
-try:
+
+
+def executable(test_this):
+    return True if os.access(test_this, os.X_OK) or subprocess.getstatusoutput(test_this)[0] not in dead_code else False
+
+
+if python_version == "2.7+":
     # python2
     import string
     translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
     def complementary_seq(input_seq):
         return string.translate(input_seq, translator)[::-1]
-except AttributeError:
+else:
     # python3
     translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
@@ -795,22 +811,10 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
 
 
 def slim_spades_result(scheme, spades_output, verbose_log, log, depth_threshold=0):
-    try:
-        # python3
-        blast_in_path = subprocess.getstatusoutput('blastn')
-    except AttributeError:
-        # python2
-        blast_in_path = commands.getstatusoutput('blastn')
-    if blast_in_path[0] == 32512:
+    if not executable("blastn"):
         log.warning('blastn not in the path!\nSkip slimming assembly result ...')
         return
-    try:
-        # python3
-        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
-    except AttributeError:
-        # python2
-        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
-    if makeblastdb_in_path[0] == 32512:
+    if not executable("makeblastdb"):
         log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
         return
     scheme_tranlation = {'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt'),
@@ -1029,13 +1033,7 @@ def require_commands(print_title, version):
         if options.bowtie2_seed or options.bowtie2_anti_seed:
             options.utilize_mapping = True
         if options.utilize_mapping:
-            try:
-                # python3
-                bowtie2_in_path = subprocess.getstatusoutput('bowtie2')
-            except:
-                # python2
-                bowtie2_in_path = commands.getstatusoutput('bowtie2')
-            if bowtie2_in_path[0] == 32512:
+            if not executable("bowtie2"):
                 options.utilize_mapping = False
                 if options.seed_file:
                     log.warning('bowtie2 not in the path! Take the seed file as initial seed.')
@@ -1047,13 +1045,7 @@ def require_commands(print_title, version):
                 else:
                     log.warning('bowtie2 not in the path! Anti-seed disabled!')
         if options.run_spades:
-            try:
-                # python3
-                spades_in_path = subprocess.getstatusoutput('spades.py -h')
-            except:
-                # python2
-                spades_in_path = commands.getstatusoutput('spades.py -h')
-            if spades_in_path[0] == 32512:
+            if not executable("spades.py -h"):
                 log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
                 options.run_spades = False
         if not options.rm_duplicates and options.pseudo_assembled:

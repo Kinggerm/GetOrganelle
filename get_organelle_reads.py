@@ -16,16 +16,18 @@ else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
 if python_version == "2.7+":
-    import commands
+    from commands import getstatusoutput
 else:
-    import subprocess
+    from subprocess import getstatusoutput
+import subprocess
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 word_size = int
 
 
+# test whether an external binary is executable
 def executable(test_this):
-    return True if os.access(test_this, os.X_OK) or subprocess.getstatusoutput(test_this)[0] not in dead_code else False
+    return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != dead_code else False
 
 
 if python_version == "2.7+":

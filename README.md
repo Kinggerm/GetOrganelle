@@ -22,6 +22,10 @@ Execute following simple git commands to download and keep update:
 
     git clone "https://github.com/Kinggerm/GetOrganelle"
 
+and keep update:
+    
+    cd GetOrganelle
+
     git pull
 
 It would be convenient to use my script if you add */GetOrganelle and */GetOrganelle/Utilities to the path.

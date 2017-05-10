@@ -41,7 +41,7 @@ def require_commands():
     if makeblastdb_in_path[0] == 32512:
         sys.stdout.write('\nError: makeblastdb not in the path!')
         exit()
-    usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -m cp')
+    usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -F cp')
     parser = OptionParser(usage=usage)
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters

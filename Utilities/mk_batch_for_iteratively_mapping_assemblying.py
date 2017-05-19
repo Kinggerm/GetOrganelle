@@ -26,6 +26,8 @@ if not (options.seed_dir and options.fastq_file_1 and options.fastq_file_2 and o
     parser.print_help()
     sys.stdout.write('\nERROR: Insufficient arguments!\n')
     exit()
+if options.fastq_file_1 == options.fastq_file_2:
+    raise IOError("1st fastq file should NOT be the same with 2nd fastq file!")
 
 out_f_h = open(options.output_sh_file+'.sh', 'w')
 if not os.path.exists(options.output_sh_file + '.mapped.RUN1'):

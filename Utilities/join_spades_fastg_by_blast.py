@@ -197,9 +197,12 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
                         connected_edges.add((edge_short_name, True))
         if full_name.split(';')[0].split(':')[0].endswith('\''):
             sequence = query_matrix[1][i]
-            new_items = {('index', False): i,
+            len_seq = len(sequence)
+            new_items = {'identity': [0 for j in range(len_seq)],
+                         ('index', False): i,
                          ('seq', False): sequence,
                          ('seq', True): complementary_seq(sequence),
+                         'len_seq': len_seq,
                          False: connected_edges}
             hits_candidates[short_name].update(new_items)
         else:

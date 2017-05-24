@@ -132,10 +132,10 @@ def require_commands():
         elif options.builtin_mode == 'nr':
             options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'nr')
         else:
-            sys.stdout.write('\n\nOption Error: illegal value for builtin mode!')
+            sys.stdout.write('\n\nOption Error: illegal value for builtin mode!\n')
             exit()
         if not len(args):
-            sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!')
+            sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!\n')
             exit()
         sys.stdout.write('\n'+' '.join(sys.argv)+'\n')
 

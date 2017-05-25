@@ -70,7 +70,7 @@ def require_commands():
                       help='Within a contig, if the query-score of hitting A is more than given times (Default: 3.0) '
                            'of the query-score of hitting B, this contig would be treated as only A related, '
                            'rather than both.')
-    parser.add_option('--keep-low-dup', dest='remove_low_duplicated', default=True, action='store_false',
+    parser.add_option('--remove-low-dup', dest='remove_low_duplicated', default=False, action='store_true',
                       help='Remove redundant low-coverage contigs that largely overlap some high-coverage contigs.')
     parser.add_option('--depth-cutoff', dest='depth_cutoff', default=10000.0, type=float,
                       help='After detection for target coverage, those beyond certain times (depth cutoff) of the'

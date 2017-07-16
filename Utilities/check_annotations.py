@@ -205,7 +205,7 @@ def read_gb(gb_dir):
                 blank_len += 1
             if gb_file[i].split('  ')[0] not in ['FEATURES', 'ORIGIN', 'BASE COUNT']:
                 temp = [x for x in gb_file[j].split(' ') if x]
-                this_title = temp[0]
+                this_title = "" if not temp else temp[0]
                 this_content = [' '.join(temp[1:])]
                 while j + 1 < len(gb_file) and gb_file[j+1].startswith(' '*(blank_len+4)):
                     this_content.append(gb_file[j+1].strip())
@@ -521,6 +521,7 @@ def main():
                 continue
         q_dict, q_names = parse_geneious_fasta(q_matrix)
         """read reference"""
+        ref_matrix = read_gb_as_geneious_format_fasta_matrix(options.reference_gb)
         try:
             ref_matrix = read_gb_as_geneious_format_fasta_matrix(options.reference_gb)
         except:

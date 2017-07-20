@@ -141,6 +141,8 @@ def require_commands():
 
 
 def check_db(options):
+    in_index = ""
+    ex_index = ""
     if options.include_priority:
         in_index = options.include_priority
     elif options.include:

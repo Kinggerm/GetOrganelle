@@ -51,11 +51,11 @@ def require_commands():
                            'Modify the arguments activated by this flag with your more custom options.'
                            '\t'
                            ' ------------------------------------------------------ '
-                           '\ncp \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')+'"'
+                           '\ncp \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')+'"'
                            ' ------------------------------------------------------ '
-                           '\nmt \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')+'"'
+                           '\nmt \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')+'"'
                            ' ------------------------------------------------------ '
-                           '\nnr \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'nr')+'"'
+                           '\nnr \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'nr')+'"'
                            ' ------------------------------------------------------ ')
     parser.add_option('--no-hits', dest='treat_no_hits', default='ex_no_con',
                       help='Provide treatment for non-hitting contigs.\t'
@@ -124,13 +124,13 @@ def require_commands():
                 sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
                 exit()
         elif options.builtin_mode == 'cp':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')
-            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')
+            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')
         elif options.builtin_mode == 'mt':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'mt')
-            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'cp')
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')
+            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')
         elif options.builtin_mode == 'nr':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'Reference', 'nr')
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'nr')
         else:
             sys.stdout.write('\n\nOption Error: illegal value for builtin mode!\n')
             exit()

@@ -819,9 +819,9 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, depth_threshold=
     if not executable("makeblastdb"):
         log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
         return
-    scheme_tranlation = {'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt'),
-                         'mt': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'cp'),
-                         'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')}
+    scheme_tranlation = {'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt'),
+                         'mt': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp'),
+                         'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')}
     if scheme in scheme_tranlation:
         run_command = scheme_tranlation[scheme]
     else:
@@ -864,8 +864,8 @@ def separate_fq_by_pair(out_base, verbose_log, log):
 def require_commands(print_title, version):
     version = version
     usage = "\n"+str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq {-s reference.fasta|--bs reference.fasta.index} -w 103 -o chloroplast " \
-            "[-a mitochondria.fasta -P 500000 -R 20 -k 75,85,95,105 -J 2]"
+            " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast " \
+            "-a mitochondria.fasta -P 500000 -R 20 -k 75,85,95,105 -J 2"
     description = print_title
     parser = OptionParser(usage=usage, version=version, description=description)
     # group1
@@ -920,11 +920,11 @@ def require_commands(print_title, version):
                                  'slim_spades_fastg_by_blast.py (should be under the same directory) '
                                  'with "cp". You can also make the index by your self.\t'
                                  ' ------------------------------------------------------ '
-                                 '\ncp \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+'"'
+                                 '\ncp \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt')+'"'
                                  ' ------------------------------------------------------ '
-                                 '\nmt \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'mt')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'Reference', 'cp')+'"'
+                                 '\nmt \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp')+'"'
                                  ' ------------------------------------------------------ '
-                                 '\nnr \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'Reference', 'nr')+'"'
+                                 '\nnr \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')+'"'
                                  ' ------------------------------------------------------ '
                                  '\n0 \t disable this slimming function'
                                  ' ------------------------------------------------------ ')

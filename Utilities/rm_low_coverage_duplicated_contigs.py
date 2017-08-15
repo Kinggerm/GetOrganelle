@@ -28,10 +28,10 @@ def check_db(reference_fa_base):
     return in_index
 
 
-def execute_blast(query, blast_db, output, outfmt):
+def execute_blast(query, blast_db, output, outfmt, threads):
     print("Executing BLAST ...")
     make_blast = subprocess.Popen(
-        'blastn -evalue 1E-30 -num_threads 4 -word_size 10 -query ' + query + ' -db ' + blast_db + ' -out ' + output + ' -outfmt '+str(outfmt),
+        'blastn -evalue 1E-30 -num_threads '+str(threads)+' -word_size 10 -query ' + query + ' -db ' + blast_db + ' -out ' + output + ' -outfmt '+str(outfmt),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = make_blast.communicate()
     if "(ERR)" in str(output) or "Error:" in str(output) or 'error' in str(output):
@@ -118,6 +118,8 @@ def require_options():
                       help='Keep temp blast files.')
     parser.add_option('-o', dest='output',
                       help='Output file. Default: *.purified.fastg')
+    parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
+                      help="Threads of blastn.")
     options, args = parser.parse_args()
     if not args:
         parser.print_help()
@@ -126,9 +128,9 @@ def require_options():
     return options, args
 
 
-def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, output):
+def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, output, threads):
     index_base = check_db(fastg_file)
-    execute_blast(fastg_file, index_base, fastg_file + '.blast', 7)
+    execute_blast(fastg_file, index_base, fastg_file + '.blast', 7, threads)
     blast_result = open(fastg_file + '.blast', 'rU')
     suspicious_nodes = {}
     for line in blast_result:
@@ -174,7 +176,7 @@ def main():
     options, args = require_options()
     for fastg_file in args:
         purify_fastg(fastg_file, options.coverage_threshold, options.length_threshold,
-                     options.blur_bases, options.keep_temp, options.output)
+                     options.blur_bases, options.keep_temp, options.output, options.threads)
 
 
 if __name__ == '__main__':

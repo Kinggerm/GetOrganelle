@@ -530,7 +530,7 @@ def filter_fastg_by_depth(fas_file, depth):
             if float(fastg_matrix[0][i].split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0]) >= depth:
                 new_fastg_matrix[0].append(fastg_matrix[0][i])
                 new_fastg_matrix[1].append(fastg_matrix[1][i])
-        out_fasta = ''.join(fas_file.split('.')[:-1]) + '.depth' + str(depth) + '.' + fas_file.split('.')[-1]
+        out_fasta = '.'.join(fas_file.split('.')[:-1]) + '.depth' + str(depth) + '.' + fas_file.split('.')[-1]
         write_fasta(out_dir=out_fasta, matrix=new_fastg_matrix, overwrite=True)
         sys.stdout.write('\nfilter by depth cost: '+str(time.time()-time0))
         return out_fasta

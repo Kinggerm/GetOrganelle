@@ -660,7 +660,7 @@ def main():
         fas_file = filter_fastg_by_depth(fas_file, options.depth_threshold)
         # rm low coverage duplicated contigs
         if options.remove_low_duplicated and is_fastg:
-            os.system('rm_low_coverage_duplicated_contigs.py '+fas_file)
+            os.system('rm_low_coverage_duplicated_contigs.py -t '+str(options.threads)+" "+fas_file)
             fas_file += '.purified.fastg'
         del_complementary(fas_file, is_fastg)
         # make blast database if not made

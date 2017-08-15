@@ -670,9 +670,9 @@ def main():
             os.path.split(exclude_index)[-1]
         # make blast
         in_names = blast_and_call_names(fasta_file=fas_file, index_files=include_index, out_file=fas_file+'.blast_in',
-                                        is_fastg=is_fastg)
+                                        is_fastg=is_fastg, threads=options.threads)
         ex_names = blast_and_call_names(fasta_file=fas_file, index_files=exclude_index, out_file=fas_file+'.blast_ex',
-                                        is_fastg=is_fastg)
+                                        is_fastg=is_fastg, threads=options.threads)
         # write out fasta according to blast
         fasta_matrix = read_fasta(fasta_dir=fas_file)
         coverages = get_coverages(matrix=fasta_matrix, is_fastg=is_fastg)

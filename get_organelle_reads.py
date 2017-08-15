@@ -672,7 +672,7 @@ def get_heads_from_sam(bowtie_sam_file):
     return hit_heads
 
 
-def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume, verbose_log, log):
+def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume, verbose_log, threads, log):
     if seed_file:
         if os.path.exists(seed_file+'.index.1.bt2l'):
             log.info("seed bowtie2 index existed!")
@@ -701,7 +701,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     else:
         log.info("Mapping reads to seed bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 -p 4 --very-fast-local --al " + total_seed_file[0] + " -x " + seed_index_base + " -U " +
+            "bowtie2 -p "+str(threads)+" --very-fast-local --al " + total_seed_file[0] + " -x " + seed_index_base + " -U " +
             ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
@@ -745,7 +745,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed bowtie2 index ...")
-            make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p 4 --very-fast-local -x " + anti_index_base + " -U " +
+            make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p "+str(threads)+" --very-fast-local -x " + anti_index_base + " -U " +
                                                       ",".join(original_fq_files) + " -S " +
                                                       anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
                                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -769,7 +769,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     return total_seed_file[1], anti_lines
 
 
-def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired, verbose_log, resume, log):
+def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired, verbose_log, resume, threads, log):
     if '-k' in parameters:
         kmer = ''
     else:
@@ -781,14 +781,14 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
     spades_out_put = '-o '+spades_out_put
     if reads_paired['input'] and reads_paired['pair_out']:
         spades_command = ' '.join(
-            ['spades.py', continue_command, parameters, '-1', os.path.join(out_base, "filtered_1_paired.fq"), '-2',
+            ['spades.py', '-t', str(threads), continue_command, parameters, '-1', os.path.join(out_base, "filtered_1_paired.fq"), '-2',
              os.path.join(out_base, "filtered_2_paired.fq"), '--s1', os.path.join(out_base, "filtered_1_unpaired.fq")] +
             ['--s' + str(i + 3) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 3) + ".fq")) for i in
              range(len(original_fq_files)-2)] +
             ['--s2', os.path.join(out_base, "filtered_2_unpaired.fq"), kmer, spades_out_put]).strip()
     else:
         spades_command = ' '.join(
-            ['spades.py', continue_command, parameters] +
+            ['spades.py', '-t', str(threads), continue_command, parameters] +
             ['--s' + str(i + 1) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 1) + ".fq")) for i in
              range(len(original_fq_files))] +
             [kmer, spades_out_put]).strip()
@@ -812,7 +812,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
         return True
 
 
-def slim_spades_result(scheme, spades_output, verbose_log, log, depth_threshold=0):
+def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_threshold=0):
     if not executable("blastn"):
         log.warning('blastn not in the path!\nSkip slimming assembly result ...')
         return
@@ -827,7 +827,7 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, depth_threshold=
     else:
         run_command = scheme
     graph_file = os.path.join(spades_output, "assembly_graph.fastg")
-    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg_by_blast.py')+' ' + graph_file + run_command+' --depth-threshold '+str(depth_threshold)
+    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg_by_blast.py') + ' -t ' + str(threads) +' ' + graph_file + run_command+' --depth-threshold '+str(depth_threshold)
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in str(output) or "command not found" in str(output):
@@ -948,6 +948,8 @@ def require_commands(print_title, version):
     # group3
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
                                                                     "Take easy to pick some according your computer's flavour")
+    group_computational.add_option('-t', dest='threads', type=int, default=4,
+                                   help="Threads for third-party tools (bowtie2, blastn, SPAdes).")
     group_computational.add_option('-P', dest='pseudo_assembled', type=int, default=200000,
                                    help='The maximum potential-organ reads to be pseudo-assembled before extension. '
                                         'pseudo_assembly is suggested when the whole genome coverage is shallow but '
@@ -1154,7 +1156,7 @@ def main():
                 seed_fastq, anti_lines = mapping_with_bowtie2(seed_file, bowt_seed, anti_seed,
                                                               b_at_seed, original_fq_files,
                                                               out_base, resume,
-                                                              verb_out, log)
+                                                              verb_out, options.threads, log)
                 initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, trim_ends))
             log.info("Reading seeds finished.\n")
 
@@ -1219,7 +1221,7 @@ def main():
                 # resume = False
                 log.info('Assembling with SPAdes ...')
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
-                                     original_fq_files, reads_paired, options.verbose_log, resume, log)
+                                     original_fq_files, reads_paired, options.verbose_log, resume, options.threads, log)
             else:
                 log.info('Assembling with SPAdes ... skipped.')
 
@@ -1227,7 +1229,7 @@ def main():
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))\
                 and options.scheme_for_slimming_spades_result != '0':
             slim_spades_result(options.scheme_for_slimming_spades_result, spades_output,
-                               options.verbose_log, log)
+                               options.verbose_log, log, options.threads)
 
         log = simple_log(log, out_base)
         log.info("\nTotal Calc-cost "+str(time.time() - time0))

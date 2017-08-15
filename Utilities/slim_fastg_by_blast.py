@@ -91,6 +91,8 @@ def require_commands():
                       help='Choose to disable deleting temp files produced by blast and this script')
     parser.add_option('--continue', dest='resume', default=False, action='store_true',
                       help='Specified for calling from get_organelle_reads.py')
+    parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
+                      help="Threads for blastn.")
     try:
         options, args = parser.parse_args()
     except optparse.OptionConflictError as e:
@@ -210,25 +212,25 @@ def make_new_matrix_with_names(names, old_matrix):
     return old_matrix
 
 
-def blast_and_call_names(fasta_file, index_files, out_file, is_fastg):
+def blast_and_call_names(fasta_file, index_files, out_file, is_fastg, threads):
     if index_files:
         time0 = time.time()
         sys.stdout.write('\nblast ...')
         if is_fastg:
             fasta_file += '.Temp'
         try:
-            blast_result = subprocess.getstatusoutput('blastn -num_threads 4 -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6 -evalue 1e-15')
+            blast_result = subprocess.getstatusoutput('blastn -num_threads '+ str(threads) +' -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6 -evalue 1e-15')
         except AttributeError:
-            blast_result = commands.getstatusoutput('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+            blast_result = commands.getstatusoutput('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
         # blastn -num_threads 4 -query assembly_graph.fastg -db db_f -out out_f -outfmt 6
         if 'Error' in str(blast_result[1]) or 'error' in str(blast_result[1]) or '不是内部或外部命令' in str(blast_result[1]):
-            os.system('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+            os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
             if not os.path.exists(out_file):
                 sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]))
                 exit()
         # windows
         if not os.path.exists(out_file):
-            os.system('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+            os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
         time1 = time.time()
         sys.stdout.write('\nblast to '+os.path.split(index_files)[-1]+' cost: '+str(time1-time0))
         names = {}

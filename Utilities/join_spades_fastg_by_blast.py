@@ -243,15 +243,17 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
     #
     # wait to improve:
     # miss the directions for jointed edges!
-    def get_jointed_edges_within_distance(all_infos, this_edge, this_direction, length_left, jointed_edges, k_mer):
+    def get_jointed_edges_within_distance(all_infos, this_edge, this_direction, length_left, jointed_edges, k_mer, recurse_depth=0):
         for this_next_edge in all_infos[this_edge][this_direction]:
             this_length_left = length_left - all_infos[this_next_edge[0]]['len_seq'] + k_mer
             if this_length_left >= 0 and this_next_edge not in jointed_edges:
-                try:
-                    jointed_edges = get_jointed_edges_within_distance(all_infos, this_next_edge[0], this_direction==this_next_edge[1], this_length_left, jointed_edges, k_mer)
-                except RuntimeError:
-                    sys.stdout.write('\nWarning: RuntimeError!')
-                    pass
+                # try:
+                # arbitrarily set recurse_depth to 20
+                if recurse_depth < 20:
+                    jointed_edges = get_jointed_edges_within_distance(all_infos, this_next_edge[0], this_direction==this_next_edge[1], this_length_left, jointed_edges, k_mer, recurse_depth+1)
+                # except RuntimeError:
+                #     sys.stdout.write('\nWarning: RuntimeError!')
+                #     pass
             jointed_edges.add(this_next_edge)
         return jointed_edges
     edge_connections = {}

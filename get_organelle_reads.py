@@ -863,9 +863,21 @@ def separate_fq_by_pair(out_base, verbose_log, log):
 
 def require_commands(print_title, version):
     version = version
-    usage = "\n"+str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s reference.fasta -w 103 -o chloroplast " \
-            "-a mitochondria.fasta -P 500000 -R 20 -k 75,85,95,105 -J 2"
+    usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n"+str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
+            " -R 10 -k 75,85,95,105 -P 300000\n" \
+            "###  Chloroplast, Fast, Memory-consuming\n"+str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
+            " -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5\n" \
+            "###  Chloroplast, Slow, Memory-economic\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
+            " -R 10 -k 75,85,95,105 -P 0 --out-per-round --no-remove-duplicates\n" \
+            "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 93 -o mitochondria_output " \
+            " -R 30 -k 65,75,85,95 -P 1000000 -F mt\n" \
+            "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 115 -o mitochondria_output " \
+            " -R 7 -k 95,105,115 -P 0 -F nr\n"
     description = print_title
     parser = OptionParser(usage=usage, version=version, description=description)
     # group1
@@ -915,19 +927,12 @@ def require_commands(print_title, version):
                                  'a smaller word size, which makes smaller word size feasible when memory is limited.'
                                  'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
     group_result.add_option('-F', dest='scheme_for_slimming_spades_result', default='cp',
-                            help='followed with cp, mt, nr, 0 (corresponding to certain arguments as following listed) '
-                                 'or custom arguments with double quotation marks. By default, this script calls '
-                                 'slim_spades_fastg_by_blast.py (should be under the same directory) '
-                                 'with "cp". You can also make the index by your self.\t'
-                                 ' ------------------------------------------------------ '
-                                 '\ncp \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt')+'"'
-                                 ' ------------------------------------------------------ '
-                                 '\nmt \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt')+' --exclude '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp')+'"'
-                                 ' ------------------------------------------------------ '
-                                 '\nnr \t " --include-priority '+os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')+'"'
-                                 ' ------------------------------------------------------ '
-                                 '\n0 \t disable this slimming function'
-                                 ' ------------------------------------------------------ ')
+                            help='This is designed to capture target associated contigs from total graph, by calling '
+                                 '"Utilities/slim_spades_fastg_by_blast.py". This flag should be followed with '
+                                 'cp (if you want get chloroplast), mt (mitochondria), nr (nuclear ribosomal RNA), '
+                                 '0 (disable this) or custom arguments with double quotation marks. Default: cp. '
+                                 'You can also make the index by your self and add those index to ' +
+                                 os.path.join(path_of_this_script, 'Library', '/NotationReference') + '')
     group_result.add_option('--trim', dest='trim_values',
                             help='Assign the number of bases in the ends to trim in extending process. '
                                  'This function will not change the length of the out put reads. '

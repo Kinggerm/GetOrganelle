@@ -876,7 +876,7 @@ def require_commands(print_title, version):
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 93 -o mitochondria_output " \
             " -R 30 -k 65,75,85,95 -P 1000000 -F mt\n" \
             "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 115 -o mitochondria_output " \
+            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 115 -o nr_output " \
             " -R 7 -k 95,105,115 -P 0 -F nr\n"
     description = print_title
     parser = OptionParser(usage=usage, version=version, description=description)

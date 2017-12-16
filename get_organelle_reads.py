@@ -854,6 +854,9 @@ def separate_fq_by_pair(out_base, verbose_log, log):
             log.warning(str(output))
         log.warning("Separating filtered fastq file failed.")
         return False
+    elif not os.path.exists(os.path.join(out_base, "filtered_2_paired.fq")):
+        log.warning("Separating filtered fastq file failed with unknown error: " + run_command)
+        return False
     else:
         if verbose_log:
             log.info(str(output))

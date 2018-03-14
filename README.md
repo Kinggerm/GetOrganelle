@@ -1,11 +1,11 @@
 # GetOrganelle
 
 
-This pipeline assemblies organelle genome from genomic skimming data with an input reference, which should be the same organelle genome sequence but not necessarily a relate species within the focal clade.
+This pipeline assemblies organelle genome from genomic skimming data with an input reference, which should be the same organelle genome sequences but not necessarily a related species within the focal clade.
 
 Citation: [Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li (2018). GetOrganelle: a simple and fast pipeline for de novo assembly of a complete circular chloroplast genome using genome skimming data. bioRxiv, 256479. http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/12/256479)
 
-License: GPL https://www.gnu.org/licenses/gpl-3.0.html
+License: GNU GPL https://www.gnu.org/licenses/gpl-3.0.html
 
 Bug&Usage contact: [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
 

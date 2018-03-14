@@ -7,7 +7,7 @@ Citation: [Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-
 
 License: GPL https://www.gnu.org/licenses/gpl-3.0.html
 
-Bug&Usage contact: [jinjianjun@mail.kib.ac.cn](jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](yuwenbin@xtbg.ac.cn)
+Bug&Usage contact: [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
 
 Please cite the dependencies if they are used:
 

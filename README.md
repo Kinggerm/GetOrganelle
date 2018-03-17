@@ -1,13 +1,15 @@
 # GetOrganelle
 
 
-This pipeline assemblies organelle genome from genomic skimming data with an input reference, which should be the same organelle genome sequences but not necessarily a related species within the focal clade.
+This pipeline assemblies organelle genome from genomic skimming data with an input reference, which should be the same organelle genome sequence but not necessarily a relate species within the focal clade.
 
-Citation: [Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li (2018). GetOrganelle: a simple and fast pipeline for de novo assembly of a complete circular chloroplast genome using genome skimming data. bioRxiv, 256479. http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/12/256479)
+<div id="citation"></div>
 
-License: GNU GPL https://www.gnu.org/licenses/gpl-3.0.html
+<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a simple and fast pipeline for de novo assembly of a complete circular chloroplast genome using genome skimming data. bioRxiv, 256479. [http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/12/256479)
 
-Bug&Usage contact: [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
+<b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
+
+<b>Bug&Usage contact:</b> [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
 
 Please cite the dependencies if they are used:
 
@@ -64,7 +66,7 @@ However, to get a complete organelle genome (such as a chloroplast genome) rathe
 Besides, if you installed python library psutil (pip install psutil), the memory cost of get_organelle_reads.py will be automatically logged.
 
 
-## HowTo
+## How To
 
 1. Preparing Data: Cut raw data into certain size (ca. 2G per-end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. You could use the Linux or Mac OS build-in command to easily get a reduced file. Currently, this script was written for illumina pair-end data (fastq).
 
@@ -96,16 +98,27 @@ For 2G raw data, 150 bp reads, to assembly nuclear ribosomal RNA (18S-ITS1-5.8S-
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 115 -o nr_output -R 7 -k 95,105,115 -P 0 -F nr
 
 
-## Similar pipelines 
+## Published Works Using GetOrganelle
 
-I will post the differences latter:</p>
+It was previously cited as GetOrganelle (https://github.com/Kinggerm/GetOrganelle), but now we have an report paper (<a href="#citation">see above</a>) to cite.
+
+Yu Song, Wen-Bin Yu, Yun-Bong Tan, Bing Liu, Xin Yao, Jian-Jun Jin, Michael Padmanaba, Jun-Bo Yang, Richard T. Corlett. 2017. Evolutionary comparisons of the chloroplast genome in Lauraceae and insights into loss events in the Magnoliids. Genome biology and evolution. 9(9): 2354-64. doi: [https://doi.org/10.1093/gbe/evx180](https://doi.org/10.1093/gbe/evx180)
+
+Twyford AD, Ness RW. 2017. Strategies for complete plastid genome sequencing. Molecular Ecology Resources. 17(5):858-68. doi: [https://doi.org/10.1111/1755-0998.12626](https://doi.org/10.1111/1755-0998.12626)
+
+Guan-Song Yang, Yin-Huan Wang, Yue-Hua Wang, Shi-Kang Shen. 2017. The complete chloroplast genome of a vulnerable species Champereia manillana (Opiliaceae). Conservation Genetics Resources. 9(3): 415-418. doi: [https://doi.org/10.1007/s12686-017-0697-1](https://doi.org/10.1007/s12686-017-0697-1)
+
+[See here for more (10+)](http://www.wbyu.net/getorganelle.html)
+
+## Similar Pipelines 
+
 1.<a href='https://github.com/chrishah/MITObim'>MITObim</a> is where the first realization of this idea.</p>
-2.<a href='http://metabarcoding.org/org-asm'>ORG.asm</a> is what I suggest be the best choice for normal samples.</p>
-3.<a href='http://metabarcoding.org/obitools'>OBItools</a> is no more suggested to do the same thing.</p>
+2.<a href='http://metabarcoding.org/org-asm'>ORG.asm</a></p>
+3.<a href='http://metabarcoding.org/obitools'>OBItools</a></p>
 4.<a href='http://ibest.github.io/ARC'>ARC</a></p>
 5.<a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
 6.<a href='https://github.com/quxiaojian/PERR'>PERR</a></p>
 
 ## Acknowledgement
 
-Chao-Nan Fu, Han-Tao Qin, Shuo Wang, Rong Zhang, Xiao-Jian Qu
+Thanks to Chao-Nan Fu, Han-Tao Qin, Shuo Wang, Rong Zhang and Xiao-Jian Qu for giving tests or suggestions.

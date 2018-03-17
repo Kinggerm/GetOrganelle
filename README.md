@@ -68,11 +68,14 @@ Besides, if you installed python library psutil (pip install psutil), the memory
 
 ## How To
 
-1. Preparing Data: Cut raw data into certain size (ca. 2G per-end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. You could use the Linux or Mac OS build-in command to easily get a reduced file. Currently, this script was written for illumina pair-end data (fastq).
+<b>Preparing Data</b>
+Cut raw data into certain size (ca. 2G per-end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. You could use the Linux or Mac OS build-in command to easily get a reduced file. Currently, this script was written for illumina pair-end data (fastq).
 
-2. Filtering and Assembly: Take your input reference (fasta or bowtie index) as probe, the script would recruit target reads in successive rounds (iterations). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After recruitment, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
+<b>Filtering and Assembly</b>
+Take your input reference (fasta or bowtie index) as probe, the script would recruit target reads in successive rounds (iterations). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After recruitment, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
 
-3. Producing result: By default, the main script would call Utilities/slim_spades_fastg_by_blast.py to modify the assembly_graph.fastg file and produce a new fastg file along with a csv file. View the new fastg file and load the csv file in Bandage and choose the best path as the final result. 
+<b>Producing Result</b>
+By default, the main script would call Utilities/slim_spades_fastg_by_blast.py to modify the assembly_graph.fastg file and produce a new fastg file along with a csv file. View the new fastg file and load the csv file in Bandage and choose the best path as the final result. 
 
 
 ## Example
@@ -112,12 +115,12 @@ Guan-Song Yang, Yin-Huan Wang, Yue-Hua Wang, Shi-Kang Shen. 2017. The complete c
 
 ## Similar Pipelines 
 
-1.<a href='https://github.com/chrishah/MITObim'>MITObim</a> is where the first realization of this idea.</p>
-2.<a href='http://metabarcoding.org/org-asm'>ORG.asm</a></p>
-3.<a href='http://metabarcoding.org/obitools'>OBItools</a></p>
-4.<a href='http://ibest.github.io/ARC'>ARC</a></p>
-5.<a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
-6.<a href='https://github.com/quxiaojian/PERR'>PERR</a></p>
+<a href='https://github.com/chrishah/MITObim'>MITObim</a> is where the first realization of this idea.</p>
+<a href='http://metabarcoding.org/org-asm'>ORG.asm</a></p>
+<a href='http://metabarcoding.org/obitools'>OBItools</a></p>
+<a href='http://ibest.github.io/ARC'>ARC</a></p>
+<a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
+<a href='https://github.com/quxiaojian/PERR'>PERR</a></p>
 
 ## Acknowledgement
 

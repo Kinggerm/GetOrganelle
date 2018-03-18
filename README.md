@@ -121,6 +121,8 @@ Guan-Song Yang, Yin-Huan Wang, Yue-Hua Wang, Shi-Kang Shen. 2017. The complete c
 <a href='http://ibest.github.io/ARC'>ARC</a></p>
 <a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
 <a href='https://github.com/quxiaojian/PERR'>PERR</a></p>
+<a href='https://github.com/ndierckx/NOVOPlasty'>NOVOPlasty</a></p>
+<a href='https://bitbucket.org/kosaidtu/norgal'>Norgal</a></p>
 
 ## Acknowledgement
 

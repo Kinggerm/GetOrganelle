@@ -113,17 +113,6 @@ Guan-Song Yang, Yin-Huan Wang, Yue-Hua Wang, Shi-Kang Shen. 2017. The complete c
 
 [See here for more (10+)](http://www.wbyu.net/getorganelle.html)
 
-## Similar Pipelines 
-
-<a href='https://github.com/chrishah/MITObim'>MITObim</a> is where the first realization of this idea.</p>
-<a href='http://metabarcoding.org/org-asm'>ORG.asm</a></p>
-<a href='http://metabarcoding.org/obitools'>OBItools</a></p>
-<a href='http://ibest.github.io/ARC'>ARC</a></p>
-<a href='https://github.com/holmrenser/IOGA'>IOGA</a></p>
-<a href='https://github.com/quxiaojian/PERR'>PERR</a></p>
-<a href='https://github.com/ndierckx/NOVOPlasty'>NOVOPlasty</a></p>
-<a href='https://bitbucket.org/kosaidtu/norgal'>Norgal</a></p>
-
 ## Acknowledgement
 
 Thanks to Chao-Nan Fu, Han-Tao Qin, Shuo Wang, Rong Zhang and Xiao-Jian Qu for giving tests or suggestions.

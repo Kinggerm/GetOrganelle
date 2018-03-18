@@ -103,7 +103,7 @@ For 2G raw data, 150 bp reads, to assembly nuclear ribosomal RNA (18S-ITS1-5.8S-
 
 ## Published Works Using GetOrganelle
 
-It was previously cited as GetOrganelle (https://github.com/Kinggerm/GetOrganelle), but now we have an report paper (<a href="#citation">see above</a>) to cite.
+It was previously cited as GetOrganelle (https://github.com/Kinggerm/GetOrganelle), but now we have a report paper (<a href="#citation">see above</a>) to cite.
 
 Yu Song, Wen-Bin Yu, Yun-Bong Tan, Bing Liu, Xin Yao, Jian-Jun Jin, Michael Padmanaba, Jun-Bo Yang, Richard T. Corlett. 2017. Evolutionary comparisons of the chloroplast genome in Lauraceae and insights into loss events in the Magnoliids. Genome biology and evolution. 9(9): 2354-64. doi: [https://doi.org/10.1093/gbe/evx180](https://doi.org/10.1093/gbe/evx180)
 

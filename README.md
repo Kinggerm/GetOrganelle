@@ -115,4 +115,4 @@ Guan-Song Yang, Yin-Huan Wang, Yue-Hua Wang, Shi-Kang Shen. 2017. The complete c
 
 ## Acknowledgement
 
-Thanks to Chao-Nan Fu, Han-Tao Qin, Rong Zhang, Shuo Wang, and Xiao-Jian Qu for giving tests or suggestions.
+Thanks to Chao-Nan Fu, Han-Tao Qin, Xiao-Jian Qu, Shuo Wang, and Rong Zhang for giving tests or suggestions.

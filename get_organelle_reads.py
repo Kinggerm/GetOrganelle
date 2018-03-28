@@ -6,7 +6,6 @@ import os
 import logging
 from optparse import OptionParser, OptionGroup
 
-
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
     python_version = "2.7+"
@@ -20,9 +19,10 @@ if python_version == "2.7+":
 else:
     from subprocess import getstatusoutput
 import subprocess
+
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-word_size = int
+word_size = 0
 
 
 # test whether an external binary is executable
@@ -33,13 +33,16 @@ def executable(test_this):
 if python_version == "2.7+":
     # python2
     import string
+
     translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+
 
     def complementary_seq(input_seq):
         return string.translate(input_seq, translator)[::-1]
 else:
     # python3
     translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
+
 
     def complementary_seq(input_seq):
         return str.translate(input_seq, translator)[::-1]
@@ -58,10 +61,10 @@ def chop_seqs(seq_generator_or_list):
         this_seq_len = len(seed)
         if this_seq_len >= word_size:
             cpt_seed = complementary_seq(seed)
-            for i in range(0, this_seq_len-word_size+1):
-                forward = seed[i:i+word_size]
+            for i in range(0, this_seq_len - word_size + 1):
+                forward = seed[i:i + word_size]
                 return_words.add(forward)
-                reverse = cpt_seed[i:i+word_size]
+                reverse = cpt_seed[i:i + word_size]
                 return_words.add(reverse)
     return return_words
 
@@ -96,7 +99,7 @@ def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
             if trim2:
                 for fq_line in open(fq_dir, 'rU'):
                     if count % 4 == 1:
-                        yield fq_line[trim1:(len(fq_line)-trim2)]
+                        yield fq_line[trim1:(len(fq_line) - trim2)]
                     count += 1
             elif trim1:
                 for fq_line in open(fq_dir, 'rU'):
@@ -115,8 +118,8 @@ def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
                 count += 1
 
 
-def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fastq_indices_in_memory, verbose, index_in_memory, log):
-
+def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fastq_indices_in_memory,
+                     verbose, index_in_memory, log):
     if verbose:
         sys.stdout.write(' ' * 100 + '\b' * 100)
         sys.stdout.flush()
@@ -143,7 +146,7 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
     if verbose:
         log.info("writing fastq lines ...")
     post_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
-    files_out = [open(out_file_name+'_'+str(i+1)+'.temp', 'w') for i in range(len(original_fq_files))]
+    files_out = [open(out_file_name + '_' + str(i + 1) + '.temp', 'w') for i in range(len(original_fq_files))]
     line_count = 0
     for i in range(len(original_fq_files)):
         line = post_reading[i].readline()
@@ -168,9 +171,12 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
         log.info("writing fastq lines finished.")
 
 
-def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pseudo_assembled, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
+def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_duplicates, output_base, anti_lines,
+                  pseudo_assembled, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
     if trim_values:
         trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
+    else:
+        trim1, trim2 = 0, 0
     # read original reads
     # line_cluster (list) ~ forward_reverse_reads
     line_clusters = []
@@ -181,8 +187,8 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
     #
     name_to_line = {}
     #
-    temp1_contig_dir = [os.path.join(output_base, k+'temp.indices.1') for k in ("_", "")]
-    temp2_clusters_dir = [os.path.join(output_base, k+'temp.indices.2') for k in ("_", "")]
+    temp1_contig_dir = [os.path.join(output_base, k + 'temp.indices.1') for k in ("_", "")]
+    temp2_clusters_dir = [os.path.join(output_base, k + 'temp.indices.2') for k in ("_", "")]
     if resume and os.path.exists(temp1_contig_dir[1]) and os.path.exists(temp2_clusters_dir[1]):
         if pseudo_assembled or index_in_memory:
             log.info("Reading existed indices for fastq ...")
@@ -191,7 +197,7 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
             #
             line_clusters = [[int(x) for x in y.split('\t')] for y in open(temp2_clusters_dir[1], 'rU')]
             if rm_duplicates:
-                line_count = sum([len(x) for x in line_clusters])*4
+                line_count = sum([len(x) for x in line_clusters]) * 4
             # log
             len_indices = len(line_clusters)
             if this_process:
@@ -208,34 +214,51 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
     else:
         if not index_in_memory:
             temp1_contig_out = open(temp1_contig_dir[0], 'w')
-        pre_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
-        for file_in in pre_reading:
+        lengths = []
+        use_user_direction = False
+        for id_file, file_name in enumerate(original_fq_files):
+            file_in = open(file_name, "rU")
             line = file_in.readline()
+            # if anti seed input, name & direction should be recognized
             if bowtie2_anti_seed or anti_seed:
                 while line:
                     if line.startswith("@"):
-                        try:
-                            if ' ' in line:
-                                this_head = line[1:].split(' ')
-                                this_name, direction = this_head[0], int(this_head[1][0])
-                            elif '#' in line:
-                                this_head = line[1:].split('#')
-                                this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
-                            else:
-                                this_name, direction = line[1:].strip(), 1
-                        except (ValueError, IndexError):
-                            log.error('Unrecognized fq format in '+str(line_count)+' '+str(line))
-                            exit()
+                        # parsing name & direction
+                        if use_user_direction:
+                            this_name = line[1:].strip()
+                            direction = direction_according_to_user_input[id_file]
                         else:
-                            if (this_name, direction) in anti_lines:
-                                line_count += 4
-                                for i in range(4):
-                                    line = file_in.readline()
-                                continue
+                            try:
+                                if ' ' in line:
+                                    this_head = line[1:].split(' ')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                elif '#' in line:
+                                    this_head = line[1:].split('#')
+                                    this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
+                                else:
+                                    log.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                    log.info("Using user-defined directions.")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                            except (ValueError, IndexError):
+                                log.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                log.info("Using user-defined directions.")
+                                use_user_direction = True
+                                this_name = line[1:].strip()
+                                direction = direction_according_to_user_input[id_file]
+                        if (this_name, direction) in anti_lines:
+                            line_count += 4
+                            for i in range(4):
+                                line = file_in.readline()
+                            continue
                         this_seq = file_in.readline().strip()
                         if trim_values:
-                            this_seq = this_seq[trim1:(len(this_seq)-trim2)].strip("N")
+                            this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
+                        else:
+                            this_seq = this_seq.strip("N")
                         # drop illegal reads
+                        lengths.append(len(this_seq))
                         if len(this_seq) < word_size:
                             line_count += 4
                             for i in range(3):
@@ -251,7 +274,7 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                                 if not index_in_memory:
-                                    temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                                    temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
@@ -261,13 +284,14 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                             else:
-                                temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                                temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                     else:
-                        log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
+                        log.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
                         exit()
                     if line_count % 54321 == 0:
-                        to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count+4)//4)+" reads"
-                        sys.stdout.write(to_print+'\b'*len(to_print))
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
                         sys.stdout.flush()
                     line_count += 1
                     for i in range(3):
@@ -277,7 +301,12 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                 while line:
                     if line.startswith("@"):
                         this_seq = file_in.readline().strip()
+                        if trim_values:
+                            this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
+                        else:
+                            this_seq = this_seq.strip("N")
                         # drop illegal reads
+                        lengths.append(len(this_seq))
                         if len(this_seq) < word_size:
                             line_count += 4
                             for i in range(3):
@@ -293,7 +322,7 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                                 if not index_in_memory:
-                                    temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                                    temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
@@ -303,13 +332,14 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                             else:
-                                temp1_contig_out.write(this_seq+'\n'+this_c_seq+'\n')
+                                temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                     else:
-                        log.error("Illegal fq format in line "+str(line_count)+' '+str(line))
+                        log.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
                         exit()
                     if line_count % 54321 == 0:
-                        to_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: "+str((line_count + 4) // 4)+" reads"
-                        sys.stdout.write(to_print+'\b'*len(to_print))
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
                         sys.stdout.flush()
                     line_count += 1
                     for i in range(3):
@@ -338,11 +368,18 @@ def read_fq_infos(original_fq_files, rm_duplicates, output_base, anti_lines, pse
             os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
 
         del seq_duplicates
-        del pre_reading
         len_indices = len(line_clusters)
         if rm_duplicates:
+            if len_indices == 0 and line_count // 4 > 0:
+                log.error("No qualified reads found!")
+                max_read_len = max(lengths)
+                if max_read_len < word_size:
+                    log.error("Word size (" + str(word_size) + ") CANNOT be larger than your post-trimmed maximum read "
+                              "length (" + str(max_read_len) + ")!")
+                exit()
             log.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
         else:
+            del lengths
             log.info(memory_usage + str(len_indices) + " reads")
     return forward_reverse_reads, line_clusters, len_indices
 
@@ -362,21 +399,21 @@ def pseudo_assembly(fastq_indices_in_memory, dupli_threshold, log):
         memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + ", "
     else:
         memory_usage = ''
-    log.info(memory_usage+str(len(lines_with_duplicates))+"/"+str(count_dupli)+" used/duplicated")
+    log.info(memory_usage + str(len(lines_with_duplicates)) + "/" + str(count_dupli) + " used/duplicated")
 
     groups_of_duplicate_lines = {}
     count_groups = 0
     these_words = {}
     for this_unique_read_id in list(lines_with_duplicates):
-        this_seq = forward_and_reverse_reads[2*this_unique_read_id]
-        this_c_seq = forward_and_reverse_reads[2*this_unique_read_id+1]
+        this_seq = forward_and_reverse_reads[2 * this_unique_read_id]
+        this_c_seq = forward_and_reverse_reads[2 * this_unique_read_id + 1]
         seq_len = len(this_seq)
         temp_length = seq_len - word_size
         these_group_id = set()
         this_words = []
-        for i in range(0, temp_length+1):
-            forward = this_seq[i:i+word_size]
-            reverse = this_c_seq[temp_length-i:seq_len-i]
+        for i in range(0, temp_length + 1):
+            forward = this_seq[i:i + word_size]
+            reverse = this_c_seq[temp_length - i:seq_len - i]
             if forward in these_words:
                 these_group_id.add(these_words[forward])
             else:
@@ -438,7 +475,7 @@ def pseudo_assembly(fastq_indices_in_memory, dupli_threshold, log):
     else:
         memory_usage = ''
     del these_words
-    log.info(memory_usage+str(len(groups_of_duplicate_lines))+" pseudo-contigs assembled.\n")
+    log.info(memory_usage + str(len(groups_of_duplicate_lines)) + " pseudo-contigs assembled.\n")
     return groups_of_duplicate_lines, lines_with_duplicates
 
 
@@ -458,9 +495,10 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembled, groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base, round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, log):
+def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_indices, pseudo_assembled,
+                    groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base,
+                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, log):
     global word_size
-    accepted_contig_id = set()
     accepted_contig_id_this_round = set()
     line_to_accept = set()
     round_count = 1
@@ -481,13 +519,19 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembl
             else:
                 memory_usage = ''
             if fg_out_per_round:
-                write_fq_results(original_fq_dir, acc_contig_id_this_round, os.path.join(round_dir, "Round."+str(r_count)), os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, verbose, bool(fastq_indices_in_memory), log)
+                write_fq_results(original_fq_dir, acc_contig_id_this_round,
+                                 os.path.join(round_dir, "Round." + str(r_count)),
+                                 os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, verbose,
+                                 bool(fastq_indices_in_memory), log)
                 # clear former accepted words from memory
                 del acc_words
                 # then add new accepted words into memory
-                acc_words = chop_seqs(read_self_fq_seq_generator([os.path.join(round_dir, "Round."+str(r_count)+'_'+str(x+1)+'.fq') for x in range(len(original_fq_dir))], trim_values))
+                acc_words = chop_seqs(read_self_fq_seq_generator(
+                    [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
+                     range(len(original_fq_dir))], trim_values))
                 acc_contig_id_this_round = set()
-            log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(len_al) + " AW " + str(len_aw) + memory_usage)
+            log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(
+                len_al) + " AW " + str(len_aw) + memory_usage)
             #
             if len_aw == pre_aw:
                 raise NoMoreReads('')
@@ -500,12 +544,13 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembl
 
         while True:
             if verbose:
-                log.info("Round "+str(round_count)+": Start ...")
+                log.info("Round " + str(round_count) + ": Start ...")
 
             if fastq_indices_in_memory:
                 reads_generator = (this_read for this_read in fastq_indices_in_memory[0])
             else:
-                reads_generator = (this_read.strip() for this_read in open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
+                reads_generator = (this_read.strip() for this_read in
+                                   open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
             unique_read_id = 0
             if pseudo_assembled and groups_of_duplicate_lines:
                 for unique_read_id in range(len_indices):
@@ -519,20 +564,20 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembl
                             accepted_contig_id.add(unique_read_id)
                             accepted_contig_id_this_round.add(unique_read_id)
                             line_to_accept.remove(unique_read_id)
-                            for i in range(0, temp_length+1, mesh_size):
+                            for i in range(0, temp_length + 1, mesh_size):
                                 # add forward
                                 accepted_words.add(this_seq[i:i + word_size])
                                 # add reverse
                                 accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                         else:
                             accepted = False
-                            for i in range(0, (temp_length+1)//2, jump_step):
+                            for i in range(0, (temp_length + 1) // 2, jump_step):
                                 # from first kmer
                                 if this_seq[i:i + word_size] in accepted_words:
                                     accepted = True
                                     break
                                 # from last kmer
-                                if this_seq[temp_length-i:seq_len-i] in accepted_words:
+                                if this_seq[temp_length - i:seq_len - i] in accepted_words:
                                     accepted = True
                                     break
                             if accepted:
@@ -551,10 +596,14 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembl
                                     line_to_accept.remove(unique_read_id)
                                     del groups_of_duplicate_lines[which_group]
                     if unique_read_id % 14321 == 0:
-                        this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.',
+                                                                                      ',') + " - INFO: Round " + str(
+                            round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
+                            len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(
+                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
             else:
                 for unique_read_id in range(len_indices):
                     this_seq = next(reads_generator)
@@ -579,24 +628,28 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembl
                             accepted_contig_id.add(unique_read_id)
                             accepted_contig_id_this_round.add(unique_read_id)
                     if unique_read_id % 14321 == 0:
-                        this_print = str("%s"%datetime.datetime.now())[:23].replace('.', ',')+" - INFO: Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.',
+                                                                                      ',') + " - INFO: Round " + str(
+                            round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
+                            len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(
+                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
             reads_generator.close()
     except KeyboardInterrupt:
         reads_generator.close()
         sys.stdout.write(' ' * 100 + '\b' * 100)
         sys.stdout.flush()
         log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
-                len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)))
+            len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)))
         log.info("KeyboardInterrupt")
     except NoMoreReads:
         reads_generator.close()
         log.info("No more reads found and terminated ...")
     except RoundLimitException as r_lim:
         reads_generator.close()
-        log.info("Hit the round limit "+str(r_lim)+" and terminated ...")
+        log.info("Hit the round limit " + str(r_lim) + " and terminated ...")
     del reads_generator
     del accepted_words
     del accepted_contig_id_this_round
@@ -604,7 +657,7 @@ def extending_reads(accepted_words, original_fq_dir, len_indices, pseudo_assembl
     return accepted_contig_id
 
 
-def get_anti_built_in_mapping(anti_words, anti_input, original_fq_files, log):
+def get_anti_with_fas(anti_words, anti_input, original_fq_files, log):
     anti_lines = set()
     pre_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
     line_count = 0
@@ -620,7 +673,7 @@ def get_anti_built_in_mapping(anti_words, anti_input, original_fq_files, log):
             else:
                 this_name, direction = here_head, 1
         except (ValueError, IndexError):
-            log.error('Unrecognized fq format in '+str(line_count))
+            log.error('Unrecognized fq format in ' + str(line_count))
             exit()
         else:
             anti_lines.add((this_name, direction))
@@ -642,7 +695,7 @@ def get_anti_built_in_mapping(anti_words, anti_input, original_fq_files, log):
                         continue
                     this_c_seq = complementary_seq(this_seq)
                     temp_length = seq_len - word_size
-                    for i in range(0, temp_length+1):
+                    for i in range(0, temp_length + 1):
                         if this_seq[i:i + word_size] in anti_words:
                             add_to_anti_lines(this_head)
                             break
@@ -672,13 +725,14 @@ def get_heads_from_sam(bowtie_sam_file):
     return hit_heads
 
 
-def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume, verbose_log, threads, log):
+def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume,
+                         verbose_log, threads, log):
     if seed_file:
-        if os.path.exists(seed_file+'.index.1.bt2l'):
+        if os.path.exists(seed_file + '.index.1.bt2l'):
             log.info("seed bowtie2 index existed!")
         else:
             log.info("Making seed bowtie2 index ...")
-            build_seed_index = subprocess.Popen("bowtie2-build --large-index "+seed_file+" " + seed_file+'.index',
+            build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
             if "unrecognized option" in str(output):
@@ -686,10 +740,10 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_seed_index.communicate()
             if "(ERR)" in str(output) or "Error:" in str(output):
-                log.error('\n'+str(output))
+                log.error('\n' + str(output))
                 exit()
             if verbose_log:
-                log.info("\n"+str(output).strip())
+                log.info("\n" + str(output).strip())
             log.info("Making seed bowtie2 index finished.")
         seed_index_base = seed_file + '.index'
     else:
@@ -701,7 +755,8 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     else:
         log.info("Mapping reads to seed bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 -p "+str(threads)+" --very-fast-local --al " + total_seed_file[0] + " -x " + seed_index_base + " -U " +
+            "bowtie2 -p " + str(threads) + " --very-fast-local --al " + total_seed_file[
+                0] + " -x " + seed_index_base + " -U " +
             ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
@@ -709,7 +764,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
             log.error('\n' + str(output))
             exit()
         if verbose_log:
-            log.info("\n"+str(output).strip())
+            log.info("\n" + str(output).strip())
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
             os.rename(total_seed_file[0], total_seed_file[1])
@@ -723,8 +778,9 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                 log.info("anti-seed bowtie2 index existed!")
             else:
                 log.info("Making anti-seed bowtie2 index ...")
-                build_anti_index = subprocess.Popen("bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
-                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                build_anti_index = subprocess.Popen(
+                    "bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_anti_index.communicate()
                 if "unrecognized option" in str(output):
                     build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_seed + '.index',
@@ -740,18 +796,19 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         else:
             anti_index_base = bowtie2_anti_seed
 
-        anti_seed_sam = [os.path.join(out_base, x+"anti_seed_bowtie.sam") for x in ("temp.", "")]
+        anti_seed_sam = [os.path.join(out_base, x + "anti_seed_bowtie.sam") for x in ("temp.", "")]
         if resume and os.path.exists(anti_seed_sam[1]):
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed bowtie2 index ...")
-            make_anti_seed_bowtie2 = subprocess.Popen("bowtie2 -p "+str(threads)+" --very-fast-local -x " + anti_index_base + " -U " +
-                                                      ",".join(original_fq_files) + " -S " +
-                                                      anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
-                                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            make_anti_seed_bowtie2 = subprocess.Popen(
+                "bowtie2 -p " + str(threads) + " --very-fast-local -x " + anti_index_base + " -U " +
+                ",".join(original_fq_files) + " -S " +
+                anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = make_anti_seed_bowtie2.communicate()
             if "(ERR)" in str(output) or "Error:" in str(output):
-                log.error('\n'+str(output))
+                log.error('\n' + str(output))
                 exit()
             if verbose_log:
                 log.info("\n" + str(output).strip())
@@ -769,22 +826,24 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     return total_seed_file[1], anti_lines
 
 
-def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired, verbose_log, resume, threads, log):
+def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired,
+                         verbose_log, resume, threads, log):
     if '-k' in parameters:
         kmer = ''
     else:
-        kmer = '-k '+spades_kmer
+        kmer = '-k ' + spades_kmer
     if resume:
         continue_command = '--continue'
     else:
         continue_command = ''
-    spades_out_put = '-o '+spades_out_put
+    spades_out_put = '-o ' + spades_out_put
     if reads_paired['input'] and reads_paired['pair_out']:
         spades_command = ' '.join(
-            ['spades.py', '-t', str(threads), continue_command, parameters, '-1', os.path.join(out_base, "filtered_1_paired.fq"), '-2',
+            ['spades.py', '-t', str(threads), continue_command, parameters, '-1',
+             os.path.join(out_base, "filtered_1_paired.fq"), '-2',
              os.path.join(out_base, "filtered_2_paired.fq"), '--s1', os.path.join(out_base, "filtered_1_unpaired.fq")] +
             ['--s' + str(i + 3) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 3) + ".fq")) for i in
-             range(len(original_fq_files)-2)] +
+             range(len(original_fq_files) - 2)] +
             ['--s2', os.path.join(out_base, "filtered_2_unpaired.fq"), kmer, spades_out_put]).strip()
     else:
         spades_command = ' '.join(
@@ -798,11 +857,11 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
         if verbose_log:
             log.error('Problem with running SPAdes:')
             log.error(str(output))
-        log.error("WAINING in SPAdes: unrecognized option in "+parameters)
+        log.error("WAINING in SPAdes: unrecognized option in " + parameters)
         log.error('Assembling failed.')
         return False
     elif "== Error ==" in str(output):
-        log.error("Error in SPAdes: \n== Error =="+str(output).split("== Error ==")[-1].split("In case you")[0])
+        log.error("Error in SPAdes: \n== Error ==" + str(output).split("== Error ==")[-1].split("In case you")[0])
         log.error('Assembling failed.')
         return False
     else:
@@ -819,20 +878,26 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
     if not executable("makeblastdb"):
         log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
         return
-    scheme_tranlation = {'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt'),
-                         'mt': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'cp'),
-                         'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')}
+    scheme_tranlation = {
+        'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference',
+                                                    'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library',
+                                                                                         'NotationReference', 'mt'),
+        'mt': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference',
+                                                    'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library',
+                                                                                         'NotationReference', 'cp'),
+        'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')}
     if scheme in scheme_tranlation:
         run_command = scheme_tranlation[scheme]
     else:
         run_command = scheme
     graph_file = os.path.join(spades_output, "assembly_graph.fastg")
-    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg_by_blast.py') + ' -t ' + str(threads) +' ' + graph_file + run_command+' --depth-threshold '+str(depth_threshold)
+    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg_by_blast.py') + ' -t ' + str(
+        threads) + ' ' + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold)
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in str(output) or "command not found" in str(output):
         if verbose_log:
-            log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py")+' not found!')
+            log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
             log.warning(str(output))
         log.warning("Processing assembly result failed.")
     else:
@@ -843,8 +908,8 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
 
 def separate_fq_by_pair(out_base, verbose_log, log):
     log.info("Separating filtered fastq file ... ")
-    run_command = os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py")\
-                  + ' ' + os.path.join(out_base, "filtered_1.fq")\
+    run_command = os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py") \
+                  + ' ' + os.path.join(out_base, "filtered_1.fq") \
                   + ' ' + os.path.join(out_base, "filtered_2.fq")
     separating = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = separating.communicate()
@@ -866,10 +931,10 @@ def separate_fq_by_pair(out_base, verbose_log, log):
 
 def require_commands(print_title, version):
     version = version
-    usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n"+str(os.path.basename(__file__)) + \
+    usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
             " -R 10 -k 75,85,95,105 -P 300000\n" \
-            "###  Chloroplast, Fast, Memory-consuming\n"+str(os.path.basename(__file__)) + \
+            "###  Chloroplast, Fast, Memory-consuming\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
             " -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5\n" \
             "###  Chloroplast, Slow, Memory-economic\n" + str(os.path.basename(__file__)) + \
@@ -989,15 +1054,16 @@ def require_commands(print_title, version):
     try:
         (options, args) = parser.parse_args()
     except Exception as e:
-        sys.stdout.write('\n############################################################################'+str(e))
+        sys.stdout.write('\n############################################################################' + str(e))
         sys.stdout.write('\n"-h" for more usage')
         exit()
     else:
-        if not ((options.seed_file or options.bowtie2_seed) and ((options.fastq_file_1 and options.fastq_file_2) or options.unpaired_fastq_files) and options.word_size and options.output_base):
+        if not ((options.seed_file or options.bowtie2_seed) and ((
+                                                                         options.fastq_file_1 and options.fastq_file_2) or options.unpaired_fastq_files) and options.word_size and options.output_base):
             parser.print_help()
             sys.stdout.write('\n############################################################################'
                              '\nERROR: Insufficient arguments!\nUsage:')
-            sys.stdout.write(usage+'\n\n')
+            sys.stdout.write(usage + '\n\n')
             exit()
         if int(bool(options.fastq_file_1)) + int(bool(options.fastq_file_2)) == 1:
             sys.stdout.write('\n############################################################################'
@@ -1034,7 +1100,7 @@ def require_commands(print_title, version):
             os.mkdir(options.output_base)
         log = simple_log(logging.getLogger(), options.output_base)
         log.info(print_title)
-        log.info(' '.join(sys.argv)+'\n')
+        log.info(' '.join(sys.argv) + '\n')
         log = timed_log(log, options.output_base)
         if options.seed_file and options.bowtie2_seed:
             log.error('Simultaneously "-s" and "--bs" is not allowed!')
@@ -1100,12 +1166,12 @@ def timed_log(log, output_base):
     return log_timed
 
 
-__version__ = "1.9.81"
+__version__ = "1.9.82"
 
 
 def main():
     time0 = time.time()
-    title = "\nGetOrganelle released by Jianjun Jin on Oct 19 2016." \
+    title = "\nGetOrganelle" \
             "\n" \
             "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
@@ -1119,9 +1185,11 @@ def main():
             reads_paired = {'input': True, 'pair_out': bool}
             original_fq_files = [options.fastq_file_1, options.fastq_file_2] + \
                                 [fastq_file for fastq_file in options.unpaired_fastq_files]
+            direction_according_to_user_input = [1, 2] + [1] * len(options.unpaired_fastq_files)
         else:
             reads_paired = {'input': False, 'pair_out': False}
             original_fq_files = [fastq_file for fastq_file in options.unpaired_fastq_files]
+            direction_according_to_user_input = [1] * len(options.unpaired_fastq_files)
 
         resume = options.script_resume
         verb_out = options.verbose_log
@@ -1129,8 +1197,8 @@ def main():
         other_options = options.other_spades_options.split(' ')
         if '-o' in other_options:
             which_out = other_options.index('-o')
-            spades_output = other_options[which_out+1]
-            del other_options[which_out: which_out+2]
+            spades_output = other_options[which_out + 1]
+            del other_options[which_out: which_out + 2]
         else:
             spades_output = os.path.join(out_base, "filtered_spades")
         other_options = ' '.join(other_options)
@@ -1142,7 +1210,7 @@ def main():
                 [os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in
                  range(2, len(original_fq_files))]),
             min([os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in
-                range(len(original_fq_files))]))
+                 range(len(original_fq_files))]))
         if not (resume and filtered_files_exist):
 
             seed_file = options.seed_file
@@ -1156,41 +1224,46 @@ def main():
             """reading seeds"""
             log.info("Reading seeds...")
             if not options.utilize_mapping:
-                initial_accepted_words = chop_seqs(read_fasta(seed_file)[1])
-                anti_lines = get_anti_built_in_mapping(chop_seqs(read_fasta(anti_seed)[1]),
-                                                       (anti_seed or b_at_seed),
-                                                       original_fq_files, log) if anti_seed else set()
+                anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
+                                               (anti_seed or b_at_seed),
+                                               original_fq_files, log) if anti_seed else set()
             else:
                 seed_fastq, anti_lines = mapping_with_bowtie2(seed_file, bowt_seed, anti_seed,
                                                               b_at_seed, original_fq_files,
                                                               out_base, resume,
                                                               verb_out, options.threads, log)
-                initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, trim_ends))
             log.info("Reading seeds finished.\n")
 
             """reading fastq files"""
             log.info("Pre-reading fastq ...")
-            fastq_indices_in_memory = read_fq_infos(original_fq_files, options.rm_duplicates, out_base,
-                                                    anti_lines, pseudoasm, in_memory,
-                                                    b_at_seed, anti_seed, trim_ends,
-                                                    resume, log)
+            fastq_indices_in_memory = read_fq_infos(original_fq_files, direction_according_to_user_input,
+                                                    options.rm_duplicates, out_base, anti_lines, pseudoasm, in_memory,
+                                                    b_at_seed, anti_seed, trim_ends, resume, log)
             len_indices = fastq_indices_in_memory[2]
             log.info("Pre-reading fastq finished.\n")
 
             """pseudo-assembly if asked"""
             if pseudoasm:
-                groups_of_duplicate_lines, lines_with_duplicates = pseudo_assembly(fastq_indices_in_memory,
-                                                                                   pseudoasm, log)
+                groups_of_lines, lines_in_a_group = pseudo_assembly(fastq_indices_in_memory, pseudoasm, log)
             else:
-                groups_of_duplicate_lines = None
-                lines_with_duplicates = None
+                groups_of_lines = None
+                lines_in_a_group = None
             if not in_memory:
                 fastq_indices_in_memory = None
 
+            """adding initial words"""
+            log.info("Adding initial words ...")
+            if not options.utilize_mapping:
+                initial_accepted_words = chop_seqs(read_fasta(seed_file)[1])
+            else:
+                initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, trim_ends))
+            log.info("Adding initial words finished.\n")
+
             """extending process"""
             log.info("Extending ...")
-            accepted_contig_id = extending_reads(initial_accepted_words, original_fq_files, len_indices,
-                                                 pseudoasm, groups_of_duplicate_lines, lines_with_duplicates,
+            accepted_ids = set()
+            accepted_contig_id = extending_reads(initial_accepted_words, accepted_ids, original_fq_files, len_indices,
+                                                 pseudoasm, groups_of_lines, lines_in_a_group,
                                                  fastq_indices_in_memory, out_base, options.round_limit,
                                                  options.fg_out_per_round,
                                                  options.jump_step,
@@ -1199,8 +1272,8 @@ def main():
             write_fq_results(original_fq_files, accepted_contig_id,
                              os.path.join(out_base, "filtered"), os.path.join(out_base, 'temp.indices.2'),
                              fastq_indices_in_memory, verb_out, in_memory, log)
-            del accepted_contig_id, fastq_indices_in_memory, groups_of_duplicate_lines, \
-                anti_lines, initial_accepted_words, lines_with_duplicates
+            del accepted_contig_id, fastq_indices_in_memory, groups_of_lines, \
+                anti_lines, initial_accepted_words, lines_in_a_group
 
             if not options.keep_temp_files:
                 try:
@@ -1214,7 +1287,9 @@ def main():
             log.info("Extending ... skipped.")
 
         if reads_paired['input']:
-            if not (resume and min([os.path.exists(x) for x in (os.path.join(out_base, "filtered_"+y+"_"+z+"paired.fq") for y in ('1', '2') for z in ('', 'un'))])):
+            if not (resume and min([os.path.exists(x) for x in
+                                    (os.path.join(out_base, "filtered_" + y + "_" + z + "paired.fq") for y in ('1', '2')
+                                     for z in ('', 'un'))])):
                 resume = False
                 reads_paired['pair_out'] = separate_fq_by_pair(out_base, verb_out, log)
                 if reads_paired['pair_out'] and not options.keep_temp_files:
@@ -1234,25 +1309,24 @@ def main():
                 log.info('Assembling with SPAdes ... skipped.')
 
         """slim"""
-        if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))\
+        if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
                 and options.scheme_for_slimming_spades_result != '0':
             slim_spades_result(options.scheme_for_slimming_spades_result, spades_output,
                                options.verbose_log, log, options.threads)
 
         log = simple_log(log, out_base)
-        log.info("\nTotal Calc-cost "+str(time.time() - time0))
+        log.info("\nTotal Calc-cost " + str(time.time() - time0))
         log.info("Thanks you!")
     except:
         log.exception("")
         log = simple_log(log, out_base)
         log.info("\nTotal Calc-cost " + str(time.time() - time0))
-        log.info("Please email me if you find bugs!")
+        log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!")
     logging.shutdown()
 
 
 if __name__ == '__main__':
     main()
-
 
 """Copyright 2016 Jianjun Jin
 

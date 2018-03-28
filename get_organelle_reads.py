@@ -237,13 +237,13 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
                                     this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
                                 else:
                                     log.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
-                                    log.info("Using user-defined directions.")
+                                    log.info("Using user-defined directions. ")
                                     use_user_direction = True
                                     this_name = line[1:].strip()
                                     direction = direction_according_to_user_input[id_file]
                             except (ValueError, IndexError):
                                 log.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
-                                log.info("Using user-defined directions.")
+                                log.info("Using user-defined directions. ")
                                 use_user_direction = True
                                 this_name = line[1:].strip()
                                 direction = direction_according_to_user_input[id_file]

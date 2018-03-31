@@ -38,11 +38,15 @@ then add */GetOrganelle and */GetOrganelle/Utilities to the path:
     
     echo "{where_you_clone_GetOrganelle}/GetOrganelle/Utilities:$PATH" >> ~/.bash_profile
     
+    echo "export PATH" >> ~/.bash_profile
+    
     # for Linux
     
     echo "{where_you_clone_GetOrganelle}/GetOrganelle:$PATH" >> ~/.bashrc
     
     echo "{where_you_clone_GetOrganelle}/GetOrganelle/Utilities:$PATH" >> ~/.bashrc
+    
+    echo "export PATH" >> ~/.bashrc
 
 
 and keep update when necessary:

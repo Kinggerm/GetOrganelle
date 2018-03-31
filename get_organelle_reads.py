@@ -834,7 +834,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
         kmer = ''
     else:
         kmer = '-k ' + spades_kmer
-    if resume:
+    if resume and os.path.exists(spades_out_put):
         continue_command = '--continue'
     else:
         continue_command = ''

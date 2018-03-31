@@ -79,7 +79,7 @@ Cut raw data into certain size (ca. 2G per-end is enough for chloroplast for mos
 Take your input reference (fasta or bowtie index) as probe, the script would recruit target reads in successive rounds (iterations). You could also using the references in `Library/SeqReference`, but a more related reference is safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After recruitment, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
 
 <b>Producing Result</b>
-By default, the main script would call Utilities/slim_spades_fastg_by_blast.py to modify the assembly_graph.fastg file and produce a new fastg file along with a csv file. View the new fastg file and load the csv file in Bandage and choose the best path as the final result. 
+By default, the main script would call Utilities/slim_spades_fastg_by_blast.py to modify the `assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+cp-mt.fastg` if -F cp been called) along with a csv file (`assembly_graph.fastg.extend+cp-mt.csv`). View `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path as the final result. 
 
 
 ## Example

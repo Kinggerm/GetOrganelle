@@ -1,10 +1,12 @@
 #!/usr/bin/env python
+
 import time
 import datetime
 import sys
 import os
 import logging
 from optparse import OptionParser, OptionGroup
+from VERSIONS import get_versions
 
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
@@ -1166,9 +1168,6 @@ def timed_log(log, output_base):
     return log_timed
 
 
-__version__ = "1.9.82"
-
-
 def main():
     time0 = time.time()
     title = "\nGetOrganelle" \
@@ -1176,7 +1175,7 @@ def main():
             "\nThis pipeline get organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
-    options, log = require_commands(print_title=title, version=__version__)
+    options, log = require_commands(print_title=title, version=get_versions())
     try:
         """ initialization """
         global word_size

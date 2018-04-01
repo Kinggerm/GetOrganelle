@@ -82,6 +82,7 @@ Take your input reference (fasta or bowtie index) as probe, the script would rec
 By default, the main script would call Utilities/slim_spades_fastg_by_blast.py to modify the `assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+cp-mt.fastg` if -F cp been called) along with a csv file (`assembly_graph.fastg.extend+cp-mt.csv`). View `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path as the final result.
 
 A short video showing how to extract the plastome from the assembly graph with Bandage:
+{% youku XMzUwNzAxMDUyMA %}
 <iframe height=498 width=885 src="http://player.youku.com/embed/XMzUwNzAxMDUyMA" frameborder=0 allowfullscreen></iframe>
 
 

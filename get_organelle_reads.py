@@ -174,7 +174,7 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
 
 
 def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_duplicates, output_base, anti_lines,
-                  pseudo_assembled, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
+                  pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
     if trim_values:
         trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
     else:
@@ -192,7 +192,7 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
     temp1_contig_dir = [os.path.join(output_base, k + 'temp.indices.1') for k in ("_", "")]
     temp2_clusters_dir = [os.path.join(output_base, k + 'temp.indices.2') for k in ("_", "")]
     if resume and os.path.exists(temp1_contig_dir[1]) and os.path.exists(temp2_clusters_dir[1]):
-        if pseudo_assembled or index_in_memory:
+        if pre_grouped or index_in_memory:
             log.info("Reading existed indices for fastq ...")
             #
             forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'rU')]
@@ -386,10 +386,10 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
     return forward_reverse_reads, line_clusters, len_indices
 
 
-def pseudo_assembly(fastq_indices_in_memory, dupli_threshold, log):
+def pre_grouping(fastq_indices_in_memory, dupli_threshold, log):
     global word_size
     forward_and_reverse_reads, line_clusters, len_indices = fastq_indices_in_memory
-    log.info("Pseudo-assembly reads...")
+    log.info("Pre-grouping reads...")
     lines_with_duplicates = {}
     count_dupli = 0
     for j in range(len(line_clusters)):
@@ -477,7 +477,7 @@ def pseudo_assembly(fastq_indices_in_memory, dupli_threshold, log):
     else:
         memory_usage = ''
     del these_words
-    log.info(memory_usage + str(len(groups_of_duplicate_lines)) + " pseudo-contigs assembled.\n")
+    log.info(memory_usage + str(len(groups_of_duplicate_lines)) + " groups made.\n")
     return groups_of_duplicate_lines, lines_with_duplicates
 
 
@@ -497,7 +497,7 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_indices, pseudo_assembled,
+def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_indices, pre_grouped,
                     groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base,
                     round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, log):
     global word_size
@@ -554,7 +554,7 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
                 reads_generator = (this_read.strip() for this_read in
                                    open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
             unique_read_id = 0
-            if pseudo_assembled and groups_of_duplicate_lines:
+            if pre_grouped and groups_of_duplicate_lines:
                 for unique_read_id in range(len_indices):
                     this_seq = next(reads_generator)
                     this_c_seq = next(reads_generator)
@@ -1025,9 +1025,9 @@ def require_commands(print_title, version):
                                                                     "Take easy to pick some according your computer's flavour")
     group_computational.add_option('-t', dest='threads', type=int, default=4,
                                    help="Threads for third-party tools (bowtie2, blastn, SPAdes).")
-    group_computational.add_option('-P', dest='pseudo_assembled', type=int, default=200000,
-                                   help='The maximum potential-organ reads to be pseudo-assembled before extension. '
-                                        'pseudo_assembly is suggested when the whole genome coverage is shallow but '
+    group_computational.add_option('-P', dest='pre_grouped', type=int, default=200000,
+                                   help='The maximum potential-organ reads to be pre-grouped before extension. '
+                                        'pre_grouping is suggested when the whole genome coverage is shallow but '
                                         'the organ genome coverage is deep.'
                                         'The default value is 200000. '
                                         'For personal computer with 8G memory, we suggest no more than 300000. '
@@ -1128,9 +1128,9 @@ def require_commands(print_title, version):
             if not executable("spades.py -h"):
                 log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
                 options.run_spades = False
-        if not options.rm_duplicates and options.pseudo_assembled:
-            log.warning("remove duplicates was inactive, so that the pseudo-assembly was disabled.")
-            options.pseudo_assembled = False
+        if not options.rm_duplicates and options.pre_grouped:
+            log.warning("remove duplicates was inactive, so that the pre-grouping was disabled.")
+            options.pre_grouped = False
         if options.round_limit and options.round_limit < 2:
             log.warning("illegal limit for rounds! Been set to default: unlimited.")
             options.round_limit = None
@@ -1216,7 +1216,7 @@ def main():
             bowt_seed = options.bowtie2_seed
             anti_seed = options.anti_seed
             b_at_seed = options.bowtie2_anti_seed
-            pseudoasm = options.pseudo_assembled
+            pre_grp = options.pre_grouped
             trim_ends = options.trim_values
             in_memory = options.index_in_memory
 
@@ -1236,14 +1236,14 @@ def main():
             """reading fastq files"""
             log.info("Pre-reading fastq ...")
             fastq_indices_in_memory = read_fq_infos(original_fq_files, direction_according_to_user_input,
-                                                    options.rm_duplicates, out_base, anti_lines, pseudoasm, in_memory,
+                                                    options.rm_duplicates, out_base, anti_lines, pre_grp, in_memory,
                                                     b_at_seed, anti_seed, trim_ends, resume, log)
             len_indices = fastq_indices_in_memory[2]
             log.info("Pre-reading fastq finished.\n")
 
-            """pseudo-assembly if asked"""
-            if pseudoasm:
-                groups_of_lines, lines_in_a_group = pseudo_assembly(fastq_indices_in_memory, pseudoasm, log)
+            """pre-grouping if asked"""
+            if pre_grp:
+                groups_of_lines, lines_in_a_group = pre_grouping(fastq_indices_in_memory, pre_grp, log)
             else:
                 groups_of_lines = None
                 lines_in_a_group = None
@@ -1262,7 +1262,7 @@ def main():
             log.info("Extending ...")
             accepted_ids = set()
             accepted_contig_id = extending_reads(initial_accepted_words, accepted_ids, original_fq_files, len_indices,
-                                                 pseudoasm, groups_of_lines, lines_in_a_group,
+                                                 pre_grp, groups_of_lines, lines_in_a_group,
                                                  fastq_indices_in_memory, out_base, options.round_limit,
                                                  options.fg_out_per_round,
                                                  options.jump_step,

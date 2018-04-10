@@ -893,7 +893,7 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
     else:
         run_command = scheme
     graph_file = os.path.join(spades_output, "assembly_graph.fastg")
-    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg_by_blast.py') + ' -t ' + str(
+    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(
         threads) + ' ' + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold)
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()

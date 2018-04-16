@@ -212,39 +212,45 @@ def main():
         this_result = [fq_pairs[0].replace("_1.fq", "")]
         # this round coverage
         this_coverage = get_coverage(bowtie_base + ".sam")
-        if not this_coverage and not options.round:
-            log.info("No more target found! Exiting ..")
-            if not options.keep_temp:
-                os.remove(bowtie_base + ".fq")
-                os.remove(bowtie_base + ".sam")
-            break
-        ref_bowtie = sorted(this_coverage.keys())[0]
-        for threshold in thresholds:
-            count_site = 0
-            for site in range(1, len_ref_seq + 1):
-                if site in this_coverage[ref_bowtie] and this_coverage[ref_bowtie][site] > threshold:
-                    count_site += 1
-            this_result.append(round(float(count_site) / len_ref_seq, 3))
-        results_to_draw.append(this_coverage)
-        # merge
-        for ref in this_coverage:
-            if ref not in all_coverages:
-                all_coverages[ref] = {}
-                for site in this_coverage[ref]:
-                    all_coverages[ref][site] = this_coverage[ref][site]
-            else:
-                for site in this_coverage[ref]:
-                    if site in all_coverages[ref]:
-                        all_coverages[ref][site] += this_coverage[ref][site]
-                    else:
+        if this_coverage:
+            if not this_coverage and not options.round:
+                log.info("No more target found! Exiting ..")
+                if not options.keep_temp:
+                    os.remove(bowtie_base + ".fq")
+                    os.remove(bowtie_base + ".sam")
+                break
+            ref_bowtie = sorted(this_coverage.keys())[0]
+            for threshold in thresholds:
+                count_site = 0
+                for site in range(1, len_ref_seq + 1):
+                    if site in this_coverage[ref_bowtie] and this_coverage[ref_bowtie][site] > threshold:
+                        count_site += 1
+                this_result.append(round(float(count_site) / len_ref_seq, 3))
+            results_to_draw.append(this_coverage)
+            # merge
+            for ref in this_coverage:
+                if ref not in all_coverages:
+                    all_coverages[ref] = {}
+                    for site in this_coverage[ref]:
                         all_coverages[ref][site] = this_coverage[ref][site]
-        ref_bowtie = sorted(all_coverages.keys())[0]
-        for threshold in thresholds:
-            count_site = 0
-            for site in range(1, len_ref_seq + 1):
-                if site in all_coverages[ref_bowtie] and all_coverages[ref_bowtie][site] > threshold:
-                    count_site += 1
-            this_result.append(round(float(count_site) / len_ref_seq, 3))
+                else:
+                    for site in this_coverage[ref]:
+                        if site in all_coverages[ref]:
+                            all_coverages[ref][site] += this_coverage[ref][site]
+                        else:
+                            all_coverages[ref][site] = this_coverage[ref][site]
+            ref_bowtie = sorted(all_coverages.keys())[0]
+            for threshold in thresholds:
+                count_site = 0
+                for site in range(1, len_ref_seq + 1):
+                    if site in all_coverages[ref_bowtie] and all_coverages[ref_bowtie][site] > threshold:
+                        count_site += 1
+                this_result.append(round(float(count_site) / len_ref_seq, 3))
+        else:
+            for threshold in thresholds:
+                this_result.append("-")
+            for threshold in thresholds:
+                this_result.append("-")
         # all reads
         all_reads_num = count_fq_reads(real_fq)
         other_reads_num = all_reads_num - count_fq_reads(bowtie_base + ".fq")

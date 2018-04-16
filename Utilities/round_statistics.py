@@ -189,7 +189,6 @@ def main():
         log.info(str(len(all_fq_files)) + " paired fastq files found. " + str(options.round) + " rounds required.")
     else:
         log.info(str(len(all_fq_files)) + " paired fastq files found.")
-    count_round = 0
     thresholds = [int(thr) for thr in options.threshold.split(",")]
     if all_fq_files:
         log.info("\t".join(
@@ -203,7 +202,7 @@ def main():
     all_fq_files = [(os.path.basename(options.initial_mapped), )] + all_fq_files
     real_fq_files = [(options.initial_mapped, )] + real_fq_files
     for go_to, fq_pairs in enumerate(all_fq_files):
-        if options.round and count_round > options.round:
+        if options.round and go_to > options.round:
             log.info("Hit required rounds! Exiting ..")
             break
         real_fq = real_fq_files[go_to]

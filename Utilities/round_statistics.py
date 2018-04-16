@@ -5,7 +5,6 @@ import os
 import sys
 import subprocess
 import logging
-import matplotlib.pyplot as plt
 
 
 def get_options():
@@ -26,6 +25,7 @@ def get_options():
                       help="sites with coverage above the threshold would be marked as covered. default:[%default]")
     parser.add_option("--continue", dest="resume", default=False, action="store_true")
     parser.add_option("--keep-temp", dest="keep_temp", default=False, action="store_true")
+    parser.add_option("--draw", dest="draw_plot", default=False, action="store_true")
     # parser.add_option("--average", default=False, action="store_true",
     #                   help="output average coverage.")
     options, argv = parser.parse_args()
@@ -255,20 +255,22 @@ def main():
             os.remove(bowtie_base + ".sam")
         log.info("\t".join([str(val) for val in this_result]))
     # draw
-    len_round = len(results_to_draw)
-    figure = plt.figure(figsize=(50, len_round*3))
-    width = 50
-    for i in range(len_round):
-        plt.subplot(len_round, 1, i + 1)
-        ref_bowtie = sorted(results_to_draw[i].keys())[0]
-        X = list(range(1, len_ref_seq + 1))
-        Y = [results_to_draw[i][ref_bowtie].get(site_here, 0) for site_here in X]
-        X = [X[n] for n in range(0, len(X), width)]
-        Y = [sum(Y[n:n+width])/float(len(Y[n:n+width])) for n in range(0, len(Y), width)]
-        plt.bar(X, Y, width=width, color="darkgreen")
-        # plt.hist([1, 2, 3, 5, 2, 1], color="darkgreen")
-        plt.yticks([100, 200, 300, 400, 500])
-    figure.savefig(os.path.join(out_base, "coverage_per_round.pdf"), bbox_inches="tight")
+    if options.draw_plot:
+        import matplotlib.pyplot as plt
+        len_round = len(results_to_draw)
+        figure = plt.figure(figsize=(50, len_round*3))
+        width = 50
+        for i in range(len_round):
+            plt.subplot(len_round, 1, i + 1)
+            ref_bowtie = sorted(results_to_draw[i].keys())[0]
+            X = list(range(1, len_ref_seq + 1))
+            Y = [results_to_draw[i][ref_bowtie].get(site_here, 0) for site_here in X]
+            X = [X[n] for n in range(0, len(X), width)]
+            Y = [sum(Y[n:n+width])/float(len(Y[n:n+width])) for n in range(0, len(Y), width)]
+            plt.bar(X, Y, width=width, color="darkgreen")
+            # plt.hist([1, 2, 3, 5, 2, 1], color="darkgreen")
+            plt.yticks([100, 200, 300, 400, 500])
+        figure.savefig(os.path.join(out_base, "coverage_per_round.pdf"), bbox_inches="tight")
 
 
 if __name__ == '__main__':

@@ -254,7 +254,10 @@ def main():
         all_reads_num = count_fq_reads(real_fq)
         other_reads_num = all_reads_num - count_fq_reads(bowtie_base + ".fq")
         this_result.append(other_reads_num)
-        this_result.append(other_reads_num/float(all_reads_num))
+        if all_reads_num:
+            this_result.append(other_reads_num/float(all_reads_num))
+        else:
+            this_result.append("-")
         if not options.keep_temp:
             os.remove(bowtie_base + ".fq")
             os.remove(bowtie_base + ".sam")

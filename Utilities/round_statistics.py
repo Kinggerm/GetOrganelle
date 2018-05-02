@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import logging
+from math import ceil
 
 
 def get_options():
@@ -26,6 +27,7 @@ def get_options():
     parser.add_option("--continue", dest="resume", default=False, action="store_true")
     parser.add_option("--keep-temp", dest="keep_temp", default=False, action="store_true")
     parser.add_option("--draw", dest="draw_plot", default=False, action="store_true")
+    parser.add_option("--max-coverage-tick", dest="max_cov_tick")
     # parser.add_option("--average", default=False, action="store_true",
     #                   help="output average coverage.")
     options, argv = parser.parse_args()
@@ -268,16 +270,28 @@ def main():
         len_round = len(results_to_draw)
         figure = plt.figure(figsize=(50, len_round*3))
         width = 50
+        x_values = list(range(1, len_ref_seq + 1))
+        x_trans_values = [x_values[n] for n in range(0, len(x_values), width)]
+        y_values_list = []
+        for i in range(len_round):
+            ref_bowtie = sorted(results_to_draw[i].keys())[0]
+            y_values_list.append([results_to_draw[i][ref_bowtie].get(site_here, 0) for site_here in x_values])
+            y_values_list[-1] = [sum(y_values_list[-1][n:n + width]) / float(len(y_values_list[-1][n:n + width]))
+                                 for n in range(0, len(y_values_list[-1]), width)]
+        if options.max_cov_tick:
+            y_tick_max = int(options.max_cov_tick)
+        else:
+            y_tick_max = ceil(max([max(y_v) for y_v in y_values_list])/100.) * 100
+        y_ticks = [int(y_tick_max/3), int(y_tick_max*2/3), y_tick_max]
         for i in range(len_round):
             plt.subplot(len_round, 1, i + 1)
-            ref_bowtie = sorted(results_to_draw[i].keys())[0]
-            X = list(range(1, len_ref_seq + 1))
-            Y = [results_to_draw[i][ref_bowtie].get(site_here, 0) for site_here in X]
-            X = [X[n] for n in range(0, len(X), width)]
-            Y = [sum(Y[n:n+width])/float(len(Y[n:n+width])) for n in range(0, len(Y), width)]
-            plt.bar(X, Y, width=width, color="darkgreen")
+            plt.bar(x_trans_values, y_values_list[i], width=width, color="darkgreen")
             # plt.hist([1, 2, 3, 5, 2, 1], color="darkgreen")
-            plt.yticks([100, 200, 300, 400, 500])
+            plt.yticks(y_ticks, [str(y_t) + "x" for y_t in y_ticks], fontsize=40)
+            if i < len_round - 1:
+                plt.xticks([])
+            else:
+                plt.xticks(fontsize=40)
         figure.savefig(os.path.join(out_base, "coverage_per_round.pdf"), bbox_inches="tight")
 
 

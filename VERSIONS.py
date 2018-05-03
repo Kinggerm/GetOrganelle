@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.0.2",
+     "features": [
+         "removing duplicates become a parameter to control the memory usage.",
+     ]},
     {"number": "1.0.1a",
      "features": [
          "Fix the bug of running spades.py with --continue when no output file exists.",

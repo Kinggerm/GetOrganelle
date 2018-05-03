@@ -273,13 +273,16 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
                             elif this_c_seq in seq_duplicates:
                                 line_clusters[seq_duplicates[this_c_seq]].append(line_count)
                             else:
-                                forward_reverse_reads.append(this_seq)
-                                forward_reverse_reads.append(this_c_seq)
-                                if not index_in_memory:
+                                if index_in_memory:
+                                    forward_reverse_reads.append(this_seq)
+                                    forward_reverse_reads.append(this_c_seq)
+                                else:
                                     temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
+                            if len(seq_duplicates) > rm_duplicates:
+                                seq_duplicates = {}
                         else:
                             line_clusters.append([line_count])
                             if index_in_memory:
@@ -321,13 +324,16 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
                             elif this_c_seq in seq_duplicates:
                                 line_clusters[seq_duplicates[this_c_seq]].append(line_count)
                             else:
-                                forward_reverse_reads.append(this_seq)
-                                forward_reverse_reads.append(this_c_seq)
-                                if not index_in_memory:
+                                if index_in_memory:
+                                    forward_reverse_reads.append(this_seq)
+                                    forward_reverse_reads.append(this_c_seq)
+                                else:
                                     temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
+                            if len(seq_duplicates) > rm_duplicates:
+                                seq_duplicates = {}
                         else:
                             line_clusters.append([line_count])
                             if index_in_memory:
@@ -386,7 +392,7 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
     return forward_reverse_reads, line_clusters, len_indices
 
 
-def pre_grouping(fastq_indices_in_memory, dupli_threshold, log):
+def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_memory, log):
     global word_size
     forward_and_reverse_reads, line_clusters, len_indices = fastq_indices_in_memory
     log.info("Pre-grouping reads...")
@@ -406,9 +412,26 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, log):
     groups_of_duplicate_lines = {}
     count_groups = 0
     these_words = {}
+
+    if index_in_memory:
+
+        def generate_forward_and_reverse(here_unique_id):
+            return forward_and_reverse_reads[2 * here_unique_id], forward_and_reverse_reads[2 * here_unique_id + 1]
+    else:
+        here_go_to = [0]
+        temp_seq_file = open(os.path.join(out_base, 'temp.indices.1'))
+
+        def generate_forward_and_reverse(here_unique_id):
+            forward_seq_line = temp_seq_file.readline()
+            while here_go_to[0] < 2 * here_unique_id:
+                forward_seq_line = temp_seq_file.readline()
+                here_go_to[0] += 1
+            reverse_seq_line = temp_seq_file.readline().strip()
+            here_go_to[0] += 1
+            return forward_seq_line.strip("\n"), reverse_seq_line
+
     for this_unique_read_id in list(lines_with_duplicates):
-        this_seq = forward_and_reverse_reads[2 * this_unique_read_id]
-        this_c_seq = forward_and_reverse_reads[2 * this_unique_read_id + 1]
+        this_seq ,this_c_seq = generate_forward_and_reverse(this_unique_read_id)
         seq_len = len(this_seq)
         temp_length = seq_len - word_size
         these_group_id = set()
@@ -1025,13 +1048,14 @@ def require_commands(print_title, version):
                                                                     "Take easy to pick some according your computer's flavour")
     group_computational.add_option('-t', dest='threads', type=int, default=4,
                                    help="Threads for third-party tools (bowtie2, blastn, SPAdes).")
-    group_computational.add_option('-P', dest='pre_grouped', type=int, default=200000,
-                                   help='The maximum potential-organ reads to be pre-grouped before extension. '
+    group_computational.add_option('-P', dest='pre_grouped', type=float, default=2E5,
+                                   help='The maximum number (integer) of high-covered reads to be pre-grouped '
+                                        'before extension. '
                                         'pre_grouping is suggested when the whole genome coverage is shallow but '
                                         'the organ genome coverage is deep.'
-                                        'The default value is 200000. '
-                                        'For personal computer with 8G memory, we suggest no more than 300000. '
-                                        'A larger number (ex. 600000) would run faster but exhaust memory '
+                                        'The default value is 2E5. '
+                                        'For personal computer with 8G memory, we suggest no more than 3E5. '
+                                        'A larger number (ex. 6E5) would run faster but exhaust memory '
                                         'in the first few minutes. Choose 0 to disable this process.')
     group_computational.add_option('--continue', dest='script_resume', default=False, action="store_true",
                                    help='Several check point based on files produced, rather than log, '
@@ -1041,11 +1065,13 @@ def require_commands(print_title, version):
                                    help="Keep index in memory. Choose save index in memory than disk.")
     group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
                                    help='Enable output per round. Choose to save memory but cost more time per round.')
-    group_computational.add_option('--no-remove-duplicates', dest='rm_duplicates', action="store_false", default=True,
-                                   help='By default this script use unique reads to extend. Choose to disable'
-                                        ' removing duplicates, which save memory but run more slow.'
-                                        ' Note that whether choose or not will not disable'
-                                        ' the calling of replicate reads.')
+    group_computational.add_option('--remove-duplicates', dest='rm_duplicates', default=1E7, type=float,
+                                   help='By default this script use unique reads to extend. Choose the number of '
+                                        'duplicates (integer) to be saved in memory. A larger number (ex. 2E7) would '
+                                        'run faster but exhaust memory in the first few minutes. '
+                                        'Choose 0 to disable this process. '
+                                        'Note that whether choose or not will not disable '
+                                        'the calling of replicate reads. Default: %default.')
     group_computational.add_option('--keep-temp', dest='keep_temp_files', action="store_true", default=False,
                                    help="Choose to keep the running temp/index files.")
     group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
@@ -1128,6 +1154,8 @@ def require_commands(print_title, version):
             if not executable("spades.py -h"):
                 log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
                 options.run_spades = False
+        options.rm_duplicates = int(options.rm_duplicates)
+        options.pre_grouped = int(options.pre_grouped)
         if not options.rm_duplicates and options.pre_grouped:
             log.warning("remove duplicates was inactive, so that the pre-grouping was disabled.")
             options.pre_grouped = False
@@ -1243,7 +1271,8 @@ def main():
 
             """pre-grouping if asked"""
             if pre_grp:
-                groups_of_lines, lines_in_a_group = pre_grouping(fastq_indices_in_memory, pre_grp, log)
+                groups_of_lines, lines_in_a_group = pre_grouping(fastq_indices_in_memory, pre_grp,
+                                                                 out_base, in_memory, log)
             else:
                 groups_of_lines = None
                 lines_in_a_group = None

@@ -95,7 +95,7 @@ or in a fast but memory-consuming way:
 
 or in a slow and memory-economic way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output -R 10 -k 75,85,95,105 -P 0 --out-per-round --no-remove-duplicates
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output -R 10 -k 75,85,95,105 -P 0 --out-per-round --remove-duplicates 0
 
 For 2G raw data, 150 bp reads, to assembly mitochondria
 

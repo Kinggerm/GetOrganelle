@@ -925,6 +925,10 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
             log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
             log.warning(str(output))
         log.warning("Processing assembly result failed.")
+    elif "failed" in str(output) or "error" in str(output):
+        if verbose_log:
+            log.error(str(output))
+        log.warning("Processing assembly result failed.")
     else:
         if verbose_log:
             log.info(str(output))
@@ -964,7 +968,7 @@ def require_commands(print_title, version):
             " -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5\n" \
             "###  Chloroplast, Slow, Memory-economic\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
-            " -R 10 -k 75,85,95,105 -P 0 --out-per-round --no-remove-duplicates\n" \
+            " -R 10 -k 75,85,95,105 -P 0 --out-per-round --remove-duplicates 0\n" \
             "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 93 -o mitochondria_output " \
             " -R 30 -k 65,75,85,95 -P 1000000 -F mt\n" \
@@ -1157,7 +1161,7 @@ def require_commands(print_title, version):
         options.rm_duplicates = int(options.rm_duplicates)
         options.pre_grouped = int(options.pre_grouped)
         if not options.rm_duplicates and options.pre_grouped:
-            log.warning("remove duplicates was inactive, so that the pre-grouping was disabled.")
+            log.warning("removing duplicates was inactive, so that the pre-grouping was disabled.")
             options.pre_grouped = False
         if options.round_limit and options.round_limit < 2:
             log.warning("illegal limit for rounds! Been set to default: unlimited.")

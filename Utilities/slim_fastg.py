@@ -224,13 +224,16 @@ def blast_and_call_names(fasta_file, index_files, out_file, is_fastg, threads):
             blast_result = commands.getstatusoutput('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
         # blastn -num_threads 4 -query assembly_graph.fastg -db db_f -out out_f -outfmt 6
         if 'Error' in str(blast_result[1]) or 'error' in str(blast_result[1]) or '不是内部或外部命令' in str(blast_result[1]):
-            os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
-            if not os.path.exists(out_file):
-                sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]))
-                exit()
+            # os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+            # if not os.path.exists(out_file):
+            sys.stdout.write('Blast command: blastn -num_threads ' + str(
+                threads) + ' -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file +
+                ' -outfmt 6 -evalue 1e-15\n')
+            sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]) + "\n")
+            raise EnvironmentError
         # windows
-        if not os.path.exists(out_file):
-            os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+        # if not os.path.exists(out_file):
+        #     os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
         time1 = time.time()
         sys.stdout.write('\nblast to '+os.path.split(index_files)[-1]+' cost: '+str(time1-time0))
         names = {}
@@ -238,7 +241,7 @@ def blast_and_call_names(fasta_file, index_files, out_file, is_fastg, threads):
             blast_out_lines = open(out_file, 'rU')
         except IOError:
             sys.stdout.write('\nBlast was not properly installed or configurated.')
-            exit()
+            raise EnvironmentError
         for line in blast_out_lines:
             line_split = line.split('\t')
             if is_fastg:
@@ -669,29 +672,31 @@ def main():
             options.treat_no_hits == 'ex_no_con') + '+' + os.path.split(include_index)[-1] + '-' + \
             os.path.split(exclude_index)[-1]
         # make blast
-        in_names = blast_and_call_names(fasta_file=fas_file, index_files=include_index, out_file=fas_file+'.blast_in',
-                                        is_fastg=is_fastg, threads=options.threads)
-        ex_names = blast_and_call_names(fasta_file=fas_file, index_files=exclude_index, out_file=fas_file+'.blast_ex',
-                                        is_fastg=is_fastg, threads=options.threads)
-        # write out fasta according to blast
-        fasta_matrix = read_fasta(fasta_dir=fas_file)
-        coverages = get_coverages(matrix=fasta_matrix, is_fastg=is_fastg)
-        in_names_r, ex_names_r, aver_dep = modify_in_ex(in_names=in_names, ex_names=ex_names,
-                                                        significant=options.significant, coverages=coverages,
-                                                        depth_cutoff=options.depth_cutoff)
-        accept_names = map_names(in_names=set(in_names_r), ex_names=set(ex_names_r), candidates=fasta_matrix[0],
-                                 is_fastg=is_fastg, aver_in_dep=aver_dep, coverages=coverages,
-                                 depth_cutoff=options.depth_cutoff)
-        fasta_matrix = make_new_matrix_with_names(names=accept_names, old_matrix=fasta_matrix)
-        write_fasta(out_dir=fas_file+'.'+in_ex_info+'.'+fas_file.split('.')[-1], matrix=fasta_matrix, overwrite=False)
-        # write out hits csv according to blast
-        write_hits_csv_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names,
-                                   exclude_file=exclude_index, out_file=fas_file+'.'+in_ex_info+'.', overwrite=False,
-                                   is_fastg=is_fastg)
+        try:
+            in_names = blast_and_call_names(fasta_file=fas_file, index_files=include_index,
+                                            out_file=fas_file+'.blast_in', is_fastg=is_fastg, threads=options.threads)
+            ex_names = blast_and_call_names(fasta_file=fas_file, index_files=exclude_index,
+                                            out_file=fas_file+'.blast_ex', is_fastg=is_fastg, threads=options.threads)
+            # write out fasta according to blast
+            fasta_matrix = read_fasta(fasta_dir=fas_file)
+            coverages = get_coverages(matrix=fasta_matrix, is_fastg=is_fastg)
+            in_names_r, ex_names_r, aver_dep = modify_in_ex(in_names=in_names, ex_names=ex_names,
+                                                            significant=options.significant, coverages=coverages,
+                                                            depth_cutoff=options.depth_cutoff)
+            accept_names = map_names(in_names=set(in_names_r), ex_names=set(ex_names_r), candidates=fasta_matrix[0],
+                                     is_fastg=is_fastg, aver_in_dep=aver_dep, coverages=coverages,
+                                     depth_cutoff=options.depth_cutoff)
+            fasta_matrix = make_new_matrix_with_names(names=accept_names, old_matrix=fasta_matrix)
+            write_fasta(out_dir=fas_file+'.'+in_ex_info+'.'+fas_file.split('.')[-1], matrix=fasta_matrix, overwrite=False)
+            # write out hits csv according to blast
+            write_hits_csv_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names,
+                                       exclude_file=exclude_index, out_file=fas_file+'.'+in_ex_info+'.', overwrite=False,
+                                       is_fastg=is_fastg)
+        except EnvironmentError:
+            sys.stdout.write('\nRound ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!\n')
+        else:
+            sys.stdout.write('\nRound ' + str(i+1) + '/' + str(len(args)) + ': ' + args[i] + ' finished!\n')
         remove_temp_files(fas_file, options.keep_temp, is_fastg)
-        # os.remove(fas_file)
-        # os.remove(args[i])
-        sys.stdout.write('\nRound ' + str(i+1) + '/' + str(len(args)) + ': ' + args[i] + ' finished!\n')
     sys.stdout.write('\nTotal cost: '+str(time.time()-time0)+'\n\n')
 
 

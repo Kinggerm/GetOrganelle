@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.0.2a",
+     "features": [
+         "prompt failure in Utilities/slim_fastg.py",
+     ]},
     {"number": "1.0.2",
      "features": [
          "removing duplicates become a parameter to control the memory usage.",

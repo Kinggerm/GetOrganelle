@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.0.3",
+     "features": [
+         "accept .gz/.zip files as input",
+         "logging errors as utf8",
+     ]},
     {"number": "1.0.2a",
      "features": [
          "prompt failure in Utilities/slim_fastg.py",

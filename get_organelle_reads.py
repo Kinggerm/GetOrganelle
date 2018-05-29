@@ -760,15 +760,15 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
             build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
-            if "unrecognized option" in str(output):
+            if "unrecognized option" in output.decode("utf8"):
                 build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
                                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_seed_index.communicate()
-            if "(ERR)" in str(output) or "Error:" in str(output):
-                log.error('\n' + str(output))
+            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                log.error('\n' + output.decode("utf8"))
                 exit()
             if verbose_log:
-                log.info("\n" + str(output).strip())
+                log.info("\n" + output.decode("utf8").strip())
             log.info("Making seed bowtie2 index finished.")
         seed_index_base = seed_file + '.index'
     else:
@@ -785,11 +785,11 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
             ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
-        if "(ERR)" in str(output) or "Error:" in str(output):
-            log.error('\n' + str(output))
+        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+            log.error('\n' + output.decode("utf8"))
             exit()
         if verbose_log:
-            log.info("\n" + str(output).strip())
+            log.info("\n" + output.decode("utf8").strip())
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
             os.rename(total_seed_file[0], total_seed_file[1])
@@ -807,15 +807,15 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                     "bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 output, err = build_anti_index.communicate()
-                if "unrecognized option" in str(output):
+                if "unrecognized option" in output.decode("utf8"):
                     build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_seed + '.index',
                                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                     output, err = build_anti_index.communicate()
-                if "(ERR)" in str(output) or "Error:" in str(output):
-                    log.error('\n' + str(output))
+                if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                    log.error('\n' + output.decode("utf8"))
                     exit()
                 if verbose_log:
-                    log.info("\n" + str(output).strip())
+                    log.info("\n" + output.decode("utf8").strip())
                 log.info("Making anti-seed bowtie2 index finished.")
             anti_index_base = anti_seed + '.index'
         else:
@@ -832,11 +832,11 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                 anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = make_anti_seed_bowtie2.communicate()
-            if "(ERR)" in str(output) or "Error:" in str(output):
-                log.error('\n' + str(output))
+            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                log.error('\n' + output.decode("utf8"))
                 exit()
             if verbose_log:
-                log.info("\n" + str(output).strip())
+                log.info("\n" + output.decode("utf8").strip())
             if os.path.exists(anti_seed_sam[0]):
                 os.rename(anti_seed_sam[0], anti_seed_sam[1])
                 log.info("Mapping finished.")
@@ -878,20 +878,20 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
             [kmer, spades_out_put]).strip()
     spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
-    if "not recognized" in str(output):
+    if "not recognized" in output.decode("utf8"):
         if verbose_log:
             log.error('Problem with running SPAdes:')
-            log.error(str(output))
+            log.error(output.decode("utf8"))
         log.error("WAINING in SPAdes: unrecognized option in " + parameters)
         log.error('Assembling failed.')
         return False
-    elif "== Error ==" in str(output):
-        log.error("Error in SPAdes: \n== Error ==" + str(output).split("== Error ==")[-1].split("In case you")[0])
+    elif "== Error ==" in output.decode("utf8"):
+        log.error("Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split("In case you")[0])
         log.error('Assembling failed.')
         return False
     else:
         if verbose_log:
-            log.info(str(output))
+            log.info(output.decode("utf8"))
         log.info('Assembling finished.\n')
         return True
 
@@ -920,18 +920,18 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
         threads) + ' ' + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold)
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
-    if "not recognized" in str(output) or "command not found" in str(output):
+    if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
         if verbose_log:
             log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
-            log.warning(str(output))
+            log.warning(output.decode("utf8"))
         log.warning("Processing assembly result failed.")
-    elif "failed" in str(output) or "error" in str(output):
+    elif "failed" in output.decode("utf8") or "error" in output.decode("utf8"):
         if verbose_log:
-            log.error(str(output))
+            log.error(output.decode("utf8"))
         log.warning("Processing assembly result failed.")
     else:
         if verbose_log:
-            log.info(str(output))
+            log.info(output.decode("utf8"))
         log.info("Processing assembly result finished!")
 
 
@@ -942,10 +942,10 @@ def separate_fq_by_pair(out_base, verbose_log, log):
                   + ' ' + os.path.join(out_base, "filtered_2.fq")
     separating = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = separating.communicate()
-    if "not recognized" in str(output) or "command not found" in str(output):
+    if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
         if verbose_log:
             log.warning(os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py") + "not found!")
-            log.warning(str(output))
+            log.warning(output.decode("utf8"))
         log.warning("Separating filtered fastq file failed.")
         return False
     elif not os.path.exists(os.path.join(out_base, "filtered_2_paired.fq")):
@@ -953,9 +953,29 @@ def separate_fq_by_pair(out_base, verbose_log, log):
         return False
     else:
         if verbose_log:
-            log.info(str(output))
+            log.info(output.decode("utf8"))
         log.info("Separating filtered fastq file finished!")
         return True
+
+
+def unzip(source, target, verbose_log, log):
+    target_temp = target + ".Temp"
+    run_command = "tar -x -f " + source + " -O > " + target_temp
+    log.info("Try unzipping your reads file: " + source)
+    unzipping = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output, err = unzipping.communicate()
+    if "Unrecognized" in output.decode("utf8") or "Error" in output.decode("utf8") or "error" in output.decode("utf8"):
+        if verbose_log:
+            log.error("\n" + output.decode("utf8"))
+        try:
+            os.remove(target_temp)
+        except:
+            pass
+        raise NotImplementedError("unzipping failed!")
+    else:
+        if verbose_log:
+            log.info(output.decode("utf8"))
+        os.rename(target_temp, target)
 
 
 def require_commands(print_title, version):
@@ -1135,10 +1155,10 @@ def require_commands(print_title, version):
         log.info(' '.join(sys.argv) + '\n')
         log = timed_log(log, options.output_base)
         if options.seed_file and options.bowtie2_seed:
-            log.error('Simultaneously "-s" and "--bs" is not allowed!')
+            log.error('Simultaneously using "-s" and "--bs" is not allowed!')
             exit()
         if options.anti_seed and options.bowtie2_anti_seed:
-            log.error('Simultaneously "-a" and "--as" is not allowed!')
+            log.error('Simultaneously using "-a" and "--as" is not allowed!')
             exit()
         if options.bowtie2_seed or options.bowtie2_anti_seed:
             options.utilize_mapping = True
@@ -1208,6 +1228,10 @@ def main():
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
     options, log = require_commands(print_title=title, version=get_versions())
+    resume = options.script_resume
+    verb_out = options.verbose_log
+    out_base = options.output_base
+    reads_files_to_drop = []
     try:
         """ initialization """
         global word_size
@@ -1222,9 +1246,6 @@ def main():
             original_fq_files = [fastq_file for fastq_file in options.unpaired_fastq_files]
             direction_according_to_user_input = [1] * len(options.unpaired_fastq_files)
 
-        resume = options.script_resume
-        verb_out = options.verbose_log
-        out_base = options.output_base
         other_options = options.other_spades_options.split(' ')
         if '-o' in other_options:
             which_out = other_options.index('-o')
@@ -1252,8 +1273,17 @@ def main():
             trim_ends = options.trim_values
             in_memory = options.index_in_memory
 
+            # unzip fq files if needed
+            for file_id, read_file in enumerate(original_fq_files):
+                if read_file.endswith(".gz") or read_file.endswith(".zip"):
+                    target_fq = read_file + ".fastq"
+                    if not (os.path.exists(target_fq) and resume):
+                        unzip(read_file, target_fq, options.verbose_log, log)
+                    original_fq_files[file_id] = target_fq
+                    reads_files_to_drop.append(target_fq)
+
             """reading seeds"""
-            log.info("Reading seeds...")
+            log.info("\nReading seeds...")
             if not options.utilize_mapping:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
                                                (anti_seed or b_at_seed),
@@ -1317,6 +1347,9 @@ def main():
             log.info("Extending finished.\n")
         else:
             log.info("Extending ... skipped.")
+        if reads_files_to_drop and not options.keep_temp_files:
+            for rm_read_file in reads_files_to_drop:
+                os.remove(rm_read_file)
 
         if reads_paired['input']:
             if not (resume and min([os.path.exists(x) for x in
@@ -1334,11 +1367,11 @@ def main():
         if options.run_spades:
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
                 # resume = False
-                log.info('Assembling with SPAdes ...')
+                log.info('Assembling using SPAdes ...')
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                      original_fq_files, reads_paired, options.verbose_log, resume, options.threads, log)
             else:
-                log.info('Assembling with SPAdes ... skipped.')
+                log.info('Assembling using SPAdes ... skipped.')
 
         """slim"""
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \

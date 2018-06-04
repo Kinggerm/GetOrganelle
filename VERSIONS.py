@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.0.3a",
+     "features": [
+         "gunzip",
+     ]},
     {"number": "1.0.3",
      "features": [
          "accept .gz/.zip files as input",

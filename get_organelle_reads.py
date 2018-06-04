@@ -754,9 +754,9 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                          verbose_log, threads, log):
     if seed_file:
         if os.path.exists(seed_file + '.index.1.bt2l'):
-            log.info("seed bowtie2 index existed!")
+            log.info("Bowtie2 index existed!")
         else:
-            log.info("Making seed bowtie2 index ...")
+            log.info("Making seed - bowtie2 index ...")
             build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
@@ -769,7 +769,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                 exit()
             if verbose_log:
                 log.info("\n" + output.decode("utf8").strip())
-            log.info("Making seed bowtie2 index finished.")
+            log.info("Making seed - bowtie2 index finished.")
         seed_index_base = seed_file + '.index'
     else:
         seed_index_base = bowtie2_seed
@@ -778,7 +778,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     if resume and os.path.exists(total_seed_file[1]):
         log.info("Initial seeds existed!")
     else:
-        log.info("Mapping reads to seed bowtie2 index ...")
+        log.info("Mapping reads to seed - bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
             "bowtie2 -p " + str(threads) + " --very-fast-local --al " + total_seed_file[
                 0] + " -x " + seed_index_base + " -U " +
@@ -800,9 +800,9 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     if anti_seed or bowtie2_anti_seed:
         if anti_seed:
             if os.path.exists(anti_seed + '.index.1.bt2l'):
-                log.info("anti-seed bowtie2 index existed!")
+                log.info("anti-seed - bowtie2 index existed!")
             else:
-                log.info("Making anti-seed bowtie2 index ...")
+                log.info("Making anti-seed - bowtie2 index ...")
                 build_anti_index = subprocess.Popen(
                     "bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -816,7 +816,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                     exit()
                 if verbose_log:
                     log.info("\n" + output.decode("utf8").strip())
-                log.info("Making anti-seed bowtie2 index finished.")
+                log.info("Making anti-seed - bowtie2 index finished.")
             anti_index_base = anti_seed + '.index'
         else:
             anti_index_base = bowtie2_anti_seed
@@ -825,7 +825,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         if resume and os.path.exists(anti_seed_sam[1]):
             log.info("Anti-seed mapping information existed!")
         else:
-            log.info("Mapping reads to anti-seed bowtie2 index ...")
+            log.info("Mapping reads to anti-seed - bowtie2 index ...")
             make_anti_seed_bowtie2 = subprocess.Popen(
                 "bowtie2 -p " + str(threads) + " --very-fast-local -x " + anti_index_base + " -U " +
                 ",".join(original_fq_files) + " -S " +
@@ -960,11 +960,23 @@ def separate_fq_by_pair(out_base, verbose_log, log):
 
 def unzip(source, target, verbose_log, log):
     target_temp = target + ".Temp"
-    run_command = "tar -x -f " + source + " -O > " + target_temp
-    log.info("Try unzipping your reads file: " + source)
-    unzipping = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    output, err = unzipping.communicate()
-    if "Unrecognized" in output.decode("utf8") or "Error" in output.decode("utf8") or "error" in output.decode("utf8"):
+    try_commands = ["gunzip -c " + source + " > " + target_temp, "tar -x -f " + source + " -O > " + target_temp]
+    log.info("Unzipping reads file: " + source)
+    success = False
+    output = b""
+    for run_command in try_commands:
+        unzipping = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, err = unzipping.communicate()
+        if "Unrecognized" not in output.decode("utf8") and \
+                "Error" not in output.decode("utf8") and \
+                "error" not in output.decode("utf8"):
+            success = True
+            break
+    if success:
+        if verbose_log:
+            log.info(output.decode("utf8"))
+        os.rename(target_temp, target)
+    else:
         if verbose_log:
             log.error("\n" + output.decode("utf8"))
         try:
@@ -972,10 +984,6 @@ def unzip(source, target, verbose_log, log):
         except:
             pass
         raise NotImplementedError("unzipping failed!")
-    else:
-        if verbose_log:
-            log.info(output.decode("utf8"))
-        os.rename(target_temp, target)
 
 
 def require_commands(print_title, version):
@@ -1273,6 +1281,8 @@ def main():
             trim_ends = options.trim_values
             in_memory = options.index_in_memory
 
+            """reading seeds"""
+            log.info("Reading seeds...")
             # unzip fq files if needed
             for file_id, read_file in enumerate(original_fq_files):
                 if read_file.endswith(".gz") or read_file.endswith(".zip"):
@@ -1281,9 +1291,6 @@ def main():
                         unzip(read_file, target_fq, options.verbose_log, log)
                     original_fq_files[file_id] = target_fq
                     reads_files_to_drop.append(target_fq)
-
-            """reading seeds"""
-            log.info("\nReading seeds...")
             if not options.utilize_mapping:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
                                                (anti_seed or b_at_seed),

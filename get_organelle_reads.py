@@ -1281,16 +1281,20 @@ def main():
             trim_ends = options.trim_values
             in_memory = options.index_in_memory
 
+            if original_fq_files:
+                log.info("Unzipping reads ...")
+                # unzip fq files if needed
+                for file_id, read_file in enumerate(original_fq_files):
+                    if read_file.endswith(".gz") or read_file.endswith(".zip"):
+                        target_fq = read_file + ".fastq"
+                        if not (os.path.exists(target_fq) and resume):
+                            unzip(read_file, target_fq, options.verbose_log, log)
+                        original_fq_files[file_id] = target_fq
+                        reads_files_to_drop.append(target_fq)
+                log.info("Unzipping reads finished.\n")
+
             """reading seeds"""
-            log.info("Reading seeds...")
-            # unzip fq files if needed
-            for file_id, read_file in enumerate(original_fq_files):
-                if read_file.endswith(".gz") or read_file.endswith(".zip"):
-                    target_fq = read_file + ".fastq"
-                    if not (os.path.exists(target_fq) and resume):
-                        unzip(read_file, target_fq, options.verbose_log, log)
-                    original_fq_files[file_id] = target_fq
-                    reads_files_to_drop.append(target_fq)
+            log.info("Reading seeds ...")
             if not options.utilize_mapping:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
                                                (anti_seed or b_at_seed),

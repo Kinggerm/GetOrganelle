@@ -73,7 +73,7 @@ Besides, if you installed python library psutil (pip install psutil), the memory
 ## How To
 
 <b>Preparing Data</b>
-Cut raw data into certain size (ca. 2G per end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. Data larger than 2G per end is NOT suggested, unless your target organelle genome is extremely low in reads percent. You could use the Linux or Mac OS build-in command to easily get a reduced file. Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz).
+Cut raw data into certain size (ca. 2G per end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. Data larger than 2G per end is NOT suggested, unless your target organelle genome is extremely low in reads percent. You could use the Linux or Mac OS build-in command (eg. `head`) to easily get a reduced file. Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz).
 
 <b>Filtering and Assembly</b>
 Take your input reference (fasta or bowtie index) as probe, the script would recruit target reads in successive rounds (iterations). You could also using the references in `Library/SeqReference`, but a more related reference is safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After recruitment, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.

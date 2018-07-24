@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.0.4",
+     "features": [
+         "support fq head with @XXXX.XXXX.X",
+         "automatically skip empty fq files for spades",
+     ]},
     {"number": "1.0.3a",
      "features": [
          "gunzip",

@@ -863,18 +863,36 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
         continue_command = ''
     spades_out_put = '-o ' + spades_out_put
     if reads_paired['input'] and reads_paired['pair_out']:
-        spades_command = ' '.join(
-            ['spades.py', '-t', str(threads), continue_command, parameters, '-1',
-             os.path.join(out_base, "filtered_1_paired.fq"), '-2',
-             os.path.join(out_base, "filtered_2_paired.fq"), '--s1', os.path.join(out_base, "filtered_1_unpaired.fq")] +
-            ['--s' + str(i + 3) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 3) + ".fq")) for i in
-             range(len(original_fq_files) - 2)] +
-            ['--s2', os.path.join(out_base, "filtered_2_unpaired.fq"), kmer, spades_out_put]).strip()
+        all_unpaired = []
+        # spades does not accept empty files
+        if os.path.getsize(os.path.join(out_base, "filtered_1_unpaired.fq")):
+            all_unpaired.append(os.path.join(out_base, "filtered_1_unpaired.fq"))
+        if os.path.getsize(os.path.join(out_base, "filtered_2_unpaired.fq")):
+            all_unpaired.append(os.path.join(out_base, "filtered_2_unpaired.fq"))
+        for iter_unpaired in range(len(original_fq_files) - 2):
+            if os.path.getsize(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 3) + ".fq"))):
+                all_unpaired.append(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 3) + ".fq")))
+        if os.path.getsize(os.path.join(out_base, "filtered_1_paired.fq")):
+            spades_command = ' '.join(
+                ['spades.py', '-t', str(threads), continue_command, parameters, '-1',
+                 os.path.join(out_base, "filtered_1_paired.fq"), '-2',
+                 os.path.join(out_base, "filtered_2_paired.fq")] +
+                ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
+                [kmer, spades_out_put]).strip()
+        else:
+            log.warning("No paired reads found for the target!?")
+            spades_command = ' '.join(
+                ['spades.py', '-t', str(threads), continue_command, parameters] +
+                ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
+                [kmer, spades_out_put]).strip()
     else:
+        all_unpaired = []
+        for iter_unpaired in range(len(original_fq_files)):
+            if os.path.getsize(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 1) + ".fq"))):
+                all_unpaired.append(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 1) + ".fq")))
         spades_command = ' '.join(
             ['spades.py', '-t', str(threads), continue_command, parameters] +
-            ['--s' + str(i + 1) + ' ' + str(os.path.join(out_base, "filtered_" + str(i + 1) + ".fq")) for i in
-             range(len(original_fq_files))] +
+            ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
             [kmer, spades_out_put]).strip()
     spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
@@ -1064,7 +1082,7 @@ def require_commands(print_title, version):
                                  'Input format: int,int (Example: 4,4). Default: 0,0')
     group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
                             help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
-    group_result.add_option('--spades-options', dest='other_spades_options', default='--careful',
+    group_result.add_option('--spades-options', dest='other_spades_options', default='',
                             help='Other SPAdes options. Use double quotation marks to include all the arguments '
                                  'and parameters, such as "--careful -o test"')
     group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
@@ -1282,16 +1300,16 @@ def main():
             in_memory = options.index_in_memory
 
             if original_fq_files:
-                log.info("Unzipping reads ...")
-                # unzip fq files if needed
                 for file_id, read_file in enumerate(original_fq_files):
+                    # unzip fq files if needed
                     if read_file.endswith(".gz") or read_file.endswith(".zip"):
+                        # log.info("Unzipping " + read_file + " ...")
                         target_fq = read_file + ".fastq"
                         if not (os.path.exists(target_fq) and resume):
                             unzip(read_file, target_fq, options.verbose_log, log)
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
-                log.info("Unzipping reads finished.\n")
+                        # log.info("Unzipping " + read_file + " finished.\n")
 
             """reading seeds"""
             log.info("Reading seeds ...")
@@ -1396,7 +1414,7 @@ def main():
     except:
         log.exception("")
         log = simple_log(log, out_base)
-        log.info("\nTotal Calc-cost " + str(time.time() - time0))
+        log.info("\nTotal cost " + str(time.time() - time0))
         log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!")
     logging.shutdown()
 

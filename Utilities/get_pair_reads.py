@@ -9,17 +9,32 @@ if len(sys.argv) == 3:
         fq2 = sys.argv[2].strip().strip("\"").strip("\'")
         file1 = open(fq1, 'rU').readlines()
         file2 = open(fq2, 'rU')
-        names = {file1[i].split()[0].split('#')[0]: i for i in range(0, len(file1), 4)}
+        names = {}
+        # common_parts = [file1[0].split()[0].split('#')[0].split(".")]
+        # len_parts = len(common_parts)
+        first_n = file1[0].split()[0].split('#')[0].split(".")
+        split_by_dot = len(first_n) > 2
+        if split_by_dot:
+            for i in range(0, len(file1), 4):
+                this_n = ".".join(file1[i].split()[0].split('#')[0].split(".")[:2])
+                names[this_n] = i
+        else:
+            for i in range(0, len(file1), 4):
+                this_n = file1[i].split()[0].split('#')[0]
+                names[this_n] = i
         outp_1 = open(fq1.rstrip('.fq')+'_paired.temp', 'w')
         outp_2 = open(fq2.rstrip('.fq')+'_paired.temp', 'w')
         outu_1 = open(fq1.rstrip('.fq')+'_unpaired.temp', 'w')
         outu_2 = open(fq2.rstrip('.fq')+'_unpaired.temp', 'w')
         this_line = file2.readline()
         while this_line:
-            this_name = this_line.split()[0].split('#')[0]
+            if split_by_dot:
+                this_name = ".".join(this_line.split()[0].split('#')[0].split(".")[:2])
+            else:
+                this_name = this_line.split()[0].split('#')[0]
             if this_name in names:
-                id = names[this_name]
-                outp_1.writelines(file1[id:id+4])
+                here_id = names[this_name]
+                outp_1.writelines(file1[here_id:here_id + 4])
                 outp_2.write(this_line)
                 for k in range(3):
                     outp_2.write(file2.readline())

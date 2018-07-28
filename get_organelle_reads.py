@@ -7,7 +7,9 @@ import os
 import logging
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
-
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(path_of_this_script, ".."))
+from Library.seq_parser import *
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
     python_version = "2.7+"
@@ -23,7 +25,7 @@ else:
 import subprocess
 
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+
 word_size = 0
 
 
@@ -69,26 +71,6 @@ def chop_seqs(seq_generator_or_list):
                 reverse = cpt_seed[i:i + word_size]
                 return_words.add(reverse)
     return return_words
-
-
-def read_fasta(fasta_dir):
-    fasta_file = open(fasta_dir, 'rU')
-    names = []
-    seqs = []
-    this_line = fasta_file.readline()
-    while this_line:
-        if this_line.startswith('>'):
-            names.append(this_line[1:].strip())
-            this_seq = ''
-            this_line = fasta_file.readline()
-            while this_line and not this_line.startswith('>'):
-                this_seq += this_line.strip()
-                this_line = fasta_file.readline()
-            seqs.append(this_seq)
-        else:
-            this_line = fasta_file.readline()
-    fasta_file.close()
-    return [names, seqs]
 
 
 def read_self_fq_seq_generator(fq_dir_list, this_trim_values):

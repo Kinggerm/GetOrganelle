@@ -1,25 +1,10 @@
 #!/usr/bin/env python
 import sys
+import os
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(path_of_this_script, ".."))
+from Library.seq_parser import *
 
-
-def read_fasta(fasta_dir):
-    fasta_file = open(fasta_dir, 'rU')
-    names = []
-    seqs = []
-    this_line = fasta_file.readline()
-    while this_line:
-        if this_line.startswith('>'):
-            names.append(this_line[1:].strip())
-            this_seq = ''
-            this_line = fasta_file.readline()
-            while this_line and not this_line.startswith('>'):
-                this_seq += this_line.strip()
-                this_line = fasta_file.readline()
-            seqs.append(this_seq)
-        else:
-            this_line = fasta_file.readline()
-    fasta_file.close()
-    return [names, seqs]
     
 in_fasta = input('fasta:').strip()
 f_matrix = read_fasta(in_fasta)

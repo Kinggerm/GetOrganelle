@@ -8,6 +8,9 @@ import math
 import os
 import sys
 from optparse import OptionParser, OptionGroup
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(path_of_this_script, ".."))
+from Library.seq_parser import *
 
 # Local version 3.4
 
@@ -254,26 +257,6 @@ def write_fasta(out_dir, matrix, overwrite):
             fasta_file.write('>'+matrix[0][i]+'\n')
             fasta_file.write(matrix[1][i]+'\n')
     fasta_file.close()
-
-
-def read_fasta(fasta_dir):
-    fasta_file = open(fasta_dir, 'rU')
-    names = []
-    seqs = []
-    this_line = fasta_file.readline()
-    while this_line:
-        if this_line.startswith('>'):
-            names.append(this_line[1:].strip())
-            this_seq = ''
-            this_line = fasta_file.readline()
-            while this_line and not this_line.startswith('>'):
-                this_seq += this_line.strip()
-                this_line = fasta_file.readline()
-            seqs.append(this_seq)
-        else:
-            this_line = fasta_file.readline()
-    fasta_file.close()
-    return [names, seqs]
 
 
 def read_gb_as_geneious_format_fasta_matrix(gb_dir):

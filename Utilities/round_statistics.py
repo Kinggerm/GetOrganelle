@@ -6,6 +6,9 @@ import sys
 import subprocess
 import logging
 from math import ceil
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(path_of_this_script, ".."))
+from Library.seq_parser import *
 
 
 def get_options():
@@ -139,31 +142,6 @@ def get_coverage(bowtie_sam_file):
                     for position in range(max(1, start_position), max(1, start_position + read_len * direction), direction):
                         coverage[reference][position] = 1
     return coverage
-
-
-def read_fasta(fasta_dir):
-    fasta_file = open(fasta_dir, 'rU')
-    names = []
-    seqs = []
-    this_line = fasta_file.readline()
-    interleaved = 0
-    while this_line:
-        if this_line.startswith('>'):
-            names.append(this_line[1:].strip('\n').strip('\r'))
-            this_seq = ''
-            this_line = fasta_file.readline()
-            seq_line_count = 0
-            while this_line and not this_line.startswith('>'):
-                if seq_line_count == 1:
-                    interleaved = len(this_seq)
-                this_seq += this_line.strip()
-                this_line = fasta_file.readline()
-                seq_line_count += 1
-            seqs.append(this_seq)
-        else:
-            this_line = fasta_file.readline()
-    fasta_file.close()
-    return [names, seqs, interleaved]
 
 
 def count_fq_reads(fq_files):

@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.0.5",
+     "features": [
+         "re-organize codes",
+     ]},
     {"number": "1.0.4",
      "features": [
          "support fq head with @XXXX.XXXX.X",

@@ -8,6 +8,7 @@ def get_versions():
 versions = [
     {"number": "1.1.0",
      "features": [
+         "automatically exporting final sequence(s)",
          "adding disentangle_organelle_assembly.py",
          "adding assembly_parser.py"
          "re-organize codes",

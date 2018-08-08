@@ -77,7 +77,7 @@ Besides, if you installed python library psutil (pip install psutil), the memory
 
 ## How To
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#Example">Example</a></b>. But you are still invited to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Example</a></b>. But you are still invited to read the following introductions:
 
 <b>Preparing Data</b>
 

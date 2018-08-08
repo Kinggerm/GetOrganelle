@@ -14,6 +14,7 @@ from optparse import OptionParser, OptionGroup
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
 # V1_4
@@ -23,19 +24,6 @@ if 'Win' in platform.architecture()[1]:
     this_dir_split = '\\'
 options = ''
 short_candidates = {}
-try:
-    # python2
-    import string
-    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return string.translate(input_seq, translator)[::-1]
-except AttributeError:
-    # python3
-    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return str.translate(input_seq, translator)[::-1]
 
 
 def require_commands():

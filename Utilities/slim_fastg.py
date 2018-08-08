@@ -14,6 +14,7 @@ from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 import optparse
 import copy
 
@@ -88,14 +89,17 @@ def require_commands():
                       help='followed by Blast index format.')
     parser.add_option('--exclude-priority', dest='exclude_priority',
                       help='followed by Blast index format')
-    parser.add_option('--no-hits-labeled-csv', dest='no_csv', default=False, action='store_true',
-                      help='Choose to disable producing csv file')
+    parser.add_option('--no-hits-labeled-tab', dest='no_tab', default=False, action='store_true',
+                      help='Choose to disable producing tab file')
     parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
                       help='Choose to disable deleting temp files produced by blast and this script')
     parser.add_option('--continue', dest='resume', default=False, action='store_true',
                       help='Specified for calling from get_organelle_reads.py')
     parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
                       help="Threads for blastn.")
+    parser.add_option('-o', '--out-dir', dest="out_dir",
+                      help="By default the output would be along with the input fastg file. "
+                           "But you could assign a new directory with this option.")
     try:
         options, args = parser.parse_args()
     except optparse.OptionConflictError as e:
@@ -514,9 +518,9 @@ def del_complementary(fastg_file, is_fastg):
         sys.stdout.write('\ndel complementary cost: '+str(time.time()-time0))
 
 
-def write_hits_csv_for_bandage(in_names, include_file, ex_names, exclude_file, out_file, overwrite, is_fastg):
+def write_hits_tab_for_bandage(in_names, include_file, ex_names, exclude_file, out_file, overwrite, is_fastg):
     global options, short_candidates
-    if options.no_csv:
+    if options.no_tab:
         return ''
     else:
         time0 = time.time()
@@ -586,7 +590,7 @@ def write_hits_csv_for_bandage(in_names, include_file, ex_names, exclude_file, o
         out_lines.sort()
         out_lines = ['EDGE\tdatabase\tloci\tloci_gene_sequential\tloci_sequential\tdetails\n'] + out_lines
         open(out_file, 'w').writelines(out_lines)
-        sys.stdout.write('\ncreate csv cost: '+str(time.time()-time0))
+        sys.stdout.write('\ncreate tab cost: '+str(time.time()-time0))
 
 
 def remove_temp_files(fastg_file, keep_temp, is_fastg):
@@ -645,10 +649,19 @@ def main():
                                      is_fastg=is_fastg, aver_in_dep=aver_dep, coverages=coverages,
                                      depth_cutoff=options.depth_cutoff)
             fasta_matrix = make_new_matrix_with_names(names=accept_names, old_matrix=fasta_matrix)
-            write_fasta(out_dir=fas_file+'.'+in_ex_info+'.'+fas_file.split('.')[-1], matrix=fasta_matrix, overwrite=False)
-            # write out hits csv according to blast
-            write_hits_csv_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names,
-                                       exclude_file=exclude_index, out_file=fas_file+'.'+in_ex_info+'.', overwrite=False,
+            if options.out_dir:
+                if not os.path.exists(options.out_dir):
+                    os.mkdir(options.out_dir)
+                out_fas = os.path.join(options.out_dir, os.path.basename(fas_file)+'.'+in_ex_info+'.'+fas_file.split('.')[-1])
+                out_csv = os.path.join(options.out_dir, os.path.basename(fas_file) + '.' + in_ex_info + '.')
+            else:
+                out_fas = fas_file+'.'+in_ex_info+'.'+fas_file.split('.')[-1]
+                out_csv = fas_file + '.' + in_ex_info + '.'
+            write_fasta(out_dir=out_fas,
+                        matrix=fasta_matrix, overwrite=False)
+            # write out hits tab according to blast
+            write_hits_tab_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names,
+                                       exclude_file=exclude_index, out_file=out_csv, overwrite=False,
                                        is_fastg=is_fastg)
         except EnvironmentError:
             sys.stdout.write('\nRound ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!\n')

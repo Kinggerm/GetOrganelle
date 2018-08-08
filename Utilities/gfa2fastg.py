@@ -5,20 +5,8 @@ import os
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
-try:
-    # python2
-    import string
-    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return string.translate(input_seq, translator)[::-1]
-except AttributeError:
-    # python3
-    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return str.translate(input_seq, translator)[::-1]
 
 direction = {'+': True, '-': False}
 

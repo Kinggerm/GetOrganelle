@@ -8,6 +8,7 @@ from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
 def require_commands():

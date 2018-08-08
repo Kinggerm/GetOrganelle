@@ -11,23 +11,12 @@ from optparse import OptionParser, OptionGroup
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 # Local version 3.4
 
 stop_codons = {"TAA", "TAG", "TGA", 'taa', 'tag', 'tga'}
 initiation_codons = {"ATG", 'atg', "GTG", 'gtg', "ATT", 'att', "ATA", 'ata', "TTG", 'ttg', "ATC", 'atc', "CTG", 'ctg'}
-try:
-    # python2
-    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return string.translate(input_seq, translator)[::-1]
-except AttributeError:
-    # python3
-    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return str.translate(input_seq, translator)[::-1]
 
 
 def get_parentheses_pairs(tree_string, sign=('(', ')')):

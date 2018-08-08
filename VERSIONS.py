@@ -6,6 +6,13 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.1.0",
+     "features": [
+         "adding disentangle_organelle_assembly.py",
+         "adding assembly_parser.py"
+         "re-organize codes",
+         "revise README.md",
+     ]},
     {"number": "1.0.5",
      "features": [
          "re-organize codes",

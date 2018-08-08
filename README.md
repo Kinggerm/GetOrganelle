@@ -57,30 +57,43 @@ and keep update when necessary:
 
 You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
 
-However, to get a complete organelle genome (such as a chloroplast genome) rather than organelle reads, other files in GetOrganelle are needed in the original relative path. Also, the following software are needed to be installed and configured in the path, since they could be called automatically:
+However, to get a complete organelle genome (such as a plastome) rather than organelle reads, other files in GetOrganelle are needed in the original relative path. Also, the following software/libraries are needed to be installed and configured in the path, since they could be called automatically:
 
-<a href='http://bioinf.spbau.ru/spades'>SPAdes</a> is the assembler
+* Python libraries numpy, scipy, sympy are used to solve the assembly graph, and could be easily installed by typing in:
 
-<a href='http://bowtie-bio.sourceforge.net/bowtie2/index.shtml'>Bowtie2</a> is used to speed up initial recruitment of target-like reads
+    
+    pip install numpy scipy sympy
 
-<a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST+</a> is used to filter target-like contigs and simplify the final assembly graph
+* <a href='http://bioinf.spbau.ru/spades'>SPAdes</a> is the assembler
 
-<a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (*.fastg).
+* <a href='http://bowtie-bio.sourceforge.net/bowtie2/index.shtml'>Bowtie2</a> is used to speed up initial recruitment of target-like reads
+
+* <a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST+</a> is used to filter target-like contigs and simplify the final assembly graph
+
+* <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (*.fastg/*.gfa).
 
 Besides, if you installed python library psutil (pip install psutil), the memory cost of get_organelle_reads.py will be automatically logged.
 
 
 ## How To
 
+<b>In practise, what you actually need is just typing in one simple command as suggested in <a href="## Example">Example</a></b>. But you are still invited to read the following introductions:
+
 <b>Preparing Data</b>
+
 Cut raw data into certain size (ca. 1G per end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. Data larger than 2G per end is NOT suggested, unless your target organelle genome is extremely low in reads percent. You could use the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`) to easily get a reduced file. Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz).
 
 <b>Filtering and Assembly</b>
+
 Take your input reference (fasta or bowtie index) as probe, the script would recruit target reads in successive rounds (iterations). You could also using the references in `Library/SeqReference`, but a more related reference is safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. After recruitment, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
 
 <b>Producing Result</b>
-By default, the main script would call Utilities/slim_fastg.py to modify the `assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+cp-mt.fastg` if -F cp been called) along with a csv file (`assembly_graph.fastg.extend+cp-mt.csv`). View `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path as the final result. 
+
+By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+cp-mt.fastg` if -F cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend+cp-mt.csv`). 
+
+The <font color="red">`assembly_graph.fastg.extend+cp-mt.fastg`</font> file along with the `assembly_graph.fastg.extend+cp-mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*path_sequence.fasta` would be produced, which is the <b>final result(s)</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path, you have to manually view `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
 [Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
+
 
 
 ## Example

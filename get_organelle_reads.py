@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import time
 import datetime
 import sys
 import os
@@ -10,14 +9,10 @@ from VERSIONS import get_versions
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
-major_version, minor_version = sys.version_info[:2]
-if major_version == 2 and minor_version >= 7:
-    python_version = "2.7+"
-elif major_version == 3 and minor_version >= 5:
-    python_version = "3.5+"
-else:
-    sys.stdout.write("Python version have to be 2.7+ or 3.5+")
-    sys.exit(0)
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+import time
+
+
 if python_version == "2.7+":
     from commands import getstatusoutput
 else:
@@ -33,23 +28,6 @@ word_size = 0
 def executable(test_this):
     return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != dead_code else False
 
-
-if python_version == "2.7+":
-    # python2
-    import string
-
-    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-
-    def complementary_seq(input_seq):
-        return string.translate(input_seq, translator)[::-1]
-else:
-    # python3
-    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-
-    def complementary_seq(input_seq):
-        return str.translate(input_seq, translator)[::-1]
 
 try:
     import psutil
@@ -896,7 +874,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
         return True
 
 
-def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_threshold=0):
+def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_base, depth_threshold=0):
     if not executable("blastn"):
         log.warning('blastn not in the path!\nSkip slimming assembly result ...')
         return
@@ -917,22 +895,25 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
         run_command = scheme
     graph_file = os.path.join(spades_output, "assembly_graph.fastg")
     run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(
-        threads) + ' ' + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold)
+        threads) + ' ' + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold) + ' -o ' + out_base
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
         if verbose_log:
             log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
             log.warning(output.decode("utf8"))
-        log.warning("Processing assembly result failed.")
+        log.warning("Processing assembly result failed.\n")
+        return 1
     elif "failed" in output.decode("utf8") or "error" in output.decode("utf8"):
         if verbose_log:
             log.error(output.decode("utf8"))
-        log.warning("Processing assembly result failed.")
+        log.warning("Processing assembly result failed.\n")
+        return 1
     else:
         if verbose_log:
             log.info(output.decode("utf8"))
-        log.info("Processing assembly result finished!")
+        log.info("Processing assembly result finished!\n")
+        return 0
 
 
 def separate_fq_by_pair(out_base, verbose_log, log):
@@ -984,6 +965,35 @@ def unzip(source, target, verbose_log, log):
         except:
             pass
         raise NotImplementedError("unzipping failed!")
+
+
+def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, depth_factor, log):
+    from Library.assembly_parser import Assembly, not_optimized
+    if not_optimized:
+        log.warning("numpy/scipy/sympy not installed, using coverage information only!")
+    input_graph = Assembly(fastg_file)
+    log.info("Parsing input fastg file finished.")
+    try:
+        target_result = input_graph.find_target_graph(tab_file, weight_factor=weight_factor, depth_factor=depth_factor,
+                                                      temp_graph=prefix + ".temp.fastg", display=False)
+        idealized_graph = target_result["graph"]
+        average_kmer_cov = target_result["cov"]
+        log.info("Detecting target graph finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+        # should add making one-step-inversion pairs for paths,
+        # which would be used to identify existence of a certain isomer using mapping information
+        count_path = 0
+        for this_path in idealized_graph.get_all_circular_paths():
+            count_path += 1
+            open(prefix + "." + str(count_path) + ".path_sequence.fasta", "w").\
+                write(idealized_graph.export_path(this_path).fasta_str())
+            log.info("Writing PATH" + str(count_path) + " to " + prefix + "." + str(count_path) + ".path_sequence.fasta")
+        log.info("Solving and unfolding graph finished")
+    except:
+        log.warning("Disentangling assembly graph failed!")
+        log.info("Writing temp graph to " + prefix + ".temp.fastg")
+    else:
+        log.info("Writing GRAPH to " + prefix + ".selected_graph.fastg")
+        idealized_graph.write_to_file(prefix + ".selected_graph.fastg")
 
 
 def require_commands(print_title, version):
@@ -1382,13 +1392,22 @@ def main():
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                      original_fq_files, reads_paired, options.verbose_log, resume, options.threads, log)
             else:
-                log.info('Assembling using SPAdes ... skipped.')
+                log.info('Assembling using SPAdes ... skipped.\n')
 
         """slim"""
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
                 and options.scheme_for_slimming_spades_result != '0':
-            slim_spades_result(options.scheme_for_slimming_spades_result, spades_output,
-                               options.verbose_log, log, options.threads)
+            running_stat = slim_spades_result(options.scheme_for_slimming_spades_result, spades_output,
+                                              options.verbose_log, log, threads=options.threads, out_base=out_base)
+
+            """disentangle"""
+            if running_stat == 0:
+                disentangle_circular_assembly(fastg_file=[os.path.join(out_base, x)
+                                                          for x in os.listdir(out_base) if x.endswith(".fastg")].pop(),
+                                              tab_file=[os.path.join(out_base, x)
+                                                        for x in os.listdir(out_base) if x.endswith(".csv")].pop(),
+                                              prefix=os.path.join(out_base, options.scheme_for_slimming_spades_result),
+                                              weight_factor=100, depth_factor=5, log=log)
 
         log = simple_log(log, out_base)
         log.info("\nTotal Calc-cost " + str(time.time() - time0))

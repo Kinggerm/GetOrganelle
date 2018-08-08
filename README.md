@@ -77,7 +77,7 @@ Besides, if you installed python library psutil (pip install psutil), the memory
 
 ## How To
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="## Example">Example</a></b>. But you are still invited to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#Example">Example</a></b>. But you are still invited to read the following introductions:
 
 <b>Preparing Data</b>
 
@@ -91,7 +91,7 @@ Take your input reference (fasta or bowtie index) as probe, the script would rec
 
 By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+cp-mt.fastg` if -F cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend+cp-mt.csv`). 
 
-The <font color="red">`assembly_graph.fastg.extend+cp-mt.fastg`</font> file along with the `assembly_graph.fastg.extend+cp-mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*path_sequence.fasta` would be produced, which is the <b>final result(s)</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path, you have to manually view `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
+The `assembly_graph.fastg.extend+cp-mt.fastg` file along with the `assembly_graph.fastg.extend+cp-mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path, you have to manually view `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
 [Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
 
 

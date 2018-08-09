@@ -6,6 +6,14 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.1.0b",
+     "features": [
+         "'-w' could be followed with a ratio of word_size to average_read_length now",
+     ]},
+    {"number": "1.1.0a",
+     "features": [
+         "Add options-maximum_number_of_reads with default=10,000,000 to avoid unnecessary overloading",
+     ]},
     {"number": "1.1.0",
      "features": [
          "automatically exporting final sequence(s)",

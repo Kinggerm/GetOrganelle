@@ -133,8 +133,8 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
         log.info("writing fastq lines finished.")
 
 
-def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_duplicates, output_base, anti_lines,
-                  pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
+def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_n_reads, rm_duplicates, output_base,
+                  anti_lines, pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
     if trim_values:
         trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
     else:
@@ -180,11 +180,13 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
         use_user_direction = False
         for id_file, file_name in enumerate(original_fq_files):
             file_in = open(file_name, "rU")
+            count_this_read_n = 0
             line = file_in.readline()
             # if anti seed input, name & direction should be recognized
             if bowtie2_anti_seed or anti_seed:
-                while line:
+                while line and count_this_read_n < maximum_n_reads:
                     if line.startswith("@"):
+                        count_this_read_n += 1
                         # parsing name & direction
                         if use_user_direction:
                             this_name = line[1:].strip()
@@ -263,8 +265,9 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
                         line = file_in.readline()
                         line_count += 1
             else:
-                while line:
+                while line and count_this_read_n < maximum_n_reads:
                     if line.startswith("@"):
+                        count_this_read_n += 1
                         this_seq = file_in.readline().strip()
                         if trim_values:
                             this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
@@ -314,6 +317,9 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, rm_dupli
                         line = file_in.readline()
                         line_count += 1
             file_in.close()
+            if count_this_read_n >= maximum_n_reads:
+                log.warning("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + file_name + ", only top "
+                            + str(int(maximum_n_reads)) + " reads are used in downstream analysis (suggested).")
         if not index_in_memory:
             temp1_contig_out.close()
             os.rename(temp1_contig_dir[0], temp1_contig_dir[1])
@@ -1032,6 +1038,8 @@ def require_commands(print_title, version):
     group_result.add_option('-u', dest='unpaired_fastq_files',
                             help='Input file(s) with unpaired reads as pool. '
                                  'files could be comma-separated lists such as "seq1,seq2".')
+    group_result.add_option('--max-reads', dest='maximum_n_reads', type=float, default=1E7,
+                            help="Maximum number of reads to be used per file. Default: 1E7")
     group_result.add_option('--bs', dest='bowtie2_seed',
                             help='Input bowtie2 index base name as pre-seed. '
                                  'This flag serves as an alternation of flag "-s".')
@@ -1319,8 +1327,9 @@ def main():
             """reading fastq files"""
             log.info("Pre-reading fastq ...")
             fastq_indices_in_memory = read_fq_infos(original_fq_files, direction_according_to_user_input,
-                                                    options.rm_duplicates, out_base, anti_lines, pre_grp, in_memory,
-                                                    b_at_seed, anti_seed, trim_ends, resume, log)
+                                                    options.maximum_n_reads, options.rm_duplicates, out_base,
+                                                    anti_lines, pre_grp, in_memory, b_at_seed, anti_seed, trim_ends,
+                                                    resume, log)
             len_indices = fastq_indices_in_memory[2]
             log.info("Pre-reading fastq finished.\n")
 

@@ -80,6 +80,11 @@ def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
                 count += 1
 
 
+def get_average_read_len(fq_files, trim_values):
+    read_lengths = [len(seq) for seq in read_self_fq_seq_generator(fq_files, trim_values)]
+    return sum(read_lengths)/len(read_lengths)
+
+
 def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fastq_indices_in_memory,
                      verbose, index_in_memory, log):
     if verbose:
@@ -1005,19 +1010,19 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, d
 def require_commands(print_title, version):
     version = version
     usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output " \
             " -R 10 -k 75,85,95,105 -P 300000\n" \
             "###  Chloroplast, Fast, Memory-consuming\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output " \
             " -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5\n" \
             "###  Chloroplast, Slow, Memory-economic\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output " \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output " \
             " -R 10 -k 75,85,95,105 -P 0 --out-per-round --remove-duplicates 0\n" \
             "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 93 -o mitochondria_output " \
+            " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 0.6 -o mitochondria_output " \
             " -R 30 -k 65,75,85,95 -P 1000000 -F mt\n" \
             "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 115 -o nr_output " \
+            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 0.85 -o nr_output " \
             " -R 7 -k 95,105,115 -P 0 -F nr\n"
     description = print_title
     parser = OptionParser(usage=usage, version=version, description=description)
@@ -1027,8 +1032,10 @@ def require_commands(print_title, version):
     group_need.add_option('-2', dest='fastq_file_2', help='Input file with reverse paired-end reads as pool.')
     group_need.add_option('-s', dest='seed_file', help='Reference. Input fasta format file as initial seed '
                                                        'or input bowtie index base name as pre-seed (see flag "--bs")')
-    group_need.add_option('-w', dest='word_size', type=int,
-                          help='Word size for extension, which have to be smaller or equal to (read length - 1)')
+    group_need.add_option('-w', dest='word_size', type=float, default=0.7,
+                          help='Word size (W) for extension. You could assign the ratio (1>input>0) of W to '
+                               'read_length, based on which this script would estimate the W for you; '
+                               'or assign an absolute W value (read length-1>input>=21). Default:0.7')
     group_need.add_option('-o', dest='output_base', help='Out put directory. Overwriting files if directory exists.')
     # group2
     group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results"
@@ -1180,6 +1187,13 @@ def require_commands(print_title, version):
         log.info(print_title)
         log.info(' '.join(sys.argv) + '\n')
         log = timed_log(log, options.output_base)
+        if 0 < options.word_size < 1:
+            pass
+        elif options.word_size >= 21:
+            options.word_size = int(options.word_size)
+        else:
+            log.error("Illegal '-w' value!")
+            exit()
         if options.seed_file and options.bowtie2_seed:
             log.error('Simultaneously using "-s" and "--bs" is not allowed!')
             exit()
@@ -1271,6 +1285,15 @@ def main():
             reads_paired = {'input': False, 'pair_out': False}
             original_fq_files = [fastq_file for fastq_file in options.unpaired_fastq_files]
             direction_according_to_user_input = [1] * len(options.unpaired_fastq_files)
+        if word_size < 1:
+            log.info("Estimating word size ...")
+            new_word_size = int(word_size * get_average_read_len(original_fq_files, options.trim_values))
+            if new_word_size < 21:
+                word_size = 21
+                log.warning("Too small ratio " + str(word_size) + ", setting word_size = 21.")
+            else:
+                word_size = new_word_size
+                log.info("Setting word_size = " + str(word_size))
 
         other_options = options.other_spades_options.split(' ')
         if '-o' in other_options:

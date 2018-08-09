@@ -80,13 +80,20 @@ def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
                 count += 1
 
 
-def get_average_read_len(fq_files, trim_values):
-    read_lengths = [len(seq) for seq in read_self_fq_seq_generator(fq_files, trim_values)]
+def get_average_read_len(fq_files, trim_values, maximum_n_reads):
+    read_lengths = []
+    for fq_f in fq_files:
+        count_r = 0
+        for seq in read_self_fq_seq_generator(fq_f, trim_values):
+            count_r += 1
+            read_lengths.append(len(seq))
+            if count_r >= maximum_n_reads:
+                break
     return sum(read_lengths)/len(read_lengths)
 
 
 def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fastq_indices_in_memory,
-                     verbose, index_in_memory, log):
+                     maximum_n_reads, verbose, index_in_memory, log):
     if verbose:
         sys.stdout.write(' ' * 100 + '\b' * 100)
         sys.stdout.flush()
@@ -116,8 +123,10 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
     files_out = [open(out_file_name + '_' + str(i + 1) + '.temp', 'w') for i in range(len(original_fq_files))]
     line_count = 0
     for i in range(len(original_fq_files)):
+        count_r = 0
         line = post_reading[i].readline()
         while line:
+            count_r += 1
             if line_count in accepted_lines:
                 files_out[i].write(line)
                 for j in range(3):
@@ -129,6 +138,8 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
                 for j in range(4):
                     line = post_reading[i].readline()
                     line_count += 1
+            if count_r >= maximum_n_reads:
+                break
         files_out[i].close()
         post_reading[i].close()
     del accepted_lines
@@ -493,7 +504,8 @@ class NoMoreReads(Exception):
 
 def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_indices, pre_grouped,
                     groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base,
-                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, log):
+                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, maximum_n_reads,
+                    log):
     global word_size
     accepted_contig_id_this_round = set()
     line_to_accept = set()
@@ -517,8 +529,8 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
             if fg_out_per_round:
                 write_fq_results(original_fq_dir, acc_contig_id_this_round,
                                  os.path.join(round_dir, "Round." + str(r_count)),
-                                 os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, verbose,
-                                 bool(fastq_indices_in_memory), log)
+                                 os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, maximum_n_reads,
+                                 verbose, bool(fastq_indices_in_memory), log)
                 # clear former accepted words from memory
                 del acc_words
                 # then add new accepted words into memory
@@ -1281,7 +1293,8 @@ def main():
             direction_according_to_user_input = [1] * len(options.unpaired_fastq_files)
         if word_size < 1:
             log.info("Estimating word size ...")
-            new_word_size = int(word_size * get_average_read_len(original_fq_files, options.trim_values))
+            new_word_size = int(word_size * get_average_read_len(original_fq_files,
+                                                                 options.trim_values, options.maximum_n_reads))
             if new_word_size < 21:
                 word_size = 21
                 log.warning("Too small ratio " + str(word_size) + ", setting word_size = 21.")
@@ -1377,10 +1390,10 @@ def main():
                                                  options.fg_out_per_round,
                                                  options.jump_step,
                                                  options.mesh_size, verb_out, resume,
-                                                 trim_ends, log)
+                                                 trim_ends, options.maximum_n_reads, log)
             write_fq_results(original_fq_files, accepted_contig_id,
                              os.path.join(out_base, "filtered"), os.path.join(out_base, 'temp.indices.2'),
-                             fastq_indices_in_memory, verb_out, in_memory, log)
+                             fastq_indices_in_memory, options.maximum_n_reads, verb_out, in_memory, log)
             del accepted_contig_id, fastq_indices_in_memory, groups_of_lines, \
                 anti_lines, initial_accepted_words, lines_in_a_group
 

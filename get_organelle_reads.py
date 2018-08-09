@@ -1010,17 +1010,11 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, d
 def require_commands(print_title, version):
     version = version
     usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output " \
-            " -R 10 -k 75,85,95,105 -P 300000\n" \
-            "###  Chloroplast, Fast, Memory-consuming\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output " \
-            " -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5\n" \
-            "###  Chloroplast, Slow, Memory-economic\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output " \
-            " -R 10 -k 75,85,95,105 -P 0 --out-per-round --remove-duplicates 0\n" \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output " \
+            " -R 10 -k 75,85,95,105\n" \
             "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 0.6 -o mitochondria_output " \
-            " -R 30 -k 65,75,85,95 -P 1000000 -F mt\n" \
+            " -R 30 -k 75,85,95,105 -F mt\n" \
             "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 0.85 -o nr_output " \
             " -R 7 -k 95,105,115 -P 0 -F nr\n"

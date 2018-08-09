@@ -100,23 +100,23 @@ The `assembly_graph.fastg.extend+cp-mt.fastg` file along with the `assembly_grap
 
 For 2G raw data, 150 bp reads, to assembly chloroplast, typically I use:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output -R 10 -k 75,85,95,105 -P 300000
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output -R 10 -k 75,85,95,105 -P 300000
 
 or in a fast but memory-consuming way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output -R 5 -k 75,85,95,105 -P 1000000 -a mitochondria.fasta -J 3 -M 5
 
 or in a slow and memory-economic way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 103 -o chloroplast_output -R 10 -k 75,85,95,105 -P 0 --out-per-round --remove-duplicates 0
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -w 0.7 -o chloroplast_output -R 10 -k 75,85,95,105 -P 0 --out-per-round --remove-duplicates 0
 
 For 2G raw data, 150 bp reads, to assembly mitochondria
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 93 -o mitochondria_output -R 30 -k 65,75,85,95 -P 1000000 -F mt 
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 0.6 -o mitochondria_output -R 30 -k 65,75,85,95 -P 1000000 -F mt 
     
 For 2G raw data, 150 bp reads, to assembly nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 115 -o nr_output -R 7 -k 95,105,115 -P 0 -F nr
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 0.85 -o nr_output -R 7 -k 95,105,115 -P 0 -F nr
 
 
 ## Published Works Using GetOrganelle

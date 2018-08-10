@@ -1444,13 +1444,17 @@ def main():
                                               options.verbose_log, log, threads=options.threads, out_base=out_base)
 
             """disentangle"""
+            out_fastg = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
+            out_csv = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
+            path_prefix = os.path.join(out_base, options.scheme_for_slimming_spades_result)
             if running_stat == 0:
-                disentangle_circular_assembly(fastg_file=[os.path.join(out_base, x)
-                                                          for x in os.listdir(out_base) if x.endswith(".fastg")].pop(),
-                                              tab_file=[os.path.join(out_base, x)
-                                                        for x in os.listdir(out_base) if x.endswith(".csv")].pop(),
-                                              prefix=os.path.join(out_base, options.scheme_for_slimming_spades_result),
+                disentangle_circular_assembly(fastg_file=out_fastg,
+                                              tab_file=out_csv,
+                                              prefix=path_prefix,
                                               weight_factor=100, depth_factor=5, log=log)
+            else:
+                log.info("Please visualize " + out_fastg + " with annotation file " + out_csv +
+                         " and export your result in Bandage.")
 
         log = simple_log(log, out_base)
         log.info("\nTotal Calc-cost " + str(time.time() - time0))

@@ -1052,7 +1052,7 @@ def require_commands(print_title, version):
                             help='Input file(s) with unpaired reads as pool. '
                                  'files could be comma-separated lists such as "seq1,seq2".')
     group_result.add_option('--max-reads', dest='maximum_n_reads', type=float, default=1E7,
-                            help="Maximum number of reads to be used per file. Default: 1E7")
+                            help="Maximum number of reads to be used per file. Default: 1E7 (-F cp,nr) or 5E7 (-F mt)")
     group_result.add_option('--bs', dest='bowtie2_seed',
                             help='Input bowtie2 index base name as pre-seed. '
                                  'This flag serves as an alternation of flag "-s".')
@@ -1200,6 +1200,10 @@ def require_commands(print_title, version):
         else:
             log.error("Illegal '-w' value!")
             exit()
+        if "--max-reads" not in sys.argv:
+            if options.scheme_for_slimming_spades_result:
+                options.maximum_n_reads *= 5
+                log.info("--max-reads " + str(options.maximum_n_reads) + " (mt)")
         if options.seed_file and options.bowtie2_seed:
             log.error('Simultaneously using "-s" and "--bs" is not allowed!')
             exit()

@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.1.0a",
+     "features": [
+         "--max-reads: default=10,000,000 for cp and nr, default=50,000,000 for mt",
+     ]},
     {"number": "1.1.0b",
      "features": [
          "'-w' could be followed with a ratio of word_size to average_read_length now",

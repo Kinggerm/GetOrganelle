@@ -81,7 +81,7 @@ Besides, if you installed python library psutil (pip install psutil), the memory
 
 <b>Preparing Data</b>
 
-Cut raw data into certain size (ca. 1G per end is enough for chloroplast for most normal angiosperm samples) if it is too large dataset. Data larger than 2G per end is NOT suggested, unless your target organelle genome is extremely low in reads percent. You could use the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`) to easily get a reduced file. Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz).
+Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz). 1G per end is enough for chloroplast for most normal angiosperm samples, and 5G per end is enough for mitochondria data. You could simply assign a maximum number of reads (number of seqs, not number of bases) for GetOrganelle to use with flag `--max-reads` or manually cut raw data into certain size before running GetOrganelle using the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`). 
 
 <b>Filtering and Assembly</b>
 

@@ -93,13 +93,15 @@ def require_commands():
                       help='Choose to disable producing tab file')
     parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
                       help='Choose to disable deleting temp files produced by blast and this script')
+    parser.add_option('-o', '--out-dir', dest="out_dir",
+                      help="By default the output would be along with the input fastg file. "
+                           "But you could assign a new directory with this option.")
+    parser.add_option("--prefix", dest="prefix", default="",
+                      help="Add prefix to the output file.")
     parser.add_option('--continue', dest='resume', default=False, action='store_true',
                       help='Specified for calling from get_organelle_reads.py')
     parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
                       help="Threads for blastn.")
-    parser.add_option('-o', '--out-dir', dest="out_dir",
-                      help="By default the output would be along with the input fastg file. "
-                           "But you could assign a new directory with this option.")
     try:
         options, args = parser.parse_args()
     except optparse.OptionConflictError as e:
@@ -525,9 +527,9 @@ def write_hits_tab_for_bandage(in_names, include_file, ex_names, exclude_file, o
     else:
         time0 = time.time()
         if not overwrite:
-            while os.path.exists(out_file+'csv'):
+            while os.path.exists(out_file+'.csv'):
                 out_file += '_'
-        out_file += 'csv'
+        out_file += '.csv'
         out_lines = []
         if include_file:
             in_database = os.path.split(include_file)[-1]
@@ -652,11 +654,11 @@ def main():
             if options.out_dir:
                 if not os.path.exists(options.out_dir):
                     os.mkdir(options.out_dir)
-                out_fas = os.path.join(options.out_dir, os.path.basename(fas_file)+'.'+in_ex_info+'.'+fas_file.split('.')[-1])
-                out_csv = os.path.join(options.out_dir, os.path.basename(fas_file) + '.' + in_ex_info + '.')
+                out_fas = os.path.join(options.out_dir, options.prefix + os.path.basename(fas_file)+'.'+in_ex_info+'.'+fas_file.split('.')[-1])
+                out_csv = os.path.join(options.out_dir, options.prefix + os.path.basename(fas_file) + '.' + in_ex_info)
             else:
-                out_fas = fas_file+'.'+in_ex_info+'.'+fas_file.split('.')[-1]
-                out_csv = fas_file + '.' + in_ex_info + '.'
+                out_fas = os.path.join(os.path.split(fas_file)[0], options.prefix + os.path.basename(fas_file)) + '.'+ in_ex_info + '.' + fas_file.split('.')[-1]
+                out_csv = os.path.join(os.path.split(fas_file)[0], options.prefix + os.path.basename(fas_file)) + '.' + in_ex_info
             write_fasta(out_dir=out_fas,
                         matrix=fasta_matrix, overwrite=False)
             # write out hits tab according to blast

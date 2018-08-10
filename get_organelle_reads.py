@@ -742,7 +742,7 @@ def get_heads_from_sam(bowtie_sam_file):
 
 
 def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume,
-                         verbose_log, threads, log):
+                         verbose_log, threads, prefix, log):
     if seed_file:
         if os.path.exists(seed_file + '.index.1.bt2l'):
             log.info("Bowtie2 index existed!")
@@ -764,8 +764,8 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         seed_index_base = seed_file + '.index'
     else:
         seed_index_base = bowtie2_seed
-    total_seed_file = [os.path.join(out_base, x + "Initial.mapped.fq") for x in ("temp.", "")]
-    total_seed_sam = [os.path.join(out_base, x + "seed_bowtie.sam") for x in ("temp.", "")]
+    total_seed_file = [os.path.join(out_base, x + prefix + "Initial.mapped.fq") for x in ("temp.", "")]
+    total_seed_sam = [os.path.join(out_base, x + prefix + "seed_bowtie.sam") for x in ("temp.", "")]
     if resume and os.path.exists(total_seed_file[1]):
         log.info("Initial seeds existed!")
     else:
@@ -812,7 +812,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         else:
             anti_index_base = bowtie2_anti_seed
 
-        anti_seed_sam = [os.path.join(out_base, x + "anti_seed_bowtie.sam") for x in ("temp.", "")]
+        anti_seed_sam = [os.path.join(out_base, x + prefix + "anti_seed_bowtie.sam") for x in ("temp.", "")]
         if resume and os.path.exists(anti_seed_sam[1]):
             log.info("Anti-seed mapping information existed!")
         else:
@@ -842,7 +842,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     return total_seed_file[1], anti_lines
 
 
-def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, original_fq_files, reads_paired,
+def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, prefix, original_fq_files, reads_paired,
                          verbose_log, resume, threads, log):
     if '-k' in parameters:
         kmer = ''
@@ -856,18 +856,18 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
     if reads_paired['input'] and reads_paired['pair_out']:
         all_unpaired = []
         # spades does not accept empty files
-        if os.path.getsize(os.path.join(out_base, "filtered_1_unpaired.fq")):
-            all_unpaired.append(os.path.join(out_base, "filtered_1_unpaired.fq"))
-        if os.path.getsize(os.path.join(out_base, "filtered_2_unpaired.fq")):
-            all_unpaired.append(os.path.join(out_base, "filtered_2_unpaired.fq"))
+        if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_unpaired.fq")):
+            all_unpaired.append(os.path.join(out_base, prefix + "filtered_1_unpaired.fq"))
+        if os.path.getsize(os.path.join(out_base, prefix + "filtered_2_unpaired.fq")):
+            all_unpaired.append(os.path.join(out_base, prefix + "filtered_2_unpaired.fq"))
         for iter_unpaired in range(len(original_fq_files) - 2):
-            if os.path.getsize(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 3) + ".fq"))):
-                all_unpaired.append(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 3) + ".fq")))
-        if os.path.getsize(os.path.join(out_base, "filtered_1_paired.fq")):
+            if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq"))):
+                all_unpaired.append(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq")))
+        if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_paired.fq")):
             spades_command = ' '.join(
                 ['spades.py', '-t', str(threads), continue_command, parameters, '-1',
-                 os.path.join(out_base, "filtered_1_paired.fq"), '-2',
-                 os.path.join(out_base, "filtered_2_paired.fq")] +
+                 os.path.join(out_base, prefix + "filtered_1_paired.fq"), '-2',
+                 os.path.join(out_base, prefix + "filtered_2_paired.fq")] +
                 ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                 [kmer, spades_out_put]).strip()
         else:
@@ -879,8 +879,8 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
     else:
         all_unpaired = []
         for iter_unpaired in range(len(original_fq_files)):
-            if os.path.getsize(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 1) + ".fq"))):
-                all_unpaired.append(str(os.path.join(out_base, "filtered_" + str(iter_unpaired + 1) + ".fq")))
+            if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq"))):
+                all_unpaired.append(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq")))
         spades_command = ' '.join(
             ['spades.py', '-t', str(threads), continue_command, parameters] +
             ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
@@ -905,7 +905,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, orig
         return True
 
 
-def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_base, depth_threshold=0):
+def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_base, prefix="", depth_threshold=0):
     if not executable("blastn"):
         log.warning('blastn not in the path!\nSkip slimming assembly result ...')
         return
@@ -925,8 +925,9 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_bas
     else:
         run_command = scheme
     graph_file = os.path.join(spades_output, "assembly_graph.fastg")
-    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(
-        threads) + ' ' + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold) + ' -o ' + out_base
+    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(threads) + ' ' \
+                  + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold) \
+                  + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
@@ -947,11 +948,11 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_bas
         return 0
 
 
-def separate_fq_by_pair(out_base, verbose_log, log):
+def separate_fq_by_pair(out_base, prefix, verbose_log, log):
     log.info("Separating filtered fastq file ... ")
     run_command = os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py") \
-                  + ' ' + os.path.join(out_base, "filtered_1.fq") \
-                  + ' ' + os.path.join(out_base, "filtered_2.fq")
+                  + ' ' + os.path.join(out_base, prefix + "filtered_1.fq") \
+                  + ' ' + os.path.join(out_base, prefix + "filtered_2.fq")
     separating = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = separating.communicate()
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
@@ -960,7 +961,7 @@ def separate_fq_by_pair(out_base, verbose_log, log):
             log.warning(output.decode("utf8"))
         log.warning("Separating filtered fastq file failed.")
         return False
-    elif not os.path.exists(os.path.join(out_base, "filtered_2_paired.fq")):
+    elif not os.path.exists(os.path.join(out_base, prefix + "filtered_2_paired.fq")):
         log.warning("Separating filtered fastq file failed with unknown error: " + run_command)
         return False
     else:
@@ -1003,7 +1004,7 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, d
     if not_optimized:
         log.warning("numpy/scipy/sympy not installed, using coverage information only!")
     input_graph = Assembly(fastg_file)
-    log.info("Parsing input fastg file finished.")
+    log.info("Disentangling ...")
     try:
         target_result = input_graph.find_target_graph(tab_file, weight_factor=weight_factor, depth_factor=depth_factor,
                                                       display=False)
@@ -1013,18 +1014,22 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, d
         # should add making one-step-inversion pairs for paths,
         # which would be used to identify existence of a certain isomer using mapping information
         count_path = 0
-        for this_path in idealized_graph.get_all_circular_paths():
+        for this_path, other_tag in idealized_graph.get_all_circular_paths():
             count_path += 1
-            open(prefix + "." + str(count_path) + ".path_sequence.fasta", "w").\
+            open(prefix + "." + str(count_path) + other_tag + ".path_sequence.fasta", "w").\
                 write(idealized_graph.export_path(this_path).fasta_str())
             log.info("Writing PATH" + str(count_path) + " to " + prefix + "." + str(count_path) + ".path_sequence.fasta")
-        log.info("Solving and unfolding graph finished")
+        log.info("Solving and unfolding graph finished!")
+        log.warning("Disentangling is in a beta version!")
+        log.warning("Please visualizing " + fastg_file + " to confirm the final result.")
     except:
-        log.info("Disentangling assembly graph failed!")
+        log.info("Disentangling assembly graph failed!\n")
         # log.info("Writing temp graph to " + prefix + ".temp.fastg")
+        log.info("Please visualize " + fastg_file + " with annotation file " + tab_file +
+                 " and export your result in Bandage.")
     else:
-        log.info("Writing GRAPH to " + prefix + ".selected_graph.fastg")
-        idealized_graph.write_to_file(prefix + ".selected_graph.fastg")
+        log.info("Writing GRAPH to " + prefix + ".selected_graph.gfa")
+        idealized_graph.write_to_gfa(prefix + ".selected_graph.gfa")
 
 
 def require_commands(print_title, version):
@@ -1147,6 +1152,8 @@ def require_commands(print_title, version):
                                         'Choose 0 to disable this process. '
                                         'Note that whether choose or not will not disable '
                                         'the calling of replicate reads. Default: %default.')
+    group_computational.add_option("--prefix", dest="prefix", default="",
+                                   help="Add extra prefix to resulting files under the output directory.")
     group_computational.add_option('--keep-temp', dest='keep_temp_files', action="store_true", default=False,
                                    help="Choose to keep the running temp/index files.")
     group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
@@ -1201,10 +1208,11 @@ def require_commands(print_title, version):
             exit()
         if not os.path.isdir(options.output_base):
             os.mkdir(options.output_base)
-        log = simple_log(logging.getLogger(), options.output_base)
+        options.prefix = os.path.basename(options.prefix)
+        log = simple_log(logging.getLogger(), options.output_base, options.prefix)
         log.info(print_title)
         log.info(' '.join(sys.argv) + '\n')
-        log = timed_log(log, options.output_base)
+        log = timed_log(log, options.output_base, options.prefix)
         if 0 < options.word_size < 1:
             pass
         elif options.word_size >= 21:
@@ -1251,7 +1259,7 @@ def require_commands(print_title, version):
         return options, log
 
 
-def simple_log(log, output_base):
+def simple_log(log, output_base, prefix):
     log_simple = log
     for handler in list(log_simple.handlers):
         log_simple.removeHandler(handler)
@@ -1259,7 +1267,7 @@ def simple_log(log, output_base):
     console = logging.StreamHandler(sys.stdout)
     console.setFormatter(logging.Formatter('%(message)s'))
     console.setLevel(logging.NOTSET)
-    logfile = logging.FileHandler(os.path.join(output_base, 'get_org.log.txt'), mode='a')
+    logfile = logging.FileHandler(os.path.join(output_base, prefix + 'get_org.log.txt'), mode='a')
     logfile.setFormatter(logging.Formatter('%(message)s'))
     logfile.setLevel(logging.NOTSET)
     log_simple.addHandler(console)
@@ -1267,14 +1275,14 @@ def simple_log(log, output_base):
     return log_simple
 
 
-def timed_log(log, output_base):
+def timed_log(log, output_base, prefix):
     log_timed = log
     for handler in list(log_timed.handlers):
         log_timed.removeHandler(handler)
     console = logging.StreamHandler(sys.stdout)
     console.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s: %(message)s'))
     console.setLevel(logging.NOTSET)
-    logfile = logging.FileHandler(os.path.join(output_base, 'get_org.log.txt'), mode='a')
+    logfile = logging.FileHandler(os.path.join(output_base, prefix + 'get_org.log.txt'), mode='a')
     logfile.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s: %(message)s'))
     logfile.setLevel(logging.NOTSET)
     log_timed.addHandler(console)
@@ -1324,17 +1332,17 @@ def main():
             spades_output = other_options[which_out + 1]
             del other_options[which_out: which_out + 2]
         else:
-            spades_output = os.path.join(out_base, "filtered_spades")
+            spades_output = os.path.join(out_base, options.prefix + "filtered_spades")
         other_options = ' '.join(other_options)
 
         """get reads"""
         filtered_files_exist = max(
-            min([os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '_unpaired.fq') for i in
-                 range(2)] +
-                [os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in
-                 range(2, len(original_fq_files))]),
-            min([os.path.exists(str(os.path.join(out_base, "filtered")) + '_' + str(i + 1) + '.fq') for i in
-                 range(len(original_fq_files))]))
+            min([os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '_unpaired.fq')
+                 for i in range(2)] +
+                [os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq')
+                 for i in range(2, len(original_fq_files))]),
+            min([os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq')
+                 for i in range(len(original_fq_files))]))
         if not (resume and filtered_files_exist):
 
             seed_file = options.seed_file
@@ -1367,7 +1375,7 @@ def main():
                 seed_fastq, anti_lines = mapping_with_bowtie2(seed_file, bowt_seed, anti_seed,
                                                               b_at_seed, original_fq_files,
                                                               out_base, resume,
-                                                              verb_out, options.threads, log)
+                                                              verb_out, options.threads, options.prefix, log)
             log.info("Reading seeds finished.\n")
 
             """reading fastq files"""
@@ -1408,7 +1416,8 @@ def main():
                                                  options.mesh_size, verb_out, resume,
                                                  trim_ends, options.maximum_n_reads, log)
             write_fq_results(original_fq_files, accepted_contig_id,
-                             os.path.join(out_base, "filtered"), os.path.join(out_base, 'temp.indices.2'),
+                             os.path.join(out_base, options.prefix + "filtered"),
+                             os.path.join(out_base, 'temp.indices.2'),
                              fastq_indices_in_memory, options.maximum_n_reads, verb_out, in_memory, log)
             del accepted_contig_id, fastq_indices_in_memory, groups_of_lines, \
                 anti_lines, initial_accepted_words, lines_in_a_group
@@ -1429,13 +1438,13 @@ def main():
 
         if reads_paired['input']:
             if not (resume and min([os.path.exists(x) for x in
-                                    (os.path.join(out_base, "filtered_" + y + "_" + z + "paired.fq") for y in ('1', '2')
-                                     for z in ('', 'un'))])):
+                                    (os.path.join(out_base, options.prefix + "filtered_" + y + "_" + z + "paired.fq")
+                                     for y in ('1', '2') for z in ('', 'un'))])):
                 resume = False
-                reads_paired['pair_out'] = separate_fq_by_pair(out_base, verb_out, log)
+                reads_paired['pair_out'] = separate_fq_by_pair(out_base, options.prefix, verb_out, log)
                 if reads_paired['pair_out'] and not options.keep_temp_files:
-                    os.remove(os.path.join(out_base, "filtered_1.fq"))
-                    os.remove(os.path.join(out_base, "filtered_2.fq"))
+                    os.remove(os.path.join(out_base, options.prefix + "filtered_1.fq"))
+                    os.remove(os.path.join(out_base, options.prefix + "filtered_2.fq"))
             else:
                 log.info("Separating filtered fastq file ... skipped.")
 
@@ -1444,36 +1453,35 @@ def main():
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
                 # resume = False
                 log.info('Assembling using SPAdes ...')
-                assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
+                assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base, options.prefix,
                                      original_fq_files, reads_paired, options.verbose_log, resume, options.threads, log)
             else:
-                log.info('Assembling using SPAdes ... skipped.\n')
+                log.info('Assembling using SPAdes ... skipped.')
 
         """slim"""
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
                 and options.scheme_for_slimming_spades_result != '0':
             running_stat = slim_spades_result(options.scheme_for_slimming_spades_result, spades_output,
-                                              options.verbose_log, log, threads=options.threads, out_base=out_base)
+                                              options.verbose_log, log, threads=options.threads,
+                                              out_base=out_base, prefix=options.prefix)
 
             """disentangle"""
-            out_fastg = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
-            out_csv = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
-            path_prefix = os.path.join(out_base, options.scheme_for_slimming_spades_result)
+
             if running_stat == 0:
+                out_fastg = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
+                out_csv = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".csv")])[0]
+                path_prefix = os.path.join(out_base, options.prefix + options.scheme_for_slimming_spades_result)
                 disentangle_circular_assembly(fastg_file=out_fastg,
                                               tab_file=out_csv,
                                               prefix=path_prefix,
                                               weight_factor=100, depth_factor=options.depth_factor, log=log)
-            else:
-                log.info("Please visualize " + out_fastg + " with annotation file " + out_csv +
-                         " and export your result in Bandage.")
 
-        log = simple_log(log, out_base)
+        log = simple_log(log, out_base, prefix=options.prefix)
         log.info("\nTotal Calc-cost " + str(time.time() - time0))
         log.info("Thanks you!")
     except:
         log.exception("")
-        log = simple_log(log, out_base)
+        log = simple_log(log, out_base, prefix=options.prefix)
         log.info("\nTotal cost " + str(time.time() - time0))
         log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!")
     logging.shutdown()

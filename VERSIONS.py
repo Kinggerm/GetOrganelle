@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.1.0d",
+     "features": [
+         "more precise in disentangling graph.",
+         "--prefix added"
+     ]},
     {"number": "1.1.0c",
      "features": [
          "--max-reads: default=10,000,000 for cp and nr, default=50,000,000 for mt",

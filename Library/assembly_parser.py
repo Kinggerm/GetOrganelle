@@ -5,7 +5,7 @@ import random
 from copy import deepcopy
 try:
     from sympy import Symbol, solve, lambdify
-    from scipy import optimize
+    from scipy import optimize, stats
     from numpy import array, dot
 except ImportError:
     not_optimized = True
@@ -15,6 +15,15 @@ path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+major_version, minor_version = sys.version_info[:2]
+if major_version == 2 and minor_version >= 7:
+    python_version = "2.7+"
+    RecursionError = RuntimeError
+elif major_version == 3 and minor_version >= 5:
+    python_version = "3.5+"
+else:
+    sys.stdout.write("Python version have to be 2.7+ or 3.5+")
+    sys.exit(0)
 
 
 class Assembly:
@@ -153,6 +162,7 @@ class Assembly:
                     del self.vertex_clusters[go_to_set]
 
     def remove_vertex(self, vertices, update_cluster=True):
+        # sys.stdout.write(">>>>" + str(vertices) + " removed!!!!!\n")
         for vertex_name in vertices:
             # sys.stdout.write(">>>>" + vertex_name + " removed!!!!!")
             for this_end, connected_set in self.vertex_info[vertex_name]["connections"].items():
@@ -290,7 +300,7 @@ class Assembly:
                 self.copy_to_vertex[this_copy].add(vertex_name)
             return given_average_cov
 
-    def estimate_copy_and_depth_precisely(self, limited_vertices=None, display=True):
+    def estimate_copy_and_depth_precisely(self, limited_vertices=None, display=True, maximum_copy_num=10):
         if not limited_vertices:
             limited_vertices = sorted(self.vertex_info)
         else:
@@ -324,6 +334,9 @@ class Assembly:
                         formulae.append(this_formula)
             copy_solution = solve(formulae, all_symbols)
             copy_solution = copy_solution if copy_solution else {}
+            for symbol_here in copy_solution:
+                if copy_solution[symbol_here] == 0:
+                    raise Exception("Incomplete/Complicated target graph!")
             free_copy_variables = list()
             for symbol_used in all_symbols:
                 if symbol_used not in copy_solution:
@@ -338,14 +351,14 @@ class Assembly:
 
             """ minimizing deviations from draft copy values """
             least_square_expr = sum([(solution_f - self.vertex_to_copy[symbols_to_vertex[symbol_used]]) ** 2
-                                for symbol_used, solution_f in copy_solution.items()])
+                                     for symbol_used, solution_f in copy_solution.items()])
             least_square_function = lambdify(args=free_copy_variables, expr=least_square_expr)
             # for compatibility between scipy and sympy
             def least_square_function_v(x):
                 return least_square_function(*tuple(x))
             opt = {'disp': display, "maxiter": 1000}
-            initials = array([random.randint(1, 8)] * len(free_copy_variables))
-            bounds = [(1, 8)] * len(free_copy_variables)
+            initials = array([random.randint(1, maximum_copy_num)] * len(free_copy_variables))
+            bounds = [(1, maximum_copy_num)] * len(free_copy_variables)
             result = optimize.minimize(fun=least_square_function_v, x0=initials,
                                        method='SLSQP', bounds=bounds, constraints=constraints, options=opt)
             free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
@@ -357,11 +370,11 @@ class Assembly:
                 if vertex_name in self.vertex_to_copy:
                     self.copy_to_vertex[self.vertex_to_copy[vertex_name]].remove(vertex_name)
                 this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
+                # print(vertex_name, this_copy)
                 self.vertex_to_copy[vertex_name] = this_copy
                 if this_copy not in self.copy_to_vertex:
                     self.copy_to_vertex[this_copy] = set()
                 self.copy_to_vertex[this_copy].add(vertex_name)
-                # print(this_symbol, copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
 
             """ re-estimate baseline depth """
             total_product = 0.
@@ -377,7 +390,7 @@ class Assembly:
             sys.stdout.write("updating average target cov: " + str(round(new_val, 4)) + "\n")
         return new_val
 
-    def find_target_graph(self, tab_file, mode="cp", weight_factor=100.0, depth_factor=5,
+    def find_target_graph(self, tab_file, mode="cp", weight_factor=100.0, depth_factor=None, max_copy=8,
                           temp_graph=None, display=True):
         # parse_csv, every locus only occur in one vertex (removing locations with smaller weight)
         self.tag_loci = {}
@@ -424,6 +437,25 @@ class Assembly:
             else:
                 self.vertex_info[vertex_name]["weight"][mode] = loci_weight
             self.tagged_vertices[mode].add(vertex_name)
+        if len(self.tagged_vertices[mode]) == 0:
+            raise Exception("No available target information found in " + tab_file)
+
+        def update_depth_factor(limited_vs, average_cov=None):
+            if len(self.tagged_vertices[mode]) == 1 or average_cov is None:
+                df = 10
+                if display:
+                    sys.stdout.write("using initial depth-factor: " + str(df) + "\n")
+                return df
+            else:
+                df = 3 * stats.tstd([self.vertex_info[this_v]["cov"]/self.vertex_to_copy.get(this_v, 1)
+                                     for this_v in limited_vs])/average_cov
+                if display:
+                    sys.stdout.write("estimated depth-factor: " + str(df) + "\n")
+                return df
+        if depth_factor is None:
+            auto_depth = True
+        else:
+            auto_depth = False
 
         new_assembly = deepcopy(self)
         cluster_trimmed = True
@@ -433,15 +465,23 @@ class Assembly:
             delete_those_vertices = set()
             average_target_cov = 0.
             while first_round or delete_those_vertices:
-                first_round = False
+                if auto_depth:
+                    if first_round:
+                        depth_factor = update_depth_factor(self.tagged_vertices[mode])
+                    else:
+                        depth_factor = update_depth_factor(self.vertex_info, average_target_cov)
                 delete_those_vertices = set()
                 average_target_cov = new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode],
                                                                                  display=display)
                 for vertex_name in new_assembly.vertex_info:
-                    if new_assembly.vertex_info[vertex_name]["cov"] * depth_factor < average_target_cov \
-                            or new_assembly.vertex_info[vertex_name]["cov"] / depth_factor > average_target_cov:
+                    if new_assembly.vertex_info[vertex_name]["cov"] * depth_factor < average_target_cov:
+                        # or new_assembly.vertex_info[vertex_name]["cov"]/(max_copy*depth_factor) > average_target_cov:
                         delete_those_vertices.add(vertex_name)
-                new_assembly.remove_vertex(delete_those_vertices)
+                if delete_those_vertices:
+                    if display:
+                        sys.stdout.write("removing low coverage contigs: " + str(delete_those_vertices) + "\n")
+                    new_assembly.remove_vertex(delete_those_vertices)
+                first_round = False
             cluster_trimmed = False
 
             # chose the target cluster (best rank)
@@ -477,7 +517,10 @@ class Assembly:
                 for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
                     if go_cl != best_id:
                         vertices_to_del |= v_2_del
-                new_assembly.remove_vertex(vertices_to_del)
+                if vertices_to_del:
+                    if display:
+                        sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
+                    new_assembly.remove_vertex(vertices_to_del)
                 cluster_trimmed = True
 
         # merge vertices
@@ -498,7 +541,10 @@ class Assembly:
                         raise Exception("Incomplete/Complicated target graph!")
                     else:
                         delete_those_vertices.add(vertex_name)
-            new_assembly.remove_vertex(delete_those_vertices)
+            if delete_those_vertices:
+                if display:
+                    sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
+                new_assembly.remove_vertex(delete_those_vertices)
 
         # create idealized vertices and edges
         new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(display=display)
@@ -507,7 +553,8 @@ class Assembly:
                 sys.stdout.write("Warning: numpy/scipy/sympy not installed, using coverage information only!")
         else:
             try:
-                new_average_cov = new_assembly.estimate_copy_and_depth_precisely(display=display)
+                new_average_cov = new_assembly.estimate_copy_and_depth_precisely(maximum_copy_num=max_copy,
+                                                                                 display=display)
             except RecursionError:
                 if temp_graph:
                     new_assembly.write_to_file(temp_graph)
@@ -549,8 +596,7 @@ class Assembly:
         del vertex_to_copy[start_vertex]
         circular_directed_graph_solver(first_path, first_connections, vertex_to_copy)
         if not paths:
-            sys.stdout.write("Complicated target graph! Detecting path(s) failed!\n")
-            sys.exit()
+            raise Exception("Complicated target graph! Detecting path(s) failed!\n")
         else:
             return paths
 

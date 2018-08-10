@@ -12,6 +12,14 @@ from Library.seq_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 import time
 
+major_version, minor_version = sys.version_info[:2]
+if major_version == 2 and minor_version >= 7:
+    python_version = "2.7+"
+elif major_version == 3 and minor_version >= 5:
+    python_version = "3.5+"
+else:
+    sys.stdout.write("Python version have to be 2.7+ or 3.5+")
+    sys.exit(0)
 
 if python_version == "2.7+":
     from commands import getstatusoutput
@@ -998,7 +1006,7 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, d
     log.info("Parsing input fastg file finished.")
     try:
         target_result = input_graph.find_target_graph(tab_file, weight_factor=weight_factor, depth_factor=depth_factor,
-                                                      temp_graph=prefix + ".temp.fastg", display=False)
+                                                      display=False)
         idealized_graph = target_result["graph"]
         average_kmer_cov = target_result["cov"]
         log.info("Detecting target graph finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
@@ -1012,8 +1020,8 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, d
             log.info("Writing PATH" + str(count_path) + " to " + prefix + "." + str(count_path) + ".path_sequence.fasta")
         log.info("Solving and unfolding graph finished")
     except:
-        log.warning("Disentangling assembly graph failed!")
-        log.info("Writing temp graph to " + prefix + ".temp.fastg")
+        log.info("Disentangling assembly graph failed!")
+        # log.info("Writing temp graph to " + prefix + ".temp.fastg")
     else:
         log.info("Writing GRAPH to " + prefix + ".selected_graph.fastg")
         idealized_graph.write_to_file(prefix + ".selected_graph.fastg")
@@ -1089,6 +1097,10 @@ def require_commands(print_title, version):
                                  '0 (disable this) or custom arguments with double quotation marks. Default: cp. '
                                  'You can also make the index by your self and add those index to ' +
                                  os.path.join(path_of_this_script, 'Library', '/NotationReference') + '')
+    group_result.add_option("--depth-f", dest="depth_factor", type=float, default=None,
+                            help="Depth factor describe the tolerance of difference between the non-target and target"
+                                 "contigs during finalizing the assembly path."
+                                 "Default: auto")
     group_result.add_option('--trim', dest='trim_values',
                             help='Assign the number of bases in the ends to trim in extending process. '
                                  'This function will not change the length of the out put reads. '
@@ -1451,7 +1463,7 @@ def main():
                 disentangle_circular_assembly(fastg_file=out_fastg,
                                               tab_file=out_csv,
                                               prefix=path_prefix,
-                                              weight_factor=100, depth_factor=5, log=log)
+                                              weight_factor=100, depth_factor=options.depth_factor, log=log)
             else:
                 log.info("Please visualize " + out_fastg + " with annotation file " + out_csv +
                          " and export your result in Bandage.")

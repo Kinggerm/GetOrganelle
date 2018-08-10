@@ -3,6 +3,7 @@ import os
 import sys
 import random
 from copy import deepcopy
+from itertools import combinations
 try:
     from sympy import Symbol, solve, lambdify
     from scipy import optimize, stats
@@ -92,9 +93,7 @@ class Assembly:
         ## find initial kmer candidate values
         initial_kmer = set()
         for vertex_name in self.vertex_info:
-            if sum([len(self.vertex_info[vertex_name]["connections"][this_e]) for this_e in (True, False)]) == 0:
-                continue
-            else:
+            if sum([len(self.vertex_info[vertex_name]["connections"][this_e]) for this_e in (True, False)]) != 0:
                 for this_e in (True, False):
                     for next_name, next_end in self.vertex_info[vertex_name]["connections"][this_e]:
                         for test_k in range(21, 128, 2):
@@ -103,8 +102,10 @@ class Assembly:
                             if this_seq == next_seq:
                                 initial_kmer.add(test_k)
                         break
-                    break
-            break
+                    if initial_kmer:
+                        break
+            if initial_kmer:
+                break
         ## check all edges
         testing_vertices = set(self.vertex_info)
         while initial_kmer and testing_vertices:
@@ -121,20 +122,48 @@ class Assembly:
         else:
             raise Exception("No kmer detected!")
 
-    def write_to_file(self, out_file):
+    def write_to_fastg(self, out_file):
+        if not out_file.endswith(".fastg"):
+            out_file += ".fastg"
         out_matrix = SequenceList()
         for vertex_name in self.vertex_info:
-            this_name = self.vertex_info[vertex_name]["long"]
-            for this_end in (False, True):
-                seq_name = [this_name, ("", "'")[not this_end]]
-                if self.vertex_info[vertex_name]["connections"][this_end]:
-                    seq_name.append(":")
-                    connect_str = ",".join([self.vertex_info[n_v]["long"] + ("", "'")[n_e]
-                                            for n_v, n_e in self.vertex_info[vertex_name]["connections"][this_end]])
-                    seq_name.append(connect_str)
-                seq_name.append(";")
-                out_matrix.append(Sequence("".join(seq_name), self.vertex_info[vertex_name]["seq"][this_end]))
+            try:
+                this_name = self.vertex_info[vertex_name]["long"]
+                for this_end in (False, True):
+                    seq_name = [this_name, ("", "'")[not this_end]]
+                    if self.vertex_info[vertex_name]["connections"][this_end]:
+                        seq_name.append(":")
+                        connect_str = ",".join([self.vertex_info[n_v]["long"] + ("", "'")[n_e]
+                                                for n_v, n_e in self.vertex_info[vertex_name]["connections"][this_end]])
+                        seq_name.append(connect_str)
+                    seq_name.append(";")
+                    out_matrix.append(Sequence("".join(seq_name), self.vertex_info[vertex_name]["seq"][this_end]))
+            except KeyError as e:
+                if str(e) == "'long'":
+                    raise Exception("Merged graph cannot be written as fastg format file, please try gfa format!")
         out_matrix.write_fasta(out_file)
+
+    def write_to_gfa(self, out_file):
+        if not out_file.endswith(".gfa"):
+            out_file += ".gfa"
+        out_file_handler = open(out_file, "w")
+        for vertex_name in self.vertex_info:
+            out_file_handler.write("\t".join([
+                "S", vertex_name, self.vertex_info[vertex_name]["seq"][True],
+                "LN:i:"+str(self.vertex_info[vertex_name]["len"]),
+                "RC:i:"+str(int(self.vertex_info[vertex_name]["len"]*self.vertex_info[vertex_name]["cov"]))
+                ]) + "\n")
+        recorded_connections = set()
+        for vertex_name in self.vertex_info:
+            for this_end in (False, True):
+                for next_v, next_e in self.vertex_info[vertex_name]["connections"][this_end]:
+                    this_con = tuple(sorted([(vertex_name, this_end), (next_v, next_e)]))
+                    if this_con not in recorded_connections:
+                        recorded_connections.add(this_con)
+                        out_file_handler.write("\t".join([
+                            "L", vertex_name, ("-", "+")[this_end], next_v, ("-", "+")[not next_e],
+                            str(self.__kmer) + "M"
+                        ]) + "\n")
 
     def kmer(self):
         return int(self.__kmer)
@@ -174,7 +203,10 @@ class Assembly:
                     self.tagged_vertices[tag].remove(vertex_name)
             # skip self.tag_loci
             if vertex_name in self.vertex_to_copy:
-                self.copy_to_vertex[self.vertex_to_copy[vertex_name]].remove(vertex_name)
+                this_copy = self.vertex_to_copy[vertex_name]
+                self.copy_to_vertex[this_copy].remove(vertex_name)
+                if not self.copy_to_vertex[this_copy]:
+                    del self.copy_to_vertex[this_copy]
                 del self.vertex_to_copy[vertex_name]
         if update_cluster:
             self.update_vertex_clusters()
@@ -184,11 +216,8 @@ class Assembly:
             limited_vertices = sorted(self.vertex_info)
         else:
             limited_vertices = sorted(limited_vertices)
-        # print(limited_vertices)
         while limited_vertices:
             this_vertex = limited_vertices.pop()
-            # print(self)
-            # print("limited_vertices", limited_vertices)
             for this_end in (True, False):
                 # print("this_vertex", this_vertex, this_end)
                 connected_set = self.vertex_info[this_vertex]["connections"][this_end]
@@ -196,19 +225,20 @@ class Assembly:
                     next_vertex, next_end = list(connected_set)[0]
                     # print("next_vertex", next_vertex, next_end)
                     # print("next_con_len", len(self.vertex_info[next_vertex]["connections"][next_end]))
-                    if len(self.vertex_info[next_vertex]["connections"][next_end]) == 1:
+                    if len(self.vertex_info[next_vertex]["connections"][next_end]) == 1 and this_vertex != next_vertex:
                         new_vertex = this_vertex + "_" + next_vertex  # + ("+", "-")[next_end]
-                        # print("limited_vertices-1", limited_vertices)
                         limited_vertices.remove(next_vertex)
-                        # print("limited_vertices-2", limited_vertices)
                         limited_vertices.append(new_vertex)
-                        # print("new_vertex", new_vertex)
-                        # print("limited_vertices-3", limited_vertices)
                         # initialization
                         self.vertex_info[new_vertex] = deepcopy(self.vertex_info[this_vertex])
+                        if "long" in self.vertex_info[new_vertex]:
+                            del self.vertex_info[new_vertex]["long"]
                         # connections
                         self.vertex_info[new_vertex]["connections"][this_end] \
                             = deepcopy(self.vertex_info[next_vertex]["connections"][not next_end])
+                        if (this_vertex, not this_end) in self.vertex_info[new_vertex]["connections"][this_end]:
+                            self.vertex_info[new_vertex]["connections"][this_end].remove((this_vertex, not this_end))
+                            self.vertex_info[new_vertex]["connections"][this_end].add((new_vertex, not this_end))
                         for new_end in (True, False):
                             for n_n_v, n_n_e in self.vertex_info[new_vertex]["connections"][new_end]:
                                 self.vertex_info[n_n_v]["connections"][n_n_e].add((new_vertex, new_end))
@@ -253,7 +283,6 @@ class Assembly:
                                                 += self.vertex_info[next_vertex]["weight"][mode]
                         self.remove_vertex([this_vertex, next_vertex], update_cluster=False)
                         break
-        # print(self)
         self.update_vertex_clusters()
 
     def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, display=True):
@@ -279,7 +308,10 @@ class Assembly:
                 # adjust this_copy according to new baseline depth
                 for vertex_name in self.vertex_info:
                     if vertex_name in self.vertex_to_copy:
-                        self.copy_to_vertex[self.vertex_to_copy[vertex_name]].remove(vertex_name)
+                        old_copy = self.vertex_to_copy[vertex_name]
+                        self.copy_to_vertex[old_copy].remove(vertex_name)
+                        if not self.copy_to_vertex[old_copy]:
+                            del self.copy_to_vertex[old_copy]
                     this_copy = max(1, int(round(self.vertex_info[vertex_name]["cov"] / new_val, 0)))
                     self.vertex_to_copy[vertex_name] = this_copy
                     if this_copy not in self.copy_to_vertex:
@@ -292,7 +324,10 @@ class Assembly:
             # adjust this_copy according to user-defined depth
             for vertex_name in self.vertex_info:
                 if vertex_name in self.vertex_to_copy:
-                    self.copy_to_vertex[self.vertex_to_copy[vertex_name]].remove(vertex_name)
+                    old_copy = self.vertex_to_copy[vertex_name]
+                    self.copy_to_vertex[old_copy].remove(vertex_name)
+                    if not self.copy_to_vertex[old_copy]:
+                        del self.copy_to_vertex[old_copy]
                 this_copy = max(1, int(round(self.vertex_info[vertex_name]["cov"] / given_average_cov, 0)))
                 self.vertex_to_copy[vertex_name] = this_copy
                 if this_copy not in self.copy_to_vertex:
@@ -300,7 +335,7 @@ class Assembly:
                 self.copy_to_vertex[this_copy].add(vertex_name)
             return given_average_cov
 
-    def estimate_copy_and_depth_precisely(self, limited_vertices=None, display=True, maximum_copy_num=10):
+    def estimate_copy_and_depth_precisely(self, limited_vertices=None, mode=None, display=True, maximum_copy_num=10):
         if not limited_vertices:
             limited_vertices = sorted(self.vertex_info)
         else:
@@ -332,6 +367,7 @@ class Assembly:
                             if n_v in limited_vertices_set:
                                 this_formula -= get_formula(n_v, n_e, vertex_name, this_end)
                         formulae.append(this_formula)
+
             copy_solution = solve(formulae, all_symbols)
             copy_solution = copy_solution if copy_solution else {}
             for symbol_here in copy_solution:
@@ -347,6 +383,10 @@ class Assembly:
                 [[copy_solution[this_symbol].coeff(symbol_used) for symbol_used in free_copy_variables]
                  for this_symbol in all_symbols])
             min_copy = array([1.00001] * len(all_symbols))
+            # print(self.vertex_to_copy)
+            # if mode == "cp":
+            #     for s_id, symbol_lim in enumerate(all_symbols):
+
             constraints = {'type': 'ineq', 'fun': lambda x: dot(coefficients, x) - min_copy}
 
             """ minimizing deviations from draft copy values """
@@ -368,7 +408,10 @@ class Assembly:
             for this_symbol in all_symbols:
                 vertex_name = symbols_to_vertex[this_symbol]
                 if vertex_name in self.vertex_to_copy:
-                    self.copy_to_vertex[self.vertex_to_copy[vertex_name]].remove(vertex_name)
+                    old_copy = self.vertex_to_copy[vertex_name]
+                    self.copy_to_vertex[old_copy].remove(vertex_name)
+                    if not self.copy_to_vertex[old_copy]:
+                        del self.copy_to_vertex[old_copy]
                 this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
                 # print(vertex_name, this_copy)
                 self.vertex_to_copy[vertex_name] = this_copy
@@ -391,7 +434,7 @@ class Assembly:
         return new_val
 
     def find_target_graph(self, tab_file, mode="cp", weight_factor=100.0, depth_factor=None, max_copy=8,
-                          temp_graph=None, display=True):
+                          temp_graph=None, display=True, debug=False):
         # parse_csv, every locus only occur in one vertex (removing locations with smaller weight)
         self.tag_loci = {}
         tab_matrix = [line.strip("\n").split("\t") for line in open(tab_file)][1:]
@@ -458,106 +501,123 @@ class Assembly:
             auto_depth = False
 
         new_assembly = deepcopy(self)
-        cluster_trimmed = True
-        while cluster_trimmed:
-            # remove low coverages
+        changed = True
+        initial_depth = True
+        average_target_cov = 0.
+        while changed:
+            changed = False
+            cluster_trimmed = True
+            while cluster_trimmed:
+                # remove low coverages
+                first_round = True
+                delete_those_vertices = set()
+                while first_round or delete_those_vertices:
+                    if auto_depth:
+                        if initial_depth:
+                            depth_factor = update_depth_factor(self.tagged_vertices[mode])
+                            initial_depth = False
+                        else:
+                            # depth_factor = update_depth_factor(self.vertex_info, average_target_cov)
+                            depth_factor = update_depth_factor(self.tagged_vertices[mode], average_target_cov)
+                    delete_those_vertices = set()
+                    average_target_cov = new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode],
+                                                                                     display=display)
+                    for vertex_name in new_assembly.vertex_info:
+                        if new_assembly.vertex_info[vertex_name]["cov"] * depth_factor < average_target_cov \
+                                or new_assembly.vertex_info[vertex_name]["cov"]/(max_copy*depth_factor) > average_target_cov:
+                            delete_those_vertices.add(vertex_name)
+                    if delete_those_vertices:
+                        if display and debug:
+                            sys.stdout.write("removing low coverage contigs: " + str(delete_those_vertices) + "\n")
+                        changed = True
+                        new_assembly.remove_vertex(delete_those_vertices)
+                    first_round = False
+
+                cluster_trimmed = False
+                # chose the target cluster (best rank)
+                if len(new_assembly.vertex_clusters) == 0:
+                    raise Exception("No available target graph detected!")
+                elif len(new_assembly.vertex_clusters) == 1:
+                    pass
+                else:
+                    cluster_weights = [sum([new_assembly.vertex_info[x_v]["weight"][mode]
+                                            for x_v in x if "weight" in new_assembly.vertex_info[x_v]])
+                                       for x in new_assembly.vertex_clusters]
+                    # print("cluster_weights", cluster_weights)
+                    best = max(cluster_weights)
+                    best_id = cluster_weights.index(best)
+                    temp_cluster_weights = deepcopy(cluster_weights)
+                    del temp_cluster_weights[best_id]
+                    second = max(temp_cluster_weights)
+                    if best < second * weight_factor:
+                        if temp_graph:
+                            new_assembly.write_to_gfa(temp_graph)
+                        raise Exception("Complicated target graph!")
+                    for j, w in enumerate(cluster_weights):
+                        if w == second:
+                            for del_v in new_assembly.vertex_clusters[j]:
+                                if del_v in new_assembly.tagged_vertices[mode]:
+                                    if new_assembly.vertex_info[del_v]["cov"] * depth_factor >= average_target_cov:
+                                        if temp_graph:
+                                            new_assembly.write_to_gfa(temp_graph)
+                                        raise Exception("Complicated target graph: please check EDGE_" + del_v + "!")
+
+                    # remove other clusters
+                    vertices_to_del = set()
+                    for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
+                        if go_cl != best_id:
+                            vertices_to_del |= v_2_del
+                    if vertices_to_del:
+                        if display and debug:
+                            sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
+                        new_assembly.remove_vertex(vertices_to_del)
+                        cluster_trimmed = True
+                        changed = True
+
+            # merge vertices
+            new_assembly.merge_all_possible_vertices()
+
+            # no terminal vertices allowed
             first_round = True
             delete_those_vertices = set()
-            average_target_cov = 0.
             while first_round or delete_those_vertices:
-                if auto_depth:
-                    if first_round:
-                        depth_factor = update_depth_factor(self.tagged_vertices[mode])
-                    else:
-                        depth_factor = update_depth_factor(self.vertex_info, average_target_cov)
-                delete_those_vertices = set()
-                average_target_cov = new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode],
-                                                                                 display=display)
-                for vertex_name in new_assembly.vertex_info:
-                    if new_assembly.vertex_info[vertex_name]["cov"] * depth_factor < average_target_cov:
-                        # or new_assembly.vertex_info[vertex_name]["cov"]/(max_copy*depth_factor) > average_target_cov:
-                        delete_those_vertices.add(vertex_name)
-                if delete_those_vertices:
-                    if display:
-                        sys.stdout.write("removing low coverage contigs: " + str(delete_those_vertices) + "\n")
-                    new_assembly.remove_vertex(delete_those_vertices)
                 first_round = False
-            cluster_trimmed = False
+                delete_those_vertices = set()
+                for vertex_name in new_assembly.vertex_info:
+                    # both ends must have edge(s)
+                    if sum([bool(len(cn)) for cn in new_assembly.vertex_info[vertex_name]["connections"].values()]) != 2:
+                        if vertex_name in new_assembly.tagged_vertices[mode]:
+                            if temp_graph:
+                                new_assembly.write_to_gfa(temp_graph)
+                            raise Exception("Incomplete/Complicated target graph!")
+                        else:
+                            delete_those_vertices.add(vertex_name)
+                if delete_those_vertices:
+                    if display and debug:
+                        sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
+                    new_assembly.remove_vertex(delete_those_vertices)
+                    changed = True
 
-            # chose the target cluster (best rank)
-            if len(new_assembly.vertex_clusters) == 0:
-                raise Exception("No available target graph detected!")
-            elif len(new_assembly.vertex_clusters) == 1:
-                pass
-            else:
-                cluster_weights = [sum([new_assembly.vertex_info[x_v]["weight"][mode]
-                                        for x_v in x if "weight" in new_assembly.vertex_info[x_v]])
-                                   for x in new_assembly.vertex_clusters]
-                # print("cluster_weights", cluster_weights)
-                best = max(cluster_weights)
-                best_id = cluster_weights.index(best)
-                temp_cluster_weights = deepcopy(cluster_weights)
-                del temp_cluster_weights[best_id]
-                second = max(temp_cluster_weights)
-                if best < second * weight_factor:
-                    if temp_graph:
-                        new_assembly.write_to_file(temp_graph)
-                    raise Exception("Complicated target graph!")
-                for j, w in enumerate(cluster_weights):
-                    if w == second:
-                        for del_v in new_assembly.vertex_clusters[j]:
-                            if del_v in new_assembly.tagged_vertices[mode]:
-                                if new_assembly.vertex_info[del_v]["cov"] * depth_factor >= average_target_cov:
-                                    if temp_graph:
-                                        new_assembly.write_to_file(temp_graph)
-                                    raise Exception("Complicated target graph: please check EDGE_" + del_v + "!")
+            # merge vertices
+            new_assembly.merge_all_possible_vertices()
 
-                # remove other clusters
-                vertices_to_del = set()
-                for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
-                    if go_cl != best_id:
-                        vertices_to_del |= v_2_del
-                if vertices_to_del:
-                    if display:
-                        sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
-                    new_assembly.remove_vertex(vertices_to_del)
-                cluster_trimmed = True
-
-        # merge vertices
-        new_assembly.merge_all_possible_vertices()
-
-        # no terminal vertices allowed
-        first_round = True
-        delete_those_vertices = set()
-        while first_round or delete_those_vertices:
-            first_round = False
-            delete_those_vertices = set()
-            for vertex_name in new_assembly.vertex_info:
-                # both ends must have edge(s)
-                if sum([bool(len(cn)) for cn in new_assembly.vertex_info[vertex_name]["connections"].values()]) != 2:
-                    if vertex_name in new_assembly.tagged_vertices[mode]:
-                        if temp_graph:
-                            new_assembly.write_to_file(temp_graph)
-                        raise Exception("Incomplete/Complicated target graph!")
-                    else:
-                        delete_those_vertices.add(vertex_name)
-            if delete_those_vertices:
-                if display:
-                    sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
-                new_assembly.remove_vertex(delete_those_vertices)
+        if temp_graph:
+            new_assembly.write_to_gfa(temp_graph)
 
         # create idealized vertices and edges
         new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(display=display)
         if not_optimized:
             if display:
-                sys.stdout.write("Warning: numpy/scipy/sympy not installed, using coverage information only!")
+                sys.stdout.write("Warning: numpy/scipy/sympy not installed, using coverage information only!\n")
         else:
             try:
+                if display:
+                    sys.stdout.write("Estimating copy and depth precisely ...\n")
                 new_average_cov = new_assembly.estimate_copy_and_depth_precisely(maximum_copy_num=max_copy,
                                                                                  display=display)
             except RecursionError:
                 if temp_graph:
-                    new_assembly.write_to_file(temp_graph)
+                    new_assembly.write_to_gfa(temp_graph)
                 raise Exception("Complicated target graph! Detecting path(s) failed!\n")
         return {"graph": new_assembly, "cov": new_average_cov}
 
@@ -589,16 +649,42 @@ class Assembly:
 
         paths = set()
         # start from a single copy vertex
+        if 1 not in self.copy_to_vertex:
+            raise Exception("No single copy region?! Detecting path(s) failed!\n")
         start_vertex = sorted(self.copy_to_vertex[1], key=lambda x: -self.vertex_info[x]["len"])[0]
         first_path = [(start_vertex, False)]
         first_connections = self.vertex_info[start_vertex]["connections"][not False]
         vertex_to_copy = deepcopy(self.vertex_to_copy)
         del vertex_to_copy[start_vertex]
         circular_directed_graph_solver(first_path, first_connections, vertex_to_copy)
+
         if not paths:
             raise Exception("Complicated target graph! Detecting path(s) failed!\n")
         else:
-            return paths
+            # sorting path by average distance among multi-copy loci
+            # the highest would be more symmetrical IR, which turns out to be more reasonable
+            sorted_paths = []
+            total_len = len(list(paths)[0])
+            record_pattern = False
+            for this_path in paths:
+                acc_dist = 0
+                for copy_num in self.copy_to_vertex:
+                    if copy_num > 2:
+                        record_pattern = True
+                        for vertex_name in self.copy_to_vertex[copy_num]:
+                            loc_ids = [go_to_id for go_to_id, (v, e) in enumerate(this_path) if v == vertex_name]
+                            for id_a, id_b in combinations(loc_ids, 2):
+                                acc_dist += min((id_a - id_b) % total_len, (id_b - id_a) % total_len)
+                sorted_paths.append((this_path, acc_dist))
+            if record_pattern:
+                sorted_paths.sort(key=lambda x: -x[1])
+                pattern_dict = {acc_distance: ad_id for
+                                ad_id, acc_distance in enumerate(sorted(set([x[1] for x in sorted_paths])))}
+                sorted_paths = [(this_path, ".nesting_repeat_pattern_" + str(pattern_dict[acc_distance]))
+                                for this_path, acc_distance in sorted_paths]
+            else:
+                sorted_paths = [(this_path, "") for this_path in sorted(paths)]
+            return sorted_paths
 
     def export_path(self, in_path):
         seq_names = []

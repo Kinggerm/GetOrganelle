@@ -118,6 +118,9 @@ For 2G raw data, 150 bp reads, to assembly nuclear ribosomal RNA (18S-ITS1-5.8S-
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 0.85 -o nr_output -R 7 -k 95,105,115 -P 0 -F nr
 
+See illustrations of those arguments by typing in:
+
+    get_organelle_reads.py -h
 
 ## Published Works Using GetOrganelle
 

@@ -1201,7 +1201,7 @@ def require_commands(print_title, version):
             log.error("Illegal '-w' value!")
             exit()
         if "--max-reads" not in sys.argv:
-            if options.scheme_for_slimming_spades_result:
+            if options.scheme_for_slimming_spades_result=="mt":
                 options.maximum_n_reads *= 5
                 log.info("--max-reads " + str(options.maximum_n_reads) + " (mt)")
         if options.seed_file and options.bowtie2_seed:

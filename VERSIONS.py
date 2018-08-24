@@ -6,6 +6,14 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.2.0",
+     "features": [
+         "more robust and precise in disentangling graph: "
+         "report contamination; "
+         "detect parallel contigs and generate consensus;"
+         "estimate chloroplast coverage distribution pattern using weighted GMM with EM and BIC;",
+         "re-organize codes",
+     ]},
     {"number": "1.1.0d",
      "features": [
          "more precise in disentangling graph.",

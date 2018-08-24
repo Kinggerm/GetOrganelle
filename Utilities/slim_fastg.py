@@ -183,21 +183,21 @@ def blast_and_call_names(fasta_file, index_files, out_file, is_fastg, threads):
         if is_fastg:
             fasta_file += '.Temp'
         try:
-            blast_result = subprocess.getstatusoutput('blastn -num_threads '+ str(threads) +' -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6 -evalue 1e-15')
+            blast_result = subprocess.getstatusoutput('blastn -num_threads '+ str(threads) +' -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6 -evalue 1e-25')
         except AttributeError:
-            blast_result = commands.getstatusoutput('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+            blast_result = commands.getstatusoutput('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-25')
         # blastn -num_threads 4 -query assembly_graph.fastg -db db_f -out out_f -outfmt 6
         if 'Error' in str(blast_result[1]) or 'error' in str(blast_result[1]) or '不是内部或外部命令' in str(blast_result[1]):
-            # os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+            # os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-25')
             # if not os.path.exists(out_file):
             sys.stdout.write('Blast command: blastn -num_threads ' + str(
                 threads) + ' -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file +
-                ' -outfmt 6 -evalue 1e-15\n')
+                ' -outfmt 6 -evalue 1e-25\n')
             sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]) + "\n")
             raise EnvironmentError
         # windows
         # if not os.path.exists(out_file):
-        #     os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-15')
+        #     os.system('blastn -num_threads '+ str(threads) +' -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6 -evalue 1e-25')
         time1 = time.time()
         sys.stdout.write('\nblast to '+os.path.split(index_files)[-1]+' cost: '+str(time1-time0))
         names = {}

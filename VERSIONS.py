@@ -13,6 +13,7 @@ versions = [
          "detect parallel contigs and generate consensus;"
          "estimate chloroplast coverage distribution pattern using weighted GMM with EM and BIC;",
          "re-organize codes",
+         "update NotationReference",
      ]},
     {"number": "1.1.0d",
      "features": [

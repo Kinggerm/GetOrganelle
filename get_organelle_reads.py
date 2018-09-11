@@ -999,53 +999,46 @@ def unzip(source, target, verbose_log, log):
         raise NotImplementedError("unzipping failed!")
 
 
+@set_time_limit(300)
 def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, log, mode="cp", verbose=False,
                                   contamination_depth=5., contamination_similarity=5.,
                                   degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
                                   hard_cov_threshold=10.,
                                   min_sigma_factor=0.1):
-    try:
-        from Library.assembly_parser import Assembly
-        input_graph = Assembly(fastg_file)
-        log.info("Disentangling ...")
-        target_results = input_graph.find_target_graph(tab_file,
-                                                       mode=mode, log_hard_cov_threshold=hard_cov_threshold,
-                                                       contamination_depth=contamination_depth,
-                                                       contamination_similarity=contamination_similarity,
-                                                       degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                       degenerate_similarity=degenerate_similarity,
-                                                       min_sigma_factor=min_sigma_factor,
-                                                       weight_factor=weight_factor,
-                                                       log_handler=log, verbose=verbose)
-        if len(target_results) > 1:
-            log.warning(str(len(target_results)) + " sets of graph detected!")
-        for go_res, res in enumerate(target_results):
-            go_res += 1
-            idealized_graph = res["graph"]
-            average_kmer_cov = res["cov"]
-            log.info("Detecting target graph" + str(go_res) +
-                     " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
-            # should add making one-step-inversion pairs for paths,
-            # which would be used to identify existence of a certain isomer using mapping information
-            count_path = 0
-            for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
-                count_path += 1
-                out_n = prefix + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
-                open(out_n, "w").write(idealized_graph.export_path(this_path).fasta_str())
-                log.info("Writing PATH" + str(count_path) + " to " + out_n)
-            log.info("Writing GRAPH to " + prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
-            idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
+    from Library.assembly_parser import Assembly
+    input_graph = Assembly(fastg_file)
+    log.info("Disentangling ...")
+    target_results = input_graph.find_target_graph(tab_file,
+                                                   mode=mode, log_hard_cov_threshold=hard_cov_threshold,
+                                                   contamination_depth=contamination_depth,
+                                                   contamination_similarity=contamination_similarity,
+                                                   degenerate=degenerate, degenerate_depth=degenerate_depth,
+                                                   degenerate_similarity=degenerate_similarity,
+                                                   min_sigma_factor=min_sigma_factor,
+                                                   weight_factor=weight_factor,
+                                                   log_handler=log, verbose=verbose)
+    if len(target_results) > 1:
+        log.warning(str(len(target_results)) + " sets of graph detected!")
+    for go_res, res in enumerate(target_results):
+        go_res += 1
+        idealized_graph = res["graph"]
+        average_kmer_cov = res["cov"]
+        log.info("Detecting target graph" + str(go_res) +
+                 " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+        # should add making one-step-inversion pairs for paths,
+        # which would be used to identify existence of a certain isomer using mapping information
+        count_path = 0
+        for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
+            count_path += 1
+            out_n = prefix + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
+            open(out_n, "w").write(idealized_graph.export_path(this_path).fasta_str())
+            log.info("Writing PATH" + str(count_path) + " to " + out_n)
+        log.info("Writing GRAPH to " + prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
+        idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
 
-        log.info("Solving and unfolding graph finished!")
-        log.warning("Disentangling is in a beta version!")
-        log.warning("Please visualizing " + fastg_file + " to confirm the final result.")
-    except ImportError:
-        log.warning("Disentangling assembly graph failed: numpy/scipy/sympy not installed!")
-    except:
-        log.info("Disentangling assembly graph failed!\n")
-        # log.info("Writing temp graph to " + prefix + ".temp.fastg")
-        log.info("Please visualize " + fastg_file + " with annotation file " + tab_file +
-                 " and export your result in Bandage.")
+    log.info("Solving and unfolding graph finished!")
+    log.warning("Disentangling is in a beta version!")
+    log.warning("Please visualizing " + fastg_file + " to confirm the final result.")
 
 
 def require_commands(print_title, version):
@@ -1142,7 +1135,7 @@ def require_commands(print_title, version):
                                  'By default, this script would map original reads to pre-seed (or bowtie2 index) '
                                  'to acquire the initial seed. This requires bowtie2 to be installed '
                                  '(and thus Linux/Unix only). It is suggested to keep mapping as default '
-                                 'when the seed is too diversed from target.')
+                                 'when the seed is too diverse from target.')
     # group3
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
                                                                     "Take easy to pick some according your computer's flavour")
@@ -1455,18 +1448,26 @@ def main():
                                               out_base=out_base, prefix=options.prefix)
 
             """disentangle"""
-
             if running_stat == 0:
                 out_fastg = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
                 out_csv = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".csv")])[0]
                 path_prefix = os.path.join(out_base, options.prefix + options.organelle_type)
-                disentangle_circular_assembly(fastg_file=out_fastg, mode=options.organelle_type,
-                                              tab_file=out_csv, prefix=path_prefix, weight_factor=100,
-                                              contamination_depth=options.contamination_depth,
-                                              contamination_similarity=options.contamination_similarity,
-                                              degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
-                                              degenerate_similarity=options.degenerate_similarity,
-                                              verbose=options.verbose_log, log=log)
+                try:
+                    disentangle_circular_assembly(fastg_file=out_fastg, mode=options.organelle_type,
+                                                  tab_file=out_csv, prefix=path_prefix, weight_factor=100,
+                                                  contamination_depth=options.contamination_depth,
+                                                  contamination_similarity=options.contamination_similarity,
+                                                  degenerate=options.degenerate,
+                                                  degenerate_depth=options.degenerate_depth,
+                                                  degenerate_similarity=options.degenerate_similarity,
+                                                  verbose=options.verbose_log, log=log)
+                except ImportError:
+                    log.warning("Disentangling assembly graph failed: numpy/scipy/sympy not installed!")
+                except:
+                    log.info("Disentangling assembly graph failed!\n")
+                    # log.info("Writing temp graph to " + prefix + ".temp.fastg")
+                    log.info("Please visualize " + out_fastg + " with annotation file " + out_csv +
+                             " and export your result in Bandage.")
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal Calc-cost " + str(time.time() - time0))

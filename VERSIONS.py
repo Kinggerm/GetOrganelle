@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.2.0a",
+     "features": [
+         "set time limit for disentangling",
+     ]},
     {"number": "1.2.0",
      "features": [
          "more robust and precise in disentangling graph: "

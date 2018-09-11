@@ -8,60 +8,8 @@ path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.assembly_parser import Assembly
 from Library.seq_parser import *
-from Library.pipe_control_func import logging, timed_log, simple_log
+from Library.pipe_control_func import logging, timed_log, simple_log, set_time_limit
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-
-
-def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, mode="cp",
-                                  log_hard_cov_threshold=10.,
-                                  contamination_depth=5., contamination_similarity=5.,
-                                  degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
-                                  min_sigma_factor=0.1, keep_temp=False,
-                                  verbose=False, log=None, debug=False):
-    time_a = time.time()
-    if log:
-        log.info(">>> Parsing " + fastg_file + " ..")
-    else:
-        sys.stdout.write("Parsing " + fastg_file + " ..\n")
-    input_graph = Assembly(fastg_file)
-    time_b = time.time()
-    if log:
-        log.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
-    else:
-        sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
-    temp_graph = prefix + ".temp.fastg" if keep_temp else None
-
-    copy_results = input_graph.find_target_graph(tab_file, mode=mode, weight_factor=weight_factor,
-                                                 log_hard_cov_threshold=log_hard_cov_threshold,
-                                                 contamination_depth=contamination_depth,
-                                                 contamination_similarity=contamination_similarity,
-                                                 degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                 degenerate_similarity=degenerate_similarity,
-                                                 min_sigma_factor=min_sigma_factor,
-                                                 temp_graph=temp_graph, verbose=verbose, log_handler=log, debug=debug)
-    time_c = time.time()
-    if log:
-        log.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
-        log.info(str(len(copy_results)) + " set(s) of graph detected.")
-    else:
-        sys.stdout.write("\n\n>>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s\n")
-        sys.stdout.write(str(len(copy_results)) + " set(s) of graph detected.\n")
-
-    for go_res, copy_res in enumerate(copy_results):
-        idealized_graph = copy_res["graph"]
-        # should add making one-step-inversion pairs for paths,
-        # which would be used to identify existence of a certain isomer using mapping information
-        count_path = 0
-        for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
-            count_path += 1
-            open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + ".path_sequence.fasta", "w"). \
-                write(idealized_graph.export_path(this_path).fasta_str())
-        idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
-    time_d = time.time()
-    if log:
-        log.info(">>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s")
-    else:
-        sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
 
 
 def get_options(print_title):
@@ -92,6 +40,8 @@ def get_options(print_title):
                       help="Minimum deviation factor for excluding non-target contigs. Default:%default")
     parser.add_option("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
                       help="export intermediate graph file.")
+    parser.add_option("--time-limit", dest="time_limit", default=300, type=int,
+                      help="time limit for the disentangling process. Default:%default")
     parser.add_option("--verbose", dest="verbose", default=False, action="store_true",
                       help="verbose logging.")
     parser.add_option("--debug", dest="debug", default=False, action="store_true",
@@ -116,6 +66,61 @@ def main():
     print_title = "\nThis is a script for extracting circular organelle genome from assembly result (fastg). " + \
                   "\nBy jinjianjun@mail.kib.ac.cn\n\n"
     options, log = get_options(print_title)
+
+    @set_time_limit(options.time_limit)
+    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, mode="cp",
+                                      log_hard_cov_threshold=10.,
+                                      contamination_depth=5., contamination_similarity=5.,
+                                      degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
+                                      min_sigma_factor=0.1, keep_temp=False,
+                                      verbose=False, log=None, debug=False):
+        time_a = time.time()
+        if log:
+            log.info(">>> Parsing " + fastg_file + " ..")
+        else:
+            sys.stdout.write("Parsing " + fastg_file + " ..\n")
+        input_graph = Assembly(fastg_file)
+        time_b = time.time()
+        if log:
+            log.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
+        else:
+            sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
+        temp_graph = prefix + ".temp.fastg" if keep_temp else None
+
+        copy_results = input_graph.find_target_graph(tab_file, mode=mode, weight_factor=weight_factor,
+                                                     log_hard_cov_threshold=log_hard_cov_threshold,
+                                                     contamination_depth=contamination_depth,
+                                                     contamination_similarity=contamination_similarity,
+                                                     degenerate=degenerate, degenerate_depth=degenerate_depth,
+                                                     degenerate_similarity=degenerate_similarity,
+                                                     min_sigma_factor=min_sigma_factor,
+                                                     temp_graph=temp_graph, verbose=verbose, log_handler=log,
+                                                     debug=debug)
+        time_c = time.time()
+        if log:
+            log.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
+            log.info(str(len(copy_results)) + " set(s) of graph detected.")
+        else:
+            sys.stdout.write("\n\n>>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s\n")
+            sys.stdout.write(str(len(copy_results)) + " set(s) of graph detected.\n")
+
+        for go_res, copy_res in enumerate(copy_results):
+            idealized_graph = copy_res["graph"]
+            # should add making one-step-inversion pairs for paths,
+            # which would be used to identify existence of a certain isomer using mapping information
+            count_path = 0
+            for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
+                count_path += 1
+                open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + ".path_sequence.fasta",
+                     "w"). \
+                    write(idealized_graph.export_path(this_path).fasta_str())
+            idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
+        time_d = time.time()
+        if log:
+            log.info(">>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s")
+        else:
+            sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
+
     try:
         disentangle_circular_assembly(options.fastg_file, options.tab_file,
                                       os.path.join(options.output_directory, "target"),

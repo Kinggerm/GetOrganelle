@@ -1,3 +1,5 @@
+import signal
+import time
 import logging
 import sys
 import os
@@ -32,3 +34,20 @@ def timed_log(log, output_base, prefix):
     log_timed.addHandler(console)
     log_timed.addHandler(logfile)
     return log_timed
+
+
+def set_time_limit(num):
+    def wrap(func):
+        def handle(sig_num, interrupted_stack_frame):
+            raise RuntimeError
+
+        def func_modified(*args, **kwargs):
+            signal.signal(signal.SIGALRM, handle)
+            signal.alarm(num)
+            r = func(*args, **kwargs)
+            signal.alarm(0)
+            return r
+
+        return func_modified
+
+    return wrap

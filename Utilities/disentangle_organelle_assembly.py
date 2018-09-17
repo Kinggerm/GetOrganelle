@@ -26,6 +26,8 @@ def get_options(print_title):
                       help="weight factor for excluding non-target contigs. Default:%default")
     parser.add_option("--depth-f", dest="depth_factor", type=float, default=10.,
                       help="Depth factor for excluding non-target contigs. Default:%default")
+    parser.add_option("--type-f", dest="type_factor", type=float, default=3.,
+                      help="Type factor for identifying genome type tag. Default:%default")
     parser.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
                       help="Depth factor for confirming contaminating contigs. Default:%default")
     parser.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
@@ -68,7 +70,7 @@ def main():
     options, log = get_options(print_title)
 
     @set_time_limit(options.time_limit)
-    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, mode="cp",
+    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="cp",
                                       log_hard_cov_threshold=10.,
                                       contamination_depth=5., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
@@ -87,7 +89,8 @@ def main():
             sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
         temp_graph = prefix + ".temp.fastg" if keep_temp else None
 
-        copy_results = input_graph.find_target_graph(tab_file, mode=mode, weight_factor=weight_factor,
+        copy_results = input_graph.find_target_graph(tab_file, mode=mode, type_factor=type_factor,
+                                                     weight_factor=weight_factor,
                                                      log_hard_cov_threshold=log_hard_cov_threshold,
                                                      contamination_depth=contamination_depth,
                                                      contamination_similarity=contamination_similarity,
@@ -124,6 +127,7 @@ def main():
     try:
         disentangle_circular_assembly(options.fastg_file, options.tab_file,
                                       os.path.join(options.output_directory, "target"),
+                                      type_factor=options.type_factor,
                                       mode=options.mode,
                                       weight_factor=options.weight_factor,
                                       log_hard_cov_threshold=options.depth_factor,

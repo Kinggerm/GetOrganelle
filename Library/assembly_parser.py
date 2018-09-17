@@ -49,6 +49,7 @@ class Assembly:
 
     def parse_fastg(self, fastg_file):
         fastg_matrix = SequenceList(fastg_file)
+        # initialize names; only accept vertex that are formally stored, skip those that are only mentioned after ":"
         for i, seq in enumerate(fastg_matrix):
             if ":" in seq.label:
                 this_vertex_str, next_vertices_str = seq.label.strip(";").split(":")
@@ -59,16 +60,27 @@ class Assembly:
                 self.vertex_info[vertex_name] = {"len": int(vertex_len),
                                                  "cov": float(vertex_cov),
                                                  "long": this_vertex_str.strip("'")}
-            # connections
             if "connections" not in self.vertex_info[vertex_name]:
                 self.vertex_info[vertex_name]["connections"] = {True: set(), False: set()}  # "tail"~True, "head"~False
+
+        # adding other info based on existed names
+        for i, seq in enumerate(fastg_matrix):
+            if ":" in seq.label:
+                this_vertex_str, next_vertices_str = seq.label.strip(";").split(":")
+            else:
+                this_vertex_str, next_vertices_str = seq.label.strip(";"), ""
+            v_tag, vertex_name, l_tag, vertex_len, c_tag, vertex_cov = this_vertex_str.strip("'").split("_")
+            # connections
             this_end = not this_vertex_str.endswith("'")
-            self.vertex_info[vertex_name]["connections"][this_end] = set()
             if next_vertices_str:
                 for next_vertex_str in next_vertices_str.split(","):
                     next_name = next_vertex_str.strip("'").split("_")[1]
-                    next_end = next_vertex_str.endswith("'")
-                    self.vertex_info[vertex_name]["connections"][this_end].add((next_name, next_end))
+                    if next_name in self.vertex_info:
+                        next_end = next_vertex_str.endswith("'")
+                        # Adding connection information (edge) to both of the related vertices
+                        # even it is only mentioned once in some SPAdes output files
+                        self.vertex_info[vertex_name]["connections"][this_end].add((next_name, next_end))
+                        self.vertex_info[next_name]["connections"][next_end].add((vertex_name, this_end))
             # sequence
             if "seq" not in self.vertex_info[vertex_name]:
                 self.vertex_info[vertex_name]["seq"] = {}
@@ -78,12 +90,7 @@ class Assembly:
                 else:
                     self.vertex_info[vertex_name]["seq"][True] = complementary_seq(seq.seq)
                     self.vertex_info[vertex_name]["seq"][False] = seq.seq
-        """delete vertices that not recorded"""
-        for vertex_name in self.vertex_info:
-            for this_end in (True, False):
-                for next_name, next_end in list(self.vertex_info[vertex_name]["connections"][this_end]):
-                    if next_name not in self.vertex_info:
-                        self.vertex_info[vertex_name]["connections"][this_end].remove((next_name, next_end))
+
         """detect kmer"""
         ## find initial kmer candidate values
         initial_kmer = set()
@@ -159,6 +166,28 @@ class Assembly:
                             "L", vertex_name, ("-", "+")[this_end], next_v, ("-", "+")[not next_e],
                             str(self.__kmer) + "M"
                         ]) + "\n")
+
+    def write_out_tags(self, modes, out_file):
+        tagged_vertices = set()
+        for mode in modes:
+            tagged_vertices |= self.tagged_vertices[mode]
+        tagged_vertices = sorted(tagged_vertices)
+        lines = [["EDGE", "database", "database_weight", "loci"]]
+        for this_vertex in tagged_vertices:
+            if "tags" in self.vertex_info[this_vertex]:
+                all_tags = self.vertex_info[this_vertex]["tags"]
+                all_tag_list = sorted(all_tags)
+                all_weights = self.vertex_info[this_vertex]["weight"]
+                lines.append([this_vertex,
+                              ";".join(all_tag_list),
+                              ";".join([tag_n + "(" + str(all_weights[tag_n]) + ")" for tag_n in all_tag_list]),
+                              ";".join([",".join(sorted(all_tags[tag_n])) for tag_n in all_tag_list])])
+            else:
+                here_tags = {tag_n for tag_n in modes if this_vertex in self.tagged_vertices[tag_n]}
+                lines.append([this_vertex,
+                              ";".join(sorted(here_tags)),
+                              "", ""])
+        open(out_file, "w").writelines(["\t".join(line) + "\n" for line in lines])
 
     def kmer(self):
         return int(self.__kmer)
@@ -247,34 +276,47 @@ class Assembly:
         connection_set_t = self.vertex_info[vertex]["connections"][True]
         connection_set_f = self.vertex_info[vertex]["connections"][False]
         inner_circle = []
+        
+        def search_leakage(start_v, start_e, terminating_end_set):
+            in_pipe_leak = False
+            circle_in_between = []
+            in_vertex_ends = set()
+            in_vertex_ends.add((start_v, start_e))
+            in_searching_con = [(start_v, not start_e)]
+            while in_searching_con:
+                in_search_v, in_search_e = in_searching_con.pop(0)
+                if (in_search_v, in_search_e) in terminating_end_set:
+                    # start from the same (next_t_v, next_t_e), merging to two different ends of connection_set_f
+                    if circle_in_between:
+                        in_pipe_leak = True
+                        break
+                    else:
+                        circle_in_between.append(((start_v, start_e), (in_search_v, in_search_e)))
+                elif (in_search_v, in_search_e) in connection_set_t:
+                    in_pipe_leak = True
+                    break
+                else:
+                    for n_in_search_v, n_in_search_e in self.vertex_info[in_search_v]["connections"][in_search_e]:
+                        if (n_in_search_v, n_in_search_e) in in_vertex_ends:
+                            pass
+                        else:
+                            in_vertex_ends.add((n_in_search_v, n_in_search_e))
+                            in_searching_con.append((n_in_search_v, not n_in_search_e))
+            if not in_pipe_leak:
+                return circle_in_between
+            else:
+                return []
+        
         # branching ends
         if len(connection_set_t) == len(connection_set_f) == 2:
             for next_t_v, next_t_e in list(connection_set_t):
-                pipe_leak = False
-                this_inner_circle = []
-                input_vertex_ends = set()
-                input_vertex_ends.add((next_t_v, next_t_e))
-                searching_con = [(next_t_v, not next_t_e)]
-                while searching_con:
-                    search_v, search_e = searching_con.pop(0)
-                    if (search_v, search_e) in connection_set_f:
-                        if this_inner_circle:
-                            pipe_leak = True
-                            break
-                        else:
-                            this_inner_circle.append(((next_t_v, next_t_e), (search_v, search_e)))
-                    elif (search_v, search_e) in connection_set_t:
-                        pipe_leak = True
-                        break
-                    else:
-                        for n_search_v, n_search_e in self.vertex_info[search_v]["connections"][search_e]:
-                            if (n_search_v, n_search_e) in input_vertex_ends:
-                                pass
-                            else:
-                                input_vertex_ends.add((n_search_v, n_search_e))
-                                searching_con.append((n_search_v, not n_search_e))
-                if not pipe_leak:
-                    inner_circle.extend(this_inner_circle)
+                this_inner_circle = search_leakage(next_t_v, next_t_e, connection_set_f)
+                if this_inner_circle:
+                    # check leakage in reverse direction
+                    reverse_v, reverse_e = this_inner_circle[0][1]
+                    not_leak = search_leakage(reverse_v, reverse_e, connection_set_t)
+                    if not_leak:
+                        inner_circle.extend(this_inner_circle)
             if switch_nearby_vertices:
                 # switch nearby vertices
                 # keep those prone to be located in the trunk road of the inverted repeat
@@ -541,7 +583,14 @@ class Assembly:
                         for n_v, n_e in connection_set:
                             # if n_v in vertices_set:
                             recorded_ends.add((n_v, n_e))
-                            this_formula -= get_formula(n_v, n_e, vertex_name, this_end)
+                            try:
+                                this_formula -= get_formula(n_v, n_e, vertex_name, this_end)
+                            except RecursionError:
+                                if log_handler:
+                                    log_handler.error("Formulating for: " + str((n_v, n_e, vertex_name, this_end)) + "!")
+                                else:
+                                    sys.stdout.write("Formulating for: " + str((n_v, n_e, vertex_name, this_end)) + "!\n")
+                                raise RecursionError
                         formulae.append(this_formula)
 
         # add following extra limitation
@@ -591,8 +640,9 @@ class Assembly:
         least_square_expr = 0
         for symbol_used in all_v_symbols:
             # least_square_expr += copy_solution[symbol_used]
-            this_copy = self.vertex_to_copy[symbols_to_vertex[symbol_used]]
-            least_square_expr += (copy_solution[symbol_used] - this_copy) ** 2
+            this_vertex = symbols_to_vertex[symbol_used]
+            this_copy = self.vertex_to_float_copy[this_vertex]
+            least_square_expr += (copy_solution[symbol_used] - this_copy) ** 2  # * self.vertex_info[this_vertex]["len"]
         least_square_function = lambdify(args=free_copy_variables, expr=least_square_expr)
 
         # for safe running
@@ -682,6 +732,18 @@ class Assembly:
                     total_len += this_len
                     total_product += this_len * this_cov
                 final_results[go_res]["cov"] = total_product / total_len
+                if log_handler:
+                    for vertex_name in vertices_list:
+                        log_handler.info("Vertex_" + vertex_name + " #copy: " +
+                                         str(final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)))
+                    log_handler.info("updating average target cov" + str(go_res) + ": " +
+                                     str(round(final_results[go_res]["cov"], 4)))
+                else:
+                    for vertex_name in vertices_list:
+                        sys.stdout.write("Vertex_" + vertex_name + " #copy: " +
+                                         str(final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)) + "\n")
+                    sys.stdout.write("updating average target cov" + str(go_res) + ": " +
+                                     str(round(final_results[go_res]["cov"], 4)) + "\n")
             return final_results
 
         else:
@@ -748,7 +810,9 @@ class Assembly:
                         # add in between
                         self.tagged_vertices[mode].add(can_v)
                         if "weight" not in self.vertex_info[can_v]:
-                            self.vertex_info[can_v]["weight"] = {mode: 0}
+                            self.vertex_info[can_v]["weight"] = {}
+                        if mode not in self.vertex_info[can_v]["weight"]:
+                            self.vertex_info[can_v]["weight"][mode] = 0
                         self.vertex_info[can_v]["weight"][mode] += 1 * self.vertex_info[can_v]["cov"]
                         # add extra circle
                         near_by_pairs = self.is_sequential_repeat(can_v, switch_nearby_vertices=False)
@@ -782,9 +846,9 @@ class Assembly:
                     else:
                         go_to_v += 1
 
-    def parse_tab_file(self, tab_file, mode, log_handler=None):
+    def parse_tab_file(self, tab_file, mode, type_factor, log_handler=None):
         # parse_csv, every locus only occur in one vertex (removing locations with smaller weight)
-        tag_loci = {mode: {}}
+        tag_loci = {}
         tab_matrix = [line.strip("\n").split("\t") for line in open(tab_file)][1:]
         for node_record in tab_matrix:
             vertex_name = node_record[0]
@@ -794,44 +858,56 @@ class Assembly:
                     if "(" in locus:
                         locus_spl = locus.split("(")
                         locus_type = locus_spl[-1].split(",")[1][:-1]
-                        if locus_type == mode:
-                            locus_name = "(".join(locus_spl[:-1])
-                            locus_start, locus_end = locus_spl[-1].split(",")[0].split("-")
-                            locus_start, locus_end = int(locus_start), int(locus_end)
-                            locus_len = locus_end - locus_start + 1
-                            # skip those tags concerning only the overlapping sites
-                            if (locus_start == 1 or locus_end == self.vertex_info[vertex_name]["len"]) \
-                                    and locus_len == self.__kmer:
-                                continue
-                            if locus_name in tag_loci[mode]:
-                                new_weight = locus_len * self.vertex_info[vertex_name]["cov"]
-                                if new_weight > tag_loci[mode][locus_name]["weight"]:
-                                    tag_loci[mode][locus_name] = {"vertex": vertex_name, "len": locus_len,
-                                                                  "weight": new_weight}
-                            else:
-                                tag_loci[mode][locus_name] = {"vertex": vertex_name, "len": locus_len,
-                                                              "weight": locus_len * self.vertex_info[vertex_name]["cov"]}
+                        if locus_type not in tag_loci:
+                            tag_loci[locus_type] = {}
+                        locus_name = "(".join(locus_spl[:-1])
+                        locus_start, locus_end = locus_spl[-1].split(",")[0].split("-")
+                        locus_start, locus_end = int(locus_start), int(locus_end)
+                        locus_len = locus_end - locus_start + 1
+                        # skip those tags concerning only the overlapping sites
+                        if (locus_start == 1 or locus_end == self.vertex_info[vertex_name]["len"]) \
+                                and locus_len == self.__kmer:
+                            continue
+                        if locus_name in tag_loci[locus_type]:
+                            new_weight = locus_len * self.vertex_info[vertex_name]["cov"]
+                            if new_weight > tag_loci[locus_type][locus_name]["weight"]:
+                                tag_loci[locus_type][locus_name] = {"vertex": vertex_name, "len": locus_len,
+                                                                    "weight": new_weight}
+                        else:
+                            tag_loci[locus_type][locus_name] = {"vertex": vertex_name, "len": locus_len,
+                                                                "weight": locus_len * self.vertex_info[vertex_name]["cov"]}
 
-        # weight_tag = mode + "-weight"
-        self.tagged_vertices[mode] = set()
-        for locus_name in tag_loci[mode]:
-            vertex_name = tag_loci[mode][locus_name]["vertex"]
-            loci_weight = tag_loci[mode][locus_name]["weight"]
-            # tags
-            if "tags" not in self.vertex_info[vertex_name]:
-                self.vertex_info[vertex_name]["tags"] = {}
-            if mode in self.vertex_info[vertex_name]["tags"]:
-                self.vertex_info[vertex_name]["tags"][mode].add(locus_name)
-            else:
-                self.vertex_info[vertex_name]["tags"][mode] = {locus_name}
-            # weight
-            if "weight" not in self.vertex_info[vertex_name]:
-                self.vertex_info[vertex_name]["weight"] = {}
-            if mode in self.vertex_info[vertex_name]["weight"]:
-                self.vertex_info[vertex_name]["weight"][mode] += loci_weight
-            else:
-                self.vertex_info[vertex_name]["weight"][mode] = loci_weight
-            self.tagged_vertices[mode].add(vertex_name)
+        for locus_type in tag_loci:
+            self.tagged_vertices[locus_type] = set()
+            for locus_name in tag_loci[locus_type]:
+                vertex_name = tag_loci[locus_type][locus_name]["vertex"]
+                loci_weight = tag_loci[locus_type][locus_name]["weight"]
+                # tags
+                if "tags" not in self.vertex_info[vertex_name]:
+                    self.vertex_info[vertex_name]["tags"] = {}
+                if locus_type in self.vertex_info[vertex_name]["tags"]:
+                    self.vertex_info[vertex_name]["tags"][locus_type].add(locus_name)
+                else:
+                    self.vertex_info[vertex_name]["tags"][locus_type] = {locus_name}
+                # weight
+                if "weight" not in self.vertex_info[vertex_name]:
+                    self.vertex_info[vertex_name]["weight"] = {}
+                if locus_type in self.vertex_info[vertex_name]["weight"]:
+                    self.vertex_info[vertex_name]["weight"][locus_type] += loci_weight
+                else:
+                    self.vertex_info[vertex_name]["weight"][locus_type] = loci_weight
+                self.tagged_vertices[locus_type].add(vertex_name)
+
+        for vertex_name in self.vertex_info:
+            if "weight" in self.vertex_info[vertex_name]:
+                if len(self.vertex_info[vertex_name]["weight"]) > 1:
+                    all_weights = sorted([(loc_type, self.vertex_info[vertex_name]["weight"][loc_type])
+                                          for loc_type in self.vertex_info[vertex_name]["weight"]], key=lambda x: -x[1])
+                    best_t, best_w = all_weights[0]
+                    for next_t, next_w in all_weights[1:]:
+                        if next_w * type_factor < best_w:
+                            self.tagged_vertices[next_t].remove(vertex_name)
+
         if len(self.tagged_vertices[mode]) == 0:
             raise Exception("No available target information found in " + tab_file)
 
@@ -1116,143 +1192,166 @@ class Assembly:
             else:
                 sys.stdout.write("Warning: The graph might suffer from contamination or polymorphism!")
 
-    def find_target_graph(self, tab_file, mode="cp", weight_factor=100.0, max_copy=8, min_sigma_factor=0.1,
+    def find_target_graph(self, tab_file, mode="cp", type_factor=3, weight_factor=100.0,
+                          max_copy=8, min_sigma_factor=0.1,
                           log_hard_cov_threshold=10., contamination_depth=5., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.95,
                           temp_graph=None, verbose=True,
                           log_handler=None, debug=False):
 
-        self.parse_tab_file(tab_file, mode=mode, log_handler=log_handler)
+        self.parse_tab_file(tab_file, mode=mode, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
-        new_assembly.merge_all_possible_vertices()
-        new_assembly.tag_in_between(mode=mode)
-        new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
-                                             contamination_similarity=contamination_similarity,
-                                             degenerate=False, verbose=verbose, debug=debug, log_handler=log_handler)
-        # new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode],
-        #                                             log_handler=log_handler, verbose=verbose, mode=mode, debug=debug)
-        changed = True
-        while changed:
-            changed = False
-            cluster_trimmed = True
-            while cluster_trimmed:
-                # remove low coverages
-                first_round = True
-                delete_those_vertices = set()
-                parameters = []
-                while first_round or delete_those_vertices:
-                    changed, parameters = new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
-                                                                          log_hard_cov_threshold=log_hard_cov_threshold,
-                                                                          min_sigma_factor=min_sigma_factor,
-                                                                          log_handler=log_handler,
-                                                                          verbose=verbose, debug=debug)
-                    new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
-                                                                log_handler=log_handler, verbose=verbose, mode=mode)
-                    first_round = False
-
-                cluster_trimmed = False
-                # chose the target cluster (best rank)
-                if len(new_assembly.vertex_clusters) == 0:
-                    raise Exception("No available target components detected!")
-                elif len(new_assembly.vertex_clusters) == 1:
-                    pass
-                else:
-                    cluster_weights = [sum([new_assembly.vertex_info[x_v]["weight"][mode]
-                                            for x_v in x if "weight" in new_assembly.vertex_info[x_v]])
-                                       for x in new_assembly.vertex_clusters]
-                    best = max(cluster_weights)
-                    best_id = cluster_weights.index(best)
-                    temp_cluster_weights = deepcopy(cluster_weights)
-                    del temp_cluster_weights[best_id]
-                    second = max(temp_cluster_weights)
-                    if best < second * weight_factor:
-                        if temp_graph:
-                            new_assembly.write_to_gfa(temp_graph)
-                        raise Exception("Multiple isolated target components detected! Broken or contamination?")
-                    for j, w in enumerate(cluster_weights):
-                        if w == second:
-                            for del_v in new_assembly.vertex_clusters[j]:
-                                if del_v in new_assembly.tagged_vertices[mode]:
-                                    new_cov = new_assembly.vertex_info[del_v]["cov"]
-                                    for mu, sigma in parameters:
-                                        if abs(new_cov - mu) < sigma:
-                                            if temp_graph:
-                                                new_assembly.write_to_gfa(temp_graph)
-                                            raise Exception("Complicated graph: please check around EDGE_" + del_v + "!"
-                                                            "\ntags: " + str(self.vertex_info[del_v]["tags"][mode]))
-
-                    # remove other clusters
-                    vertices_to_del = set()
-                    for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
-                        if go_cl != best_id:
-                            vertices_to_del |= v_2_del
-                    if vertices_to_del:
-                        if verbose or debug:
-                            if log_handler:
-                                log_handler.info("removing other clusters: " + str(vertices_to_del))
-                            else:
-                                sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
-                        new_assembly.remove_vertex(vertices_to_del)
-                        cluster_trimmed = True
-                        changed = True
-
-            # merge vertices
+        try:
             new_assembly.merge_all_possible_vertices()
             new_assembly.tag_in_between(mode=mode)
+            new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
+                                                 contamination_similarity=contamination_similarity,
+                                                 degenerate=False, verbose=verbose, debug=debug, log_handler=log_handler)
+            # new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode],
+            #                                             log_handler=log_handler, verbose=verbose, mode=mode, debug=debug)
+            changed = True
+            while changed:
+                changed = False
+                cluster_trimmed = True
+                while cluster_trimmed:
+                    # remove low coverages
+                    first_round = True
+                    delete_those_vertices = set()
+                    parameters = []
+                    while first_round or delete_those_vertices:
+                        changed, parameters = new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
+                                                                              log_hard_cov_threshold=log_hard_cov_threshold,
+                                                                              min_sigma_factor=min_sigma_factor,
+                                                                              log_handler=log_handler,
+                                                                              verbose=verbose, debug=debug)
+                        new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
+                                                                    log_handler=log_handler, verbose=verbose, mode=mode)
+                        first_round = False
 
-            # no terminal vertices allowed
-            first_round = True
-            delete_those_vertices = set()
-            while first_round or delete_those_vertices:
-                first_round = False
-                delete_those_vertices = set()
-                for vertex_name in new_assembly.vertex_info:
-                    # both ends must have edge(s)
-                    if sum([bool(len(cn)) for cn in new_assembly.vertex_info[vertex_name]["connections"].values()]) != 2:
-                        if vertex_name in new_assembly.tagged_vertices[mode]:
+                    cluster_trimmed = False
+                    # chose the target cluster (best rank)
+                    if len(new_assembly.vertex_clusters) == 0:
+                        raise Exception("No available target components detected!")
+                    elif len(new_assembly.vertex_clusters) == 1:
+                        pass
+                    else:
+                        cluster_weights = [sum([new_assembly.vertex_info[x_v]["weight"][mode]
+                                                for x_v in x
+                                                if "weight" in new_assembly.vertex_info[x_v]
+                                                and mode in new_assembly.vertex_info[x_v]["weight"]])
+                                           for x in new_assembly.vertex_clusters]
+                        best = max(cluster_weights)
+                        best_id = cluster_weights.index(best)
+                        temp_cluster_weights = deepcopy(cluster_weights)
+                        del temp_cluster_weights[best_id]
+                        second = max(temp_cluster_weights)
+                        if best < second * weight_factor:
                             if temp_graph:
                                 new_assembly.write_to_gfa(temp_graph)
-                            raise Exception("Incomplete/Complicated graph: please check around EDGE_" + vertex_name + "!")
-                        else:
-                            delete_those_vertices.add(vertex_name)
-                if delete_those_vertices:
-                    if verbose or debug:
-                        if log_handler:
-                            log_handler.info("removing terminal contigs: " + str(delete_those_vertices))
-                        else:
-                            sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
-                    new_assembly.remove_vertex(delete_those_vertices)
-                    changed = True
+                                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                            raise Exception("Multiple isolated target components detected! Broken or contamination?")
+                        for j, w in enumerate(cluster_weights):
+                            if w == second:
+                                for del_v in new_assembly.vertex_clusters[j]:
+                                    if del_v in new_assembly.tagged_vertices[mode]:
+                                        new_cov = new_assembly.vertex_info[del_v]["cov"]
+                                        for mu, sigma in parameters:
+                                            if abs(new_cov - mu) < sigma:
+                                                if temp_graph:
+                                                    new_assembly.write_to_gfa(temp_graph)
+                                                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                                raise Exception("Complicated graph: please check around EDGE_" + del_v + "!"
+                                                                "\ntags: " + str(new_assembly.vertex_info[del_v]["tags"][mode]))
 
-            # merge vertices
-            new_assembly.merge_all_possible_vertices()
+                        # remove other clusters
+                        vertices_to_del = set()
+                        for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
+                            if go_cl != best_id:
+                                vertices_to_del |= v_2_del
+                        if vertices_to_del:
+                            if verbose or debug:
+                                if log_handler:
+                                    log_handler.info("removing other clusters: " + str(vertices_to_del))
+                                else:
+                                    sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
+                            new_assembly.remove_vertex(vertices_to_del)
+                            cluster_trimmed = True
+                            changed = True
+
+                # merge vertices
+                new_assembly.merge_all_possible_vertices()
+                new_assembly.tag_in_between(mode=mode)
+
+                # no terminal vertices allowed
+                first_round = True
+                delete_those_vertices = set()
+                while first_round or delete_those_vertices:
+                    first_round = False
+                    delete_those_vertices = set()
+                    for vertex_name in new_assembly.vertex_info:
+                        # both ends must have edge(s)
+                        if sum([bool(len(cn)) for cn in new_assembly.vertex_info[vertex_name]["connections"].values()]) != 2:
+                            if vertex_name in new_assembly.tagged_vertices[mode]:
+                                if temp_graph:
+                                    new_assembly.write_to_gfa(temp_graph)
+                                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                raise Exception("Incomplete/Complicated graph: please check around EDGE_" + vertex_name + "!")
+                            else:
+                                delete_those_vertices.add(vertex_name)
+                    if delete_those_vertices:
+                        if verbose or debug:
+                            if log_handler:
+                                log_handler.info("removing terminal contigs: " + str(delete_those_vertices))
+                            else:
+                                sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
+                        new_assembly.remove_vertex(delete_those_vertices)
+                        changed = True
+
+                # merge vertices
+                new_assembly.merge_all_possible_vertices()
+                new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
+                                                     contamination_similarity=contamination_similarity,
+                                                     degenerate=False, degenerate_depth=degenerate_depth,
+                                                     degenerate_similarity=degenerate_similarity,
+                                                     verbose=verbose, debug=debug, log_handler=log_handler)
+                new_assembly.tag_in_between(mode=mode)
+
+            if temp_graph:
+                new_assembly.write_to_gfa(temp_graph)
+                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
             new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
                                                  contamination_similarity=contamination_similarity,
                                                  degenerate=degenerate, degenerate_depth=degenerate_depth,
                                                  degenerate_similarity=degenerate_similarity,
                                                  verbose=verbose, debug=debug, log_handler=log_handler)
-            new_assembly.tag_in_between(mode=mode)
-
-        if temp_graph:
-            new_assembly.write_to_gfa(temp_graph)
-
-        # create idealized vertices and edges
-        new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(log_handler=log_handler, verbose=verbose,
-                                                                      mode="all", debug=debug)
-        try:
-            if log_handler:
-                log_handler.info("Estimating copy and depth precisely ...")
-            else:
-                sys.stdout.write("Estimating copy and depth precisely ...\n")
-            copy_results = new_assembly.estimate_copy_and_depth_precisely(maximum_copy_num=max_copy,
-                                                                          log_handler=log_handler, verbose=verbose,
-                                                                          debug=debug)
-        except RecursionError:
+            new_assembly.merge_all_possible_vertices()
             if temp_graph:
                 new_assembly.write_to_gfa(temp_graph)
-            raise Exception("Complicated target graph! Detecting path(s) failed!\n")
-        else:
-            return copy_results
+                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+
+            # create idealized vertices and edges
+            new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(log_handler=log_handler, verbose=verbose,
+                                                                          mode="all", debug=debug)
+            try:
+                if log_handler:
+                    log_handler.info("Estimating copy and depth precisely ...")
+                else:
+                    sys.stdout.write("Estimating copy and depth precisely ...\n")
+                copy_results = new_assembly.estimate_copy_and_depth_precisely(maximum_copy_num=max_copy,
+                                                                              log_handler=log_handler, verbose=verbose,
+                                                                              debug=debug)
+            except RecursionError:
+                if temp_graph:
+                    new_assembly.write_to_gfa(temp_graph)
+                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                raise Exception("Complicated target graph! Detecting path(s) failed!\n")
+            else:
+                return copy_results
+        except KeyboardInterrupt as e:
+            if temp_graph:
+                new_assembly.write_to_gfa(temp_graph)
+                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+            raise KeyboardInterrupt
 
     def get_all_circular_paths(self, mode="cp", log_handler=None):
 

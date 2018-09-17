@@ -340,8 +340,9 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
                     for i in range(3):
                         line = file_in.readline()
                         line_count += 1
+            line = file_in.readline()
             file_in.close()
-            if count_this_read_n >= maximum_n_reads:
+            if line:
                 log.warning("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + file_name + ", only top "
                             + str(int(maximum_n_reads)) + " reads are used in downstream analysis (suggested).")
         if not index_in_memory:
@@ -1000,7 +1001,8 @@ def unzip(source, target, verbose_log, log):
 
 
 @set_time_limit(300)
-def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, log, mode="cp", verbose=False,
+def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, log, type_factor=3.,
+                                  mode="cp", verbose=False,
                                   contamination_depth=5., contamination_similarity=5.,
                                   degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
                                   hard_cov_threshold=10.,
@@ -1009,7 +1011,8 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, l
     input_graph = Assembly(fastg_file)
     log.info("Disentangling ...")
     target_results = input_graph.find_target_graph(tab_file,
-                                                   mode=mode, log_hard_cov_threshold=hard_cov_threshold,
+                                                   mode=mode, type_factor=type_factor,
+                                                   log_hard_cov_threshold=hard_cov_threshold,
                                                    contamination_depth=contamination_depth,
                                                    contamination_similarity=contamination_similarity,
                                                    degenerate=degenerate, degenerate_depth=degenerate_depth,
@@ -1109,8 +1112,10 @@ def require_commands(print_title, version):
                                  'mt (mitochondria), nr (nuclear ribosomal RNA), 0 (disable this). Default: cp. '
                                  'You can also make the index by your self and add those index to ' +
                                  os.path.join(path_of_this_script, 'Library', '/NotationReference') + '')
+    group_result.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
+                            help="Depth factor for differentiate genome type of contigs. Default:%default")
     group_result.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
-                            help="Depth factor for confirming contaminating contigs. Default:%default")
+                            help="Depth factor for confirming contamination in parallel contigs. Default:%default")
     group_result.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
                             help="Similarity threshold for confirming contaminating contigs. Default:%default")
     group_result.add_option("--no-degenerate", dest="degenerate", default=True, action="store_false",
@@ -1455,6 +1460,7 @@ def main():
                 try:
                     disentangle_circular_assembly(fastg_file=out_fastg, mode=options.organelle_type,
                                                   tab_file=out_csv, prefix=path_prefix, weight_factor=100,
+                                                  hard_cov_threshold=options.disentangle_depth_factor,
                                                   contamination_depth=options.contamination_depth,
                                                   contamination_similarity=options.contamination_similarity,
                                                   degenerate=options.degenerate,

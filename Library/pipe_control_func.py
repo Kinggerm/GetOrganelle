@@ -3,6 +3,7 @@ import time
 import logging
 import sys
 import os
+from multiprocessing import Pool
 
 
 def simple_log(log, output_base, prefix):
@@ -51,3 +52,29 @@ def set_time_limit(num):
         return func_modified
 
     return wrap
+
+
+def pool_multiprocessing(target, iter_args, constant_args, num_process):
+    # parse args
+    if iter_args:
+        if type(iter_args) in {list, tuple}:
+            if type(iter_args[0]) not in {list, tuple}:
+                iter_args = [[each_arg] for each_arg in iter_args]
+        else:
+            sys.stderr.write("iter_args must be list/tuple!\n")
+    else:
+        return
+    if constant_args:
+        if type(constant_args) not in {list, tuple}:
+            constant_args = [constant_args]
+    else:
+        constant_args = []
+    pool = Pool(processes=num_process)
+    for this_arg in iter_args:
+        pool.apply_async(target, tuple(list(this_arg) + list(constant_args)))
+    pool.close()
+    try:
+        pool.join()
+    except KeyboardInterrupt:
+        pool.terminate()
+        raise KeyboardInterrupt

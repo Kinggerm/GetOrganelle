@@ -6,13 +6,20 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.2.0c",
+     "features": [
+         "1.Go over assemblies based on all kmer values, from large to small, until the solvable assembly is found.",
+         "2.overwrite option added for slim_fastg.py",
+         "3.Optimize the log",
+         "4.multiprocessing function added (planed, not utilized yet)",
+     ]},
     {"number": "1.2.0b",
      "features": [
          "1.Assembly.parse_fastg(): (more robust) Add connection information to both of the related vertices"
-         " even it is only mentioned once;"
+         " even it is only mentioned once;",
          "2.Assembly.is_sequential_repeat(): fix a bug that leak in the reverse direction;",
-         "3.add depth_factor to the main script;"
-         "4.remove unnecessary warning when #read equals maximum#reads setting, show warning only when overrunning;"
+         "3.add depth_factor to the main script;",
+         "4.remove unnecessary warning when #read equals maximum#reads setting, show warning only when overrunning;",
      ]},
     {"number": "1.2.0a",
      "features": [
@@ -20,9 +27,9 @@ versions = [
      ]},
     {"number": "1.2.0",
      "features": [
-         "1.more robust and precise in disentangling graph: "
-         "2.report contamination; "
-         "3.detect parallel contigs and generate consensus;"
+         "1.more robust and precise in disentangling graph: ",
+         "2.report contamination; ",
+         "3.detect parallel contigs and generate consensus;",
          "4.estimate chloroplast coverage distribution pattern using weighted GMM with EM and BIC;",
          "5.re-organize codes",
          "6.update NotationReference",
@@ -30,7 +37,7 @@ versions = [
     {"number": "1.1.0d",
      "features": [
          "1.more precise in disentangling graph.",
-         "2.--prefix added"
+         "2.--prefix added",
      ]},
     {"number": "1.1.0c",
      "features": [
@@ -48,7 +55,7 @@ versions = [
      "features": [
          "1.automatically exporting final sequence(s)",
          "2.adding disentangle_organelle_assembly.py",
-         "3.adding assembly_parser.py"
+         "3.adding assembly_parser.py",
          "4.re-organize codes",
          "5.revise README.md",
      ]},

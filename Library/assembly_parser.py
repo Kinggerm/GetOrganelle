@@ -457,9 +457,9 @@ class Assembly:
                     self.copy_to_vertex[this_copy].add(vertex_name)
             if debug or verbose:
                 if log_handler:
-                    log_handler.info("updating average target cov: " + str(round(new_val, 4)))
+                    log_handler.info("updating average target kmer-coverage: " + str(round(new_val, 4)))
                 else:
-                    sys.stdout.write("updating average target cov: " + str(round(new_val, 4)) + "\n")
+                    sys.stdout.write("updating average target kmer-coverage: " + str(round(new_val, 4)) + "\n")
             return new_val
         else:
             # adjust this_copy according to user-defined depth
@@ -736,13 +736,13 @@ class Assembly:
                     for vertex_name in vertices_list:
                         log_handler.info("Vertex_" + vertex_name + " #copy: " +
                                          str(final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)))
-                    log_handler.info("updating average target cov" + str(go_res) + ": " +
+                    log_handler.info("Average target kmer-coverage(" + str(go_res + 1) + "): " +
                                      str(round(final_results[go_res]["cov"], 4)))
                 else:
                     for vertex_name in vertices_list:
                         sys.stdout.write("Vertex_" + vertex_name + " #copy: " +
                                          str(final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)) + "\n")
-                    sys.stdout.write("updating average target cov" + str(go_res) + ": " +
+                    sys.stdout.write("Average target kmer-coverage(" + str(go_res + 1) + "): " +
                                      str(round(final_results[go_res]["cov"], 4)) + "\n")
             return final_results
 
@@ -778,9 +778,9 @@ class Assembly:
                     total_product += this_len * this_cov
                 new_val = total_product / total_len
                 if log_handler:
-                    log_handler.info("updating average target cov: " + str(round(new_val, 4)))
+                    log_handler.info("Average target kmer-coverage: " + str(round(new_val, 4)))
                 else:
-                    sys.stdout.write("updating average target cov: " + str(round(new_val, 4)) + "\n")
+                    sys.stdout.write("Average target kmer-coverage: " + str(round(new_val, 4)) + "\n")
 
     def tag_in_between(self, mode):
         # add those in between the tagged vertices to tagged_vertices
@@ -1333,10 +1333,11 @@ class Assembly:
             new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(log_handler=log_handler, verbose=verbose,
                                                                           mode="all", debug=debug)
             try:
-                if log_handler:
-                    log_handler.info("Estimating copy and depth precisely ...")
-                else:
-                    sys.stdout.write("Estimating copy and depth precisely ...\n")
+                if verbose:
+                    if log_handler:
+                        log_handler.info("Estimating copy and depth precisely ...")
+                    else:
+                        sys.stdout.write("Estimating copy and depth precisely ...\n")
                 copy_results = new_assembly.estimate_copy_and_depth_precisely(maximum_copy_num=max_copy,
                                                                               log_handler=log_handler, verbose=verbose,
                                                                               debug=debug)
@@ -1447,10 +1448,10 @@ class Assembly:
                 elif len(sorted_paths) > 1:
                     if log_handler:
                         log_handler.warning("As long as more than one path produced, check the final result to confirm "
-                                            "whether they are simply flip-flop configurations.")
+                                            "whether they are simply flip-flop configurations!")
                     else:
                         sys.stdout.write("Warning: As long as more than one path produced, check the final result to "
-                                         "confirm whether they are simply flip-flop configurations.\n")
+                                         "confirm whether they are simply flip-flop configurations!\n")
             return sorted_paths
 
     def export_path(self, in_path):

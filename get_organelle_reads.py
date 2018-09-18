@@ -32,6 +32,239 @@ dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 word_size = 0
 
 
+def require_commands(print_title, version):
+    version = version
+    usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output " \
+            " -R 10 -k 75,85,95,105\n" \
+            "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 0.6 -o mitochondria_output " \
+            " -R 30 -k 75,85,95,105 -F mt\n" \
+            "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 0.85 -o nr_output " \
+            " -R 7 -k 95,105,115 -P 0 -F nr\n"
+    description = print_title
+    parser = OptionParser(usage=usage, version=version, description=description)
+    # group1
+    group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
+    group_need.add_option('-1', dest='fastq_file_1', help='Input file with forward paired-end reads as pool.')
+    group_need.add_option('-2', dest='fastq_file_2', help='Input file with reverse paired-end reads as pool.')
+    group_need.add_option('-s', dest='seed_file', help='Reference. Input fasta format file as initial seed '
+                                                       'or input bowtie index base name as pre-seed (see flag "--bs")')
+    group_need.add_option('-w', dest='word_size', type=float, default=0.7,
+                          help='Word size (W) for extension. You could assign the ratio (1>input>0) of W to '
+                               'read_length, based on which this script would estimate the W for you; '
+                               'or assign an absolute W value (read length-1>input>=21). Default:0.7')
+    group_need.add_option('-o', dest='output_base', help='Out put directory. Overwriting files if directory exists.')
+    # group2
+    group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results"
+                                                              " or serve as alternations of the required options")
+    group_result.add_option('-R', dest='round_limit', type=int,
+                            help='Limit running rounds (>=2).')
+    group_result.add_option('-u', dest='unpaired_fastq_files',
+                            help='Input file(s) with unpaired reads as pool. '
+                                 'files could be comma-separated lists such as "seq1,seq2".')
+    group_result.add_option('--max-reads', dest='maximum_n_reads', type=float, default=1E7,
+                            help="Maximum number of reads to be used per file. Default: 1E7 (-F cp,nr) or 5E7 (-F mt)")
+    group_result.add_option('--bs', dest='bowtie2_seed',
+                            help='Input bowtie2 index base name as pre-seed. '
+                                 'This flag serves as an alternation of flag "-s".')
+    group_result.add_option('-a', dest='anti_seed', help='Anti-reference. Input fasta format file as anti-seed, '
+                                                         'where the extension process stop. Typically serves as '
+                                                         'excluding chloroplast reads when extending mitochondrial '
+                                                         'reads, or the other way around. You should be cautious about '
+                                                         'using this option, because if the anti-seed includes '
+                                                         'some word in the target but not in the seed, the result '
+                                                         'would have gaps. Typically, use the mt and cp from the same '
+                                                         'species as seed and anti-seed.')
+    group_result.add_option('--ba', dest='bowtie2_anti_seed',
+                            help='Input bowtie2 index base name as pre-anti-seed. '
+                                 'This flag serves as an alternation of flag "-a".')
+    group_result.add_option('-J', dest='jump_step', type=int, default=1,
+                            help='The wide of steps of checking words in reads during extension (integer >= 1). '
+                                 'When you have reads of high quality, the larger the number is, '
+                                 'the faster the extension will be, '
+                                 'the more risk of missing reads in low coverage area. '
+                                 'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
+    group_result.add_option('-M', dest='mesh_size', type=int, default=1,
+                            help='(Beta parameter) '
+                                 'The wide of steps of building words from seeds during extension (integer >= 1). '
+                                 'When you have reads of high quality, the larger the number is, '
+                                 'the faster the extension will be, '
+                                 'the more risk of missing reads in low coverage area. '
+                                 'Another usage of this mesh size is to choose a larger mesh size coupled with '
+                                 'a smaller word size, which makes smaller word size feasible when memory is limited.'
+                                 'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
+    group_result.add_option('-F', dest='organelle_type', default='cp',
+                            help='This flag should be followed with cp (if you want get chloroplast), '
+                                 'mt (mitochondria), nr (nuclear ribosomal RNA), 0 (disable this). Default: cp. '
+                                 'You can also make the index by your self and add those index to ' +
+                                 os.path.join(path_of_this_script, 'Library', '/NotationReference') + '')
+    group_result.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
+                            help="Depth factor for differentiate genome type of contigs. Default:%default")
+    group_result.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
+                            help="Depth factor for confirming contamination in parallel contigs. Default:%default")
+    group_result.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
+                            help="Similarity threshold for confirming contaminating contigs. Default:%default")
+    group_result.add_option("--no-degenerate", dest="degenerate", default=True, action="store_false",
+                            help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
+    group_result.add_option("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
+                            help="Depth factor for confirming parallel contigs. Default:%default")
+    group_result.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
+                            help="Similarity threshold for confirming parallel contigs. Default:%default")
+    group_result.add_option('--trim', dest='trim_values',
+                            help='Assign the number of bases in the ends to trim in extending process. '
+                                 'This function will not change the length of the out put reads. '
+                                 'Input format: int,int (Example: 4,4). Default: 0,0')
+    group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
+                            help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
+    group_result.add_option('--spades-options', dest='other_spades_options', default='',
+                            help='Other SPAdes options. Use double quotation marks to include all the arguments '
+                                 'and parameters, such as "--careful -o test"')
+    group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
+                            help='Disable SPAdes.')
+    group_result.add_option('--no-bowtie2', dest='utilize_mapping', action="store_false", default=True,
+                            help='Choose to disable mapping process.'
+                                 'By default, this script would map original reads to pre-seed (or bowtie2 index) '
+                                 'to acquire the initial seed. This requires bowtie2 to be installed '
+                                 '(and thus Linux/Unix only). It is suggested to keep mapping as default '
+                                 'when the seed is too diverse from target.')
+    # group3
+    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
+                                                                    "Take easy to pick some according your computer's flavour")
+    group_computational.add_option('-t', dest='threads', type=int, default=4,
+                                   help="Maximum threads to use.")
+    group_computational.add_option('-P', dest='pre_grouped', type=float, default=2E5,
+                                   help='The maximum number (integer) of high-covered reads to be pre-grouped '
+                                        'before extension. '
+                                        'pre_grouping is suggested when the whole genome coverage is shallow but '
+                                        'the organ genome coverage is deep.'
+                                        'The default value is 2E5. '
+                                        'For personal computer with 8G memory, we suggest no more than 3E5. '
+                                        'A larger number (ex. 6E5) would run faster but exhaust memory '
+                                        'in the first few minutes. Choose 0 to disable this process.')
+    group_computational.add_option('--continue', dest='script_resume', default=False, action="store_true",
+                                   help='Several check point based on files produced, rather than log, '
+                                        'so keep in mind that this script will not detect the difference '
+                                        'between this input parameters and the previous ones.')
+    group_computational.add_option('--index-in-memory', dest='index_in_memory', action="store_true", default=False,
+                                   help="Keep index in memory. Choose save index in memory than disk.")
+    group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
+                                   help='Enable output per round. Choose to save memory but cost more time per round.')
+    group_computational.add_option('--remove-duplicates', dest='rm_duplicates', default=1E7, type=float,
+                                   help='By default this script use unique reads to extend. Choose the number of '
+                                        'duplicates (integer) to be saved in memory. A larger number (ex. 2E7) would '
+                                        'run faster but exhaust memory in the first few minutes. '
+                                        'Choose 0 to disable this process. '
+                                        'Note that whether choose or not will not disable '
+                                        'the calling of replicate reads. Default: %default.')
+    group_computational.add_option("--prefix", dest="prefix", default="",
+                                   help="Add extra prefix to resulting files under the output directory.")
+    group_computational.add_option('--keep-temp', dest='keep_temp_files', action="store_true", default=False,
+                                   help="Choose to keep the running temp/index files.")
+    group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
+                                   help='Verbose output. Choose to enable verbose running log.')
+    parser.add_option_group(group_need)
+    parser.add_option_group(group_result)
+    parser.add_option_group(group_computational)
+    try:
+        (options, args) = parser.parse_args()
+    except Exception as e:
+        sys.stdout.write('\n############################################################################' + str(e))
+        sys.stdout.write('\n"-h" for more usage')
+        exit()
+    else:
+        if not ((options.seed_file or options.bowtie2_seed) and ((
+                                                                         options.fastq_file_1 and options.fastq_file_2) or options.unpaired_fastq_files) and options.word_size and options.output_base):
+            parser.print_help()
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: Insufficient arguments!\nUsage:')
+            sys.stdout.write(usage + '\n\n')
+            exit()
+        if int(bool(options.fastq_file_1)) + int(bool(options.fastq_file_2)) == 1:
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: unbalanced paired reads!\n\n')
+            exit()
+        for check_file in (options.fastq_file_1, options.fastq_file_2, options.seed_file, options.anti_seed):
+            if check_file:
+                if not os.path.exists(check_file):
+                    sys.stdout.write('\n############################################################################'
+                                     '\nERROR: ' + check_file + ' not found!\n\n')
+                    exit()
+        if options.unpaired_fastq_files:
+            options.unpaired_fastq_files = options.unpaired_fastq_files.split(',')
+            for fastq_file in options.unpaired_fastq_files:
+                if not os.path.exists(fastq_file):
+                    sys.stdout.write('\n############################################################################'
+                                     '\nERROR: ' + fastq_file + ' not found!\n\n')
+                    exit()
+        else:
+            options.unpaired_fastq_files = []
+        if options.jump_step < 1:
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: Jump step MUST be an integer that >= 1')
+            exit()
+        if options.mesh_size < 1:
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: Mesh size MUST be an integer that >= 1')
+            exit()
+        if options.fastq_file_1 == options.fastq_file_2 and options.fastq_file_1:
+            sys.stdout.write('\n############################################################################'
+                             '\nERROR: 1st fastq file is the same with 2nd fastq file!')
+            exit()
+        if not os.path.isdir(options.output_base):
+            os.mkdir(options.output_base)
+        options.prefix = os.path.basename(options.prefix)
+        log = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
+        log.info(print_title)
+        log.info(' '.join(sys.argv) + '\n')
+        log = timed_log(log, options.output_base, options.prefix + "get_org.")
+        if 0 < options.word_size < 1:
+            pass
+        elif options.word_size >= 21:
+            options.word_size = int(options.word_size)
+        else:
+            log.error("Illegal '-w' value!")
+            exit()
+        if "--max-reads" not in sys.argv:
+            if options.organelle_type == "mt":
+                options.maximum_n_reads *= 5
+                log.info("--max-reads " + str(options.maximum_n_reads) + " (mt)")
+        if options.seed_file and options.bowtie2_seed:
+            log.error('Simultaneously using "-s" and "--bs" is not allowed!')
+            exit()
+        if options.anti_seed and options.bowtie2_anti_seed:
+            log.error('Simultaneously using "-a" and "--as" is not allowed!')
+            exit()
+        if options.bowtie2_seed or options.bowtie2_anti_seed:
+            options.utilize_mapping = True
+        if options.utilize_mapping:
+            if not executable("bowtie2"):
+                options.utilize_mapping = False
+                if options.seed_file:
+                    log.warning('bowtie2 not in the path! Take the seed file as initial seed.')
+                else:
+                    log.error('bowtie2 not in the path!')
+                    exit()
+                if options.anti_seed:
+                    log.warning('bowtie2 not in the path! Take the anti-seed file as initial anti-seed.')
+                else:
+                    log.warning('bowtie2 not in the path! Anti-seed disabled!')
+        if options.run_spades:
+            if not executable("spades.py -h"):
+                log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
+                options.run_spades = False
+        options.rm_duplicates = int(options.rm_duplicates)
+        options.pre_grouped = int(options.pre_grouped)
+        if not options.rm_duplicates and options.pre_grouped:
+            log.warning("removing duplicates was inactive, so that the pre-grouping was disabled.")
+            options.pre_grouped = False
+        if options.round_limit and options.round_limit < 2:
+            log.warning("illegal limit for rounds! Been set to default: unlimited.")
+            options.round_limit = None
+        return options, log
+
+
 # test whether an external binary is executable
 def executable(test_this):
     return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != dead_code else False
@@ -906,14 +1139,23 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         return True
 
 
-def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_base, prefix="", depth_threshold=0):
+def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_threshold=0, resume=False):
     if not executable("blastn"):
-        log.warning('blastn not in the path!\nSkip slimming assembly result ...')
+        if log:
+            log.warning('blastn not in the path! Skip slimming assembly result ...')
         return
     if not executable("makeblastdb"):
-        log.warning('makeblastdb not in the path!\nSkip slimming assembly result ...')
+        if log:
+            log.warning('makeblastdb not in the path! Skip slimming assembly result ...')
         return
-    scheme_tranlation = {
+    graph_file = os.path.join(spades_output, "assembly_graph.fastg")
+    if resume:
+        for existed_file in os.listdir(spades_output):
+            if existed_file.count(".fastg") == 2:
+                if log:
+                    log.info("Slimming      " + graph_file + " ... skipped.")
+                return 0
+    scheme_translation = {
         'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference',
                                                     'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library',
                                                                                          'NotationReference', 'mt'),
@@ -921,31 +1163,33 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, out_bas
                                                     'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library',
                                                                                          'NotationReference', 'cp'),
         'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')}
-    if scheme in scheme_tranlation:
-        run_command = scheme_tranlation[scheme]
+    if scheme in scheme_translation:
+        run_command = scheme_translation[scheme]
     else:
         run_command = scheme
-    graph_file = os.path.join(spades_output, "assembly_graph.fastg")
     run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(threads) + ' ' \
-                  + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold) \
-                  + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
+                  + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold)  #\
+                  # + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
-        if verbose_log:
-            log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
-            log.warning(output.decode("utf8"))
-        log.warning("Processing assembly result failed.\n")
+        if log:
+            if verbose_log:
+                log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
+                log.warning(output.decode("utf8"))
+            log.warning("Slimming      " + graph_file + " failed.")
         return 1
     elif "failed" in output.decode("utf8") or "error" in output.decode("utf8"):
-        if verbose_log:
-            log.error(output.decode("utf8"))
-        log.warning("Processing assembly result failed.\n")
+        if log:
+            if verbose_log:
+                log.error(output.decode("utf8"))
+            log.warning("Slimming      " + graph_file + " failed.")
         return 1
     else:
-        if verbose_log:
-            log.info(output.decode("utf8"))
-        log.info("Processing assembly result finished!\n")
+        if log:
+            if verbose_log:
+                log.info(output.decode("utf8"))
+            log.info("Slimming      " + graph_file + " finished!")
         return 0
 
 
@@ -1001,15 +1245,15 @@ def unzip(source, target, verbose_log, log):
 
 
 @set_time_limit(300)
-def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, log, type_factor=3.,
+def disentangle_circular_assembly(fastg_file, tab_file, output, weight_factor, log, type_factor=3.,
                                   mode="cp", verbose=False,
                                   contamination_depth=5., contamination_similarity=5.,
                                   degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
                                   hard_cov_threshold=10.,
                                   min_sigma_factor=0.1):
     from Library.assembly_parser import Assembly
+    log.info("Disentangling " + fastg_file + " ... ")
     input_graph = Assembly(fastg_file)
-    log.info("Disentangling ...")
     target_results = input_graph.find_target_graph(tab_file,
                                                    mode=mode, type_factor=type_factor,
                                                    log_hard_cov_threshold=hard_cov_threshold,
@@ -1025,256 +1269,53 @@ def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, l
     for go_res, res in enumerate(target_results):
         go_res += 1
         idealized_graph = res["graph"]
-        average_kmer_cov = res["cov"]
-        log.info("Detecting target graph" + str(go_res) +
-                 " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+        # average_kmer_cov = res["cov"]
+        # log.info("Detecting target graph" + str(go_res) +
+        #          " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+
         # should add making one-step-inversion pairs for paths,
         # which would be used to identify existence of a certain isomer using mapping information
         count_path = 0
         for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
             count_path += 1
-            out_n = prefix + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
+            out_n = output + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
             open(out_n, "w").write(idealized_graph.export_path(this_path).fasta_str())
             log.info("Writing PATH" + str(count_path) + " to " + out_n)
-        log.info("Writing GRAPH to " + prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
-        idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
+        log.info("Writing GRAPH to " + output + ".graph" + str(go_res) + ".selected_graph.gfa")
+        idealized_graph.write_to_gfa(output + ".graph" + str(go_res) + ".selected_graph.gfa")
 
     log.info("Solving and unfolding graph finished!")
-    log.warning("Disentangling is in a beta version!")
-    log.warning("Please visualizing " + fastg_file + " to confirm the final result.")
+    log.info("Please visualize " + fastg_file + " to confirm the final result.")
 
 
-def require_commands(print_title, version):
-    version = version
-    usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output " \
-            " -R 10 -k 75,85,95,105\n" \
-            "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -w 0.6 -o mitochondria_output " \
-            " -R 30 -k 75,85,95,105 -F mt\n" \
-            "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -w 0.85 -o nr_output " \
-            " -R 7 -k 95,105,115 -P 0 -F nr\n"
-    description = print_title
-    parser = OptionParser(usage=usage, version=version, description=description)
-    # group1
-    group_need = OptionGroup(parser, "COMMON OPTIONS", "All these arguments are required unless alternations provided")
-    group_need.add_option('-1', dest='fastq_file_1', help='Input file with forward paired-end reads as pool.')
-    group_need.add_option('-2', dest='fastq_file_2', help='Input file with reverse paired-end reads as pool.')
-    group_need.add_option('-s', dest='seed_file', help='Reference. Input fasta format file as initial seed '
-                                                       'or input bowtie index base name as pre-seed (see flag "--bs")')
-    group_need.add_option('-w', dest='word_size', type=float, default=0.7,
-                          help='Word size (W) for extension. You could assign the ratio (1>input>0) of W to '
-                               'read_length, based on which this script would estimate the W for you; '
-                               'or assign an absolute W value (read length-1>input>=21). Default:0.7')
-    group_need.add_option('-o', dest='output_base', help='Out put directory. Overwriting files if directory exists.')
-    # group2
-    group_result = OptionGroup(parser, "INFLUENTIAI OPTIONS", "These option will affect the final results"
-                                                              " or serve as alternations of the required options")
-    group_result.add_option('-R', dest='round_limit', type=int,
-                            help='Limit running rounds (>=2).')
-    group_result.add_option('-u', dest='unpaired_fastq_files',
-                            help='Input file(s) with unpaired reads as pool. '
-                                 'files could be comma-separated lists such as "seq1,seq2".')
-    group_result.add_option('--max-reads', dest='maximum_n_reads', type=float, default=1E7,
-                            help="Maximum number of reads to be used per file. Default: 1E7 (-F cp,nr) or 5E7 (-F mt)")
-    group_result.add_option('--bs', dest='bowtie2_seed',
-                            help='Input bowtie2 index base name as pre-seed. '
-                                 'This flag serves as an alternation of flag "-s".')
-    group_result.add_option('-a', dest='anti_seed', help='Anti-reference. Input fasta format file as anti-seed, '
-                                                         'where the extension process stop. Typically serves as '
-                                                         'excluding chloroplast reads when extending mitochondrial '
-                                                         'reads, or the other way around. You should be cautious about '
-                                                         'using this option, because if the anti-seed includes '
-                                                         'some word in the target but not in the seed, the result '
-                                                         'would have gaps. Typically, use the mt and cp from the same '
-                                                         'species as seed and anti-seed.')
-    group_result.add_option('--ba', dest='bowtie2_anti_seed',
-                            help='Input bowtie2 index base name as pre-anti-seed. '
-                                 'This flag serves as an alternation of flag "-a".')
-    group_result.add_option('-J', dest='jump_step', type=int, default=1,
-                            help='The wide of steps of checking words in reads during extension (integer >= 1). '
-                                 'When you have reads of high quality, the larger the number is, '
-                                 'the faster the extension will be, '
-                                 'the more risk of missing reads in low coverage area. '
-                                 'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
-    group_result.add_option('-M', dest='mesh_size', type=int, default=1,
-                            help='(Beta parameter) '
-                                 'The wide of steps of building words from seeds during extension (integer >= 1). '
-                                 'When you have reads of high quality, the larger the number is, '
-                                 'the faster the extension will be, '
-                                 'the more risk of missing reads in low coverage area. '
-                                 'Another usage of this mesh size is to choose a larger mesh size coupled with '
-                                 'a smaller word size, which makes smaller word size feasible when memory is limited.'
-                                 'Choose 1 to choose the slowest but safest extension strategy. Default: 1')
-    group_result.add_option('-F', dest='organelle_type', default='cp',
-                            help='This flag should be followed with cp (if you want get chloroplast), '
-                                 'mt (mitochondria), nr (nuclear ribosomal RNA), 0 (disable this). Default: cp. '
-                                 'You can also make the index by your self and add those index to ' +
-                                 os.path.join(path_of_this_script, 'Library', '/NotationReference') + '')
-    group_result.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
-                            help="Depth factor for differentiate genome type of contigs. Default:%default")
-    group_result.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
-                            help="Depth factor for confirming contamination in parallel contigs. Default:%default")
-    group_result.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
-                            help="Similarity threshold for confirming contaminating contigs. Default:%default")
-    group_result.add_option("--no-degenerate", dest="degenerate", default=True, action="store_false",
-                            help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
-    group_result.add_option("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
-                            help="Depth factor for confirming parallel contigs. Default:%default")
-    group_result.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
-                            help="Similarity threshold for confirming parallel contigs. Default:%default")
-    group_result.add_option('--trim', dest='trim_values',
-                            help='Assign the number of bases in the ends to trim in extending process. '
-                                 'This function will not change the length of the out put reads. '
-                                 'Input format: int,int (Example: 4,4). Default: 0,0')
-    group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
-                            help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
-    group_result.add_option('--spades-options', dest='other_spades_options', default='',
-                            help='Other SPAdes options. Use double quotation marks to include all the arguments '
-                                 'and parameters, such as "--careful -o test"')
-    group_result.add_option('--no-spades', dest='run_spades', action="store_false", default=True,
-                            help='Disable SPAdes.')
-    group_result.add_option('--no-bowtie2', dest='utilize_mapping', action="store_false", default=True,
-                            help='Choose to disable mapping process.'
-                                 'By default, this script would map original reads to pre-seed (or bowtie2 index) '
-                                 'to acquire the initial seed. This requires bowtie2 to be installed '
-                                 '(and thus Linux/Unix only). It is suggested to keep mapping as default '
-                                 'when the seed is too diverse from target.')
-    # group3
-    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
-                                                                    "Take easy to pick some according your computer's flavour")
-    group_computational.add_option('-t', dest='threads', type=int, default=4,
-                                   help="Threads for third-party tools (bowtie2, blastn, SPAdes).")
-    group_computational.add_option('-P', dest='pre_grouped', type=float, default=2E5,
-                                   help='The maximum number (integer) of high-covered reads to be pre-grouped '
-                                        'before extension. '
-                                        'pre_grouping is suggested when the whole genome coverage is shallow but '
-                                        'the organ genome coverage is deep.'
-                                        'The default value is 2E5. '
-                                        'For personal computer with 8G memory, we suggest no more than 3E5. '
-                                        'A larger number (ex. 6E5) would run faster but exhaust memory '
-                                        'in the first few minutes. Choose 0 to disable this process.')
-    group_computational.add_option('--continue', dest='script_resume', default=False, action="store_true",
-                                   help='Several check point based on files produced, rather than log, '
-                                        'so keep in mind that this script will not detect the difference '
-                                        'between this input parameters and the previous ones.')
-    group_computational.add_option('--index-in-memory', dest='index_in_memory', action="store_true", default=False,
-                                   help="Keep index in memory. Choose save index in memory than disk.")
-    group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
-                                   help='Enable output per round. Choose to save memory but cost more time per round.')
-    group_computational.add_option('--remove-duplicates', dest='rm_duplicates', default=1E7, type=float,
-                                   help='By default this script use unique reads to extend. Choose the number of '
-                                        'duplicates (integer) to be saved in memory. A larger number (ex. 2E7) would '
-                                        'run faster but exhaust memory in the first few minutes. '
-                                        'Choose 0 to disable this process. '
-                                        'Note that whether choose or not will not disable '
-                                        'the calling of replicate reads. Default: %default.')
-    group_computational.add_option("--prefix", dest="prefix", default="",
-                                   help="Add extra prefix to resulting files under the output directory.")
-    group_computational.add_option('--keep-temp', dest='keep_temp_files', action="store_true", default=False,
-                                   help="Choose to keep the running temp/index files.")
-    group_computational.add_option('--verbose', dest='verbose_log', action="store_true", default=False,
-                                   help='Verbose output. Choose to enable verbose running log.')
-    parser.add_option_group(group_need)
-    parser.add_option_group(group_result)
-    parser.add_option_group(group_computational)
-    try:
-        (options, args) = parser.parse_args()
-    except Exception as e:
-        sys.stdout.write('\n############################################################################' + str(e))
-        sys.stdout.write('\n"-h" for more usage')
-        exit()
+def extract_organelle_genome(out_base, spades_output, go_round,
+                             prefix, organelle_type, verbose, log, threads, options):
+    running_stat = slim_spades_result(organelle_type, spades_output, verbose, log, threads=threads,
+                                      resume=options.script_resume)
+    """disentangle"""
+    if running_stat == 0:
+        out_fastg = sorted([os.path.join(spades_output, x)
+                            for x in os.listdir(spades_output) if x.count(".fastg") == 2])[0]
+        out_csv = out_fastg[:-5] + "csv"
+        # if it is the first round (the largest kmer), copy the slimmed result to the main spades output folder
+        if go_round == 0:
+            main_spades_folder = os.path.split(spades_output)[0]
+            os.system("cp " + out_fastg + " " + main_spades_folder)
+            os.system("cp " + out_csv + " " + main_spades_folder)
+
+        path_prefix = os.path.join(out_base, prefix + organelle_type)
+        disentangle_circular_assembly(fastg_file=out_fastg, mode=organelle_type,
+                                      tab_file=out_csv, output=path_prefix, weight_factor=100,
+                                      hard_cov_threshold=options.disentangle_depth_factor,
+                                      contamination_depth=options.contamination_depth,
+                                      contamination_similarity=options.contamination_similarity,
+                                      degenerate=options.degenerate,
+                                      degenerate_depth=options.degenerate_depth,
+                                      degenerate_similarity=options.degenerate_similarity,
+                                      verbose=verbose, log=log)
+        return 0
     else:
-        if not ((options.seed_file or options.bowtie2_seed) and ((
-                                                                         options.fastq_file_1 and options.fastq_file_2) or options.unpaired_fastq_files) and options.word_size and options.output_base):
-            parser.print_help()
-            sys.stdout.write('\n############################################################################'
-                             '\nERROR: Insufficient arguments!\nUsage:')
-            sys.stdout.write(usage + '\n\n')
-            exit()
-        if int(bool(options.fastq_file_1)) + int(bool(options.fastq_file_2)) == 1:
-            sys.stdout.write('\n############################################################################'
-                             '\nERROR: unbalanced paired reads!\n\n')
-            exit()
-        for check_file in (options.fastq_file_1, options.fastq_file_2, options.seed_file, options.anti_seed):
-            if check_file:
-                if not os.path.exists(check_file):
-                    sys.stdout.write('\n############################################################################'
-                                     '\nERROR: ' + check_file + ' not found!\n\n')
-                    exit()
-        if options.unpaired_fastq_files:
-            options.unpaired_fastq_files = options.unpaired_fastq_files.split(',')
-            for fastq_file in options.unpaired_fastq_files:
-                if not os.path.exists(fastq_file):
-                    sys.stdout.write('\n############################################################################'
-                                     '\nERROR: ' + fastq_file + ' not found!\n\n')
-                    exit()
-        else:
-            options.unpaired_fastq_files = []
-        if options.jump_step < 1:
-            sys.stdout.write('\n############################################################################'
-                             '\nERROR: Jump step MUST be an integer that >= 1')
-            exit()
-        if options.mesh_size < 1:
-            sys.stdout.write('\n############################################################################'
-                             '\nERROR: Mesh size MUST be an integer that >= 1')
-            exit()
-        if options.fastq_file_1 == options.fastq_file_2 and options.fastq_file_1:
-            sys.stdout.write('\n############################################################################'
-                             '\nERROR: 1st fastq file is the same with 2nd fastq file!')
-            exit()
-        if not os.path.isdir(options.output_base):
-            os.mkdir(options.output_base)
-        options.prefix = os.path.basename(options.prefix)
-        log = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
-        log.info(print_title)
-        log.info(' '.join(sys.argv) + '\n')
-        log = timed_log(log, options.output_base, options.prefix + "get_org.")
-        if 0 < options.word_size < 1:
-            pass
-        elif options.word_size >= 21:
-            options.word_size = int(options.word_size)
-        else:
-            log.error("Illegal '-w' value!")
-            exit()
-        if "--max-reads" not in sys.argv:
-            if options.organelle_type == "mt":
-                options.maximum_n_reads *= 5
-                log.info("--max-reads " + str(options.maximum_n_reads) + " (mt)")
-        if options.seed_file and options.bowtie2_seed:
-            log.error('Simultaneously using "-s" and "--bs" is not allowed!')
-            exit()
-        if options.anti_seed and options.bowtie2_anti_seed:
-            log.error('Simultaneously using "-a" and "--as" is not allowed!')
-            exit()
-        if options.bowtie2_seed or options.bowtie2_anti_seed:
-            options.utilize_mapping = True
-        if options.utilize_mapping:
-            if not executable("bowtie2"):
-                options.utilize_mapping = False
-                if options.seed_file:
-                    log.warning('bowtie2 not in the path! Take the seed file as initial seed.')
-                else:
-                    log.error('bowtie2 not in the path!')
-                    exit()
-                if options.anti_seed:
-                    log.warning('bowtie2 not in the path! Take the anti-seed file as initial anti-seed.')
-                else:
-                    log.warning('bowtie2 not in the path! Anti-seed disabled!')
-        if options.run_spades:
-            if not executable("spades.py -h"):
-                log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
-                options.run_spades = False
-        options.rm_duplicates = int(options.rm_duplicates)
-        options.pre_grouped = int(options.pre_grouped)
-        if not options.rm_duplicates and options.pre_grouped:
-            log.warning("removing duplicates was inactive, so that the pre-grouping was disabled.")
-            options.pre_grouped = False
-        if options.round_limit and options.round_limit < 2:
-            log.warning("illegal limit for rounds! Been set to default: unlimited.")
-            options.round_limit = None
-        return options, log
+        return 1
 
 
 def main():
@@ -1418,7 +1459,7 @@ def main():
 
             log.info("Extending finished.\n")
         else:
-            log.info("Extending ... skipped.")
+            log.info("Extending ... skipped.\n")
         if reads_files_to_drop and not options.keep_temp_files:
             for rm_read_file in reads_files_to_drop:
                 os.remove(rm_read_file)
@@ -1433,7 +1474,7 @@ def main():
                     os.remove(os.path.join(out_base, options.prefix + "filtered_1.fq"))
                     os.remove(os.path.join(out_base, options.prefix + "filtered_2.fq"))
             else:
-                log.info("Separating filtered fastq file ... skipped.")
+                log.info("Separating filtered fastq file ... skipped.\n")
 
         """assembly"""
         if options.run_spades:
@@ -1443,37 +1484,37 @@ def main():
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base, options.prefix,
                                      original_fq_files, reads_paired, options.verbose_log, resume, options.threads, log)
             else:
-                log.info('Assembling using SPAdes ... skipped.')
+                log.info('Assembling using SPAdes ... skipped.\n')
 
-        """slim"""
+        """export organelle"""
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
                 and options.organelle_type != '0':
-            running_stat = slim_spades_result(options.organelle_type, spades_output,
-                                              options.verbose_log, log, threads=options.threads,
-                                              out_base=out_base, prefix=options.prefix)
-
-            """disentangle"""
-            if running_stat == 0:
-                out_fastg = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".fastg")])[0]
-                out_csv = sorted([os.path.join(out_base, x) for x in os.listdir(out_base) if x.endswith(".csv")])[0]
-                path_prefix = os.path.join(out_base, options.prefix + options.organelle_type)
+            export_succeeded = False
+            kmer_vals = sorted([int(kmer_val) for kmer_val in options.spades_kmer.split(",")], reverse=True)
+            kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
+            for go_k, kmer_dir in enumerate(kmer_dirs):
                 try:
-                    disentangle_circular_assembly(fastg_file=out_fastg, mode=options.organelle_type,
-                                                  tab_file=out_csv, prefix=path_prefix, weight_factor=100,
-                                                  hard_cov_threshold=options.disentangle_depth_factor,
-                                                  contamination_depth=options.contamination_depth,
-                                                  contamination_similarity=options.contamination_similarity,
-                                                  degenerate=options.degenerate,
-                                                  degenerate_depth=options.degenerate_depth,
-                                                  degenerate_similarity=options.degenerate_similarity,
-                                                  verbose=options.verbose_log, log=log)
+                    run_stat = extract_organelle_genome(out_base=out_base, spades_output=kmer_dir, go_round=go_k,
+                                                        prefix=options.prefix, organelle_type=options.organelle_type,
+                                                        verbose=options.verbose_log, log=log, threads=options.threads,
+                                                        options=options)
                 except ImportError:
-                    log.warning("Disentangling assembly graph failed: numpy/scipy/sympy not installed!")
+                    log.warning("Disentangling failed: numpy/scipy/sympy not installed!")
+                    break
                 except:
-                    log.info("Disentangling assembly graph failed!\n")
-                    # log.info("Writing temp graph to " + prefix + ".temp.fastg")
-                    log.info("Please visualize " + out_fastg + " with annotation file " + out_csv +
-                             " and export your result in Bandage.")
+                    log.info("Disentangling failed.")
+                else:
+                    if run_stat == 0:
+                        export_succeeded = True
+                        break
+            if not export_succeeded:
+                out_fastg = sorted([os.path.join(spades_output, x)
+                                    for x in os.listdir(spades_output) if x.count(".fastg") == 2])[0]
+                out_csv = out_fastg[:-5] + "csv"
+                log.info("Please ...")
+                log.info("load the graph file: " + out_fastg)
+                log.info("load the CSV file: " + out_csv)
+                log.info("visualize and export your result in Bandage.\n")
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal Calc-cost " + str(time.time() - time0))

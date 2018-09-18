@@ -100,6 +100,8 @@ def require_commands():
                       help="Add prefix to the output file.")
     parser.add_option('--continue', dest='resume', default=False, action='store_true',
                       help='Specified for calling from get_organelle_reads.py')
+    parser.add_option("--overwrite", dest="overwrite", default=False, action="store_true",
+                      help="Overwrite existing output result.")
     parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
                       help="Threads for blastn.")
     try:
@@ -660,10 +662,10 @@ def main():
                 out_fas = os.path.join(os.path.split(fas_file)[0], options.prefix + os.path.basename(fas_file)) + '.'+ in_ex_info + '.' + fas_file.split('.')[-1]
                 out_csv = os.path.join(os.path.split(fas_file)[0], options.prefix + os.path.basename(fas_file)) + '.' + in_ex_info
             write_fasta(out_dir=out_fas,
-                        matrix=fasta_matrix, overwrite=False)
+                        matrix=fasta_matrix, overwrite=options.overwrite)
             # write out hits tab according to blast
             write_hits_tab_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names,
-                                       exclude_file=exclude_index, out_file=out_csv, overwrite=False,
+                                       exclude_file=exclude_index, out_file=out_csv, overwrite=options.overwrite,
                                        is_fastg=is_fastg)
         except EnvironmentError:
             sys.stdout.write('\nRound ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!\n')

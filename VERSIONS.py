@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.2.0d",
+     "features": [
+         "1.Add --max-words.",
+     ]},
     {"number": "1.2.0c",
      "features": [
          "1.Go over assemblies based on all kmer values, from large to small, until the solvable assembly is found.",

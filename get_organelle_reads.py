@@ -66,6 +66,9 @@ def require_commands(print_title, version):
                                  'files could be comma-separated lists such as "seq1,seq2".')
     group_result.add_option('--max-reads', dest='maximum_n_reads', type=float, default=1E7,
                             help="Maximum number of reads to be used per file. Default: 1E7 (-F cp,nr) or 5E7 (-F mt)")
+    group_result.add_option('--max-words', dest='maximum_n_words', type=float, default=5E7,
+                            help="Maximum number of words to be used in total."
+                                 "Default: 5E7 (-F cp), 1E7 (-F nr) or 3E8 (-F mt)")
     group_result.add_option('--bs', dest='bowtie2_seed',
                             help='Input bowtie2 index base name as pre-seed. '
                                  'This flag serves as an alternation of flag "-s".')
@@ -148,7 +151,7 @@ def require_commands(print_title, version):
                                         'so keep in mind that this script will not detect the difference '
                                         'between this input parameters and the previous ones.')
     group_computational.add_option('--index-in-memory', dest='index_in_memory', action="store_true", default=False,
-                                   help="Keep index in memory. Choose save index in memory than disk.")
+                                   help="Keep index in memory. Choose save index in memory than in disk.")
     group_computational.add_option('--out-per-round', dest='fg_out_per_round', action="store_true", default=False,
                                    help='Enable output per round. Choose to save memory but cost more time per round.')
     group_computational.add_option('--remove-duplicates', dest='rm_duplicates', default=1E7, type=float,
@@ -229,7 +232,13 @@ def require_commands(print_title, version):
         if "--max-reads" not in sys.argv:
             if options.organelle_type == "mt":
                 options.maximum_n_reads *= 5
-                log.info("--max-reads " + str(options.maximum_n_reads) + " (mt)")
+                # log.info("--max-reads " + str(options.maximum_n_reads) + " (mt)")
+        if "--max-words" not in sys.argv:
+            if options.organelle_type == "mt":
+                options.maximum_n_words *= 6
+            elif options.organelle_type == "nr":
+                options.maximum_n_words /= 5
+                # log.info()
         if options.seed_file and options.bowtie2_seed:
             log.error('Simultaneously using "-s" and "--bs" is not allowed!')
             exit()
@@ -736,6 +745,14 @@ class RoundLimitException(Exception):
         return repr(self.value)
 
 
+class WordsLimitException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
 class NoMoreReads(Exception):
     def __init__(self, value):
         self.value = value
@@ -746,9 +763,10 @@ class NoMoreReads(Exception):
 
 def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_indices, pre_grouped,
                     groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base,
-                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values, maximum_n_reads,
-                    log):
+                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values,
+                    maximum_n_reads, maximum_n_words, log):
     global word_size
+    accumulated_num_words = 0
     accepted_contig_id_this_round = set()
     line_to_accept = set()
     round_count = 1
@@ -761,9 +779,10 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
         log.warning("Package psutil is not installed, so that memory usage will not be logged\n"
                     "Don't worry. This will not affect the result.")
     try:
-        def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count, unique_id):
+        def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count, acc_num_words, unique_id):
             len_aw = len(acc_words)
             len_al = len(acc_contig_id_this_round)
+            acc_num_words += len_aw - pre_aw
             if this_process:
                 memory_usage = " Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3))
             else:
@@ -790,7 +809,7 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
             if r_count == round_limit:
                 raise RoundLimitException(r_count)
             r_count += 1
-            return acc_words, acc_contig_id_this_round, pre_aw, r_count
+            return acc_words, acc_contig_id_this_round, pre_aw, r_count, acc_num_words
 
         while True:
             if verbose:
@@ -846,14 +865,19 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
                                     line_to_accept.remove(unique_read_id)
                                     del groups_of_duplicate_lines[which_group]
                     if unique_read_id % 14321 == 0:
-                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.',
-                                                                                      ',') + " - INFO: Round " + str(
-                            round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
-                            len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round "\
+                                     + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
+                                     " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(
-                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
+                        if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
+                            log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
+                                     str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) +
+                                     " AW " + str(len(accepted_words)))
+                            raise WordsLimitException("")
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
+                    = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                                      accumulated_num_words, unique_read_id)
             else:
                 for unique_read_id in range(len_indices):
                     this_seq = next(reads_generator)
@@ -878,14 +902,19 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
                             accepted_contig_id.add(unique_read_id)
                             accepted_contig_id_this_round.add(unique_read_id)
                     if unique_read_id % 14321 == 0:
-                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.',
-                                                                                      ',') + " - INFO: Round " + str(
-                            round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
-                            len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round " \
+                                     + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
+                                     " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
                         sys.stdout.write(this_print + '\b' * len(this_print))
                         sys.stdout.flush()
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count = summarise_round(
-                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, unique_read_id)
+                        if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
+                            log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
+                                     str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW "
+                                     + str(len(accepted_words)))
+                            raise WordsLimitException("")
+                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
+                    = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                                      accumulated_num_words, unique_read_id)
             reads_generator.close()
     except KeyboardInterrupt:
         reads_generator.close()
@@ -900,6 +929,9 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
     except RoundLimitException as r_lim:
         reads_generator.close()
         log.info("Hit the round limit " + str(r_lim) + " and terminated ...")
+    except WordsLimitException:
+        reads_generator.close()
+        log.info("Hit the words limit and terminated ...")
     del reads_generator
     del accepted_words
     del accepted_contig_id_this_round
@@ -1442,7 +1474,7 @@ def main():
                                                  options.fg_out_per_round,
                                                  options.jump_step,
                                                  options.mesh_size, verb_out, resume,
-                                                 trim_ends, options.maximum_n_reads, log)
+                                                 trim_ends, options.maximum_n_reads, options.maximum_n_words, log)
             write_fq_results(original_fq_files, accepted_contig_id,
                              os.path.join(out_base, options.prefix + "filtered"),
                              os.path.join(out_base, 'temp.indices.2'),

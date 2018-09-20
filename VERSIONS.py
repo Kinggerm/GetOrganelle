@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.3.0a",
+     "features": [
+         "1.automatically discard improper input kmers",
+     ]},
     {"number": "1.3.0",
      "features": [
          "1.Read quality control (--min-quality-score) added.",

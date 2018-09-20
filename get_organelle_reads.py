@@ -123,8 +123,10 @@ def require_commands(print_title, version):
     group_result.add_option("--min-quality-score", dest="min_quality_score", type=int, default=15,
                             help="Minimum quality score in extending extension. "
                                  "Default:%default ('+' in Phred+33; 'J' in Phred+64/Solexa+64)")
-    group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
-                            help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
+    group_result.add_option('-k', dest='spades_kmer', default='75,85,95',
+                            help='SPAdes kmer settings. Use the same format as in SPAdes. kmer larger than '
+                                 'maximum read length would be automatically discarded by GetOrganelle. '
+                                 'Default:%default')
     group_result.add_option('--spades-options', dest='other_spades_options', default='',
                             help='Other SPAdes options. Use double quotation marks to include all the arguments '
                                  'and parameters, such as "--careful -o test"')
@@ -1346,7 +1348,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
 
 def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, prefix, original_fq_files, reads_paired,
                          verbose_log, resume, threads, log):
-    if '-k' in parameters:
+    if '-k' in parameters or not spades_kmer:
         kmer = ''
     else:
         kmer = '-k ' + spades_kmer
@@ -1658,18 +1660,25 @@ def main():
                                                                options.min_quality_score, log, sampling_percent=0.1)
             log.info("Counting read lengths ...")
             mean_read_len, max_read_len = get_read_len_mean_max(original_fq_files, options.maximum_n_reads)
+            log.info("mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
             if word_size < 1:
                 new_word_size = int(word_size * mean_read_len)
                 if new_word_size < 21:
                     word_size = 21
-                    log.warning("Too small ratio " + str(word_size) + ", setting word_size = 21.")
+                    log.warning("Too small ratio " + str(word_size) + ", setting '-w 21'")
                 else:
                     word_size = min(new_word_size, {"nr": 141, "cp": 121, "mt": 101}[options.organelle_type])
-                    log.info("Setting word_size = " + str(word_size))
+                    log.info("Setting '-w " + str(word_size) + "'")
             if float(word_size) / max_read_len <= 0.5 and len(low_quality_pattern) > 2:
                 keep_seq_parts = True
             else:
                 keep_seq_parts = False
+            if options.spades_kmer:
+                kmer_values = [kmer_v
+                               for kmer_v in options.spades_kmer.split(",")
+                               if  21 <= int(kmer_v) <= min(max_read_len, 127)]
+                options.spades_kmer = ",".join(kmer_values)
+                log.info("Setting '-k " + options.spades_kmer + "'")
             log.info("Pre-reading fastq finished.\n")
 
             # reading seeds
@@ -1781,7 +1790,9 @@ def main():
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
                 and options.organelle_type != '0':
             export_succeeded = False
-            kmer_vals = sorted([int(kmer_val) for kmer_val in options.spades_kmer.split(",")], reverse=True)
+            kmer_vals = sorted([int(kmer_d[1:])
+                                for kmer_d in os.listdir(spades_output)
+                                if os.path.isdir(kmer_d) and kmer_d.startswith("K")], reverse=True)
             kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
             for go_k, kmer_dir in enumerate(kmer_dirs):
                 try:

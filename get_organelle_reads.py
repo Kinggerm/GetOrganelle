@@ -3,6 +3,7 @@
 import datetime
 import sys
 import os
+import re
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
@@ -115,10 +116,13 @@ def require_commands(print_title, version):
                             help="Depth factor for confirming parallel contigs. Default:%default")
     group_result.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
                             help="Similarity threshold for confirming parallel contigs. Default:%default")
-    group_result.add_option('--trim', dest='trim_values',
-                            help='Assign the number of bases in the ends to trim in extending process. '
-                                 'This function will not change the length of the out put reads. '
-                                 'Input format: int,int (Example: 4,4). Default: 0,0')
+    # group_result.add_option("--trim", dest='trim_values',
+    #                         help='Assign the number of bases in the ends to trim in extending process. '
+    #                              'This function will not change the length of the out put reads. '
+    #                              'Input format: int,int (Example: 4,4). Default: 0,0')
+    group_result.add_option("--min-quality-score", dest="min_quality_score", type=int, default=15,
+                            help="Minimum quality score in extending extension. "
+                                 "Default:%default ('+' in Phred+33; 'J' in Phred+64/Solexa+64)")
     group_result.add_option('-k', dest='spades_kmer', default='65,75,85',
                             help='SPAdes kmer settings. Use the same format as in SPAdes. Default=65,75,85')
     group_result.add_option('--spades-options', dest='other_spades_options', default='',
@@ -301,48 +305,72 @@ def chop_seqs(seq_generator_or_list):
     return return_words
 
 
-def read_self_fq_seq_generator(fq_dir_list, this_trim_values):
-    if not ((type(fq_dir_list) is list) or (type(fq_dir_list) is tuple)):
-        fq_dir_list = [fq_dir_list]
-    for fq_dir in fq_dir_list:
-        count = 0
-        if this_trim_values:
-            trim1, trim2 = [int(trim_value) for trim_value in this_trim_values.split(',')]
-            if trim2:
-                for fq_line in open(fq_dir, 'rU'):
-                    if count % 4 == 1:
-                        yield fq_line[trim1:(len(fq_line) - trim2)]
-                    count += 1
-            elif trim1:
-                for fq_line in open(fq_dir, 'rU'):
-                    if count % 4 == 1:
-                        yield fq_line[trim1:]
-                    count += 1
-            else:
-                for fq_line in open(fq_dir, 'rU'):
-                    if count % 4 == 1:
-                        yield fq_line
-                    count += 1
-        else:
-            for fq_line in open(fq_dir, 'rU'):
-                if count % 4 == 1:
-                    yield fq_line
-                count += 1
+def chop_seq_list(seq_generator_or_list):
+    return_words = set()
+    for seed in seq_generator_or_list:
+        for seq_part in seed:
+            this_seq_len = len(seq_part)
+            if this_seq_len >= word_size:
+                cpt_seed = complementary_seq(seq_part)
+                for i in range(0, this_seq_len - word_size + 1):
+                    forward = seq_part[i:i + word_size]
+                    return_words.add(forward)
+                    reverse = cpt_seed[i:i + word_size]
+                    return_words.add(reverse)
+    return return_words
 
 
-def get_average_read_len(fq_files, trim_values, maximum_n_reads):
+def get_read_len_mean_max(fq_files, maximum_n_reads):
     read_lengths = []
     for fq_f in fq_files:
         count_r = 0
-        for seq in read_self_fq_seq_generator(fq_f, trim_values):
+        for seq in fq_seq_simple_generator(fq_f):
             count_r += 1
-            read_lengths.append(len(seq))
+            read_lengths.append(len(seq.strip("N")))
             if count_r >= maximum_n_reads:
                 break
-    return sum(read_lengths)/len(read_lengths)
+    return sum(read_lengths)/len(read_lengths), max(read_lengths)
 
 
-def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fastq_indices_in_memory,
+def get_low_quality_char_pattern(fq_files, maximum_n_reads, digit_threshold, log, sampling_percent=0.1):
+    max_quality = "!"
+    min_quality = "~"
+    sampling_percent = int(1/sampling_percent)
+    for fq_f in fq_files:
+        count_r = 0
+        for quality_str in fq_seq_simple_generator(fq_f, go_to_line=3):
+            if count_r % sampling_percent == 0:
+                max_quality = max(max_quality, max(quality_str))
+                min_quality = min(max_quality, min(quality_str))
+            count_r += 1
+            if count_r >= maximum_n_reads:
+                break
+    max_quality = ord(max_quality)
+    min_quality = ord(min_quality)
+    decision_making = []
+    for type_name, char_min, char_max, score_min, score_max in [("Sanger", 33, 73, 0, 40),
+                                                                ("Solexa", 59, 104, -5, 40),
+                                                                ("Illumina 1.3+", 64, 104, 0, 40),
+                                                                ("Illumina 1.5+", 67, 105, 3, 41),
+                                                                ("Illumina 1.8+", 33, 74, 0, 41)]:
+        decision_making.append((type_name, char_min, char_max, score_min, score_max,
+                                (max_quality - char_max) ** 2 + (min_quality - char_min) ** 2))
+    the_name, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
+    log.info("Identified quality encoding format: " + the_name)
+    if max_quality > the_c_max:
+        log.warning("Max quality score " + repr(chr(max_quality)) +
+                    "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
+                    ") in your fastq file exceeds the usual boundary " + str((the_c_min, the_c_max)))
+    if min_quality < the_c_min:
+        log.warning("Min quality score " + repr(chr(min_quality)) +
+                    "(" + str(min_quality) + ":" + str(min_quality - the_c_min + the_s_min) +
+                    ") in your fastq file is under the usual lower boundary " + str((the_c_min, the_c_max)))
+    low_quality_chars = [chr(low_quality_score)
+                         for low_quality_score in range(min_quality, the_c_min + digit_threshold - the_s_min)]
+    return "[" + "".join(low_quality_chars) + "]"
+
+
+def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fq_info_in_memory,
                      maximum_n_reads, verbose, index_in_memory, log):
     if verbose:
         sys.stdout.write(' ' * 100 + '\b' * 100)
@@ -353,7 +381,7 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
     if index_in_memory:
         # read cluster indices
         for this_index in accepted_contig_id:
-            accepted_lines += fastq_indices_in_memory[1][this_index]
+            accepted_lines += fq_info_in_memory[1][this_index]
         # produce the pair-end output
         accepted_lines = set(accepted_lines)
     else:
@@ -399,12 +427,14 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
         log.info("writing fastq lines finished.")
 
 
-def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_n_reads, rm_duplicates, output_base,
-                  anti_lines, pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, trim_values, resume, log):
-    if trim_values:
-        trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
-    else:
-        trim1, trim2 = 0, 0
+def make_read_index(original_fq_files, direction_according_to_user_input, maximum_n_reads, rm_duplicates, output_base,
+                    anti_lines, pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, keep_seq_parts,
+                    low_quality, echo_frequency, resume, log):
+    # if trim_values:
+    #     trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
+    # else:
+    #     trim1, trim2 = 0, 0
+
     # read original reads
     # line_cluster (list) ~ forward_reverse_reads
     line_clusters = []
@@ -412,16 +442,22 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
     forward_reverse_reads = []
     line_count = 0
     this_index = 0
+    do_split_low_quality = len(low_quality) > 2
     #
     name_to_line = {}
     #
     temp1_contig_dir = [os.path.join(output_base, k + 'temp.indices.1') for k in ("_", "")]
     temp2_clusters_dir = [os.path.join(output_base, k + 'temp.indices.2') for k in ("_", "")]
+    cancel_seq_parts = True
     if resume and os.path.exists(temp1_contig_dir[1]) and os.path.exists(temp2_clusters_dir[1]):
         if pre_grouped or index_in_memory:
             log.info("Reading existed indices for fastq ...")
             #
-            forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'rU')]
+            if keep_seq_parts:
+                forward_reverse_reads = [x.strip().split("\t") for x in open(temp1_contig_dir[1], 'rU')]
+                cancel_seq_parts = True if max([len(x) for x in forward_reverse_reads]) == 1 else False
+            else:
+                forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'rU')]
             #
             line_clusters = [[int(x) for x in y.split('\t')] for y in open(temp2_clusters_dir[1], 'rU')]
             if rm_duplicates:
@@ -477,24 +513,46 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
                                 use_user_direction = True
                                 this_name = line[1:].strip()
                                 direction = direction_according_to_user_input[id_file]
+
                         if (this_name, direction) in anti_lines:
                             line_count += 4
                             for i in range(4):
                                 line = file_in.readline()
                             continue
                         this_seq = file_in.readline().strip()
-                        if trim_values:
-                            this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
-                        else:
-                            this_seq = this_seq.strip("N")
-                        # drop illegal reads
-                        lengths.append(len(this_seq))
+                        # if trim_values:
+                        #     this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
+                        # else:
+                        #     this_seq = this_seq.strip("N")
+                        # drop nonsense reads
                         if len(this_seq) < word_size:
                             line_count += 4
                             for i in range(3):
                                 line = file_in.readline()
                             continue
-                        this_c_seq = complementary_seq(this_seq)
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+
+                            if keep_seq_parts:
+                                if cancel_seq_parts and len(this_seq) > 1:
+                                    cancel_seq_parts = False
+                                this_c_seq = complementary_seqs(this_seq)
+                                lengths.extend([len(seq_part) for seq_part in this_seq])
+                            else:
+                                this_seq = this_seq[0]
+                                this_c_seq = complementary_seq(this_seq)
+                                lengths.append(len(this_seq))
+                        else:
+                            this_c_seq = complementary_seq(this_seq)
+                            lengths.append(len(this_seq))
                         if rm_duplicates:
                             if this_seq in seq_duplicates:
                                 line_clusters[seq_duplicates[this_seq]].append(line_count)
@@ -505,7 +563,11 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
                                     forward_reverse_reads.append(this_seq)
                                     forward_reverse_reads.append(this_c_seq)
                                 else:
-                                    temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
+                                    if do_split_low_quality and keep_seq_parts:
+                                        temp1_contig_out.write(
+                                            "\t".join(this_seq) + '\n' + "\t".join(this_c_seq) + '\n')
+                                    else:
+                                        temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
@@ -517,36 +579,59 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                             else:
-                                temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
+                                if do_split_low_quality and keep_seq_parts:
+                                    temp1_contig_out.write("\t".join(this_seq) + '\n' + "\t".join(this_c_seq) + '\n')
+                                else:
+                                    temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                     else:
                         log.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
                         exit()
-                    if line_count % 54321 == 0:
+                    if line_count % echo_frequency == 0:
                         to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
                             (line_count + 4) // 4) + " reads"
                         sys.stdout.write(to_print + '\b' * len(to_print))
                         sys.stdout.flush()
-                    line_count += 1
-                    for i in range(3):
-                        line = file_in.readline()
-                        line_count += 1
+                    line_count += 4
+                    line = file_in.readline()
             else:
                 while line and count_this_read_n < maximum_n_reads:
                     if line.startswith("@"):
                         count_this_read_n += 1
                         this_seq = file_in.readline().strip()
-                        if trim_values:
-                            this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
-                        else:
-                            this_seq = this_seq.strip("N")
-                        # drop illegal reads
-                        lengths.append(len(this_seq))
+
+                        # if trim_values:
+                        #     this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
+                        # else:
+                        #     this_seq = this_seq.strip("N")
+
+                        # drop nonsense reads
                         if len(this_seq) < word_size:
                             line_count += 4
                             for i in range(3):
                                 line = file_in.readline()
                             continue
-                        this_c_seq = complementary_seq(this_seq)
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                            if keep_seq_parts:
+                                if cancel_seq_parts and len(this_seq) > 1:
+                                    cancel_seq_parts = False
+                                this_c_seq = complementary_seqs(this_seq)
+                                lengths.extend([len(seq_part) for seq_part in this_seq])
+                            else:
+                                this_seq = this_seq[0]
+                                this_c_seq = complementary_seq(this_seq)
+                                lengths.append(len(this_seq))
+                        else:
+                            this_c_seq = complementary_seq(this_seq)
+                            lengths.append(len(this_seq))
                         if rm_duplicates:
                             if this_seq in seq_duplicates:
                                 line_clusters[seq_duplicates[this_seq]].append(line_count)
@@ -557,7 +642,11 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
                                     forward_reverse_reads.append(this_seq)
                                     forward_reverse_reads.append(this_c_seq)
                                 else:
-                                    temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
+                                    if do_split_low_quality and keep_seq_parts:
+                                        temp1_contig_out.write(
+                                            "\t".join(this_seq) + '\n' + "\t".join(this_c_seq) + '\n')
+                                    else:
+                                        temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                                 seq_duplicates[this_seq] = this_index
                                 line_clusters.append([line_count])
                                 this_index += 1
@@ -569,19 +658,20 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
                                 forward_reverse_reads.append(this_seq)
                                 forward_reverse_reads.append(this_c_seq)
                             else:
-                                temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
+                                if do_split_low_quality and keep_seq_parts:
+                                    temp1_contig_out.write("\t".join(this_seq) + '\n' + "\t".join(this_c_seq) + '\n')
+                                else:
+                                    temp1_contig_out.write(this_seq + '\n' + this_c_seq + '\n')
                     else:
                         log.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
                         exit()
-                    if line_count % 54321 == 0:
+                    if line_count % echo_frequency == 0:
                         to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
                             (line_count + 4) // 4) + " reads"
                         sys.stdout.write(to_print + '\b' * len(to_print))
                         sys.stdout.flush()
-                    line_count += 1
-                    for i in range(3):
-                        line = file_in.readline()
-                        line_count += 1
+                    line_count += 4
+                    line = file_in.readline()
             line = file_in.readline()
             file_in.close()
             if line:
@@ -622,12 +712,16 @@ def read_fq_infos(original_fq_files, direction_according_to_user_input, maximum_
         else:
             del lengths
             log.info(memory_usage + str(len_indices) + " reads")
-    return forward_reverse_reads, line_clusters, len_indices
+    if keep_seq_parts and cancel_seq_parts:
+        keep_seq_parts = False
+        for go_to, all_seq_parts in enumerate(forward_reverse_reads):
+            forward_reverse_reads[go_to] = all_seq_parts[0]
+    return forward_reverse_reads, line_clusters, len_indices, keep_seq_parts
 
 
 def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_memory, log):
     global word_size
-    forward_and_reverse_reads, line_clusters, len_indices = fastq_indices_in_memory
+    forward_and_reverse_reads, line_clusters, len_indices, keep_seq_parts = fastq_indices_in_memory
     log.info("Pre-grouping reads...")
     lines_with_duplicates = {}
     count_dupli = 0
@@ -651,32 +745,57 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_me
         def generate_forward_and_reverse(here_unique_id):
             return forward_and_reverse_reads[2 * here_unique_id], forward_and_reverse_reads[2 * here_unique_id + 1]
     else:
+        # variable outside the function
         here_go_to = [0]
         temp_seq_file = open(os.path.join(out_base, 'temp.indices.1'))
-
-        def generate_forward_and_reverse(here_unique_id):
-            forward_seq_line = temp_seq_file.readline()
-            while here_go_to[0] < 2 * here_unique_id:
+        if keep_seq_parts:
+            def generate_forward_and_reverse(here_unique_id):
                 forward_seq_line = temp_seq_file.readline()
+                # skip those reads that are not unique/represented by others
+                while here_go_to[0] < 2 * here_unique_id:
+                    forward_seq_line = temp_seq_file.readline()
+                    here_go_to[0] += 1
+                reverse_seq_line = temp_seq_file.readline()
                 here_go_to[0] += 1
-            reverse_seq_line = temp_seq_file.readline().strip()
-            here_go_to[0] += 1
-            return forward_seq_line.strip("\n"), reverse_seq_line
+                return forward_seq_line.strip().split("\t"), reverse_seq_line.strip().split("\t")
+        else:
+            def generate_forward_and_reverse(here_unique_id):
+                forward_seq_line = temp_seq_file.readline()
+                # skip those reads that are not unique/represented by others
+                while here_go_to[0] < 2 * here_unique_id:
+                    forward_seq_line = temp_seq_file.readline()
+                    here_go_to[0] += 1
+                reverse_seq_line = temp_seq_file.readline()
+                here_go_to[0] += 1
+                return forward_seq_line.strip(), reverse_seq_line.strip()
 
     for this_unique_read_id in list(lines_with_duplicates):
-        this_seq ,this_c_seq = generate_forward_and_reverse(this_unique_read_id)
-        seq_len = len(this_seq)
-        temp_length = seq_len - word_size
+        this_seq, this_c_seq = generate_forward_and_reverse(this_unique_read_id)
         these_group_id = set()
         this_words = []
-        for i in range(0, temp_length + 1):
-            forward = this_seq[i:i + word_size]
-            reverse = this_c_seq[temp_length - i:seq_len - i]
-            if forward in these_words:
-                these_group_id.add(these_words[forward])
-            else:
-                this_words.append(forward)
-                this_words.append(reverse)
+        if keep_seq_parts:
+            for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                seq_len = len(this_seq_part)
+                temp_length = seq_len - word_size
+                for i in range(0, temp_length + 1):
+                    forward = this_seq_part[i:i + word_size]
+                    reverse = this_c_seq_part[temp_length - i:seq_len - i]
+                    if forward in these_words:
+                        these_group_id.add(these_words[forward])
+                    else:
+                        this_words.append(forward)
+                        this_words.append(reverse)
+        else:
+            seq_len = len(this_seq)
+            temp_length = seq_len - word_size
+            for i in range(0, temp_length + 1):
+                forward = this_seq[i:i + word_size]
+                reverse = this_c_seq[temp_length - i:seq_len - i]
+                if forward in these_words:
+                    these_group_id.add(these_words[forward])
+                else:
+                    this_words.append(forward)
+                    this_words.append(reverse)
         len_groups = len(these_group_id)
         # create a new group
         if len_groups == 0:
@@ -733,7 +852,7 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_me
     else:
         memory_usage = ''
     del these_words
-    log.info(memory_usage + str(len(groups_of_duplicate_lines)) + " groups made.\n")
+    log.info(memory_usage + str(len(groups_of_duplicate_lines)) + " groups made.")
     return groups_of_duplicate_lines, lines_with_duplicates
 
 
@@ -762,9 +881,9 @@ class NoMoreReads(Exception):
 
 
 def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_indices, pre_grouped,
-                    groups_of_duplicate_lines, lines_with_duplicates, fastq_indices_in_memory, output_base,
-                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume, trim_values,
-                    maximum_n_reads, maximum_n_words, log):
+                    groups_of_duplicate_lines, lines_with_duplicates, fq_info_in_memory, output_base,
+                    round_limit, fg_out_per_round, jump_step, mesh_size, verbose, resume,
+                    maximum_n_reads, maximum_n_words, keep_seq_parts, low_quality_pattern, echo_frequency, log):
     global word_size
     accumulated_num_words = 0
     accepted_contig_id_this_round = set()
@@ -790,14 +909,14 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
             if fg_out_per_round:
                 write_fq_results(original_fq_dir, acc_contig_id_this_round,
                                  os.path.join(round_dir, "Round." + str(r_count)),
-                                 os.path.join(output_base, 'temp.indices.2'), fastq_indices_in_memory, maximum_n_reads,
-                                 verbose, bool(fastq_indices_in_memory), log)
+                                 os.path.join(output_base, 'temp.indices.2'), fq_info_in_memory, maximum_n_reads,
+                                 verbose, bool(fq_info_in_memory), log)
                 # clear former accepted words from memory
                 del acc_words
                 # then add new accepted words into memory
-                acc_words = chop_seqs(read_self_fq_seq_generator(
+                acc_words = chop_seqs(fq_seq_simple_generator(
                     [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
-                     range(len(original_fq_dir))], trim_values))
+                     range(len(original_fq_dir))], split_pattern=low_quality_pattern, min_sub_seq=word_size))
                 acc_contig_id_this_round = set()
             log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(
                 len_al) + " AW " + str(len_aw) + memory_usage)
@@ -811,110 +930,226 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
             r_count += 1
             return acc_words, acc_contig_id_this_round, pre_aw, r_count, acc_num_words
 
+        # core extending code
+        # here efficiency is more important than code conciseness,
+        # so there are four similar structure with minor differences
         while True:
             if verbose:
                 log.info("Round " + str(round_count) + ": Start ...")
 
-            if fastq_indices_in_memory:
-                reads_generator = (this_read for this_read in fastq_indices_in_memory[0])
+            if fq_info_in_memory:
+                reads_generator = (this_read for this_read in fq_info_in_memory[0])
             else:
-                reads_generator = (this_read.strip() for this_read in
-                                   open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
+                if keep_seq_parts:
+                    reads_generator = (this_read.strip().split("\t") for this_read in
+                                       open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
+                else:
+                    reads_generator = (this_read.strip() for this_read in
+                                       open(os.path.join(output_base, 'temp.indices.1'), 'rU'))
             unique_read_id = 0
-            if pre_grouped and groups_of_duplicate_lines:
-                for unique_read_id in range(len_indices):
-                    this_seq = next(reads_generator)
-                    this_c_seq = next(reads_generator)
-                    if unique_read_id not in accepted_contig_id:
-                        # if not universal_len:
-                        seq_len = len(this_seq)
-                        temp_length = seq_len - word_size
-                        if unique_read_id in line_to_accept:
-                            accepted_contig_id.add(unique_read_id)
-                            accepted_contig_id_this_round.add(unique_read_id)
-                            line_to_accept.remove(unique_read_id)
-                            for i in range(0, temp_length + 1, mesh_size):
-                                # add forward
-                                accepted_words.add(this_seq[i:i + word_size])
-                                # add reverse
-                                accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
-                        else:
+            if keep_seq_parts:
+                if pre_grouped and groups_of_duplicate_lines:
+                    for unique_read_id in range(len_indices):
+                        this_seq = next(reads_generator)
+                        this_c_seq = next(reads_generator)
+                        if unique_read_id not in accepted_contig_id:
+                            if unique_read_id in line_to_accept:
+                                accepted_contig_id.add(unique_read_id)
+                                accepted_contig_id_this_round.add(unique_read_id)
+                                line_to_accept.remove(unique_read_id)
+                                for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                    seq_len = len(this_seq_part)
+                                    temp_length = seq_len - word_size
+                                    for i in range(0, temp_length + 1, mesh_size):
+                                        # add forward
+                                        accepted_words.add(this_seq_part[i:i + word_size])
+                                        # add reverse
+                                        accepted_words.add(this_c_seq_part[temp_length - i:seq_len - i])
+                            else:
+                                accepted = False
+                                for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                    seq_len = len(this_seq_part)
+                                    temp_length = seq_len - word_size
+                                    for i in range(0, (temp_length + 1) // 2, jump_step):
+                                        # from first kmer to the middle
+                                        if this_seq_part[i:i + word_size] in accepted_words:
+                                            accepted = True
+                                            break
+                                        # from last kmer to the middle
+                                        if this_seq_part[temp_length - i:seq_len - i] in accepted_words:
+                                            accepted = True
+                                            break
+                                    if accepted:
+                                        break
+                                if accepted:
+                                    for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                        seq_len = len(this_seq_part)
+                                        temp_length = seq_len - word_size
+                                        for i in range(0, temp_length + 1, mesh_size):
+                                            # add forward
+                                            accepted_words.add(this_seq_part[i:i + word_size])
+                                            # add reverse
+                                            accepted_words.add(this_c_seq_part[temp_length - i:seq_len - i])
+                                    accepted_contig_id.add(unique_read_id)
+                                    accepted_contig_id_this_round.add(unique_read_id)
+                                    if unique_read_id in lines_with_duplicates:
+                                        which_group = lines_with_duplicates[unique_read_id]
+                                        for id_to_accept in groups_of_duplicate_lines[which_group]:
+                                            line_to_accept.add(id_to_accept)
+                                            del lines_with_duplicates[id_to_accept]
+                                        line_to_accept.remove(unique_read_id)
+                                        del groups_of_duplicate_lines[which_group]
+                        if unique_read_id % echo_frequency == 0:
+                            this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round "\
+                                         + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
+                                         " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                            sys.stdout.write(this_print + '\b' * len(this_print))
+                            sys.stdout.flush()
+                            if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
+                                log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
+                                         str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) +
+                                         " AW " + str(len(accepted_words)))
+                                raise WordsLimitException("")
+                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
+                        = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                                          accumulated_num_words, unique_read_id)
+                else:
+                    for unique_read_id in range(len_indices):
+                        this_seq = next(reads_generator)
+                        this_c_seq = next(reads_generator)
+                        if unique_read_id not in accepted_contig_id:
                             accepted = False
-                            for i in range(0, (temp_length + 1) // 2, jump_step):
-                                # from first kmer
-                                if this_seq[i:i + word_size] in accepted_words:
-                                    accepted = True
-                                    break
-                                # from last kmer
-                                if this_seq[temp_length - i:seq_len - i] in accepted_words:
-                                    accepted = True
+                            for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                seq_len = len(this_seq_part)
+                                temp_length = seq_len - word_size
+                                for i in range(0, (temp_length + 1) // 2, jump_step):
+                                    # from first kmer to the middle
+                                    if this_seq_part[i:i + word_size] in accepted_words:
+                                        accepted = True
+                                        break
+                                    # from last kmer to the middle
+                                    if this_seq_part[temp_length - i:seq_len - i] in accepted_words:
+                                        accepted = True
+                                        break
+                                if accepted:
                                     break
                             if accepted:
+                                for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                    seq_len = len(this_seq_part)
+                                    temp_length = seq_len - word_size
+                                    for i in range(0, temp_length + 1, mesh_size):
+                                        accepted_words.add(this_seq_part[i:i + word_size])
+                                        accepted_words.add(this_c_seq_part[temp_length - i:seq_len - i])
+                                accepted_contig_id.add(unique_read_id)
+                                accepted_contig_id_this_round.add(unique_read_id)
+                        if unique_read_id % echo_frequency == 0:
+                            this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round " \
+                                         + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
+                                         " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                            sys.stdout.write(this_print + '\b' * len(this_print))
+                            sys.stdout.flush()
+                            if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
+                                log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
+                                         str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW "
+                                         + str(len(accepted_words)))
+                                raise WordsLimitException("")
+                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
+                        = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                                          accumulated_num_words, unique_read_id)
+            else:
+                if pre_grouped and groups_of_duplicate_lines:
+                    for unique_read_id in range(len_indices):
+                        this_seq = next(reads_generator)
+                        this_c_seq = next(reads_generator)
+                        if unique_read_id not in accepted_contig_id:
+                            seq_len = len(this_seq)
+                            temp_length = seq_len - word_size
+                            if unique_read_id in line_to_accept:
+                                accepted_contig_id.add(unique_read_id)
+                                accepted_contig_id_this_round.add(unique_read_id)
+                                line_to_accept.remove(unique_read_id)
                                 for i in range(0, temp_length + 1, mesh_size):
                                     # add forward
                                     accepted_words.add(this_seq[i:i + word_size])
                                     # add reverse
                                     accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
+                            else:
+                                accepted = False
+                                for i in range(0, (temp_length + 1) // 2, jump_step):
+                                    # from first kmer to the middle
+                                    if this_seq[i:i + word_size] in accepted_words:
+                                        accepted = True
+                                        break
+                                    # from last kmer to the middle
+                                    if this_seq[temp_length - i:seq_len - i] in accepted_words:
+                                        accepted = True
+                                        break
+                                if accepted:
+                                    for i in range(0, temp_length + 1, mesh_size):
+                                        # add forward
+                                        accepted_words.add(this_seq[i:i + word_size])
+                                        # add reverse
+                                        accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
+                                    accepted_contig_id.add(unique_read_id)
+                                    accepted_contig_id_this_round.add(unique_read_id)
+                                    if unique_read_id in lines_with_duplicates:
+                                        which_group = lines_with_duplicates[unique_read_id]
+                                        for id_to_accept in groups_of_duplicate_lines[which_group]:
+                                            line_to_accept.add(id_to_accept)
+                                            del lines_with_duplicates[id_to_accept]
+                                        line_to_accept.remove(unique_read_id)
+                                        del groups_of_duplicate_lines[which_group]
+                        if unique_read_id % echo_frequency == 0:
+                            this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round "\
+                                         + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
+                                         " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                            sys.stdout.write(this_print + '\b' * len(this_print))
+                            sys.stdout.flush()
+                            if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
+                                log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
+                                         str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) +
+                                         " AW " + str(len(accepted_words)))
+                                raise WordsLimitException("")
+                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
+                        = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                                          accumulated_num_words, unique_read_id)
+                else:
+                    for unique_read_id in range(len_indices):
+                        this_seq = next(reads_generator)
+                        this_c_seq = next(reads_generator)
+                        if unique_read_id not in accepted_contig_id:
+                            accepted = False
+                            seq_len = len(this_seq)
+                            temp_length = seq_len - word_size
+                            for i in range(0, (temp_length + 1) // 2, jump_step):
+                                # from first kmer to the middle
+                                if this_seq[i:i + word_size] in accepted_words:
+                                    accepted = True
+                                    break
+                                # from last kmer to the middle
+                                if this_seq[temp_length - i:seq_len - i] in accepted_words:
+                                    accepted = True
+                                    break
+                            if accepted:
+                                for i in range(0, temp_length + 1, mesh_size):
+                                    accepted_words.add(this_seq[i:i + word_size])
+                                    accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
                                 accepted_contig_id.add(unique_read_id)
                                 accepted_contig_id_this_round.add(unique_read_id)
-                                if unique_read_id in lines_with_duplicates:
-                                    which_group = lines_with_duplicates[unique_read_id]
-                                    for id_to_accept in groups_of_duplicate_lines[which_group]:
-                                        line_to_accept.add(id_to_accept)
-                                        del lines_with_duplicates[id_to_accept]
-                                    line_to_accept.remove(unique_read_id)
-                                    del groups_of_duplicate_lines[which_group]
-                    if unique_read_id % 14321 == 0:
-                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round "\
-                                     + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
-                                     " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
-                        sys.stdout.write(this_print + '\b' * len(this_print))
-                        sys.stdout.flush()
-                        if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
-                            log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
-                                     str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) +
-                                     " AW " + str(len(accepted_words)))
-                            raise WordsLimitException("")
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
-                    = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
-                                      accumulated_num_words, unique_read_id)
-            else:
-                for unique_read_id in range(len_indices):
-                    this_seq = next(reads_generator)
-                    this_c_seq = next(reads_generator)
-                    if unique_read_id not in accepted_contig_id:
-                        accepted = False
-                        seq_len = len(this_seq)
-                        temp_length = seq_len - word_size
-                        for i in range(0, (temp_length + 1) // 2, jump_step):
-                            # from first kmer
-                            if this_seq[i:i + word_size] in accepted_words:
-                                accepted = True
-                                break
-                            # from last kmer
-                            if this_seq[temp_length - i:seq_len - i] in accepted_words:
-                                accepted = True
-                                break
-                        if accepted:
-                            for i in range(0, temp_length + 1, mesh_size):
-                                accepted_words.add(this_seq[i:i + word_size])
-                                accepted_words.add(this_c_seq[temp_length - i:seq_len - i])
-                            accepted_contig_id.add(unique_read_id)
-                            accepted_contig_id_this_round.add(unique_read_id)
-                    if unique_read_id % 14321 == 0:
-                        this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round " \
-                                     + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
-                                     " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
-                        sys.stdout.write(this_print + '\b' * len(this_print))
-                        sys.stdout.flush()
-                        if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
-                            log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
-                                     str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW "
-                                     + str(len(accepted_words)))
-                            raise WordsLimitException("")
-                accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
-                    = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
-                                      accumulated_num_words, unique_read_id)
+                        if unique_read_id % echo_frequency == 0:
+                            this_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: Round " \
+                                         + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + \
+                                         " AI " + str(len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words))
+                            sys.stdout.write(this_print + '\b' * len(this_print))
+                            sys.stdout.flush()
+                            if accumulated_num_words + len(accepted_words) - previous_aw_count > maximum_n_words:
+                                log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' +
+                                         str(len_indices) + " AI " + str(len(accepted_contig_id_this_round)) + " AW "
+                                         + str(len(accepted_words)))
+                                raise WordsLimitException("")
+                    accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
+                        = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                                          accumulated_num_words, unique_read_id)
             reads_generator.close()
     except KeyboardInterrupt:
         reads_generator.close()
@@ -933,6 +1168,7 @@ def extending_reads(accepted_words, accepted_contig_id, original_fq_dir, len_ind
         reads_generator.close()
         log.info("Hit the words limit and terminated ...")
     del reads_generator
+
     del accepted_words
     del accepted_contig_id_this_round
     del lines_with_duplicates
@@ -1375,17 +1611,6 @@ def main():
             reads_paired = {'input': False, 'pair_out': False}
             original_fq_files = [fastq_file for fastq_file in options.unpaired_fastq_files]
             direction_according_to_user_input = [1] * len(options.unpaired_fastq_files)
-        if word_size < 1:
-            log.info("Estimating word size ...")
-            new_word_size = int(word_size * get_average_read_len(original_fq_files,
-                                                                 options.trim_values, options.maximum_n_reads))
-            if new_word_size < 21:
-                word_size = 21
-                log.warning("Too small ratio " + str(word_size) + ", setting word_size = 21.")
-            else:
-                word_size = new_word_size
-                log.info("Setting word_size = " + str(word_size))
-
         other_options = options.other_spades_options.split(' ')
         if '-o' in other_options:
             which_out = other_options.index('-o')
@@ -1395,7 +1620,7 @@ def main():
             spades_output = os.path.join(out_base, options.prefix + "filtered_spades")
         other_options = ' '.join(other_options)
 
-        """get reads"""
+        """ get reads """
         filtered_files_exist = max(
             min([os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '_unpaired.fq')
                  for i in range(2)] +
@@ -1410,7 +1635,7 @@ def main():
             anti_seed = options.anti_seed
             b_at_seed = options.bowtie2_anti_seed
             pre_grp = options.pre_grouped
-            trim_ends = options.trim_values
+            # trim_ends = options.trim_values
             in_memory = options.index_in_memory
 
             if original_fq_files:
@@ -1425,8 +1650,30 @@ def main():
                         reads_files_to_drop.append(target_fq)
                         # log.info("Unzipping " + read_file + " finished.\n")
 
-            """reading seeds"""
-            log.info("Reading seeds ...")
+            # pre-reading fastq
+            log.info("Pre-reading fastq ...")
+            log.info("Counting read qualities ...")
+            low_quality_pattern = get_low_quality_char_pattern(original_fq_files,
+                                                               options.maximum_n_reads,
+                                                               options.min_quality_score, log, sampling_percent=0.1)
+            log.info("Counting read lengths ...")
+            mean_read_len, max_read_len = get_read_len_mean_max(original_fq_files, options.maximum_n_reads)
+            if word_size < 1:
+                new_word_size = int(word_size * mean_read_len)
+                if new_word_size < 21:
+                    word_size = 21
+                    log.warning("Too small ratio " + str(word_size) + ", setting word_size = 21.")
+                else:
+                    word_size = min(new_word_size, {"nr": 141, "cp": 121, "mt": 101}[options.organelle_type])
+                    log.info("Setting word_size = " + str(word_size))
+            if float(word_size) / max_read_len <= 0.5 and len(low_quality_pattern) > 2:
+                keep_seq_parts = True
+            else:
+                keep_seq_parts = False
+            log.info("Pre-reading fastq finished.\n")
+
+            # reading seeds
+            log.info("Making seed reads ...")
             if not options.utilize_mapping:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
                                                (anti_seed or b_at_seed),
@@ -1436,50 +1683,62 @@ def main():
                                                               b_at_seed, original_fq_files,
                                                               out_base, resume,
                                                               verb_out, options.threads, options.prefix, log)
-            log.info("Reading seeds finished.\n")
+            log.info("Making seed reads finished.\n")
 
-            """reading fastq files"""
-            log.info("Pre-reading fastq ...")
-            fastq_indices_in_memory = read_fq_infos(original_fq_files, direction_according_to_user_input,
-                                                    options.maximum_n_reads, options.rm_duplicates, out_base,
-                                                    anti_lines, pre_grp, in_memory, b_at_seed, anti_seed, trim_ends,
-                                                    resume, log)
-            len_indices = fastq_indices_in_memory[2]
-            log.info("Pre-reading fastq finished.\n")
-
-            """pre-grouping if asked"""
+            # make read index
+            log.info("Making read index ...")
+            echo_frequency = 54321
+            fq_info_in_memory = make_read_index(original_fq_files, direction_according_to_user_input,
+                                                options.maximum_n_reads, options.rm_duplicates, out_base,
+                                                anti_lines, pre_grp, in_memory, b_at_seed, anti_seed,
+                                                keep_seq_parts=keep_seq_parts, low_quality=low_quality_pattern,
+                                                resume=resume, echo_frequency=echo_frequency, log=log)
+            len_indices = fq_info_in_memory[2]
+            keep_seq_parts = fq_info_in_memory[3]
+            if keep_seq_parts:
+                log.info("Reads are stored as fragments.")
+            # pre-grouping if asked
             if pre_grp:
-                groups_of_lines, lines_in_a_group = pre_grouping(fastq_indices_in_memory, pre_grp,
-                                                                 out_base, in_memory, log)
+                groups_of_lines, lines_in_a_group = pre_grouping(fq_info_in_memory, pre_grp, out_base, in_memory, log)
             else:
                 groups_of_lines = None
                 lines_in_a_group = None
             if not in_memory:
-                fastq_indices_in_memory = None
+                fq_info_in_memory = None
+            log.info("Making read index finished.\n")
 
-            """adding initial words"""
+            # adding initial word
             log.info("Adding initial words ...")
             if not options.utilize_mapping:
                 initial_accepted_words = chop_seqs(read_fasta(seed_file)[1])
             else:
-                initial_accepted_words = chop_seqs(read_self_fq_seq_generator(seed_fastq, trim_ends))
+                if keep_seq_parts:
+                    initial_accepted_words = chop_seq_list(
+                        fq_seq_simple_generator(seed_fastq, split_pattern=low_quality_pattern, min_sub_seq=word_size))
+                else:
+                    initial_accepted_words = chop_seqs(fq_seq_simple_generator(seed_fastq))
             log.info("Adding initial words finished.\n")
 
-            """extending process"""
+            # extending process
             log.info("Extending ...")
             accepted_ids = set()
+            echo_frequency = 1234321//(mean_read_len - word_size + 1)//2
             accepted_contig_id = extending_reads(initial_accepted_words, accepted_ids, original_fq_files, len_indices,
                                                  pre_grp, groups_of_lines, lines_in_a_group,
-                                                 fastq_indices_in_memory, out_base, options.round_limit,
+                                                 fq_info_in_memory, out_base, options.round_limit,
                                                  options.fg_out_per_round,
                                                  options.jump_step,
                                                  options.mesh_size, verb_out, resume,
-                                                 trim_ends, options.maximum_n_reads, options.maximum_n_words, log)
+                                                 options.maximum_n_reads, options.maximum_n_words,
+                                                 keep_seq_parts=keep_seq_parts,
+                                                 low_quality_pattern=low_quality_pattern,
+                                                 echo_frequency=echo_frequency,
+                                                 log=log)
             write_fq_results(original_fq_files, accepted_contig_id,
                              os.path.join(out_base, options.prefix + "filtered"),
                              os.path.join(out_base, 'temp.indices.2'),
-                             fastq_indices_in_memory, options.maximum_n_reads, verb_out, in_memory, log)
-            del accepted_contig_id, fastq_indices_in_memory, groups_of_lines, \
+                             fq_info_in_memory, options.maximum_n_reads, verb_out, in_memory, log)
+            del accepted_contig_id, fq_info_in_memory, groups_of_lines, \
                 anti_lines, initial_accepted_words, lines_in_a_group
 
             if not options.keep_temp_files:
@@ -1508,7 +1767,7 @@ def main():
             else:
                 log.info("Separating filtered fastq file ... skipped.\n")
 
-        """assembly"""
+        """ assembly """
         if options.run_spades:
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
                 # resume = False
@@ -1518,7 +1777,7 @@ def main():
             else:
                 log.info('Assembling using SPAdes ... skipped.\n')
 
-        """export organelle"""
+        """ export organelle """
         if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
                 and options.organelle_type != '0':
             export_succeeded = False

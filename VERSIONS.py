@@ -6,6 +6,12 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.3.0",
+     "features": [
+         "1.Read quality control (--min-quality-score) added.",
+         "2.--trim option removed.",
+         "3.fix a bug on word size estimation",
+     ]},
     {"number": "1.2.0d",
      "features": [
          "1.Add --max-words.",

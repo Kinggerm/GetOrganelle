@@ -586,10 +586,13 @@ class Assembly:
                             try:
                                 this_formula -= get_formula(n_v, n_e, vertex_name, this_end)
                             except RecursionError:
+                                direct = ["_tail", "_head"]
                                 if log_handler:
-                                    log_handler.error("Formulating for: " + str((n_v, n_e, vertex_name, this_end)) + "!")
+                                    log_handler.error("Formulating for: " +
+                                                      n_v + direct[n_e] + vertex_name + direct[this_end] + "!")
                                 else:
-                                    sys.stdout.write("Formulating for: " + str((n_v, n_e, vertex_name, this_end)) + "!\n")
+                                    sys.stdout.write("Formulating for: " +
+                                                      n_v + direct[n_e] + vertex_name + direct[this_end] + "!\n")
                                 raise RecursionError
                         formulae.append(this_formula)
 

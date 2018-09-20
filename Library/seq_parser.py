@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import re
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
     python_version = "2.7+"
@@ -19,6 +20,7 @@ if python_version == "2.7+":
 
     def complementary_seq(input_seq):
         return string.translate(input_seq, translator)[::-1]
+
 else:
     # python3
     translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
@@ -26,6 +28,10 @@ else:
 
     def complementary_seq(input_seq):
         return str.translate(input_seq, translator)[::-1]
+
+
+def complementary_seqs(input_seq_iter):
+    return tuple([complementary_seq(seq) for seq in input_seq_iter])
 
 
 class Sequence:
@@ -154,7 +160,7 @@ def read_fasta_as_list(fasta_dir):
     interleaved = 0
     while this_line:
         if this_line.startswith('>'):
-            names.append(this_line[1:].strip('\n').strip('\r'))
+            names.append(this_line[1:].strip())
             this_seq = ''
             this_line = fasta_file.readline()
             seq_line_count = 0
@@ -293,17 +299,6 @@ degenerate_dict_digit = {  # degenerate
     1: "A", 2: "C", 4: "G", 8: "T"}
 
 
-# def consensus_seq(*seq_str):
-#     consensus_res = []
-#     seq_num = len(seq_str)
-#     for go_to_base in range(len(seq_str[0])):
-#         this_base_set = set()
-#         for go_to_seq in range(seq_num):
-#             this_base_set.update(degenerate_dict.get(seq_str[go_to_seq][go_to_base], []))
-#         consensus_res.append(degenerate_dict[tuple(sorted(this_base_set))])
-#     return "".join(consensus_res)
-
-
 def generate_consensus(*seq_str):
     consensus_res = []
     seq_num = len(seq_str)
@@ -314,3 +309,60 @@ def generate_consensus(*seq_str):
         consensus_res.append(degenerate_dict_digit[sum(this_base_set)])
     return "".join(consensus_res)
 
+
+def split_seq_by_quality_pattern(sequence, quality_str, low_quality_pattern, min_sub_seq=0):
+    seq_list = []
+    start = 0
+    for splicer in re.finditer(low_quality_pattern, quality_str):
+        end, new_start = splicer.span()
+        seq_part = sequence[start:end]
+        if len(seq_part) > min_sub_seq:
+            seq_list.append(seq_part)
+        start = new_start
+    seq_part = sequence[start:]
+    if len(seq_part) > min_sub_seq:
+        seq_list.append(seq_part)
+    return tuple(seq_list)
+
+
+def fq_seq_simple_generator(fq_dir_list, go_to_line=1, split_pattern=None, min_sub_seq=0):
+    if not ((type(fq_dir_list) is list) or (type(fq_dir_list) is tuple)):
+        fq_dir_list = [fq_dir_list]
+    if split_pattern and len(split_pattern) > 2:
+        for fq_dir in fq_dir_list:
+            count = 0
+            fq_handler = open(fq_dir, 'rU')
+            seq_line = fq_handler.readline()
+            while seq_line:
+                if count % 4 == go_to_line:
+                    fq_handler.readline()
+                    quality_str = fq_handler.readline()[:-1]
+                    count += 2
+                    yield split_seq_by_quality_pattern(seq_line[:-1], quality_str, split_pattern, min_sub_seq)
+                count += 1
+                seq_line = fq_handler.readline()
+    else:
+        for fq_dir in fq_dir_list:
+            count = 0
+            # if this_trim_values:
+            #     trim1, trim2 = [int(trim_value) for trim_value in this_trim_values.split(',')]
+            #     if trim2:
+            #         for fq_line in open(fq_dir, 'rU'):
+            #             if count % 4 == go_to_line:
+            #                 yield fq_line[trim1:(len(fq_line) - trim2)]
+            #             count += 1
+            #     elif trim1:
+            #         for fq_line in open(fq_dir, 'rU'):
+            #             if count % 4 == go_to_line:
+            #                 yield fq_line[trim1:]
+            #             count += 1
+            #     else:
+            #         for fq_line in open(fq_dir, 'rU'):
+            #             if count % 4 == go_to_line:
+            #                 yield fq_line
+            #             count += 1
+            # else:
+            for fq_line in open(fq_dir, 'rU'):
+                if count % 4 == go_to_line:
+                    yield fq_line[:-1]
+                count += 1

@@ -1334,42 +1334,41 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
     else:
         kmer = '-k ' + spades_kmer
     if resume and os.path.exists(spades_out_put):
-        continue_command = '--continue'
+        spades_command = 'spades.py --continue -o ' + spades_out_put
     else:
-        continue_command = ''
-    spades_out_put = '-o ' + spades_out_put
-    if reads_paired['input'] and reads_paired['pair_out']:
-        all_unpaired = []
-        # spades does not accept empty files
-        if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_unpaired.fq")):
-            all_unpaired.append(os.path.join(out_base, prefix + "filtered_1_unpaired.fq"))
-        if os.path.getsize(os.path.join(out_base, prefix + "filtered_2_unpaired.fq")):
-            all_unpaired.append(os.path.join(out_base, prefix + "filtered_2_unpaired.fq"))
-        for iter_unpaired in range(len(original_fq_files) - 2):
-            if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq"))):
-                all_unpaired.append(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq")))
-        if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_paired.fq")):
-            spades_command = ' '.join(
-                ['spades.py', '-t', str(threads), continue_command, parameters, '-1',
-                 os.path.join(out_base, prefix + "filtered_1_paired.fq"), '-2',
-                 os.path.join(out_base, prefix + "filtered_2_paired.fq")] +
-                ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
-                [kmer, spades_out_put]).strip()
+        spades_out_put = '-o ' + spades_out_put
+        if reads_paired['input'] and reads_paired['pair_out']:
+            all_unpaired = []
+            # spades does not accept empty files
+            if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_unpaired.fq")):
+                all_unpaired.append(os.path.join(out_base, prefix + "filtered_1_unpaired.fq"))
+            if os.path.getsize(os.path.join(out_base, prefix + "filtered_2_unpaired.fq")):
+                all_unpaired.append(os.path.join(out_base, prefix + "filtered_2_unpaired.fq"))
+            for iter_unpaired in range(len(original_fq_files) - 2):
+                if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq"))):
+                    all_unpaired.append(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq")))
+            if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_paired.fq")):
+                spades_command = ' '.join(
+                    ['spades.py', '-t', str(threads), parameters, '-1',
+                     os.path.join(out_base, prefix + "filtered_1_paired.fq"), '-2',
+                     os.path.join(out_base, prefix + "filtered_2_paired.fq")] +
+                    ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
+                    [kmer, spades_out_put]).strip()
+            else:
+                log.warning("No paired reads found for the target!?")
+                spades_command = ' '.join(
+                    ['spades.py', '-t', str(threads), parameters] +
+                    ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
+                    [kmer, spades_out_put]).strip()
         else:
-            log.warning("No paired reads found for the target!?")
+            all_unpaired = []
+            for iter_unpaired in range(len(original_fq_files)):
+                if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq"))):
+                    all_unpaired.append(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq")))
             spades_command = ' '.join(
-                ['spades.py', '-t', str(threads), continue_command, parameters] +
+                ['spades.py', '-t', str(threads), parameters] +
                 ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                 [kmer, spades_out_put]).strip()
-    else:
-        all_unpaired = []
-        for iter_unpaired in range(len(original_fq_files)):
-            if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq"))):
-                all_unpaired.append(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq")))
-        spades_command = ' '.join(
-            ['spades.py', '-t', str(threads), continue_command, parameters] +
-            ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
-            [kmer, spades_out_put]).strip()
     spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
     if "not recognized" in output.decode("utf8"):

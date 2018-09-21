@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.3.0b",
+     "features": [
+         "1.fix a bug for exporting organelle",
+     ]},
     {"number": "1.3.0a",
      "features": [
          "1.automatically discard improper input kmers",

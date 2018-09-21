@@ -3,7 +3,6 @@
 import datetime
 import sys
 import os
-import re
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
@@ -116,10 +115,6 @@ def require_commands(print_title, version):
                             help="Depth factor for confirming parallel contigs. Default:%default")
     group_result.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
                             help="Similarity threshold for confirming parallel contigs. Default:%default")
-    # group_result.add_option("--trim", dest='trim_values',
-    #                         help='Assign the number of bases in the ends to trim in extending process. '
-    #                              'This function will not change the length of the out put reads. '
-    #                              'Input format: int,int (Example: 4,4). Default: 0,0')
     group_result.add_option("--min-quality-score", dest="min_quality_score", type=int, default=15,
                             help="Minimum quality score in extending extension. "
                                  "Default:%default ('+' in Phred+33; 'J' in Phred+64/Solexa+64)")
@@ -432,11 +427,6 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
 def make_read_index(original_fq_files, direction_according_to_user_input, maximum_n_reads, rm_duplicates, output_base,
                     anti_lines, pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, keep_seq_parts,
                     low_quality, echo_frequency, resume, log):
-    # if trim_values:
-    #     trim1, trim2 = [int(trim_value) for trim_value in trim_values.split(',')]
-    # else:
-    #     trim1, trim2 = 0, 0
-
     # read original reads
     # line_cluster (list) ~ forward_reverse_reads
     line_clusters = []
@@ -522,10 +512,6 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
                                 line = file_in.readline()
                             continue
                         this_seq = file_in.readline().strip()
-                        # if trim_values:
-                        #     this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
-                        # else:
-                        #     this_seq = this_seq.strip("N")
                         # drop nonsense reads
                         if len(this_seq) < word_size:
                             line_count += 4
@@ -600,11 +586,6 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
                     if line.startswith("@"):
                         count_this_read_n += 1
                         this_seq = file_in.readline().strip()
-
-                        # if trim_values:
-                        #     this_seq = this_seq[trim1:(len(this_seq) - trim2)].strip("N")
-                        # else:
-                        #     this_seq = this_seq.strip("N")
 
                         # drop nonsense reads
                         if len(this_seq) < word_size:
@@ -1637,7 +1618,6 @@ def main():
             anti_seed = options.anti_seed
             b_at_seed = options.bowtie2_anti_seed
             pre_grp = options.pre_grouped
-            # trim_ends = options.trim_values
             in_memory = options.index_in_memory
 
             if original_fq_files:
@@ -1792,7 +1772,8 @@ def main():
             export_succeeded = False
             kmer_vals = sorted([int(kmer_d[1:])
                                 for kmer_d in os.listdir(spades_output)
-                                if os.path.isdir(kmer_d) and kmer_d.startswith("K")], reverse=True)
+                                if os.path.isdir(os.path.join(spades_output, kmer_d)) and kmer_d.startswith("K")],
+                               reverse=True)
             kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
             for go_k, kmer_dir in enumerate(kmer_dirs):
                 try:

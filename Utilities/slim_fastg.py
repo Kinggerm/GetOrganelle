@@ -100,7 +100,7 @@ def require_commands():
                       help="Add prefix to the output file.")
     parser.add_option('--continue', dest='resume', default=False, action='store_true',
                       help='Specified for calling from get_organelle_reads.py')
-    parser.add_option("--overwrite", dest="overwrite", default=False, action="store_true",
+    parser.add_option("--no-overwrite", dest="overwrite", default=True, action="store_false",
                       help="Overwrite existing output result.")
     parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
                       help="Threads for blastn.")

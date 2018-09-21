@@ -49,7 +49,7 @@ then add */GetOrganelle and */GetOrganelle/Utilities to the path:
     echo "export PATH" >> ~/.bashrc
 
 
-and keep update when necessary:
+and keep updated (Very IMPORTANT if you find your version is out of date!):
     
     cd {where_you_clone_GetOrganelle}/GetOrganelle
 

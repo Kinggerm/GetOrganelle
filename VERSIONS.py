@@ -6,6 +6,18 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.3.1",
+     "features": [
+         "1.'--max-discard-percent' added to prevent discarding too much data.",
+         "2.fix the bug in get_low_quality_char_pattern, which causes misidentification for quality encoding format.",
+         "3.--flush-frequency added",
+         "4.better log info",
+         "5.'--overwrite' -> '--no-overwrite' in slim_fastg.py"
+     ]},
+    {"number": "1.3.0d",
+     "features": [
+         "1.continue to process assembly results based on available kmers if SPAdes failed at one of the planned kmers",
+     ]},
     {"number": "1.3.0c",
      "features": [
          "1.fix a bug: compatibility with '--continue' option of SPAdes",

@@ -34,7 +34,7 @@ word_size = 0
 
 def require_commands(print_title, version):
     version = version
-    usage = "\n###  Chloroplast, Normal, 2G raw data, 150 bp reads\n" + str(os.path.basename(__file__)) + \
+    usage = "\n###  Chloroplast, Normal, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output " \
             " -R 10 -k 75,85,95,105\n" \
             "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
@@ -115,8 +115,12 @@ def require_commands(print_title, version):
                             help="Depth factor for confirming parallel contigs. Default:%default")
     group_result.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
                             help="Similarity threshold for confirming parallel contigs. Default:%default")
+    group_result.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
+                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
+                                 "Default:%default")
     group_result.add_option("--min-quality-score", dest="min_quality_score", type=int, default=15,
-                            help="Minimum quality score in extending extension. "
+                            help="Minimum quality score in extension. This value would be automatically increased "
+                                 "to prevent ignoring too much raw data (see --max-ignore-percent)."
                                  "Default:%default ('+' in Phred+33; 'J' in Phred+64/Solexa+64)")
     group_result.add_option('-k', dest='spades_kmer', default='75,85,95',
                             help='SPAdes kmer settings. Use the same format as in SPAdes. kmer larger than '
@@ -162,6 +166,8 @@ def require_commands(print_title, version):
                                         'Choose 0 to disable this process. '
                                         'Note that whether choose or not will not disable '
                                         'the calling of replicate reads. Default: %default.')
+    group_computational.add_option("--flush-frequency", dest="echo_frequency", default=54321, type=int,
+                                   help="Flush frequency for presenting progress. Default:%default")
     group_computational.add_option("--prefix", dest="prefix", default="",
                                    help="Add extra prefix to resulting files under the output directory.")
     group_computational.add_option('--keep-temp', dest='keep_temp_files', action="store_true", default=False,
@@ -329,19 +335,21 @@ def get_read_len_mean_max(fq_files, maximum_n_reads):
     return sum(read_lengths)/len(read_lengths), max(read_lengths)
 
 
-def get_low_quality_char_pattern(fq_files, maximum_n_reads, digit_threshold, log, sampling_percent=0.1):
-    max_quality = "!"
-    min_quality = "~"
+def get_low_quality_char_pattern(fq_files, maximum_n_reads, min_quality_score, log, maximum_ignore_percent=0.05,
+                                 sampling_percent=0.1):
     sampling_percent = int(1/sampling_percent)
+    all_quality_chars = []
     for fq_f in fq_files:
         count_r = 0
         for quality_str in fq_seq_simple_generator(fq_f, go_to_line=3):
             if count_r % sampling_percent == 0:
-                max_quality = max(max_quality, max(quality_str))
-                min_quality = min(max_quality, min(quality_str))
+                all_quality_chars.append(quality_str)
             count_r += 1
             if count_r >= maximum_n_reads:
                 break
+    all_quality_chars = "".join(all_quality_chars)
+    max_quality = max(all_quality_chars)
+    min_quality = min(all_quality_chars)
     max_quality = ord(max_quality)
     min_quality = ord(min_quality)
     decision_making = []
@@ -362,8 +370,28 @@ def get_low_quality_char_pattern(fq_files, maximum_n_reads, digit_threshold, log
         log.warning("Min quality score " + repr(chr(min_quality)) +
                     "(" + str(min_quality) + ":" + str(min_quality - the_c_min + the_s_min) +
                     ") in your fastq file is under the usual lower boundary " + str((the_c_min, the_c_max)))
-    low_quality_chars = [chr(low_quality_score)
-                         for low_quality_score in range(min_quality, the_c_min + digit_threshold - the_s_min)]
+    # increase --min-quality-score if ignoring too much data.
+    low_quality_score = min(the_c_min, min_quality)
+    ignore_percent = 0
+    low_quality_chars = []
+    len_total = float(len(all_quality_chars))
+    while low_quality_score < the_c_min + min_quality_score - the_s_min:
+        ignore_this_time = all_quality_chars.count(chr(low_quality_score)) / len_total
+        ignore_percent += ignore_this_time
+        if ignore_percent > maximum_ignore_percent:
+            ignore_percent -= ignore_this_time
+            break
+        # elif ignore_this_time > 0:
+        # chr(low_quality_score) does not exist in the sampling != chr(low_quality_score) does not exist
+        else:
+            low_quality_chars.append(chr(low_quality_score))
+        low_quality_score += 1
+    if low_quality_score < the_c_min + min_quality_score - the_s_min:
+        log.info("Resetting '--min-quality-score " + str(low_quality_score + the_s_min - the_c_min) + "'")
+    if low_quality_chars:
+        log.info("Ignoring bases with qualities (" + str(round(ignore_percent, 4)) + "): " +
+                 str(ord(min("".join(low_quality_chars)))) + ".." + str(ord(max("".join(low_quality_chars)))) + "  " +
+                 "".join(low_quality_chars))
     return "[" + "".join(low_quality_chars) + "]"
 
 
@@ -1336,7 +1364,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
     if resume and os.path.exists(spades_out_put):
         spades_command = 'spades.py --continue -o ' + spades_out_put
     else:
-        spades_out_put = '-o ' + spades_out_put
+        spades_out_command = '-o ' + spades_out_put
         if reads_paired['input'] and reads_paired['pair_out']:
             all_unpaired = []
             # spades does not accept empty files
@@ -1353,13 +1381,13 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                      os.path.join(out_base, prefix + "filtered_1_paired.fq"), '-2',
                      os.path.join(out_base, prefix + "filtered_2_paired.fq")] +
                     ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
-                    [kmer, spades_out_put]).strip()
+                    [kmer, spades_out_command]).strip()
             else:
                 log.warning("No paired reads found for the target!?")
                 spades_command = ' '.join(
                     ['spades.py', '-t', str(threads), parameters] +
                     ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
-                    [kmer, spades_out_put]).strip()
+                    [kmer, spades_out_command]).strip()
         else:
             all_unpaired = []
             for iter_unpaired in range(len(original_fq_files)):
@@ -1368,7 +1396,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
             spades_command = ' '.join(
                 ['spades.py', '-t', str(threads), parameters] +
                 ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
-                [kmer, spades_out_put]).strip()
+                [kmer, spades_out_command]).strip()
     spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
     if "not recognized" in output.decode("utf8"):
@@ -1379,9 +1407,46 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         log.error('Assembling failed.')
         return False
     elif "== Error ==" in output.decode("utf8"):
-        log.error("Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split("In case you")[0])
-        log.error('Assembling failed.')
-        return False
+        # check when other kmer assembly results were produced
+        real_kmer_values = sorted([int(kmer_d[1:])
+                                   for kmer_d in os.listdir(spades_out_put)
+                                   if os.path.isdir(os.path.join(spades_out_put, kmer_d))
+                                   and kmer_d.startswith("K")])
+        real_kmer_values = [str(k_val) for k_val in real_kmer_values]
+        temp_res = False
+        failed_at_k = None
+        for kmer_val in real_kmer_values:
+            this_k_path = os.path.join(spades_out_put, "K" + kmer_val)
+            if os.path.exists(os.path.join(this_k_path, "assembly_graph.fastg")):
+                temp_res = True
+            else:
+                failed_at_k = kmer_val
+        if temp_res:
+            if failed_at_k:
+                log.warning("SPAdes failed for '-k " + failed_at_k + "'!")
+                log.warning("If you need result based on kmer=" + failed_at_k + " urgently, "
+                            "please check " + os.path.join(spades_out_put, "spades.log"))
+                del real_kmer_values[real_kmer_values.index(failed_at_k)]
+                log.warning("GetOrganelle would continue to process results based on "
+                            "kmer=" + ",".join(real_kmer_values) + ".")
+                os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
+                          + " " + spades_out_put)
+                log.info('Assembling finished with warnings.\n')
+                return True
+            else:
+                log.warning("SPAdes failed with unknown errors!")
+                log.warning("If you need to know more details, please check " +
+                            os.path.join(spades_out_put, "spades.log") + " and contact SPAdes developers.")
+                log.warning("GetOrganelle would continue to process results based on "
+                            "kmer=" + ",".join(real_kmer_values) + ".")
+                os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
+                          + " " + spades_out_put)
+                log.info('Assembling finished with warnings.\n')
+                return True
+        else:
+            log.error("Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split("In case you")[0])
+            log.error('Assembling failed.')
+            return False
     else:
         if verbose_log:
             log.info(output.decode("utf8"))
@@ -1422,6 +1487,7 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
                   # + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = slim_spades.communicate()
+    output_file_list = [os.path.join(spades_output, x) for x in os.listdir(spades_output) if x.count(".fastg") == 2]
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
         if log:
             if verbose_log:
@@ -1435,6 +1501,10 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
                 log.error(output.decode("utf8"))
             log.warning("Slimming      " + graph_file + " failed.")
         return 1
+    elif output_file_list and os.path.getsize(output_file_list[0]) == 0:
+        if log:
+            log.warning("Slimming      " + graph_file + " finished with no target organelle contigs found!")
+        return 2
     else:
         if log:
             if verbose_log:
@@ -1565,7 +1635,7 @@ def extract_organelle_genome(out_base, spades_output, go_round,
                                       verbose=verbose, log=log)
         return 0
     else:
-        return 1
+        return running_stat
 
 
 def main():
@@ -1579,6 +1649,7 @@ def main():
     resume = options.script_resume
     verb_out = options.verbose_log
     out_base = options.output_base
+    echo_frequency = options.echo_frequency
     reads_files_to_drop = []
     try:
         """ initialization """
@@ -1636,7 +1707,9 @@ def main():
             log.info("Counting read qualities ...")
             low_quality_pattern = get_low_quality_char_pattern(original_fq_files,
                                                                options.maximum_n_reads,
-                                                               options.min_quality_score, log, sampling_percent=0.1)
+                                                               options.min_quality_score, log,
+                                                               maximum_ignore_percent=options.maximum_ignore_percent,
+                                                               sampling_percent=0.1)
             log.info("Counting read lengths ...")
             mean_read_len, max_read_len = get_read_len_mean_max(original_fq_files, options.maximum_n_reads)
             log.info("mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
@@ -1671,11 +1744,11 @@ def main():
                                                               b_at_seed, original_fq_files,
                                                               out_base, resume,
                                                               verb_out, options.threads, options.prefix, log)
+                log.info(seed_fastq + ": " + str(os.path.getsize(seed_fastq)/1024/1024) + "M")
             log.info("Making seed reads finished.\n")
 
             # make read index
             log.info("Making read index ...")
-            echo_frequency = 54321
             fq_info_in_memory = make_read_index(original_fq_files, direction_according_to_user_input,
                                                 options.maximum_n_reads, options.rm_duplicates, out_base,
                                                 anti_lines, pre_grp, in_memory, b_at_seed, anti_seed,
@@ -1705,12 +1778,13 @@ def main():
                         fq_seq_simple_generator(seed_fastq, split_pattern=low_quality_pattern, min_sub_seq=word_size))
                 else:
                     initial_accepted_words = chop_seqs(fq_seq_simple_generator(seed_fastq))
+            log.info("AW " + str(len(initial_accepted_words)))
             log.info("Adding initial words finished.\n")
 
             # extending process
             log.info("Extending ...")
             accepted_ids = set()
-            echo_frequency = 1234321//(mean_read_len - word_size + 1)//2
+            # echo_frequency = 1234321//(mean_read_len - word_size + 1)//2
             accepted_contig_id = extending_reads(initial_accepted_words, accepted_ids, original_fq_files, len_indices,
                                                  pre_grp, groups_of_lines, lines_in_a_group,
                                                  fq_info_in_memory, out_base, options.round_limit,
@@ -1760,8 +1834,9 @@ def main():
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
                 # resume = False
                 log.info('Assembling using SPAdes ...')
-                assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base, options.prefix,
-                                     original_fq_files, reads_paired, options.verbose_log, resume, options.threads, log)
+                assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
+                                     options.prefix, original_fq_files, reads_paired, options.verbose_log,
+                                     resume, options.threads, log)
             else:
                 log.info('Assembling using SPAdes ... skipped.\n')
 
@@ -1771,9 +1846,12 @@ def main():
             export_succeeded = False
             kmer_vals = sorted([int(kmer_d[1:])
                                 for kmer_d in os.listdir(spades_output)
-                                if os.path.isdir(os.path.join(spades_output, kmer_d)) and kmer_d.startswith("K")],
+                                if os.path.isdir(os.path.join(spades_output, kmer_d))
+                                and kmer_d.startswith("K")
+                                and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
                                reverse=True)
             kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
+            run_stat_set = set()
             for go_k, kmer_dir in enumerate(kmer_dirs):
                 try:
                     run_stat = extract_organelle_genome(out_base=out_base, spades_output=kmer_dir, go_round=go_k,
@@ -1789,14 +1867,28 @@ def main():
                     if run_stat == 0:
                         export_succeeded = True
                         break
+                    else:
+                        run_stat_set.add(run_stat)
             if not export_succeeded:
-                out_fastg = sorted([os.path.join(spades_output, x)
-                                    for x in os.listdir(spades_output) if x.count(".fastg") == 2])[0]
-                out_csv = out_fastg[:-5] + "csv"
-                log.info("Please ...")
-                log.info("load the graph file: " + out_fastg)
-                log.info("load the CSV file: " + out_csv)
-                log.info("visualize and export your result in Bandage.\n")
+                if run_stat_set == {2}:
+                    log.warning("No target organelle contigs found!")
+                    log.warning("This might due to a bug or unreasonable reference/parameter choices")
+                    log.info("Please email jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
+                else:
+                    out_fastg = sorted([x for x in os.listdir(spades_output) if x.count(".fastg") == 2])
+                    if out_fastg:
+                        out_fastg = out_fastg[0]
+                        out_csv = out_fastg[:-5] + "csv"
+                        log.info("Please ...")
+                        log.info("load the graph file '" + out_fastg +
+                                 "' in " + "/".join(["K" + str(k_val) for k_val in kmer_vals]))
+                        log.info("load the CSV file '" + out_csv +
+                                 "' in " + "/".join(["K" + str(k_val) for k_val in kmer_vals]))
+                        log.info("visualize and export your result in Bandage.")
+                    else:
+                        log.info("Please ...")
+                        log.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
+                        log.info("visualize and export your result in Bandage.")
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal Calc-cost " + str(time.time() - time0))
@@ -1806,6 +1898,7 @@ def main():
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal cost " + str(time.time() - time0))
         log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!")
+        log.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()
 
 

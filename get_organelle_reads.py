@@ -567,9 +567,9 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
             base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
             mean_error_rate=mean_error_rate/2., log=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
         log.info("Setting '-w " + str(word_size) + "'")
-        log.info("The estimated '-w " + str(word_size) + "' might not be the best.")
-        log.info("If the result is not a closed graph (circular organelle genome), "
-                 "you could adjust the word size for another new run.")
+        log.info("The automatically-estimated word size does not ensure the best choice.")
+        log.info("If the result is not a closed graph (circular organelle genome), ")
+        log.info("you could adjust the word size for another new run.")
     elif word_size < 1:
         new_word_size = int(word_size * mean_read_len)
         if new_word_size < global_min_wl:

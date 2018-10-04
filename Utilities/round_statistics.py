@@ -9,6 +9,7 @@ from math import ceil
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
+from Library.pipe_control_func import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
@@ -45,37 +46,6 @@ def get_options():
     log.info(' '.join(sys.argv) + '\n')
     log = timed_log(log, options.output_base)
     return options, log
-
-
-def simple_log(log, output_base):
-    log_simple = log
-    for handler in list(log_simple.handlers):
-        log_simple.removeHandler(handler)
-    log_simple.setLevel(logging.NOTSET)
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(logging.Formatter('%(message)s'))
-    console.setLevel(logging.NOTSET)
-    logfile = logging.FileHandler(os.path.join(output_base, 'log.txt'), mode='a')
-    logfile.setFormatter(logging.Formatter('%(message)s'))
-    logfile.setLevel(logging.NOTSET)
-    log_simple.addHandler(console)
-    log_simple.addHandler(logfile)
-    return log_simple
-
-
-def timed_log(log, output_base):
-    log_timed = log
-    for handler in list(log_timed.handlers):
-        log_timed.removeHandler(handler)
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s: %(message)s'))
-    console.setLevel(logging.NOTSET)
-    logfile = logging.FileHandler(os.path.join(output_base, 'log.txt'), mode='a')
-    logfile.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s: %(message)s'))
-    logfile.setLevel(logging.NOTSET)
-    log_timed.addHandler(console)
-    log_timed.addHandler(logfile)
-    return log_timed
 
 
 def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, log):
@@ -118,31 +88,6 @@ def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threa
         else:
             log.error("Cannot find bowtie2 result!")
             exit()
-
-
-# does not deal with multiple hits!
-def get_coverage(bowtie_sam_file):
-    coverage = {}
-    for line in open(bowtie_sam_file):
-        if line.strip() and not line.startswith('@'):
-            line_split = line.strip().split('\t')
-            start_position = int(line_split[3])
-            if start_position:
-                flag = int(line_split[1])
-                reference = line_split[2]
-                direction = 1 if flag % 32 < 16 else -1
-                read_len = len(line_split[9])
-                if reference in coverage:
-                    for position in range(max(1, start_position), max(1, start_position + read_len*direction), direction):
-                        if position in coverage[reference]:
-                            coverage[reference][position] += 1
-                        else:
-                            coverage[reference][position] = 1
-                else:
-                    coverage[reference] = {}
-                    for position in range(max(1, start_position), max(1, start_position + read_len * direction), direction):
-                        coverage[reference][position] = 1
-    return coverage
 
 
 def count_fq_reads(fq_files):
@@ -191,7 +136,7 @@ def main():
         mapping_with_bowtie2(options.fasta, real_fq, bowtie_base, options.resume, options.threads, log)
         this_result = [fq_pairs[0].replace("_1.fq", "")]
         # this round coverage
-        this_coverage = get_coverage(bowtie_base + ".sam")
+        this_coverage = get_coverage_from_sam(bowtie_base + ".sam")
         if this_coverage:
             if not this_coverage and not options.round:
                 log.info("No more target found! Exiting ..")

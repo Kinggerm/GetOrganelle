@@ -3,7 +3,7 @@
 import os
 from optparse import OptionParser
 
-usage = "mk_get_organelle.py -o basename -p \"*\" " \
+usage = "mk_get_organelle.py -o basename -p \"\" " \
         "[a_list_of_directories_containing_balanced_fastq_file, default='./*']"
 parser = OptionParser(usage=usage)
 parser.add_option('-o', dest='output_base',
@@ -45,7 +45,9 @@ for dire in dirs:
         if not_exist:
             continue
     else:
-        these_files = [os.path.join(dire, y) for y in os.listdir(dire) if y.endswith('.fq') or y.endswith('.fastq')]
+        these_files = [os.path.join(dire, y)
+                       for y in os.listdir(dire)
+                       if y.endswith('.fq') or y.endswith('.fastq') or y.endswith(".fq.gz") or y.endswith("fastq.gz")]
         if these_files:
             if len(these_files) != 2:
                 print('Warning: Undetermined fq file in '+dire+'. Omitted!')

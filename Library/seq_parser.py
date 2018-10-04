@@ -344,25 +344,127 @@ def fq_seq_simple_generator(fq_dir_list, go_to_line=1, split_pattern=None, min_s
     else:
         for fq_dir in fq_dir_list:
             count = 0
-            # if this_trim_values:
-            #     trim1, trim2 = [int(trim_value) for trim_value in this_trim_values.split(',')]
-            #     if trim2:
-            #         for fq_line in open(fq_dir, 'rU'):
-            #             if count % 4 == go_to_line:
-            #                 yield fq_line[trim1:(len(fq_line) - trim2)]
-            #             count += 1
-            #     elif trim1:
-            #         for fq_line in open(fq_dir, 'rU'):
-            #             if count % 4 == go_to_line:
-            #                 yield fq_line[trim1:]
-            #             count += 1
-            #     else:
-            #         for fq_line in open(fq_dir, 'rU'):
-            #             if count % 4 == go_to_line:
-            #                 yield fq_line
-            #             count += 1
-            # else:
             for fq_line in open(fq_dir, 'rU'):
                 if count % 4 == go_to_line:
                     yield fq_line[:-1]
                 count += 1
+
+
+def check_fasta_seq_names(original_fas, log=None):
+    fas_matrix = read_fasta(original_fas)
+    short_names = [s_n.split(" ")[0] for s_n in fas_matrix[0]]
+    if len(short_names) == len(set(short_names)):
+        return original_fas
+    else:
+        new_fas = original_fas + ".modified"
+        if os.path.exists(new_fas):
+            return check_fasta_seq_names(new_fas)
+        else:
+            if log:
+                log.info("Setting '-s " + new_fas + "'")
+            for go_to, name in enumerate(fas_matrix[0]):
+                fas_matrix[0][go_to] = name.replace(" ", "_")
+            if len(fas_matrix[0]) != len(set(fas_matrix[0])):
+                existed = {}
+                for go_to, name in enumerate(fas_matrix[0]):
+                    if name in existed:
+                        existed[name] += 1
+                    else:
+                        existed[name] = 1
+                    fas_matrix[0][go_to] += "-" + str(existed[name])
+            write_fasta(new_fas, fas_matrix, True)
+            return new_fas
+
+
+# does not deal with multiple hits!
+def get_coverage_from_sam(bowtie_sam_file):
+    coverage = {}
+    for line in open(bowtie_sam_file):
+        if line.strip() and not line.startswith('@'):
+            line_split = line.strip().split('\t')
+            start_position = int(line_split[3])
+            if start_position:
+                flag = int(line_split[1])
+                reference = line_split[2]
+                direction = 1 if flag % 32 < 16 else -1
+                read_len = len(line_split[9])
+                if reference in coverage:
+                    for position in range(max(1, start_position), max(1, start_position + read_len * direction), direction):
+                        if position in coverage[reference]:
+                            coverage[reference][position] += 1
+                        else:
+                            coverage[reference][position] = 1
+                else:
+                    coverage[reference] = {}
+                    for position in range(max(1, start_position), max(1, start_position + read_len * direction), direction):
+                        coverage[reference][position] = 1
+    return coverage
+
+
+def get_query_cover(coverage_info, log=None, percent=0.07):
+    # empirical value
+    center_p = 0.93
+    all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]
+                     if coverage_info[ref][pos] > 2]
+    all_coverages.sort()
+    if not all_coverages:
+        all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]]
+        if not all_coverages:
+            if log:
+                log.error("No seed reads found!")
+            exit()
+    total_len = len(all_coverages)
+    start_cov_pos = int((center_p - percent/2) * total_len)
+    end_cov_pos = min(int((center_p + percent/2) * total_len), total_len)
+    used_len = end_cov_pos-start_cov_pos
+    used_points = all_coverages[start_cov_pos:end_cov_pos]
+    mean = sum(used_points) / used_len
+    up_dev = (sum([(single_p-mean)**2 for single_p in used_points if single_p >= mean])/used_len) ** 0.5
+    down_dev = (sum([(single_p-mean)**2 for single_p in used_points if single_p <= mean])/used_len) ** 0.5
+    return round(mean - down_dev, 2), round(mean, 2), round(mean + up_dev, 2)
+
+
+# Q = -10*log10(P)
+def score_2_error_prob_sanger_quality(quality_score):
+    return 10**(-quality_score / 10.)
+
+
+# Q = -10*log10(P/(1-P))
+def score_2_error_prob_solexa_quality(quality_score):
+    this_sanger_prob = score_2_error_prob_sanger_quality(quality_score)
+    return this_sanger_prob/(1 + this_sanger_prob)
+
+
+# solexa_quality_str = ";<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefgh"
+all_quality_str = set("!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~")
+phred_33_quality_trans = {in_trans_char: ord(in_trans_char) - 33
+                          for in_trans_char in all_quality_str}
+phred_64_quality_trans = {in_trans_char: ord(in_trans_char) - 64
+                          for in_trans_char in all_quality_str}
+
+
+def sanger_error_prob(quality_char):
+    return score_2_error_prob_sanger_quality(phred_33_quality_trans.get(quality_char, 0))
+
+
+def solexa_error_prob(quality_char):
+    return score_2_error_prob_solexa_quality(phred_64_quality_trans.get(quality_char, -31))
+
+
+def illumina_1_3_error_prob(quality_char):
+    return score_2_error_prob_sanger_quality(phred_64_quality_trans.get(quality_char, -31))
+
+
+def illumina_1_5_error_prob(quality_char):
+    return score_2_error_prob_sanger_quality(phred_64_quality_trans.get(quality_char, -31))
+
+
+def illumina_1_8_error_prob(quality_char):
+    return score_2_error_prob_sanger_quality(phred_33_quality_trans.get(quality_char, 0))
+
+
+chose_error_prob_func = {"Sanger": sanger_error_prob,
+                         "Solexa": solexa_error_prob,
+                         "Illumina 1.3+": illumina_1_3_error_prob,
+                         "Illumina 1.5+": illumina_1_5_error_prob,
+                         "Illumina 1.8+": illumina_1_8_error_prob}

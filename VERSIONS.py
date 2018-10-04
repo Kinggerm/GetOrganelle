@@ -6,6 +6,15 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0",
+     "features": [
+         "1.estimate_word_size() added.",
+         "2.auto_word_size_step (--auto-wss, --soft-max-words, -r) added.",
+         "3.mean_error_rate added.",
+         "4.options re-organized and introductions optimized: '-h' versus '--help'.",
+         "5.Utilities/mk_get_organelle.py recognize *.gz files.",
+         "6.change the default setting of --max-n-words"
+     ]},
     {"number": "1.3.1",
      "features": [
          "1.'--max-discard-percent' added to prevent discarding too much data.",

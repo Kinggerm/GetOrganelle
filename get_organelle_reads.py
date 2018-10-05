@@ -531,7 +531,7 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
         # 1. relationship between kmer coverage and base coverage, k_cov = base_cov * (read_len - k_len + 1) / read_len
         estimated_word_size = int(read_length * (1 - word_cov / base_cov)) + 1
         estimated_word_size = min(read_length - min_dif_rl_wl, max(min_word_size, estimated_word_size))
-        all_word_sizes.append(estimated_word_size)
+        all_word_sizes.append(int(round(estimated_word_size, 0)))
     if echo_problem:
         if log:
             log.warning("Guessing that you are using too few data for assembly!")

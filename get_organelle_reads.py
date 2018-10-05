@@ -96,7 +96,7 @@ def get_options(descriptions, version):
                                  "You can also make the index by your self and add those index to " +
                                  os.path.join(path_of_this_script, "Library", "/NotationReference") + "")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
-                            help="=\"-R 200 -r 10 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
+                            help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
                                  "--auto-wss 2 --max-n-words 1E9 -k 55,65,75,85,95,105,115,125\" "
                                  "This option is suggested for lowly-covered or nonhomogeneously-covered data (poor "
                                  "data). You can overwrite the value of a specific option listed above by adding "
@@ -267,7 +267,7 @@ def get_options(descriptions, version):
                           help="Target organelle genome type: cp/mt/nr/0. Default: %default")
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
-                          help="=\"-R 200 -r 10 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
+                          help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
                                "--auto-wss 2 --max-n-words 1E9 -k 55,65,75,85,95,105,115,125\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
@@ -364,8 +364,6 @@ def get_options(descriptions, version):
         if options.safe_strategy:
             if "-R" not in sys.argv and "--max-rounds" not in sys.argv:
                 options.max_rounds = 200
-            if "-r" not in sys.argv and "--min-rounds" not in sys.argv:
-                options.min_rounds = 10
             if "--max-reads" not in sys.argv:
                 options.maximum_n_reads = 2E8
             if "--min-quality-score" not in sys.argv:
@@ -548,13 +546,6 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
     global word_size
     if utilize_mapping:
         base_cov_values = get_query_cover(get_coverage_from_sam(os.path.join(out_base, "seed_bowtie.sam")))
-        # if estimated_base_cov < 15:
-        #     log.warning("Estimated " + options.organelle_type + " base-coverage: " + str(estimated_base_cov)
-        #                 + " too LOW!")
-        # elif estimated_base_cov < 25:
-        #     log.warning("Estimated " + options.organelle_type + " base-coverage: " + str(estimated_base_cov)
-        #                 + " relatively LOW!")
-        # else:
         log.info("Estimated " + organelle_type + " base-coverage: " + str(base_cov_values[1]))
     else:
         organelle_base_percent = 0.05
@@ -573,7 +564,6 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
             word_size = global_min_wl
             log.warning("Too small ratio " + str(word_size) + ", setting '-w " + str(global_min_wl) + "'")
         else:
-            # word_size = min(new_word_size, {"nr": 141, "cp": 121, "mt": 101}[options.organelle_type])
             word_size = new_word_size
             log.info("Setting '-w " + str(word_size) + "'")
         min_word_size = max(global_min_wl, word_size - auto_word_size_step * 4)
@@ -715,8 +705,6 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log, max
         if ignore_percent > maximum_ignore_percent:
             ignore_percent -= ignore_this_time
             break
-        # elif ignore_this_time > 0:
-        # chr(low_quality_score) does not exist in the sampling != chr(low_quality_score) does not exist
         else:
             low_quality_chars.append(chr(low_quality_score))
         low_quality_score += 1
@@ -729,22 +717,12 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log, max
     low_quality_chars = "".join(low_quality_chars)
 
     # calculate mean error rate
-    # if low_quality_chars:
-    #     all_quality_chars_list = [quality_line.strip(low_quality_chars) for quality_line in all_quality_chars_list]
-    # all_quality_chars = "".join(all_quality_chars_list)
     all_quality_char_dict = {in_quality_char: all_quality_chars.count(in_quality_char)
                              for in_quality_char in set(all_quality_chars)}
     error_prob_func = chose_error_prob_func[the_name]
     mean_error_rate = sum([error_prob_func(in_quality_char) * all_quality_char_dict[in_quality_char]
                            for in_quality_char in all_quality_char_dict]) / len_total
-    # if low_quality_chars:
-    #     log.info("Post trimming mean error rate: " + str(round(mean_error_rate, 4)))
-    # else:
     log.info("Mean error rate: " + str(round(mean_error_rate, 4)))
-
-    # calculate post trimming lengths
-    # post_trimming_read_lengths = [len(quality_line) for quality_line in all_quality_chars_list]
-    # post_trimming_mean = sum(post_trimming_read_lengths) / len(post_trimming_read_lengths)
 
     return "[" + low_quality_chars + "]", mean_error_rate  # , post_trimming_mean
 
@@ -1196,7 +1174,6 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_me
                 for word_to_merge in words_to_merge:
                     groups_of_duplicate_lines[this_group_to_keep][1].add(word_to_merge)
                     these_words[word_to_merge] = this_group_to_keep
-                    # print 'words to merge', words_to_merge
                 del groups_of_duplicate_lines[this_group_to_merge]
             # for the remain group to grow
             for this_word in this_words:
@@ -1213,8 +1190,6 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_me
             del lines_with_duplicates[del_line]
             del groups_of_duplicate_lines[del_words]
             count_del_single += 1
-    # print 'deleting', count_del_single, 'single line groups'
-    # print lines_with_duplicates
     if this_process:
         memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + " G, "
     else:
@@ -2171,13 +2146,11 @@ def main():
                 for file_id, read_file in enumerate(original_fq_files):
                     # unzip fq files if needed
                     if read_file.endswith(".gz") or read_file.endswith(".zip"):
-                        # log.info("Unzipping " + read_file + " ...")
                         target_fq = read_file + ".fastq"
                         if not (os.path.exists(target_fq) and resume):
                             unzip(read_file, target_fq, options.verbose_log, log)
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
-                        # log.info("Unzipping " + read_file + " finished.\n")
 
             # pre-reading fastq
             log.info("Pre-reading fastq ...")
@@ -2191,7 +2164,6 @@ def main():
             mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
                                                                                     options.maximum_n_reads)
             all_bases = mean_read_len * all_read_num
-            # mean_read_len = post_trimming_mean_len
             log.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
             log.info("Pre-reading fastq finished.\n")
 
@@ -2247,7 +2219,6 @@ def main():
             # extending process
             log.info("Extending ...")
             accepted_ids = set()
-            # echo_frequency = 1234321//(mean_read_len - word_size + 1)//2
             accepted_contig_id = extending_reads(seed_file=seed_file, seed_is_fq=options.utilize_mapping,
                                                  original_fq_files=original_fq_files, len_indices=len_indices,
                                                  pre_grouped=pre_grp, groups_of_duplicate_lines=groups_of_lines,

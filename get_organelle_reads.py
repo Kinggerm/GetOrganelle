@@ -1645,8 +1645,8 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
             log.info("Hit the round limit " + str(r_lim) + " and terminated ...")
         del reads_generator
         not_reasonable_word_size = False
-    del accepted_words
-    del accepted_contig_id_this_round
+        accepted_words = set()
+        accepted_contig_id_this_round = set()
     del l_with_duplicates
     return accepted_contig_id
 

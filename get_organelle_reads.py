@@ -1380,7 +1380,7 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                                             accepted_words.add(this_c_seq_part[temp_length - i:seq_len - i])
                                 else:
                                     accepted = False
-                                    for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                    for this_seq_part in this_seq:
                                         seq_len = len(this_seq_part)
                                         temp_length = seq_len - word_size
                                         for i in range(0, (temp_length + 1) // 2, jump_step):
@@ -1433,7 +1433,7 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                             this_c_seq = next(reads_generator)
                             if unique_read_id not in accepted_contig_id:
                                 accepted = False
-                                for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
+                                for this_seq_part in this_seq:
                                     seq_len = len(this_seq_part)
                                     temp_length = seq_len - word_size
                                     for i in range(0, (temp_length + 1) // 2, jump_step):

@@ -12,6 +12,8 @@ sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.seq_parser import *
 from Library.pipe_control_func import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+not_ref_path = os.path.join(path_of_this_script, "Library", "NotationReference")
+seq_ref_path = os.path.join(path_of_this_script, "Library", "SeqReference")
 import time
 
 
@@ -58,11 +60,13 @@ def get_options(descriptions, version):
                            help="Input file(s) with unpaired (single-end) reads to be added to the pool. "
                                 "files could be comma-separated lists such as 'seq1,seq2'.")
     group_inout.add_option("-o", dest="output_base", help="Out put directory. Overwriting files if directory exists.")
-    group_inout.add_option("-s", dest="seed_file", help="Reference. Input fasta format file as initial seed "
-                                                        "or input bowtie index base name as pre-seed (see flag '--bs')")
+    group_inout.add_option("-s", dest="seed_file", default=os.path.join(seq_ref_path, "*.fasta"),
+                           help="Reference. Input fasta format file as initial seed or input bowtie index base name "
+                                "as pre-seed (see flag '--bs'). "
+                                "Default: '%default' (* depends on the value followed with flag '-F')")
     group_inout.add_option("--bs", dest="bowtie2_seed",
                            help="Input bowtie2 index base name as pre-seed. "
-                                "This flag serves as an alternation of flag '-s'.")
+                                "This flag serves as an alternation of the flag '-s'.")
     group_inout.add_option("-a", dest="anti_seed", 
                            help="Anti-reference. Input fasta format file as anti-seed, where the extension process "
                                 "stop. Typically serves as excluding chloroplast reads when extending mitochondrial "
@@ -92,9 +96,7 @@ def get_options(descriptions, version):
     group_scheme = OptionGroup(parser, "SCHEME OPTIONS", "Options on running schemes.")
     group_scheme.add_option("-F", dest="organelle_type", default="cp",
                             help="This flag should be followed with cp (if you want get chloroplast), mt "
-                                 "(mitochondria), nr (nuclear ribosomal RNA), 0 (disable this). Default: %default. "
-                                 "You can also make the index by your self and add those index to " +
-                                 os.path.join(path_of_this_script, "Library", "/NotationReference") + "")
+                                 "(mitochondria), nr (nuclear ribosomal RNA). Default: %default. ")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
                             help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
                                  "--auto-wss 2 --max-n-words 1E9 -k 55,65,75,85,95,105,115,125\" "
@@ -183,7 +185,10 @@ def get_options(descriptions, version):
     group_assembly.add_option("--no-spades", dest="run_spades", action="store_false", default=True,
                               help="Disable SPAdes.")
     group_assembly.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
-                              help="Depth factor for differentiate genome type of contigs. Default: %default")
+                              help="Depth factor for differentiate genome type of contigs. "
+                                   "The genome type of contigs are determined by blast. "
+                                   "You can also make the blast index by your self and add those index to '" +
+                                   not_ref_path + "'. Default: %default")
     group_assembly.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
                               help="Depth factor for confirming contamination in parallel contigs. Default: %default")
     group_assembly.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
@@ -257,14 +262,15 @@ def get_options(descriptions, version):
         parser.remove_option("-o")
         parser.add_option("-o", dest="output_base", help="Out put directory.")
         parser.remove_option("-s")
-        parser.add_option("-s", dest="seed_file", help="Reference. Input fasta format file as initial seed.")
+        parser.add_option("-s", dest="seed_file", help="Reference. Input fasta format file as initial seed. "
+                                                       "Default: " + os.path.join(seq_ref_path, "*.fasta"))
         parser.remove_option("-w")
         parser.add_option("-w", dest="word_size", help="Word size (W) for extension. Default: auto-estimated")
         parser.remove_option("-R")
         parser.add_option("-R", dest="max_rounds", help="Maximum running rounds (>=3). Default: unlimited")
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type", default="cp",
-                          help="Target organelle genome type: cp/mt/nr/0. Default: %default")
+                          help="Target organelle genome type: cp/mt/nr. Default: %default")
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
@@ -306,6 +312,11 @@ def get_options(descriptions, version):
             sys.stdout.write("\n############################################################################"
                              "\nERROR: unbalanced paired reads!\n\n")
             exit()
+        if options.organelle_type not in {"cp", "mt", "nr"}:
+            sys.stdout.write("\n############################################################################"
+                             "\nERROR: \"-F\" MUST be one of 'cp', 'mt', 'nr'!")
+        if "*" in options.seed_file:
+            options.seed_file = options.seed_file.replace("*", options.organelle_type)
         for check_file in (options.fq_file_1, options.fq_file_2, options.seed_file, options.anti_seed):
             if check_file:
                 if not os.path.exists(check_file):
@@ -429,6 +440,7 @@ def get_options(descriptions, version):
                 options.target_genome_size *= 3
             elif options.organelle_type == "nr":
                 options.target_genome_size /= 10.
+
         if options.maximum_n_words <= options.soft_max_words:
             log.error("The value of \"--max-n-words\" must be smaller than the value of \"--soft-max-words\"!")
             exit()

@@ -1,7 +1,7 @@
 # GetOrganelle
 
 
-This pipeline assemblies organelle genome from genomic skimming data with an input reference, which should be the same organelle genome sequence but not necessarily a relate species within the focal clade.
+This pipeline assemblies organelle genome from genomic skimming data.
 
 <div id="citation"></div>
 
@@ -48,13 +48,15 @@ then add */GetOrganelle and */GetOrganelle/Utilities to the path:
     
     echo "export PATH" >> ~/.bashrc
     
-and make them executable:
+and make them writable/executable:
     
     chmod +x {where_you_clone_GetOrganelle}/GetOrganelle/*.py
     
     chmod +x {where_you_clone_GetOrganelle}/GetOrganelle/Utilities/*.py
     
     chmod +x {where_you_clone_GetOrganelle}/GetOrganelle/Library/*.py
+    
+    chmod +w {where_you_clone_GetOrganelle}/GetOrganelle/Library/*Reference
     
 It is also very IMPORTANT to keep updated (if you find your version is out of date!):
     
@@ -92,7 +94,7 @@ Currently, this script was written for illumina pair-end/single-end data (fastq 
 
 <b>Filtering and Assembly</b>
 
-Take your input reference (fasta or bowtie index) as probe, the script would recruit target reads in successive rounds (extending process). You could also using the references in `Library/SeqReference`, but a more related reference is safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. Since version 1.4.0, if there is no user assigned word size value, GetOrganelle would automatically estimate the initial word size based no the data characters and adjust the value ("--auto-wss") according to the behaviour of extending process. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust the value if a complete/circular organelle result is produced, because the circular result by GetOrganelle is generally consistent under different options. After extending, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
+Take your input reference (fasta or bowtie index; the default is Library/SeqReference/*.fasta) as probe, the script would recruit target reads in successive rounds (extending process). You could also using the references in `Library/SeqReference`, but a more related reference is safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes from data to data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. Since version 1.4.0, if there is no user assigned word size value, GetOrganelle would automatically estimate the initial word size based no the data characters and adjust the value ("--auto-wss") according to the behaviour of extending process. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust the value if a complete/circular organelle result is produced, because the circular result by GetOrganelle is generally consistent under different options. After extending, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
 
 <b>Producing Result</b>
 
@@ -111,7 +113,7 @@ For 2G raw data, 150 bp reads, to assembly chloroplast, typically I use:
 
 or in a draft way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output --fast -k 75,85,95,105
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 75,85,95,105
 
 or in a slow and memory-economic way:
 

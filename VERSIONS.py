@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0a",
+     "features": [
+         "1.default reference seq set as Library/SeqReference/*.fasta.",
+     ]},
     {"number": "1.4.0",
      "features": [
          "1.estimate_word_size() added.",

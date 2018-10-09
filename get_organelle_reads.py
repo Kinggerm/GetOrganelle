@@ -669,18 +669,28 @@ def get_read_len_mean_max_count(fq_files, maximum_n_reads):
     return sum(read_lengths)/len(read_lengths), max(read_lengths), all_count
 
 
-def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log, maximum_ignore_percent=0.05,
-                          sampling_percent=0.1):
+def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
+                          maximum_ignore_percent=0.05, sampling_percent=0.1):
     sampling_percent = int(1 / sampling_percent)
     all_quality_chars_list = []
+    record_fq_beyond_read_num_limit = []
     for fq_f in fq_files:
         count_r = 0
-        for quality_str in fq_seq_simple_generator(fq_f, go_to_line=3):
+        record_fq_beyond_read_num_limit.append(False)
+        this_fq_generator = fq_seq_simple_generator(fq_f, go_to_line=3)
+        for quality_str in this_fq_generator:
             if count_r % sampling_percent == 0:
                 all_quality_chars_list.append(quality_str)
             count_r += 1
             if count_r >= maximum_n_reads:
                 break
+        for quality_str in this_fq_generator:
+            if quality_str:
+                log.info("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + os.path.basename(fq_f)
+                         + ", only top " + str(int(maximum_n_reads))
+                         + " reads are used in downstream analysis (suggested).")
+                record_fq_beyond_read_num_limit[-1] = True
+            break
     all_quality_chars = "".join(all_quality_chars_list)
     len_total = float(len(all_quality_chars))
     max_quality = max(all_quality_chars)
@@ -736,7 +746,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log, max
                            for in_quality_char in all_quality_char_dict]) / len_total
     log.info("Mean error rate: " + str(round(mean_error_rate, 4)))
 
-    return "[" + low_quality_chars + "]", mean_error_rate  # , post_trimming_mean
+    return "[" + low_quality_chars + "]", mean_error_rate, record_fq_beyond_read_num_limit  # , post_trimming_mean
 
 
 def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fq_info_in_memory,
@@ -1032,9 +1042,9 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
                     line = file_in.readline()
             line = file_in.readline()
             file_in.close()
-            if line:
-                log.warning("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + file_name + ", only top "
-                            + str(int(maximum_n_reads)) + " reads are used in downstream analysis (suggested).")
+            # if line:
+            #     log.warning("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + file_name + ", only "
+            #                 "top " +str(int(maximum_n_reads)) + " reads are used in downstream analysis (suggested).")
         if not index_in_memory:
             temp1_contig_out.close()
             os.rename(temp1_contig_dir[0], temp1_contig_dir[1])
@@ -1703,8 +1713,8 @@ def get_heads_from_sam(bowtie_sam_file):
     return hit_heads
 
 
-def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, original_fq_files, out_base, resume,
-                         verbose_log, threads, prefix, log):
+def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, max_num_reads, original_fq_files,
+                         original_fq_beyond_read_limit, out_base, resume, verbose_log, threads, prefix, keep_temp, log):
     if seed_file:
         if os.path.exists(seed_file + '.index.1.bt2l'):
             log.info("Bowtie2 index existed!")
@@ -1728,6 +1738,16 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         seed_index_base = seed_file + '.index'
     else:
         seed_index_base = bowtie2_seed
+
+    query_fq_files = []
+    for count_fq, ori_fq in enumerate(original_fq_files):
+        if original_fq_beyond_read_limit[count_fq]:
+            query_fq = ori_fq.strip() + ".Reduced"
+            os.system("head -n " + str(int(max_num_reads * 4)) + " " + ori_fq + " > " + query_fq)
+            query_fq_files.append(query_fq)
+        else:
+            query_fq_files.append(ori_fq)
+
     total_seed_file = [os.path.join(out_base, x + prefix + "Initial.mapped.fq") for x in ("temp.", "")]
     total_seed_sam = [os.path.join(out_base, x + prefix + "seed_bowtie.sam") for x in ("temp.", "")]
     if resume and os.path.exists(total_seed_file[1]):
@@ -1735,7 +1755,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
     else:
         log.info("Mapping reads to seed - bowtie2 index ...")
         this_command = "bowtie2 -p " + str(threads) + " --very-fast-local --al " + total_seed_file[0] + \
-                       " -x " + seed_index_base + " -U " + ",".join(original_fq_files) + " -S " + total_seed_sam[0] + \
+                       " -x " + seed_index_base + " -U " + ",".join(query_fq_files) + " -S " + total_seed_sam[0] + \
                        " --no-unal --no-hd --no-sq -t"
         make_seed_bowtie2 = subprocess.Popen(this_command,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -1788,7 +1808,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         else:
             log.info("Mapping reads to anti-seed - bowtie2 index ...")
             this_command = "bowtie2 -p " + str(threads) + " --very-fast-local -x " + anti_index_base + " -U " +\
-                           ",".join(original_fq_files) + " -S " + anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t"
+                           ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t"
             make_anti_seed_bowtie2 = subprocess.Popen(this_command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log:
@@ -1810,6 +1830,12 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         log.info("Parsing bowtie2 result finished ...")
     else:
         anti_lines = set()
+
+    if not keep_temp:
+        for count_fq, query_fq in enumerate(query_fq_files):
+            if original_fq_beyond_read_limit[count_fq]:
+                os.remove(query_fq)
+
     return total_seed_file[1], anti_lines
 
 
@@ -2000,9 +2026,10 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log):
         return True
 
 
-def unzip(source, target, verbose_log, log):
+def unzip(source, target, line_limit, verbose_log, log):
     target_temp = target + ".Temp"
-    try_commands = ["gunzip -c " + source + " > " + target_temp, "tar -x -f " + source + " -O > " + target_temp]
+    try_commands = ["gunzip -c " + source + " | head -n " + str(line_limit) + " > " + target_temp,
+                    "tar -x -f " + source + " -O | head -n " + str(line_limit) + " > " + target_temp]
     log.info("Unzipping reads file: " + source)
     success = False
     output = b""
@@ -2160,7 +2187,7 @@ def main():
                     if read_file.endswith(".gz") or read_file.endswith(".zip"):
                         target_fq = read_file + ".fastq"
                         if not (os.path.exists(target_fq) and resume):
-                            unzip(read_file, target_fq, options.verbose_log, log)
+                            unzip(read_file, target_fq, int(4 * options.maximum_n_reads), options.verbose_log, log)
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
 
@@ -2168,7 +2195,7 @@ def main():
             log.info("Pre-reading fastq ...")
             log.info("Counting read qualities ...")
             sampling_percent = 0.1
-            low_quality_pattern, mean_error_rate = \
+            low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
                 get_read_quality_info(original_fq_files, options.maximum_n_reads, options.min_quality_score, log,
                                       maximum_ignore_percent=options.maximum_ignore_percent,
                                       sampling_percent=sampling_percent)
@@ -2184,9 +2211,10 @@ def main():
             seed_file = check_fasta_seq_names(options.seed_file, log)
             if options.utilize_mapping:
                 seed_file, anti_lines = mapping_with_bowtie2(seed_file, bowt_seed, anti_seed,
-                                                             b_at_seed, original_fq_files,
-                                                             out_base, resume,
-                                                             verb_log, options.threads, options.prefix, log)
+                                                             b_at_seed, options.maximum_n_reads, original_fq_files,
+                                                             original_fq_beyond_read_limit, out_base, resume,
+                                                             verb_log, options.threads, options.prefix,
+                                                             options.keep_temp_files, log)
                 log.info(seed_file + ": " + str(round(os.path.getsize(seed_file) / 1024 / 1024, 2)) + " M")
             else:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),

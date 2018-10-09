@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0b",
+     "features": [
+         "1.--max-reads also works for mapping now, which would do better in target coverage estimation.",
+     ]},
     {"number": "1.4.0a",
      "features": [
          "1.default reference seq set as Library/SeqReference/*.fasta.",

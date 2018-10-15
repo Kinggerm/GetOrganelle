@@ -6,7 +6,7 @@ import sys
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.assembly_parser import Assembly
+from Library.assembly_parser import *
 from Library.seq_parser import *
 from Library.pipe_control_func import logging, timed_log, simple_log, set_time_limit
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
@@ -40,6 +40,12 @@ def get_options(print_title):
                       help="Similarity threshold for confirming parallel contigs. Default:%default")
     parser.add_option("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
                       help="Minimum deviation factor for excluding non-target contigs. Default:%default")
+    parser.add_option("--min-cov", dest="min_cov", type=float, default=0.,
+                      help="Minimum coverage for a contig to be included in disentangling. Default:%default")
+    parser.add_option("--max-cov", dest="max_cov", type=float, default=inf,
+                      help="Minimum coverage for a contig to be included in disentangling. Default:%default")
+    parser.add_option("--prefix", dest="prefix", default="target",
+                      help="Prefix of output files inside output directory. Default:%default")
     parser.add_option("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
                       help="export intermediate graph file.")
     parser.add_option("--time-limit", dest="time_limit", default=300, type=int,
@@ -56,10 +62,10 @@ def get_options(print_title):
     else:
         if options.output_directory and not os.path.exists(options.output_directory):
             os.mkdir(options.output_directory)
-        log = simple_log(logging.getLogger(), options.output_directory, "disentangle.")
+        log = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
         log.info(print_title)
         log.info(' '.join(sys.argv) + '\n')
-        log = timed_log(log, options.output_directory, "disentangle.")
+        log = timed_log(log, options.output_directory, options.prefix + ".disentangle.")
         return options, log
 
 
@@ -81,7 +87,7 @@ def main():
             log.info(">>> Parsing " + fastg_file + " ..")
         else:
             sys.stdout.write("Parsing " + fastg_file + " ..\n")
-        input_graph = Assembly(fastg_file)
+        input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
         time_b = time.time()
         if log:
             log.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
@@ -126,7 +132,7 @@ def main():
 
     try:
         disentangle_circular_assembly(options.fastg_file, options.tab_file,
-                                      os.path.join(options.output_directory, "target"),
+                                      os.path.join(options.output_directory, options.prefix),
                                       type_factor=options.type_factor,
                                       mode=options.mode,
                                       weight_factor=options.weight_factor,
@@ -138,12 +144,12 @@ def main():
                                       min_sigma_factor=options.min_sigma_factor,
                                       keep_temp=options.keep_temp_graph,
                                       log=log, verbose=options.verbose, debug=options.debug)
-        log = simple_log(logging.getLogger(), options.output_directory, "disentangle.")
+        log = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
 
         log.info('\nTotal cost: ' + str(round(time.time() - time0, 4)) + 's\n')
     except:
         log.exception("")
-        log = simple_log(log, options.output_directory, "disentangle.")
+        log = simple_log(log, options.output_directory, options.prefix + ".disentangle.")
         log.info("\nTotal cost " + str(time.time() - time0))
         log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")
     logging.shutdown()

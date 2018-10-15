@@ -22,10 +22,10 @@ else:
 
 
 class Assembly:
-    def __init__(self, fastg_file):
+    def __init__(self, fastg_file, min_cov=0., max_cov=inf):
         self.vertex_info = {}
         self.__kmer = 127
-        self.parse_fastg(fastg_file)
+        self.parse_fastg(fastg_file, min_cov=min_cov, max_cov=max_cov)
         self.vertex_clusters = []
         self.update_vertex_clusters()
         self.tagged_vertices = {}
@@ -47,7 +47,7 @@ class Assembly:
             res.append("\n")
         return "".join(res)
 
-    def parse_fastg(self, fastg_file):
+    def parse_fastg(self, fastg_file, min_cov=0., max_cov=inf):
         fastg_matrix = SequenceList(fastg_file)
         # initialize names; only accept vertex that are formally stored, skip those that are only mentioned after ":"
         for i, seq in enumerate(fastg_matrix):
@@ -56,9 +56,13 @@ class Assembly:
             else:
                 this_vertex_str, next_vertices_str = seq.label.strip(";"), ""
             v_tag, vertex_name, l_tag, vertex_len, c_tag, vertex_cov = this_vertex_str.strip("'").split("_")
+            # skip vertices with cov out of bounds
+            vertex_cov = float(vertex_cov)
+            if not (min_cov <= vertex_cov <= max_cov):
+                continue
             if vertex_name not in self.vertex_info:
                 self.vertex_info[vertex_name] = {"len": int(vertex_len),
-                                                 "cov": float(vertex_cov),
+                                                 "cov": vertex_cov,
                                                  "long": this_vertex_str.strip("'")}
             if "connections" not in self.vertex_info[vertex_name]:
                 self.vertex_info[vertex_name]["connections"] = {True: set(), False: set()}  # "tail"~True, "head"~False
@@ -70,26 +74,28 @@ class Assembly:
             else:
                 this_vertex_str, next_vertices_str = seq.label.strip(";"), ""
             v_tag, vertex_name, l_tag, vertex_len, c_tag, vertex_cov = this_vertex_str.strip("'").split("_")
-            # connections
-            this_end = not this_vertex_str.endswith("'")
-            if next_vertices_str:
-                for next_vertex_str in next_vertices_str.split(","):
-                    next_name = next_vertex_str.strip("'").split("_")[1]
-                    if next_name in self.vertex_info:
-                        next_end = next_vertex_str.endswith("'")
-                        # Adding connection information (edge) to both of the related vertices
-                        # even it is only mentioned once in some SPAdes output files
-                        self.vertex_info[vertex_name]["connections"][this_end].add((next_name, next_end))
-                        self.vertex_info[next_name]["connections"][next_end].add((vertex_name, this_end))
-            # sequence
-            if "seq" not in self.vertex_info[vertex_name]:
-                self.vertex_info[vertex_name]["seq"] = {}
-                if this_end:
-                    self.vertex_info[vertex_name]["seq"][True] = seq.seq
-                    self.vertex_info[vertex_name]["seq"][False] = complementary_seq(seq.seq)
-                else:
-                    self.vertex_info[vertex_name]["seq"][True] = complementary_seq(seq.seq)
-                    self.vertex_info[vertex_name]["seq"][False] = seq.seq
+            # skip vertices that not in self.vertex_info: 1. with cov out of bounds
+            if vertex_name in self.vertex_info:
+                # connections
+                this_end = not this_vertex_str.endswith("'")
+                if next_vertices_str:
+                    for next_vertex_str in next_vertices_str.split(","):
+                        next_name = next_vertex_str.strip("'").split("_")[1]
+                        if next_name in self.vertex_info:
+                            next_end = next_vertex_str.endswith("'")
+                            # Adding connection information (edge) to both of the related vertices
+                            # even it is only mentioned once in some SPAdes output files
+                            self.vertex_info[vertex_name]["connections"][this_end].add((next_name, next_end))
+                            self.vertex_info[next_name]["connections"][next_end].add((vertex_name, this_end))
+                # sequence
+                if "seq" not in self.vertex_info[vertex_name]:
+                    self.vertex_info[vertex_name]["seq"] = {}
+                    if this_end:
+                        self.vertex_info[vertex_name]["seq"][True] = seq.seq
+                        self.vertex_info[vertex_name]["seq"][False] = complementary_seq(seq.seq)
+                    else:
+                        self.vertex_info[vertex_name]["seq"][True] = complementary_seq(seq.seq)
+                        self.vertex_info[vertex_name]["seq"][False] = seq.seq
 
         """detect kmer"""
         ## find initial kmer candidate values

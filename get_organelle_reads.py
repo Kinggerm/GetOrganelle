@@ -128,9 +128,14 @@ def get_options(descriptions, version):
     # group 3
     group_extending = OptionGroup(parser, "EXTENDING OPTIONS", "Options on the performance of extending process")
     group_extending.add_option("-w", dest="word_size", type=float,
-                               help="Word size (W) for extension. You could assign the ratio (1>input>0) of W to "
+                               help="Word size (W) for pre-grouping (if not assigned by '--pre-w') and extending "
+                                    "process. You could assign the ratio (1>input>0) of W to "
                                     "read_length, based on which this script would estimate the W for you; "
                                     "or assign an absolute W value (read length>input>=35). Default: auto-estimated.")
+    group_extending.add_option("--pre-w", dest="pregroup_word_size", type=float,
+                               help="Word size (W) for pre-grouping. Used to reproduce result when word size is "
+                                    "a certain value during pregrouping process and later changed during reads "
+                                    "extending process. Similar to word size. Default: auto-estimated.")
     group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int,
                                help="Maximum number of running rounds (>=3). Default: unlimited.")
     group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
@@ -142,15 +147,15 @@ def get_options(descriptions, version):
                                help="Maximum number of words to be used in total."
                                     "Default: 2E8 (-F cp), 4E7 (-F nr) or 1E9 (-F mt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=1,
-                               help="The wide of steps of checking words in reads during extension (integer >= 1). "
-                                    "When you have reads of high quality, the larger the number is, "
+                               help="The wide of steps of checking words in reads during extending process "
+                                    "(integer >= 1). When you have reads of high quality, the larger the number is, "
                                     "the faster the extension will be, "
                                     "the more risk of missing reads in low coverage area. "
                                     "Choose 1 to choose the slowest but safest extension strategy. Default: 1")
     group_extending.add_option("-M", dest="mesh_size", type=int, default=1,
                                help="(Beta parameter) "
-                                    "The wide of steps of building words from seeds during extension (integer >= 1). "
-                                    "When you have reads of high quality, the larger the number is, "
+                                    "The wide of steps of building words from seeds during extending process "
+                                    "(integer >= 1). When you have reads of high quality, the larger the number is, "
                                     "the faster the extension will be, "
                                     "the more risk of missing reads in low coverage area. "
                                     "Another usage of this mesh size is to choose a larger mesh size coupled with a "
@@ -246,7 +251,7 @@ def get_options(descriptions, version):
     elif "-h" in sys.argv:
         for not_often_used in ("--bs", "-a", "--ba", "--max-reads", "--max-ignore-percent",
                                "--min-quality-score", "--prefix", "--out-per-round", "--keep-temp",
-                               "--memory-save", "--memory-unlimited", "-r",
+                               "--memory-save", "--memory-unlimited", "--pre-w", "-r", "--min-rounds",
                                "--max-n-words", "-J", "-M", "--no-bowtie2", "--auto-wss", "--soft-max-words",
                                "--target-genome-size", "--spades-options", "--no-spades", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
@@ -366,11 +371,20 @@ def get_options(descriptions, version):
                 exit()
         elif 0 < options.word_size < 1:
             pass
-        elif options.word_size >= 21:
+        elif options.word_size >= global_min_wl:
             options.word_size = int(options.word_size)
         else:
             log.error("Illegal word size (\"-w\") value!")
             exit()
+        
+        if options.pregroup_word_size:
+            if 0 < options.pregroup_word_size < 1:
+                pass
+            elif options.pregroup_word_size >= global_min_wl:
+                options.pregroup_word_size = int(options.pregroup_word_size)
+            else:
+                log.error("Illegal word size (\"--pre-w\") value!")
+                exit()
 
         if options.safe_strategy:
             if "-R" not in sys.argv and "--max-rounds" not in sys.argv:
@@ -1087,10 +1101,10 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
     return forward_reverse_reads, line_clusters, len_indices, keep_seq_parts
 
 
-def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_memory, log):
-    global word_size
+def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_memory, preg_word_size, log):
     forward_and_reverse_reads, line_clusters, len_indices, keep_seq_parts = fastq_indices_in_memory
-    log.info("Pre-grouping reads...")
+    log.info("Pre-grouping reads ...")
+    log.info("Setting '--pre-w " + str(preg_word_size) + "'")
     lines_with_duplicates = {}
     count_dupli = 0
     for j in range(len(line_clusters)):
@@ -1144,9 +1158,9 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_me
         if keep_seq_parts:
             for this_seq_part, this_c_seq_part in zip(this_seq, this_c_seq):
                 seq_len = len(this_seq_part)
-                temp_length = seq_len - word_size
+                temp_length = seq_len - preg_word_size
                 for i in range(0, temp_length + 1):
-                    forward = this_seq_part[i:i + word_size]
+                    forward = this_seq_part[i:i + preg_word_size]
                     reverse = this_c_seq_part[temp_length - i:seq_len - i]
                     if forward in these_words:
                         these_group_id.add(these_words[forward])
@@ -1155,9 +1169,9 @@ def pre_grouping(fastq_indices_in_memory, dupli_threshold, out_base, index_in_me
                         this_words.append(reverse)
         else:
             seq_len = len(this_seq)
-            temp_length = seq_len - word_size
+            temp_length = seq_len - preg_word_size
             for i in range(0, temp_length + 1):
-                forward = this_seq[i:i + word_size]
+                forward = this_seq[i:i + preg_word_size]
                 reverse = this_c_seq[temp_length - i:seq_len - i]
                 if forward in these_words:
                     these_group_id.add(these_words[forward])
@@ -2248,7 +2262,9 @@ def main():
                 log.info("Reads are stored as fragments.")
             # pre-grouping if asked
             if pre_grp:
-                groups_of_lines, lines_in_a_group = pre_grouping(fq_info_in_memory, pre_grp, out_base, in_memory, log)
+                preg_word_size = word_size if not options.pregroup_word_size else options.pregroup_word_size
+                groups_of_lines, lines_in_a_group = pre_grouping(fq_info_in_memory, pre_grp, out_base, in_memory,
+                                                                 preg_word_size=preg_word_size, log=log)
             else:
                 groups_of_lines = None
                 lines_in_a_group = None

@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0c",
+     "features": [
+         "1.'--pre-w' added mainly for reproducing results when word size changes during reads extending process.",
+     ]},
     {"number": "1.4.0b",
      "features": [
          "1.--max-reads also works for mapping now, which would do better in target coverage estimation.",

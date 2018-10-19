@@ -10,6 +10,7 @@ try:
     import commands
 except:
     pass
+from math import inf
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
@@ -79,8 +80,10 @@ def require_commands():
     parser.add_option('--depth-cutoff', dest='depth_cutoff', default=10000.0, type=float,
                       help='After detection for target coverage, those beyond certain times (depth cutoff) of the'
                            ' detected coverage would be excluded. Default: 100.0')
-    parser.add_option('--depth-threshold', dest='depth_threshold',
-                      help='Input a float or integer number. filter fastg file by depth. Default: no threshold.')
+    parser.add_option('--min-depth', dest='min_depth',
+                      help='Input a float or integer number. Filter fastg file by a minimum depth. Default: no threshold.')
+    parser.add_option('--max-depth', dest='max_depth',
+                      help='Input a float or integer number. filter fastg file by a maximum depth. Default: no threshold.')
     parser.add_option('--include', dest='include',
                       help='followed by Blast index format')
     parser.add_option('--include-priority', dest='include_priority',
@@ -489,17 +492,21 @@ def map_names(in_names, ex_names, candidates, is_fastg, aver_in_dep, coverages, 
     return accepted
 
 
-def filter_fastg_by_depth(fas_file, depth):
-    if fas_file.endswith('.fastg') and depth and float(depth):
-        depth = float(depth)
+def filter_fastg_by_depth(fas_file, max_depth, min_depth):
+    bounded = (max_depth and float(max_depth)) or (min_depth and float(min_depth))
+    if fas_file.endswith('.fastg') and bounded:
+        max_depth = min(float(max_depth), inf)
+        min_depth = max(0., float(min_depth))
         time0 = time.time()
         fastg_matrix = read_fasta(fas_file)
         new_fastg_matrix = [[], [], fastg_matrix[2]]
         for i in range(len(fastg_matrix[0])):
-            if float(fastg_matrix[0][i].split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0]) >= depth:
+            if max_depth > float(fastg_matrix[0][i].split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0]) \
+                    >= min_depth:
                 new_fastg_matrix[0].append(fastg_matrix[0][i])
                 new_fastg_matrix[1].append(fastg_matrix[1][i])
-        out_fasta = '.'.join(fas_file.split('.')[:-1]) + '.depth' + str(depth) + '.' + fas_file.split('.')[-1]
+        out_fasta = '.'.join(fas_file.split('.')[:-1]) + '.depth' + str(min_depth) + "-" + str(max_depth) + \
+                    '.' + fas_file.split('.')[-1]
         write_fasta(out_dir=out_fasta, matrix=new_fastg_matrix, overwrite=True)
         sys.stdout.write('\nfilter by depth cost: '+str(time.time()-time0))
         return out_fasta
@@ -626,7 +633,7 @@ def main():
         fas_file = args[i]
         is_fastg = fas_file.endswith('.fastg')
         # prepare fasta file
-        fas_file = filter_fastg_by_depth(fas_file, options.depth_threshold)
+        fas_file = filter_fastg_by_depth(fas_file, options.max_depth, options.min_depth)
         # rm low coverage duplicated contigs
         if options.remove_low_duplicated and is_fastg:
             os.system('rm_low_coverage_duplicated_contigs.py -t '+str(options.threads)+" "+fas_file)

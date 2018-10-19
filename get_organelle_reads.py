@@ -82,7 +82,7 @@ def get_options(descriptions, version):
     group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
                                 "Default: %default")
-    group_inout.add_option("--min-quality-score", dest="min_quality_score", type=int, default=5,
+    group_inout.add_option("--min-quality-score", dest="min_quality_score", type=int, default=2,
                            help="Minimum quality score in extension. This value would be automatically increased "
                                 "to prevent ignoring too much raw data (see --max-ignore-percent)."
                                 "Default: %default ('%' in Phred+33; 'E' in Phred+64/Solexa+64)")
@@ -170,9 +170,9 @@ def get_options(descriptions, version):
     group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=4, type=int,
                                help="The step of word size adjustment during extending process."
                                     "Choose 0 to disable this automatic adjustment. Default: %default.")
-    group_extending.add_option("--soft-max-words", dest="soft_max_words", type=float, default=6E7,
+    group_extending.add_option("--soft-max-words", dest="soft_max_words", type=float, default=8E7,
                                help="Maximum number of words to be used to test the fitness of a word size value."
-                                    "Default: 6E7 (-F cp), 1.2E7 (-F nr) or 3E8 (-F mt)")
+                                    "Default: 8E7 (-F cp), 1.6E7 (-F nr) or 4E8 (-F mt)")
     group_extending.add_option("--target-genome-size", dest="target_genome_size", default=130000, type=int,
                                help="Hypothetical value of target genome single copy region size for estimating "
                                     "word size when '--no-bowtie2' is chosen and no '-w word_size' is given. "
@@ -1627,7 +1627,7 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                                     "'-w " + str(word_size + auto_word_size_step) + "'")
                 else:
                     log.info("No more reads found and terminated ...")
-                    log.warning("Terminated at an insufficient number of rounds, see '--auto-wss' for more.")
+                    log.warning("Terminated at an insufficient number of rounds, see '--auto-wss' and '-r' for more.")
             else:
                 log.info("No more reads found and terminated ...")
         except WordsLimitException:
@@ -1638,7 +1638,8 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                     log.warning("Terminated at an insufficient number of rounds while '-w " + str(word_size) + "'")
                 else:
                     log.info("Hit the words limit and terminated ...")
-                    log.warning("Terminated at an insufficient number of rounds, see '--auto-wss' for more.")
+                    log.warning("Terminated at an insufficient number of rounds, see '--auto-wss', '-r' and "
+                                "'--max-n-words' for more.")
             else:
                 log.info("Hit the words limit and terminated ...")
         except WordsSoftLimitException:

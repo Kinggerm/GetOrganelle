@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0d",
+     "features": [
+         "1.some default values adjusted.",
+         "2.slim_fastg.py: '--depth-threshold' -> '--min-depth'&'--max-depth'"
+     ]},
     {"number": "1.4.0c",
      "features": [
          "1.'--pre-w' added mainly for reproducing results when word size changes during reads extending process.",

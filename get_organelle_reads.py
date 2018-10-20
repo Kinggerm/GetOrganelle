@@ -361,6 +361,7 @@ def get_options(descriptions, version):
         log = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
         log.info("")
         log.info(descriptions)
+        log.info(sys.version)
         log.info(" ".join(sys.argv) + "\n")
         log = timed_log(log, options.output_base, options.prefix + "get_org.")
         if options.word_size is None:

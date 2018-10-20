@@ -6,10 +6,17 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0e",
+     "features": [
+         "1.print python version",
+         "2.gfa2fastg.py modified, gfa2fasta.py added, fastg2gfa.py added",
+     ]},
     {"number": "1.4.0d",
      "features": [
          "1.some default values adjusted.",
-         "2.slim_fastg.py: '--depth-threshold' -> '--min-depth'&'--max-depth'"
+         "2.slim_fastg.py: '--depth-threshold' -> '--min-depth'&'--max-depth'",
+         "3.print python version"
+         "4.gfa2fastg.py modified, gfa2fasta.py added, fastg2gfa.py added"
      ]},
     {"number": "1.4.0c",
      "features": [

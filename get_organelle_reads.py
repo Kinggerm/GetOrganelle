@@ -251,7 +251,7 @@ def get_options(descriptions, version):
     elif "-h" in sys.argv:
         for not_often_used in ("--bs", "-a", "--ba", "--max-reads", "--max-ignore-percent",
                                "--min-quality-score", "--prefix", "--out-per-round", "--keep-temp",
-                               "--memory-save", "--memory-unlimited", "--pre-w", "-r", "--min-rounds",
+                               "--memory-save", "--memory-unlimited", "--pre-w", "-r",
                                "--max-n-words", "-J", "-M", "--no-bowtie2", "--auto-wss", "--soft-max-words",
                                "--target-genome-size", "--spades-options", "--no-spades", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",

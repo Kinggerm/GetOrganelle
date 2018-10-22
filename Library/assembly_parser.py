@@ -22,10 +22,13 @@ else:
 
 
 class Assembly:
-    def __init__(self, fastg_file, min_cov=0., max_cov=inf):
+    def __init__(self, graph_file, min_cov=0., max_cov=inf):
         self.vertex_info = {}
         self.__kmer = 127
-        self.parse_fastg(fastg_file, min_cov=min_cov, max_cov=max_cov)
+        if graph_file.endswith(".gfa"):
+            self.parse_gfa(graph_file, min_cov=min_cov, max_cov=max_cov)
+        else:
+            self.parse_fastg(graph_file, min_cov=min_cov, max_cov=max_cov)
         self.vertex_clusters = []
         self.update_vertex_clusters()
         self.tagged_vertices = {}
@@ -47,6 +50,37 @@ class Assembly:
             res.append("\n")
         return "".join(res)
 
+    def parse_gfa(self, gfa_file, min_cov=0., max_cov=inf):
+        with open(gfa_file) as gfa_open:
+            kmer_values = set()
+            for line in gfa_open:
+                if line.startswith("S\t"):
+                    flag, vertex_name, sequence, seq_len, seq_num = line.strip().split("\t")
+                    seq_len = int(seq_len.split(":")[-1])
+                    seq_num = int(seq_num.split(":")[-1])
+                    seq_cov = seq_num/float(seq_len)
+                    if min_cov <= seq_cov <= max_cov:
+                        self.vertex_info[vertex_name] = {"len": seq_len, "cov": seq_cov,
+                                                         "connections": {True: set(), False: set()},
+                                                         "seq": {True: sequence, False: complementary_seq(sequence)}}
+                        if vertex_name.isdigit():
+                            self.vertex_info[vertex_name]["long"] = \
+                                "EDGE_" + vertex_name + "_length_" + str(seq_len) + "_cov_" + str(round(seq_cov, 5))
+                        else:
+                            raise Exception(vertex_name)
+                elif line.startswith("L\t"):
+                    flag, vertex_1, end_1, vertex_2, end_2, kmer_val = line.strip().split("\t")
+                    # "head"~False, "tail"~True
+                    end_1 = {"+": True, "-": False}[end_1]
+                    end_2 = {"+": False, "-": True}[end_2]
+                    kmer_values.add(kmer_val)
+                    self.vertex_info[vertex_1]["connections"][end_1].add((vertex_2, end_2))
+                    self.vertex_info[vertex_2]["connections"][end_2].add((vertex_1, end_1))
+            if len(kmer_values) != 1:
+                raise Exception("Multiple overlap values: " + ",".join(sorted(kmer_values)))
+            else:
+                self.__kmer = int(kmer_values.pop()[:-1])
+
     def parse_fastg(self, fastg_file, min_cov=0., max_cov=inf):
         fastg_matrix = SequenceList(fastg_file)
         # initialize names; only accept vertex that are formally stored, skip those that are only mentioned after ":"
@@ -65,7 +99,7 @@ class Assembly:
                                                  "cov": vertex_cov,
                                                  "long": this_vertex_str.strip("'")}
             if "connections" not in self.vertex_info[vertex_name]:
-                self.vertex_info[vertex_name]["connections"] = {True: set(), False: set()}  # "tail"~True, "head"~False
+                self.vertex_info[vertex_name]["connections"] = {True: set(), False: set()}  # "head"~False, "tail"~True
 
         # adding other info based on existed names
         for i, seq in enumerate(fastg_matrix):
@@ -149,6 +183,7 @@ class Assembly:
             except KeyError as e:
                 if str(e) == "'long'":
                     raise Exception("Merged graph cannot be written as fastg format file, please try gfa format!")
+        out_matrix.interleaved = 70
         out_matrix.write_fasta(out_file)
 
     def write_to_gfa(self, out_file):

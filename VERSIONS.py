@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0f",
+     "features": [
+         "1.parse_gfa() added to Library/assembly_parser.py",
+         "2.get_organelle_reads.py -h",
+     ]},
     {"number": "1.4.0e",
      "features": [
          "1.print python version",

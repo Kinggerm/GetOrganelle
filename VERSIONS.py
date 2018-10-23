@@ -9,6 +9,7 @@ versions = [
     {"number": "1.4.0g",
      "features": [
          "1.slim_fastg.py: fix the import error when using python2.*",
+         "2.README.md: in case of HTTP request failed",
      ]},
     {"number": "1.4.0f",
      "features": [

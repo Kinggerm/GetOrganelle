@@ -66,8 +66,6 @@ class Assembly:
                         if vertex_name.isdigit():
                             self.vertex_info[vertex_name]["long"] = \
                                 "EDGE_" + vertex_name + "_length_" + str(seq_len) + "_cov_" + str(round(seq_cov, 5))
-                        else:
-                            raise Exception(vertex_name)
                 elif line.startswith("L\t"):
                     flag, vertex_1, end_1, vertex_2, end_2, kmer_val = line.strip().split("\t")
                     # "head"~False, "tail"~True

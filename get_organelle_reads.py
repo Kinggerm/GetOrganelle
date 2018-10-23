@@ -1985,7 +1985,7 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
     else:
         run_command = scheme
     run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(threads) + ' ' \
-                  + graph_file + run_command + ' --depth-threshold ' + str(depth_threshold)  #\
+                  + graph_file + run_command + ' --max-depth ' + str(depth_threshold)  #\
                   # + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     if verbose_log:

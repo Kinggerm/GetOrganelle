@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0h",
+     "features": [
+         "1.fix a bug: calling slim_fastg.py failed.",
+     ]},
     {"number": "1.4.0g",
      "features": [
          "1.slim_fastg.py: fix the import error when using python2.*",

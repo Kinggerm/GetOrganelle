@@ -4,13 +4,12 @@ import time
 import os
 import sys
 import subprocess
-import math
 try:
     # python2
     import commands
 except:
     pass
-from math import inf
+inf = float("inf")
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
@@ -80,10 +79,10 @@ def require_commands():
     parser.add_option('--depth-cutoff', dest='depth_cutoff', default=10000.0, type=float,
                       help='After detection for target coverage, those beyond certain times (depth cutoff) of the'
                            ' detected coverage would be excluded. Default: 100.0')
-    parser.add_option('--min-depth', dest='min_depth',
-                      help='Input a float or integer number. Filter fastg file by a minimum depth. Default: no threshold.')
-    parser.add_option('--max-depth', dest='max_depth',
-                      help='Input a float or integer number. filter fastg file by a maximum depth. Default: no threshold.')
+    parser.add_option('--min-depth', dest='min_depth', default=0., type=float,
+                      help='Input a float or integer number. Filter fastg file by a minimum depth. Default: %default.')
+    parser.add_option('--max-depth', dest='max_depth', default=inf, type=float,
+                      help='Input a float or integer number. filter fastg file by a maximum depth. Default: %default.')
     parser.add_option('--include', dest='include',
                       help='followed by Blast index format')
     parser.add_option('--include-priority', dest='include_priority',
@@ -493,10 +492,10 @@ def map_names(in_names, ex_names, candidates, is_fastg, aver_in_dep, coverages, 
 
 
 def filter_fastg_by_depth(fas_file, max_depth, min_depth):
-    bounded = (max_depth and float(max_depth)) or (min_depth and float(min_depth))
+    bounded = (max_depth and float(max_depth) and float(max_depth) != inf) or (min_depth and float(min_depth))
     if fas_file.endswith('.fastg') and bounded:
-        max_depth = min(float(max_depth), inf)
-        min_depth = max(0., float(min_depth))
+        max_depth = float(max_depth)
+        min_depth = float(min_depth)
         time0 = time.time()
         fastg_matrix = read_fasta(fas_file)
         new_fastg_matrix = [[], [], fastg_matrix[2]]

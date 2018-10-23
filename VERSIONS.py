@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0g",
+     "features": [
+         "1.slim_fastg.py: fix the import error when using python2.*",
+     ]},
     {"number": "1.4.0f",
      "features": [
          "1.parse_gfa() added to Library/assembly_parser.py",

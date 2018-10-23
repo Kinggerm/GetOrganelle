@@ -28,7 +28,7 @@ This pipeline was written in python 3.5.1, but compatible with 2.7.11.
 
 Execute following simple git commands to download:
 
-    git clone "https://github.com/Kinggerm/GetOrganelle"
+    git clone git://github.com/Kinggerm/GetOrganelle
 
 then add */GetOrganelle and */GetOrganelle/Utilities to the path:
 

@@ -26,7 +26,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 This pipeline was written in python 3.5.1, but compatible with 2.7.11.
 
-Execute following simple git commands to download:
+Execute following simple git commands to download the latest version (suggested) or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
 
     git clone git://github.com/Kinggerm/GetOrganelle
 

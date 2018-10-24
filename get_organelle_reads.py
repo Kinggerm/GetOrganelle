@@ -59,7 +59,7 @@ def get_options(descriptions, version):
     group_inout.add_option("-u", dest="unpaired_fq_files",
                            help="Input file(s) with unpaired (single-end) reads to be added to the pool. "
                                 "files could be comma-separated lists such as 'seq1,seq2'.")
-    group_inout.add_option("-o", dest="output_base", help="Out put directory. Overwriting files if directory exists.")
+    group_inout.add_option("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
     group_inout.add_option("-s", dest="seed_file", default=os.path.join(seq_ref_path, "*.fasta"),
                            help="Reference. Input fasta format file as initial seed or input bowtie index base name "
                                 "as pre-seed (see flag '--bs'). "
@@ -265,7 +265,7 @@ def get_options(descriptions, version):
         parser.remove_option("-u")
         parser.add_option("-u", dest="unpaired_fq_files", help="Input file(s) with unpaired (single-end) reads. ")
         parser.remove_option("-o")
-        parser.add_option("-o", dest="output_base", help="Out put directory.")
+        parser.add_option("-o", dest="output_base", help="Output directory.")
         parser.remove_option("-s")
         parser.add_option("-s", dest="seed_file", help="Reference. Input fasta format file as initial seed. "
                                                        "Default: " + os.path.join(seq_ref_path, "*.fasta"))

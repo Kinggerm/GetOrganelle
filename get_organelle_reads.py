@@ -366,11 +366,12 @@ def get_options(descriptions, version):
         log.info(" ".join(sys.argv) + "\n")
         log = timed_log(log, options.output_base, options.prefix + "get_org.")
         if options.word_size is None:
-            if options.auto_word_size_step:
-                pass
-            else:
-                log.error("Do not turn off auto_word_size_step if no input initial word size!")
-                exit()
+            # if options.auto_word_size_step:
+            #     pass
+            # else:
+            #     log.error("Do not turn off auto_word_size_step if no input initial word size!")
+            #     exit()
+            pass
         elif 0 < options.word_size < 1:
             pass
         elif options.word_size >= global_min_wl:

@@ -34,7 +34,7 @@ import subprocess
 
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 word_size = 0
-min_dif_rl_wl = 15
+max_ratio_rl_wl = 0.8
 global_min_wl = 41
 
 
@@ -555,7 +555,7 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
         word_cov = trans_word_cov(word_cov, base_cov, mean_error_rate, read_length)
         # 1. relationship between kmer coverage and base coverage, k_cov = base_cov * (read_len - k_len + 1) / read_len
         estimated_word_size = int(read_length * (1 - word_cov / base_cov)) + 1
-        estimated_word_size = min(read_length - min_dif_rl_wl, max(min_word_size, estimated_word_size))
+        estimated_word_size = min(int(read_length * max_ratio_rl_wl), max(min_word_size, estimated_word_size))
         all_word_sizes.append(int(round(estimated_word_size, 0)))
     if echo_problem:
         if log:
@@ -594,10 +594,10 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
             word_size = new_word_size
             log.info("Setting '-w " + str(word_size) + "'")
         min_word_size = max(global_min_wl, word_size - auto_word_size_step * 4)
-        max_word_size = min(word_size + auto_word_size_step * 4, mean_read_len - min_dif_rl_wl)
+        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_wl))
     else:
         min_word_size = max(global_min_wl, word_size - auto_word_size_step * 4)
-        max_word_size = min(word_size + auto_word_size_step * 4, mean_read_len - min_dif_rl_wl)
+        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_wl))
     # arbitrarily adjust word size range
     if not auto_word_size_step:
         min_word_size = max_word_size = word_size
@@ -1901,7 +1901,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
     if verbose_log:
         log.info(spades_command)
     output, err = spades_running.communicate()
-    if "not recognized" in output.decode("utf8"):
+    if "not recognized" in output.decode("utf8") or not os.path.exists(spades_out_put):
         if verbose_log:
             log.error('Problem with running SPAdes:')
             log.error(output.decode("utf8"))

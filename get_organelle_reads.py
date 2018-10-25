@@ -83,10 +83,10 @@ def get_options(descriptions, version):
     group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
                                 "Default: %default")
-    group_inout.add_option("--min-quality-score", dest="min_quality_score", type=int, default=2,
+    group_inout.add_option("--min-quality-score", dest="min_quality_score", type=int, default=1,
                            help="Minimum quality score in extension. This value would be automatically increased "
                                 "to prevent ignoring too much raw data (see --max-ignore-percent)."
-                                "Default: %default ('%' in Phred+33; 'E' in Phred+64/Solexa+64)")
+                                "Default: %default ('\"' in Phred+33; 'A' in Phred+64/Solexa+64)")
     group_inout.add_option("--prefix", dest="prefix", default="",
                            help="Add extra prefix to resulting files under the output directory.")
     group_inout.add_option("--out-per-round", dest="fg_out_per_round", action="store_true", default=False,

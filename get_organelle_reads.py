@@ -362,7 +362,7 @@ def get_options(descriptions, version):
         log = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
         log.info("")
         log.info(descriptions)
-        log.info(sys.version)
+        log.info("Python " + sys.version)
         log.info(" ".join(sys.argv) + "\n")
         log = timed_log(log, options.output_base, options.prefix + "get_org.")
         if options.word_size is None:
@@ -456,9 +456,6 @@ def get_options(descriptions, version):
             elif options.organelle_type == "nr":
                 options.target_genome_size /= 10.
 
-        if options.maximum_n_words <= options.soft_max_words:
-            log.error("The value of \"--max-n-words\" must be smaller than the value of \"--soft-max-words\"!")
-            exit()
         if options.seed_file and options.bowtie2_seed:
             log.error('Simultaneously using "-s" and "--bs" is not allowed!')
             exit()
@@ -2277,6 +2274,10 @@ def main():
             # extending process
             log.info("Extending ...")
             accepted_ids = set()
+            if options.auto_word_size_step:
+                if options.maximum_n_words <= options.soft_max_words:
+                    log.info("Setting '--soft-max-words " + str(int(options.maximum_n_words)) + "'")
+                    options.soft_max_words = options.maximum_n_words
             accepted_contig_id = extending_reads(seed_file=seed_file, seed_is_fq=options.utilize_mapping,
                                                  original_fq_files=original_fq_files, len_indices=len_indices,
                                                  pre_grouped=pre_grp, groups_of_duplicate_lines=groups_of_lines,

@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.0j",
+     "features": [
+         "1.default values (--max-n-words & --auto-wss) set to make GetOrganelle perform like older versions",
+     ]},
     {"number": "1.4.0i",
      "features": [
          "1.empirically reduce maximum word size",

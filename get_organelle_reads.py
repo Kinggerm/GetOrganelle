@@ -34,7 +34,7 @@ import subprocess
 
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 word_size = 0
-max_ratio_rl_wl = 0.8
+max_ratio_rl_wl = 0.75
 global_min_wl = 41
 
 
@@ -77,8 +77,9 @@ def get_options(descriptions, version):
     group_inout.add_option("--ba", dest="bowtie2_anti_seed",
                            help="Input bowtie2 index base name as pre-anti-seed. "
                                 "This flag serves as an alternation of flag '-a'.")
-    group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1E7,
-                           help="Maximum number of reads to be used per file. Default: 1E7 (-F cp,nr) or 5E7 (-F mt)")
+    group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
+                           help="Maximum number of reads to be used per file. "
+                                "Default: 1.5E7 (-F cp,nr) or 7.5E7 (-F mt)")
     group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
                                 "Default: %default")
@@ -99,7 +100,7 @@ def get_options(descriptions, version):
                                  "(mitochondria), nr (nuclear ribosomal RNA). Default: %default. ")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
                             help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
-                                 "--auto-wss 2 --max-n-words 1E9 -k 55,65,75,85,95,105,115,125\" "
+                                 "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
                                  "This option is suggested for lowly-covered or nonhomogeneously-covered data (poor "
                                  "data). You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--safe\" flag. "
@@ -110,7 +111,7 @@ def get_options(descriptions, version):
                                  "(say a circular plastome) under this option, you need to adjust '-w' and '-k' "
                                  "carefully to confirm whether it was the problem of the dataset. ")
     group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
-                            help="=\"-R 10 --max-reads 5E6 --max-n-words 5E7 -t 4 --auto-wss 0 -J 3 -M 5\" "
+                            help="=\"-R 10 --max-reads 5E6 -t 4 --auto-wss 0 -J 3 -M 5\" "
                                  "This option is suggested for homogeneously and highly covered data (very fine data). "
                                  "You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--fast\" flag. "
@@ -136,16 +137,16 @@ def get_options(descriptions, version):
                                help="Word size (W) for pre-grouping. Used to reproduce result when word size is "
                                     "a certain value during pregrouping process and later changed during reads "
                                     "extending process. Similar to word size. Default: auto-estimated.")
-    group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int,
-                               help="Maximum number of running rounds (>=3). Default: unlimited.")
+    group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=100,
+                               help="Maximum number of running rounds (>=3). Default: %default.")
     group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
                                help="Minimum number of running rounds (>=3). If 'auto_word_size_step' is enabled "
                                     "(see '--auto-wss' for more) and extending stopped before finishing the designed "
                                     "minimum rounds, automatically restart extending with a smaller word size. "
                                     "Default: %default")
-    group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=2E8,
+    group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
-                                    "Default: 2E8 (-F cp), 4E7 (-F nr) or 1E9 (-F mt)")
+                                    "Default: 4E8 (-F cp), 8E7 (-F nr) or 2E9 (-F mt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=1,
                                help="The wide of steps of checking words in reads during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
@@ -167,9 +168,9 @@ def get_options(descriptions, version):
                                     "to acquire the initial seed. This requires bowtie2 to be installed "
                                     "(and thus Linux/Unix only). It is suggested to keep mapping as default "
                                     "when the seed is too diverse from target.")
-    group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=4, type=int,
+    group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=0, type=int,
                                help="The step of word size adjustment during extending process."
-                                    "Choose 0 to disable this automatic adjustment. Default: %default.")
+                                    "Use 0 to disable this automatic adjustment. Default: %default.")
     group_extending.add_option("--soft-max-words", dest="soft_max_words", type=float, default=8E7,
                                help="Maximum number of words to be used to test the fitness of a word size value."
                                     "Default: 8E7 (-F cp), 1.6E7 (-F nr) or 4E8 (-F mt)")
@@ -279,10 +280,10 @@ def get_options(descriptions, version):
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
-                               "--auto-wss 2 --max-n-words 1E9 -k 55,65,75,85,95,105,115,125\"")
+                               "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
-                          help="=\"-R 10 --max-reads 5E6 --max-n-words 5E7 -t 4 --auto-wss 0 -J 3 -M 5\"")
+                          help="=\"-R 10 --max-reads 5E6 -t 4 --auto-wss 0 -J 3 -M 5\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="75,85,95", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
@@ -399,7 +400,7 @@ def get_options(descriptions, version):
             if "--auto-wss" not in sys.argv:
                 options.auto_word_size_step = 2
             if "--max-n-words" not in sys.argv:
-                options.maximum_n_words = 1E9
+                options.maximum_n_words = 4E9
             if "-k" not in sys.argv:
                 options.spades_kmer = "55,65,75,85,95,105,115,125"
 
@@ -408,8 +409,6 @@ def get_options(descriptions, version):
                 options.max_rounds = 10
             if "--max-reads" not in sys.argv:
                 options.maximum_n_reads = 5E6
-            if "--max-n-words" not in sys.argv:
-                options.maximum_n_words = 5E7
             if "-t" not in sys.argv:
                 options.threads = 4
             if "--auto-wss" not in sys.argv:
@@ -703,7 +702,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
             if quality_str:
                 log.info("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + os.path.basename(fq_f)
                          + ", only top " + str(int(maximum_n_reads))
-                         + " reads are used in downstream analysis (suggested).")
+                         + " reads are used in downstream analysis (suggested, ).")
                 record_fq_beyond_read_num_limit[-1] = True
             break
     all_quality_chars = "".join(all_quality_chars_list)

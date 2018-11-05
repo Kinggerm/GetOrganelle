@@ -592,6 +592,19 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
     return all_word_sizes
 
 
+def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log):
+    if word_size_ratio < 1:
+        new_word_size = int(round(word_size_ratio * mean_read_len, 0))
+        if new_word_size < global_min_wl:
+            new_word_size = global_min_wl
+            log.warning("Too small ratio " + str(new_word_size) + ", setting '-w " + str(global_min_wl) + "'")
+        else:
+            log.info("Setting '-w " + str(new_word_size) + "'")
+        return new_word_size
+    else:
+        return word_size_ratio
+
+
 def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_word_size_step, mean_error_rate,
                      target_genome_size, mean_read_len, max_read_len, spades_kmer, low_quality_pattern,
                      log, wc_bc_ratio_constant=0.35):
@@ -611,7 +624,7 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
             mean_error_rate=mean_error_rate/2., log=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
         log.info("Setting '-w " + str(word_size) + "'")
     elif word_size < 1:
-        new_word_size = int(word_size * mean_read_len)
+        new_word_size = int(round(word_size * mean_read_len, 0))
         if new_word_size < global_min_wl:
             word_size = global_min_wl
             log.warning("Too small ratio " + str(word_size) + ", setting '-w " + str(global_min_wl) + "'")
@@ -695,17 +708,29 @@ def chop_seq_list(seq_generator_or_list):
     return return_words
 
 
-def get_read_len_mean_max_count(fq_files, maximum_n_reads):
+def get_read_len_mean_max_count(fq_files, maximum_n_reads, sampling_percent=1.):
     read_lengths = []
     all_count = 0
-    for fq_f in fq_files:
-        count_r = 0
-        for seq in fq_seq_simple_generator(fq_f):
-            count_r += 1
-            read_lengths.append(len(seq.strip("N")))
-            if count_r >= maximum_n_reads:
-                break
-        all_count += count_r
+    if sampling_percent == 1:
+        for fq_f in fq_files:
+            count_r = 0
+            for seq in fq_seq_simple_generator(fq_f):
+                count_r += 1
+                read_lengths.append(len(seq.strip("N")))
+                if count_r >= maximum_n_reads:
+                    break
+            all_count += count_r
+    else:
+        sampling_percent = int(1 / sampling_percent)
+        for fq_f in fq_files:
+            count_r = 0
+            for seq in fq_seq_simple_generator(fq_f):
+                count_r += 1
+                if count_r % sampling_percent == 0:
+                    read_lengths.append(len(seq.strip("N")))
+                if count_r >= maximum_n_reads:
+                    break
+            all_count += count_r
     return sum(read_lengths)/len(read_lengths), max(read_lengths), all_count
 
 
@@ -2232,11 +2257,11 @@ def main():
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
 
+            sampling_percent = 0.1
             if options.pre_reading:
                 # pre-reading fastq
                 log.info("Pre-reading fastq ...")
                 log.info("Counting read qualities ...")
-                sampling_percent = 0.1
                 low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
                     get_read_quality_info(original_fq_files, options.maximum_n_reads, options.min_quality_score, log,
                                           maximum_ignore_percent=options.maximum_ignore_percent,
@@ -2250,7 +2275,10 @@ def main():
             else:
                 low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
                     "[]", None, [True for j in range(len(original_fq_files))]
-                mean_read_len, max_read_len, all_read_num, all_bases = None, None, None, None
+                mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
+                                                                                        options.maximum_n_reads,
+                                                                                        sampling_percent)
+                all_bases = None
 
             # reading seeds
             log.info("Making seed reads ...")
@@ -2282,7 +2310,10 @@ def main():
                     options.spades_kmer = spades_kmer
                 log.info("Checking seed reads and parameters finished.\n")
             else:
-                min_word_size, word_size, max_word_size, keep_seq_parts = word_size, word_size, word_size, False
+                log.info("Estimating word size from given ratio ...")
+                word_size = calculate_word_size_according_to_ratio(word_size, mean_read_len, log)
+                min_word_size, max_word_size, keep_seq_parts = word_size, word_size, False
+                log.info("Estimating word size from given ratio finished.\n")
 
             # make read index
             log.info("Making read index ...")

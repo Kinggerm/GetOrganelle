@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.1a",
+     "features": [
+         "1.get_organelle_reads.py: '--no-pre-reading' added",
+     ]},
     {"number": "1.4.1",
      "features": [
          "1.assembly_parser.py: Assembly.export_path() and Assembly.merge_all_possible_vertices():"

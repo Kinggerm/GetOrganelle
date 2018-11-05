@@ -35,7 +35,7 @@ import subprocess
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 word_size = 0
 max_ratio_rl_wl = 0.75
-global_min_wl = 41
+global_min_wl = 49
 
 
 def get_options(descriptions, version):

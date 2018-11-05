@@ -168,6 +168,8 @@ def get_options(descriptions, version):
                                     "to acquire the initial seed. This requires bowtie2 to be installed "
                                     "(and thus Linux/Unix only). It is suggested to keep mapping as default "
                                     "when the seed is too diverse from target.")
+    group_scheme.add_option("--no-pre-reading", dest="pre_reading", default=True, action="store_false",
+                            help="No pre-reading the read characteristics, nor estimating parameters (including '-w').")
     group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=0, type=int,
                                help="The step of word size adjustment during extending process."
                                     "Use 0 to disable this automatic adjustment. Default: %default.")
@@ -252,8 +254,8 @@ def get_options(descriptions, version):
     elif "-h" in sys.argv:
         for not_often_used in ("--bs", "-a", "--ba", "--max-reads", "--max-ignore-percent",
                                "--min-quality-score", "--prefix", "--out-per-round", "--keep-temp",
-                               "--memory-save", "--memory-unlimited", "--pre-w", "-r",
-                               "--max-n-words", "-J", "-M", "--no-bowtie2", "--auto-wss", "--soft-max-words",
+                               "--memory-save", "--memory-unlimited", "--pre-w", "-r", "--max-n-words",
+                               "-J", "-M", "--no-bowtie2", "--no-pre-reading", "--auto-wss", "--soft-max-words",
                                "--target-genome-size", "--spades-options", "--no-spades", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--continue", "--index-in-memory",
@@ -418,6 +420,8 @@ def get_options(descriptions, version):
                 options.mesh_size = 7
             if "--max-n-words" not in sys.argv:
                 options.maximum_n_words = 3E7
+            # if "--no-pre-reading" not in sys.argv:
+            #     options.pre_reading = False
 
         if options.memory_save:
             if "-P" not in sys.argv:
@@ -464,6 +468,8 @@ def get_options(descriptions, version):
             exit()
         if options.bowtie2_seed or options.bowtie2_anti_seed:
             options.utilize_mapping = True
+        if not options.pre_reading and not options.word_size:
+            log.error("When '--no-pre-reading' was chosen, a user defined word size value ('-w') must be given!")
         if options.utilize_mapping:
             if not executable("bowtie2"):
                 options.utilize_mapping = False
@@ -2226,20 +2232,25 @@ def main():
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
 
-            # pre-reading fastq
-            log.info("Pre-reading fastq ...")
-            log.info("Counting read qualities ...")
-            sampling_percent = 0.1
-            low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
-                get_read_quality_info(original_fq_files, options.maximum_n_reads, options.min_quality_score, log,
-                                      maximum_ignore_percent=options.maximum_ignore_percent,
-                                      sampling_percent=sampling_percent)
-            log.info("Counting read lengths ...")
-            mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
-                                                                                    options.maximum_n_reads)
-            all_bases = mean_read_len * all_read_num
-            log.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
-            log.info("Pre-reading fastq finished.\n")
+            if options.pre_reading:
+                # pre-reading fastq
+                log.info("Pre-reading fastq ...")
+                log.info("Counting read qualities ...")
+                sampling_percent = 0.1
+                low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
+                    get_read_quality_info(original_fq_files, options.maximum_n_reads, options.min_quality_score, log,
+                                          maximum_ignore_percent=options.maximum_ignore_percent,
+                                          sampling_percent=sampling_percent)
+                log.info("Counting read lengths ...")
+                mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
+                                                                                        options.maximum_n_reads)
+                all_bases = mean_read_len * all_read_num
+                log.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
+                log.info("Pre-reading fastq finished.\n")
+            else:
+                low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
+                    "[]", None, [True for j in range(len(original_fq_files))]
+                mean_read_len, max_read_len, all_read_num, all_bases = None, None, None, None
 
             # reading seeds
             log.info("Making seed reads ...")
@@ -2257,18 +2268,21 @@ def main():
                                                original_fq_files, log) if anti_seed else set()
             log.info("Making seed reads finished.\n")
 
-            log.info("Checking seed reads and parameters ...")
-            min_word_size, word_size, max_word_size, keep_seq_parts, spades_kmer = \
-                check_parameters(out_base=out_base, utilize_mapping=options.utilize_mapping,
-                                 organelle_type=options.organelle_type, all_bases=all_bases,
-                                 auto_word_size_step=options.auto_word_size_step, mean_error_rate=mean_error_rate,
-                                 target_genome_size=options.target_genome_size, mean_read_len=mean_read_len,
-                                 max_read_len=max_read_len, spades_kmer=options.spades_kmer,
-                                 low_quality_pattern=low_quality_pattern, log=log,
-                                 wc_bc_ratio_constant=0.35)
-            if spades_kmer:
-                options.spades_kmer = spades_kmer
-            log.info("Checking seed reads and parameters finished.\n")
+            if options.pre_reading:
+                log.info("Checking seed reads and parameters ...")
+                min_word_size, word_size, max_word_size, keep_seq_parts, spades_kmer = \
+                    check_parameters(out_base=out_base, utilize_mapping=options.utilize_mapping,
+                                     organelle_type=options.organelle_type, all_bases=all_bases,
+                                     auto_word_size_step=options.auto_word_size_step, mean_error_rate=mean_error_rate,
+                                     target_genome_size=options.target_genome_size, mean_read_len=mean_read_len,
+                                     max_read_len=max_read_len, spades_kmer=options.spades_kmer,
+                                     low_quality_pattern=low_quality_pattern, log=log,
+                                     wc_bc_ratio_constant=0.35)
+                if spades_kmer:
+                    options.spades_kmer = spades_kmer
+                log.info("Checking seed reads and parameters finished.\n")
+            else:
+                min_word_size, word_size, max_word_size, keep_seq_parts = word_size, word_size, word_size, False
 
             # make read index
             log.info("Making read index ...")

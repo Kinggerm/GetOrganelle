@@ -28,7 +28,7 @@ This pipeline was written in python 3.5.1, but compatible with 2.7.11.
 
 Execute following simple git commands to download the latest version (suggested) or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
 
-    # suppose you are going to install it at ~/Applications/bin
+    # Supposing you are going to install it at ~/Applications/bin
     
     GetOrganellePATH=~/Applications/bin
     

@@ -48,9 +48,9 @@ then add GetOrganelle to the path:
     
     # for Linux
     
-    echo "PATH=$GetOrganellePATH/GetOrganelle:$PATH" >> ~/.bashrc
+    echo "PATH=$GetOrganellePATH/GetOrganelle:\$PATH" >> ~/.bashrc
     
-    echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:$PATH" >> ~/.bashrc
+    echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:\$PATH" >> ~/.bashrc
     
     echo "export PATH" >> ~/.bashrc
     

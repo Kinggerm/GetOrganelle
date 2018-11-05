@@ -602,6 +602,11 @@ def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log):
             log.info("Setting '-w " + str(new_word_size) + "'")
         return new_word_size
     else:
+        max_ws = int(round(mean_read_len * 0.9))
+        if word_size_ratio > max_ws:
+            word_size_ratio = max_ws
+            log.warning("Too large word size for mean read length " + str(mean_read_len) +
+                        ", setting '-w " + str(word_size_ratio) + "'")
         return word_size_ratio
 
 

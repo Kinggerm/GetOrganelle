@@ -111,7 +111,7 @@ def get_options(descriptions, version):
                                  "(say a circular plastome) under this option, you need to adjust '-w' and '-k' "
                                  "carefully to confirm whether it was the problem of the dataset. ")
     group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
-                            help="=\"-R 10 --max-reads 5E6 -t 4 --auto-wss 0 -J 3 -M 5\" "
+                            help="=\"-R 10 --max-reads 5E6 -t 4 -J 3 -M 7 --max-n-words 3E7\" "
                                  "This option is suggested for homogeneously and highly covered data (very fine data). "
                                  "You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--fast\" flag. "
@@ -283,7 +283,7 @@ def get_options(descriptions, version):
                                "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
-                          help="=\"-R 10 --max-reads 5E6 -t 4 --auto-wss 0 -J 3 -M 5\"")
+                          help="=\"-R 10 --max-reads 5E6 -t 4 -J 3 -M 7 --max-words 3E7\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="75,85,95", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
@@ -412,12 +412,12 @@ def get_options(descriptions, version):
                 options.maximum_n_reads = 5E6
             if "-t" not in sys.argv:
                 options.threads = 4
-            if "--auto-wss" not in sys.argv:
-                options.auto_word_size_step = 0
             if "-J" not in sys.argv:
                 options.jump_step = 3
             if "-M" not in sys.argv:
-                options.mesh_size = 5
+                options.mesh_size = 7
+            if "--max-n-words" not in sys.argv:
+                options.maximum_n_words = 3E7
 
         if options.memory_save:
             if "-P" not in sys.argv:
@@ -476,6 +476,28 @@ def get_options(descriptions, version):
                     log.warning('bowtie2 not in the path! Take the anti-seed file as initial anti-seed.')
                 else:
                     log.warning('bowtie2 not in the path! Anti-seed disabled!')
+            if not executable("bowtie2-build"):
+                options.utilize_mapping = False
+                if options.seed_file:
+                    log.warning('bowtie2-build not in the path! Take the seed file as initial seed.')
+                else:
+                    log.error('bowtie2-build not in the path!')
+                    exit()
+                if options.anti_seed:
+                    log.warning('bowtie2-build not in the path! Take the anti-seed file as initial anti-seed.')
+                else:
+                    log.warning('bowtie2-build not in the path! Anti-seed disabled!')
+            if not executable("bowtie2-build-l"):
+                options.utilize_mapping = False
+                if options.seed_file:
+                    log.warning('bowtie2-build-l not in the path! Take the seed file as initial seed.')
+                else:
+                    log.error('bowtie2-build-l not in the path!')
+                    exit()
+                if options.anti_seed:
+                    log.warning('bowtie2-build-l not in the path! Take the anti-seed file as initial anti-seed.')
+                else:
+                    log.warning('bowtie2-build-l not in the path! Anti-seed disabled!')
         if options.run_spades:
             if not executable("spades.py -h"):
                 log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
@@ -1767,7 +1789,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         log.info("Initial seeds existed!")
     else:
         log.info("Mapping reads to seed - bowtie2 index ...")
-        this_command = "bowtie2 -p " + str(threads) + " --very-fast-local --al " + total_seed_file[0] + \
+        this_command = "bowtie2 -p " + str(threads) + " --very-fast --al " + total_seed_file[0] + \
                        " -x " + seed_index_base + " -U " + ",".join(query_fq_files) + " -S " + total_seed_sam[0] + \
                        " --no-unal --no-hd --no-sq -t"
         make_seed_bowtie2 = subprocess.Popen(this_command,
@@ -1820,7 +1842,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed - bowtie2 index ...")
-            this_command = "bowtie2 -p " + str(threads) + " --very-fast-local -x " + anti_index_base + " -U " +\
+            this_command = "bowtie2 -p " + str(threads) + " --very-fast -x " + anti_index_base + " -U " +\
                            ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t"
             make_anti_seed_bowtie2 = subprocess.Popen(this_command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)

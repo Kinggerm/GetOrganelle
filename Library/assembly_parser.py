@@ -162,8 +162,8 @@ class Assembly:
         else:
             raise Exception("No kmer detected!")
 
-    def write_to_fastg(self, out_file):
-        if not out_file.endswith(".fastg"):
+    def write_to_fastg(self, out_file, check_postfix=True):
+        if check_postfix and not out_file.endswith(".fastg"):
             out_file += ".fastg"
         out_matrix = SequenceList()
         for vertex_name in self.vertex_info:
@@ -184,8 +184,17 @@ class Assembly:
         out_matrix.interleaved = 70
         out_matrix.write_fasta(out_file)
 
-    def write_to_gfa(self, out_file):
-        if not out_file.endswith(".gfa"):
+    def write_to_fasta(self, out_file, check_postfix=True):
+        if check_postfix and not out_file.endswith(".fasta"):
+            out_file += ".fasta"
+        out_matrix = SequenceList()
+        for vertex_name in self.vertex_info:
+            out_matrix.append(Sequence(vertex_name, self.vertex_info[vertex_name]["seq"][True]))
+        out_matrix.interleaved = 70
+        out_matrix.write_fasta(out_file)
+
+    def write_to_gfa(self, out_file, check_postfix=True):
+        if check_postfix and not out_file.endswith(".gfa"):
             out_file += ".gfa"
         out_file_handler = open(out_file, "w")
         for vertex_name in self.vertex_info:
@@ -383,7 +392,18 @@ class Assembly:
                 if len(connected_set) == 1:
                     next_vertex, next_end = list(connected_set)[0]
                     if len(self.vertex_info[next_vertex]["connections"][next_end]) == 1 and this_vertex != next_vertex:
-                        new_vertex = this_vertex + "_" + next_vertex  # + ("+", "-")[next_end]
+                        # reverse the names
+                        if this_end:
+                            if next_end:
+                                new_vertex = this_vertex + "_" + "_".join(next_vertex.split("_")[::-1])
+                            else:
+                                new_vertex = this_vertex + "_" + next_vertex
+                        else:
+                            if next_end:
+                                new_vertex = next_vertex + "_" + this_vertex
+                            else:
+                                new_vertex = "_".join(next_vertex.split("_")[::-1]) + "_" + this_vertex
+
                         limited_vertices.remove(next_vertex)
                         limited_vertices.append(new_vertex)
                         # initialization
@@ -1396,7 +1416,7 @@ class Assembly:
                 new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
             raise KeyboardInterrupt
 
-    def get_all_circular_paths(self, mode="cp", log_handler=None):
+    def get_all_circular_paths(self, mode="cp", library_info=None, log_handler=None):
 
         def circular_directed_graph_solver(ongoing_path, next_connections, vertices_left):
             # print("-----------------------------")
@@ -1408,7 +1428,7 @@ class Assembly:
                 if next_vertex in vertices_left:
                     new_path = deepcopy(ongoing_path)
                     new_left = deepcopy(vertices_left)
-                    new_path.append((next_vertex, next_end))
+                    new_path.append((next_vertex, not next_end))
                     new_left[next_vertex] -= 1
                     if not new_left[next_vertex]:
                         del new_left[next_vertex]
@@ -1428,8 +1448,9 @@ class Assembly:
         if 1 not in self.copy_to_vertex:
             raise Exception("No single copy region?! Detecting path(s) failed!\n")
         start_vertex = sorted(self.copy_to_vertex[1], key=lambda x: -self.vertex_info[x]["len"])[0]
-        first_path = [(start_vertex, False)]
-        first_connections = self.vertex_info[start_vertex]["connections"][not False]
+        # each contig stored format:
+        first_path = [(start_vertex, True)]
+        first_connections = self.vertex_info[start_vertex]["connections"][True]
         vertex_to_copy = deepcopy(self.vertex_to_copy)
         del vertex_to_copy[start_vertex]
         circular_directed_graph_solver(first_path, first_connections, vertex_to_copy)
@@ -1437,6 +1458,7 @@ class Assembly:
         if not paths:
             raise Exception("Detecting path(s) from remaining graph failed!\n")
         else:
+
             # sorting path by average distance among multi-copy loci
             # the highest would be more symmetrical IR, which turns out to be more reasonable
             sorted_paths = []
@@ -1502,11 +1524,11 @@ class Assembly:
         seq_names = []
         seq_segments = []
         for this_vertex, this_end in in_path:
-            seq_segments.append(self.vertex_info[this_vertex]["seq"][not this_end][self.__kmer:])
-            seq_names.append(this_vertex + ("+", "-")[not this_end])
+            seq_segments.append(self.vertex_info[this_vertex]["seq"][this_end][self.__kmer:])
+            seq_names.append(this_vertex + ("-", "+")[this_end])
         # if not circular
-        if in_path[0] not in self.vertex_info[in_path[-1][0]]["connections"][not in_path[-1][1]]:
-            seq_segments[0] = self.vertex_info[in_path[0][0]]["seq"][not in_path[0][1]][:self.__kmer] + seq_segments[0]
+        if (in_path[0][0], not in_path[0][1]) not in self.vertex_info[in_path[-1][0]]["connections"][in_path[-1][1]]:
+            seq_segments[0] = self.vertex_info[in_path[0][0]]["seq"][in_path[0][1]][:self.__kmer] + seq_segments[0]
         else:
             seq_names[-1] += "(circular)"
         return Sequence(",".join(seq_names), "".join(seq_segments))

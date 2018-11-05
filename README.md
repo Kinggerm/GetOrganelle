@@ -28,48 +28,53 @@ This pipeline was written in python 3.5.1, but compatible with 2.7.11.
 
 Execute following simple git commands to download the latest version (suggested) or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
 
+    # suppose you are going to install it at ~/Applications/bin
+    
+    GetOrganellePATH=~/Applications/bin
+    
+    cd $GetOrganellePATH
+    
     git clone git://github.com/Kinggerm/GetOrganelle
 
-then add */GetOrganelle and */GetOrganelle/Utilities to the path:
-
+then add GetOrganelle to the path:
+    
     # for MacOS
     
-    echo "{where_you_clone_GetOrganelle}/GetOrganelle:$PATH" >> ~/.bash_profile
+    echo "PATH=$GetOrganellePATH/GetOrganelle:\$PATH" >> ~/.bash_profile
     
-    echo "{where_you_clone_GetOrganelle}/GetOrganelle/Utilities:$PATH" >> ~/.bash_profile
+    echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:\$PATH" >> ~/.bash_profile
     
     echo "export PATH" >> ~/.bash_profile
     
     # for Linux
     
-    echo "{where_you_clone_GetOrganelle}/GetOrganelle:$PATH" >> ~/.bashrc
+    echo "PATH=$GetOrganellePATH/GetOrganelle:$PATH" >> ~/.bashrc
     
-    echo "{where_you_clone_GetOrganelle}/GetOrganelle/Utilities:$PATH" >> ~/.bashrc
+    echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:$PATH" >> ~/.bashrc
     
     echo "export PATH" >> ~/.bashrc
     
-and make them writable/executable:
+and make them writable/executable if they are not:
     
-    chmod +x {where_you_clone_GetOrganelle}/GetOrganelle/*.py
+    chmod +x $GetOrganellePATH/GetOrganelle/*.py
     
-    chmod +x {where_you_clone_GetOrganelle}/GetOrganelle/Utilities/*.py
+    chmod +x $GetOrganellePATH/GetOrganelle/Utilities/*.py
     
-    chmod +x {where_you_clone_GetOrganelle}/GetOrganelle/Library/*.py
+    chmod +x $GetOrganellePATH/GetOrganelle/Library/*.py
     
-    chmod +w {where_you_clone_GetOrganelle}/GetOrganelle/Library/*Reference
+    chmod +w $GetOrganellePATH/GetOrganelle/Library/*Reference
     
 It is also very IMPORTANT to keep updated (if you find your version is out of date!):
     
-    cd {where_you_clone_GetOrganelle}/GetOrganelle
+    cd $GetOrganellePATH/GetOrganelle
 
     git pull
 
 You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
 
-However, to get a complete organelle genome (such as a plastome) rather than organelle reads, other files in GetOrganelle are needed in the original relative path. Also, the following software/libraries are needed to be installed and configured in the path, since they could be called automatically:
+However, to get a complete organelle genome (such as a plastome) rather than organelle reads, other files in GetOrganelle are needed in the original relative path. Also, the following software/libraries are needed to be installed and added to the PATH, since they could be called automatically:
 
 * Python libraries numpy, scipy, sympy are used to solve the assembly graph, and could be easily installed by typing in:
-
     
     pip install numpy scipy sympy
 

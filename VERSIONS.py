@@ -6,6 +6,15 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.1",
+     "features": [
+         "1.assembly_parser.py: Assembly.export_path() and Assembly.merge_all_possible_vertices():"
+         " name of merged vertices optimized",
+         "2.README: PATH configuration",
+         "3.mk_batch_for_iteratively_mapping_assembling.py: -t threads",
+         "4.get_organelle_reads.py --fast mode modified",
+         "5.sam_parser.py added: for 1.5.0",
+     ]},
     {"number": "1.4.0j",
      "features": [
          "1.default values (--max-n-words & --auto-wss) set to make GetOrganelle perform like older versions",

@@ -17,7 +17,8 @@ def get_options(print_title):
     parser.add_option("-g", dest="fastg_file",
                       help="input fastg format file.")
     parser.add_option("-t", dest="tab_file",
-                      help="input tab format file produced by slim_fastg.py.")
+                      help="input tab format file (*.csv; the postfix 'csv' was in conformity with Bandage) "
+                           "produced by slim_fastg.py.")
     parser.add_option("-o", dest="output_directory",
                       help="output directory.")
     parser.add_option("-m", dest="mode", default="cp",
@@ -40,15 +41,15 @@ def get_options(print_title):
                       help="Similarity threshold for confirming parallel contigs. Default:%default")
     parser.add_option("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
                       help="Minimum deviation factor for excluding non-target contigs. Default:%default")
-    parser.add_option("--min-cov", dest="min_cov", type=float, default=0.,
+    parser.add_option("--min-depth", dest="min_cov", type=float, default=0.,
                       help="Minimum coverage for a contig to be included in disentangling. Default:%default")
-    parser.add_option("--max-cov", dest="max_cov", type=float, default=inf,
+    parser.add_option("--max-depth", dest="max_cov", type=float, default=inf,
                       help="Minimum coverage for a contig to be included in disentangling. Default:%default")
     parser.add_option("--prefix", dest="prefix", default="target",
                       help="Prefix of output files inside output directory. Default:%default")
     parser.add_option("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
                       help="export intermediate graph file.")
-    parser.add_option("--time-limit", dest="time_limit", default=300, type=int,
+    parser.add_option("--time-limit", dest="time_limit", default=1500, type=int,
                       help="time limit for the disentangling process. Default:%default")
     parser.add_option("--verbose", dest="verbose", default=False, action="store_true",
                       help="verbose logging.")

@@ -36,7 +36,7 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, maximum_cluster=5, m
         if len(parameters) == 1:
             return np.array([0] * int(data_len))
         else:
-            loglike_res = stats.norm.logpdf(dat_arr, parameters[0]["mu"], parameters[1]["sigma"]) + \
+            loglike_res = stats.norm.logpdf(dat_arr, parameters[0]["mu"], parameters[1]["sigma"]) * dat_w + \
                           log(parameters[1]["percent"])
             for pr in parameters[1:]:
                 loglike_res = np.vstack(
@@ -81,11 +81,11 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, maximum_cluster=5, m
                 this_mean, this_std = weighted_mean_and_std(these_points, these_weights)
                 pr["mu"] = this_mean
                 pr["sigma"] = max(this_std, min_sigma)
-                pr["percent"] = sum(these_weights)
+                pr["percent"] = sum(these_weights)  # / data_len
             elif len(these_points) == 1:
                 pr["sigma"] = max(dat_arr.std() / data_len, min_sigma)
                 pr["mu"] = np.average(these_points, weights=these_weights) + pr["sigma"] * (2 * random.random() - 1)
-                pr["percent"] = sum(these_weights)
+                pr["percent"] = sum(these_weights)  # / data_len
             else:
                 # exclude
                 pr["mu"] = max(dat_arr) * 1E4

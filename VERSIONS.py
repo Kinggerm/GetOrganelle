@@ -6,6 +6,16 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.2",
+     "features": [
+         "1.get_organelle_reads.py: better seed fastq file log; "
+         " increase the default values of jump_step and mesh_size",
+         "2.assembly_parser.py: fix a bug in filter_by_coverage().",
+         "3.disentangle_organelle_assembly.py: '--acyclic-allowed' added (not activated yet)",
+         "4.statistical_func.py: fix a bug in assign_cluster_labels",
+         "5.join_spades_fastg_by_blast.py: signs of gap and overlap",
+         "6.SeqReference/cp.fasta: source id specified",
+     ]},
     {"number": "1.4.1a",
      "features": [
          "1.get_organelle_reads.py: '--no-pre-reading' added",

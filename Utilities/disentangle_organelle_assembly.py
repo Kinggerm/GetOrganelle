@@ -23,6 +23,10 @@ def get_options(print_title):
                       help="output directory.")
     parser.add_option("-m", dest="mode", default="cp",
                       help="organelle mode: cp, mt, or nt. Default:%default")
+    parser.add_option("--acyclic-allowed", dest="acyclic_allowed", default=False,
+                      help="By default, this script would only disentangle the circular graph (the complete circular "
+                           "organelle genome), and would directly give up linear/broken graphs). Choose this option "
+                           "to try for linear/broken cases.")
     parser.add_option("--weight-f", dest="weight_factor", type=float, default=100.0,
                       help="weight factor for excluding non-target contigs. Default:%default")
     parser.add_option("--depth-f", dest="depth_factor", type=float, default=10.,

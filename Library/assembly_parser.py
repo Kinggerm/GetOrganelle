@@ -845,7 +845,7 @@ class Assembly:
                     sys.stdout.write("Average target kmer-coverage: " + str(round(new_val, 2)) + "\n")
 
     def tag_in_between(self, mode):
-        # add those in between the tagged vertices to tagged_vertices
+        # add those in between the tagged vertices to tagged_vertices, which offered the only connection
         updated = True
         candidate_vertices = list(self.vertex_info)
         while updated:
@@ -1003,16 +1003,32 @@ class Assembly:
 
         # gmm_scheme = gmm_with_em_aic(coverages, maximum_cluster=6, cluster_limited=set_cluster,
         #                              min_sigma_factor=min_sigma_factor)
+        if log_handler and (debug or verbose):
+            log_handler.info("Vertices: " + str(vertices))
+            log_handler.info("Coverages: " + str([float("%.1f" % cov_x) for cov_x in coverages]))
+        elif verbose or debug:
+            sys.stdout.write("Vertices: " + str(vertices) + "\n")
+            sys.stdout.write("Coverages: " + str([float("%.1f" % cov_x) for cov_x in coverages]) + "\n")
         gmm_scheme = weighted_gmm_with_em_aic(coverages, data_weights=cover_weights,
                                               maximum_cluster=6, cluster_limited=set_cluster,
                                               min_sigma_factor=min_sigma_factor)
         cluster_num = gmm_scheme["cluster_num"]
         parameters = gmm_scheme["parameters"]
         labels = gmm_scheme["labels"]
+        if log_handler and (debug or verbose):
+            log_handler.info("Labels: " + str(labels))
+        elif verbose or debug:
+            sys.stdout.write("Labels: " + str(labels) + "\n")
         selected_label_type = list(
             set([lb for go, lb in enumerate(labels) if vertices[go] in self.tagged_vertices[mode]]))
         if len(selected_label_type) > 1:
-            label_weights = {lb: sum([self.vertex_info[vertices[go]].get("weight", {mode: 0})[mode]
+            label_weights = {}
+            # for lb in selected_label_type:
+            #     this_add_up = 0
+            #     for go in np.where(labels == lb)[0]:
+            #         this_add_up += self.vertex_info[vertices[go]].get("weight", {}).get(mode, 0)
+            #     label_weights[lb] = this_add_up
+            label_weights = {lb: sum([self.vertex_info[vertices[go]].get("weight", {}).get(mode, 0)
                                       for go in np.where(labels == lb)[0]])
                              for lb in selected_label_type}
             selected_label_type.sort(key=lambda x: -label_weights[x])
@@ -1258,7 +1274,7 @@ class Assembly:
                           max_copy=8, min_sigma_factor=0.1,
                           log_hard_cov_threshold=10., contamination_depth=5., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.95,
-                          temp_graph=None, verbose=True,
+                          broken_graph_allowed=False, temp_graph=None, verbose=True,
                           log_handler=None, debug=False):
 
         self.parse_tab_file(tab_file, mode=mode, type_factor=type_factor, log_handler=log_handler)

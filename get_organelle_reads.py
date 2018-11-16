@@ -99,7 +99,7 @@ def get_options(descriptions, version):
                             help="This flag should be followed with cp (if you want get chloroplast), mt "
                                  "(mitochondria), nr (nuclear ribosomal RNA). Default: %default. ")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
-                            help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
+                            help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
                                  "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
                                  "This option is suggested for lowly-covered or nonhomogeneously-covered data (poor "
                                  "data). You can overwrite the value of a specific option listed above by adding "
@@ -111,7 +111,7 @@ def get_options(descriptions, version):
                                  "(say a circular plastome) under this option, you need to adjust '-w' and '-k' "
                                  "carefully to confirm whether it was the problem of the dataset. ")
     group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
-                            help="=\"-R 10 --max-reads 5E6 -t 4 -J 3 -M 7 --max-n-words 3E7\" "
+                            help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-n-words 3E7\" "
                                  "This option is suggested for homogeneously and highly covered data (very fine data). "
                                  "You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--fast\" flag. "
@@ -147,13 +147,13 @@ def get_options(descriptions, version):
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
                                     "Default: 4E8 (-F cp), 8E7 (-F nr) or 2E9 (-F mt)")
-    group_extending.add_option("-J", dest="jump_step", type=int, default=1,
+    group_extending.add_option("-J", dest="jump_step", type=int, default=3,
                                help="The wide of steps of checking words in reads during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
                                     "the faster the extension will be, "
                                     "the more risk of missing reads in low coverage area. "
-                                    "Choose 1 to choose the slowest but safest extension strategy. Default: 1")
-    group_extending.add_option("-M", dest="mesh_size", type=int, default=1,
+                                    "Choose 1 to choose the slowest but safest extension strategy. Default: %default")
+    group_extending.add_option("-M", dest="mesh_size", type=int, default=2,
                                help="(Beta parameter) "
                                     "The wide of steps of building words from seeds during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
@@ -161,7 +161,7 @@ def get_options(descriptions, version):
                                     "the more risk of missing reads in low coverage area. "
                                     "Another usage of this mesh size is to choose a larger mesh size coupled with a "
                                     "smaller word size, which makes smaller word size feasible when memory is limited."
-                                    "Choose 1 to choose the slowest but safest extension strategy. Default: 1")
+                                    "Choose 1 to choose the slowest but safest extension strategy. Default: %default")
     group_extending.add_option("--no-bowtie2", dest="utilize_mapping", action="store_false", default=True,
                                help="Choose to disable mapping process."
                                     "By default, this script would map original reads to pre-seed (or bowtie2 index) "
@@ -281,11 +281,11 @@ def get_options(descriptions, version):
                           help="Target organelle genome type: cp/mt/nr. Default: %default")
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
-                          help="=\"-R 200 --max-reads 2E8 --min-quality-score -5 --max-ignore-percent 0 "
+                          help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
                                "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
-                          help="=\"-R 10 --max-reads 5E6 -t 4 -J 3 -M 7 --max-words 3E7\"")
+                          help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-words 3E7\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="75,85,95", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
@@ -396,6 +396,10 @@ def get_options(descriptions, version):
                 options.max_rounds = 200
             if "--max-reads" not in sys.argv:
                 options.maximum_n_reads = 2E8
+            if "-J" not in sys.argv:
+                options.jump_step = 1
+            if "-M" not in sys.argv:
+                options.mesh_size = 1
             if "--min-quality-score" not in sys.argv:
                 options.min_quality_score = -5
             if "--max-ignore-percent" not in sys.argv:
@@ -415,7 +419,7 @@ def get_options(descriptions, version):
             if "-t" not in sys.argv:
                 options.threads = 4
             if "-J" not in sys.argv:
-                options.jump_step = 3
+                options.jump_step = 5
             if "-M" not in sys.argv:
                 options.mesh_size = 7
             if "--max-n-words" not in sys.argv:
@@ -762,7 +766,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
                 record_fq_beyond_read_num_limit[-1] = True
             break
     all_quality_chars = "".join(all_quality_chars_list)
-    len_total = float(len(all_quality_chars))
+    len_quality_chars_total = float(len(all_quality_chars))
     max_quality = max(all_quality_chars)
     min_quality = min(all_quality_chars)
     max_quality = ord(max_quality)
@@ -775,8 +779,8 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
                                                                 ("Illumina 1.8+", 33, 74, 0, 41)]:
         decision_making.append((type_name, char_min, char_max, score_min, score_max,
                                 (max_quality - char_max) ** 2 + (min_quality - char_min) ** 2))
-    the_name, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
-    log.info("Identified quality encoding format: " + the_name)
+    the_form, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
+    log.info("Identified quality encoding format: " + the_form)
     if max_quality > the_c_max:
         log.warning("Max quality score " + repr(chr(max_quality)) +
                     "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
@@ -789,34 +793,34 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
     # increase --min-quality-score if ignoring too much data.
     low_quality_score = min(the_c_min, min_quality)
     ignore_percent = 0
-    low_quality_chars = []
+    trimmed_quality_chars = []
 
     while low_quality_score < the_c_min + min_quality_score - the_s_min:
-        ignore_this_time = all_quality_chars.count(chr(low_quality_score)) / len_total
+        ignore_this_time = all_quality_chars.count(chr(low_quality_score)) / len_quality_chars_total
         ignore_percent += ignore_this_time
         if ignore_percent > maximum_ignore_percent:
             ignore_percent -= ignore_this_time
             break
         else:
-            low_quality_chars.append(chr(low_quality_score))
+            trimmed_quality_chars.append(chr(low_quality_score))
         low_quality_score += 1
     if low_quality_score < the_c_min + min_quality_score - the_s_min:
         log.info("Resetting '--min-quality-score " + str(low_quality_score + the_s_min - the_c_min) + "'")
-    if low_quality_chars:
-        log.info("Trimming bases with qualities (" + str(round(ignore_percent, 4)) + "): " +
-                 str(ord(min("".join(low_quality_chars)))) + ".." + str(ord(max("".join(low_quality_chars)))) + "  " +
-                 "".join(low_quality_chars))
-    low_quality_chars = "".join(low_quality_chars)
+    if trimmed_quality_chars:
+        log.info("Trimming bases with qualities (" + "%.4f" % round(ignore_percent, 4) + "): " +
+                 str(ord(min("".join(trimmed_quality_chars)))) + ".." + str(ord(max("".join(trimmed_quality_chars)))) +
+                 "  " + "".join(trimmed_quality_chars))
+    trimmed_quality_chars = "".join(trimmed_quality_chars)
 
     # calculate mean error rate
     all_quality_char_dict = {in_quality_char: all_quality_chars.count(in_quality_char)
                              for in_quality_char in set(all_quality_chars)}
-    error_prob_func = chose_error_prob_func[the_name]
+    error_prob_func = chose_error_prob_func[the_form]
     mean_error_rate = sum([error_prob_func(in_quality_char) * all_quality_char_dict[in_quality_char]
-                           for in_quality_char in all_quality_char_dict]) / len_total
+                           for in_quality_char in all_quality_char_dict]) / len_quality_chars_total
     log.info("Mean error rate: " + str(round(mean_error_rate, 4)))
 
-    return "[" + low_quality_chars + "]", mean_error_rate, record_fq_beyond_read_num_limit  # , post_trimming_mean
+    return "[" + trimmed_quality_chars + "]", mean_error_rate, record_fq_beyond_read_num_limit  # , post_trimming_mean
 
 
 def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fq_info_in_memory,
@@ -1819,17 +1823,16 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         else:
             query_fq_files.append(ori_fq)
 
-    total_seed_file = [os.path.join(out_base, x + prefix + "Initial.mapped.fq") for x in ("temp.", "")]
+    total_seed_fq = [os.path.join(out_base, x + prefix + "Initial.mapped.fq") for x in ("temp.", "")]
     total_seed_sam = [os.path.join(out_base, x + prefix + "seed_bowtie.sam") for x in ("temp.", "")]
-    if resume and os.path.exists(total_seed_file[1]):
+    if resume and os.path.exists(total_seed_fq[1]):
         log.info("Initial seeds existed!")
     else:
         log.info("Mapping reads to seed - bowtie2 index ...")
-        this_command = "bowtie2 -p " + str(threads) + " --very-fast --al " + total_seed_file[0] + \
+        this_command = "bowtie2 -p " + str(threads) + " --very-fast --al " + total_seed_fq[0] + \
                        " -x " + seed_index_base + " -U " + ",".join(query_fq_files) + " -S " + total_seed_sam[0] + \
                        " --no-unal --no-hd --no-sq -t"
-        make_seed_bowtie2 = subprocess.Popen(this_command,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        make_seed_bowtie2 = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         if verbose_log:
             log.info(this_command)
         output, err = make_seed_bowtie2.communicate()
@@ -1840,7 +1843,7 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
             log.info("\n" + output.decode("utf8").strip())
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
-            os.rename(total_seed_file[0], total_seed_file[1])
+            os.rename(total_seed_fq[0], total_seed_fq[1])
             log.info("Mapping finished.")
         else:
             log.error("Cannot find bowtie2 result!")
@@ -1906,8 +1909,14 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         for count_fq, query_fq in enumerate(query_fq_files):
             if original_fq_beyond_read_limit[count_fq]:
                 os.remove(query_fq)
-
-    return total_seed_file[1], anti_lines
+    seed_fq_size = os.path.getsize(total_seed_fq[1])
+    if seed_fq_size < 1024:
+        log.info("Seed reads made: " + seed_file + " (" + str(int(seed_fq_size)) + " bytes)")
+    elif 1024 * 1024 > seed_fq_size >= 1024:
+        log.info("Seed reads made: " + seed_file + " (" + "%.2f" % round(seed_fq_size / 1024, 2) + " K)")
+    elif seed_fq_size >= 1024 * 1024:
+        log.info("Seed reads made: " + seed_file + " (" + "%.2f" % round(seed_fq_size / 1024 / 1024, 2) + " M)")
+    return total_seed_fq[1], anti_lines
 
 
 def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, prefix, original_fq_files, reads_paired,
@@ -2294,7 +2303,6 @@ def main():
                                                              original_fq_beyond_read_limit, out_base, resume,
                                                              verb_log, options.threads, options.prefix,
                                                              options.keep_temp_files, log)
-                log.info(seed_file + ": " + str(round(os.path.getsize(seed_file) / 1024 / 1024, 2)) + " M")
             else:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
                                                (anti_seed or b_at_seed),

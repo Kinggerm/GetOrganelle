@@ -395,9 +395,10 @@ def main():
     time0 = time.time()
     sys.stdout.write(
         "\nThis script would join the spades fastg contigs according to the reference."
-        "\nIt would add extra gap nodes and/or overlap nodes in between the worth connecting nodes in a fastg file."
+        "\nIt would add extra gap nodes (N) and/or overlap nodes (?) in between the connectible nodes and generate "
+        " a new fastg file."
         "\n"
-        "\nHowever, this is a BETA version:"
+        "\nThis is a BETA version:"
         "\nAlthough it will not produce error connections, it usually replicates the same right connection."
         "\nDon't be surprised if you find any other bugs.\n")
     require_commands()

@@ -23,7 +23,7 @@ def get_options(print_title):
                       help="output directory.")
     parser.add_option("-m", dest="mode", default="cp",
                       help="organelle mode: cp, mt, or nt. Default:%default")
-    parser.add_option("--acyclic-allowed", dest="acyclic_allowed", default=False,
+    parser.add_option("--acyclic-allowed", dest="acyclic_allowed", default=False, action="store_true",
                       help="By default, this script would only disentangle the circular graph (the complete circular "
                            "organelle genome), and would directly give up linear/broken graphs). Choose this option "
                            "to try for linear/broken cases.")
@@ -41,8 +41,11 @@ def get_options(print_title):
                       help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
     parser.add_option("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
                       help="Depth factor for confirming parallel contigs. Default:%default")
-    parser.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
+    parser.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
                       help="Similarity threshold for confirming parallel contigs. Default:%default")
+    parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
+                      help="By default, this script would pick the contig with highest coverage among all parallel "
+                           "(polymorphic) contigs. Choose this flag to export all combinations.")
     parser.add_option("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
                       help="Minimum deviation factor for excluding non-target contigs. Default:%default")
     parser.add_option("--min-depth", dest="min_cov", type=float, default=0.,
@@ -55,6 +58,8 @@ def get_options(print_title):
                       help="export intermediate graph file.")
     parser.add_option("--time-limit", dest="time_limit", default=1500, type=int,
                       help="time limit for the disentangling process. Default:%default")
+    parser.add_option("--continue", dest="resume", default=False, action="store_true",
+                      help="continue mode.")
     parser.add_option("--verbose", dest="verbose", default=False, action="store_true",
                       help="verbose logging.")
     parser.add_option("--debug", dest="debug", default=False, action="store_true",
@@ -85,55 +90,89 @@ def main():
                                       log_hard_cov_threshold=10.,
                                       contamination_depth=5., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
-                                      min_sigma_factor=0.1, keep_temp=False,
+                                      min_sigma_factor=0.1, only_max_c=True, keep_temp=False, acyclic_allowed=False,
                                       verbose=False, log=None, debug=False):
-        time_a = time.time()
-        if log:
-            log.info(">>> Parsing " + fastg_file + " ..")
+        if options.resume and os.path.exists(prefix + ".graph1.selected_graph.gfa"):
+            pass
+            if log:
+                log.info(">>> Result graph existed!")
+            else:
+                sys.stdout.write(">>> Result graph existed!\n")
         else:
-            sys.stdout.write("Parsing " + fastg_file + " ..\n")
-        input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
-        time_b = time.time()
-        if log:
-            log.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
-        else:
-            sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
-        temp_graph = prefix + ".temp.fastg" if keep_temp else None
+            time_a = time.time()
+            if log:
+                log.info(">>> Parsing " + fastg_file + " ..")
+            else:
+                sys.stdout.write("Parsing " + fastg_file + " ..\n")
+            input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
+            time_b = time.time()
+            if log:
+                log.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
+            else:
+                sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
+            temp_graph = prefix + ".temp.fastg" if keep_temp else None
 
-        copy_results = input_graph.find_target_graph(tab_file, mode=mode, type_factor=type_factor,
-                                                     weight_factor=weight_factor,
-                                                     log_hard_cov_threshold=log_hard_cov_threshold,
-                                                     contamination_depth=contamination_depth,
-                                                     contamination_similarity=contamination_similarity,
-                                                     degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                     degenerate_similarity=degenerate_similarity,
-                                                     min_sigma_factor=min_sigma_factor,
-                                                     temp_graph=temp_graph, verbose=verbose, log_handler=log,
-                                                     debug=debug)
-        time_c = time.time()
-        if log:
-            log.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
-            log.info(str(len(copy_results)) + " set(s) of graph detected.")
-        else:
-            sys.stdout.write("\n\n>>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s\n")
-            sys.stdout.write(str(len(copy_results)) + " set(s) of graph detected.\n")
+            copy_results = input_graph.find_target_graph(tab_file, mode=mode, type_factor=type_factor,
+                                                         weight_factor=weight_factor,
+                                                         log_hard_cov_threshold=log_hard_cov_threshold,
+                                                         contamination_depth=contamination_depth,
+                                                         contamination_similarity=contamination_similarity,
+                                                         degenerate=degenerate, degenerate_depth=degenerate_depth,
+                                                         degenerate_similarity=degenerate_similarity,
+                                                         only_keep_max_cov=only_max_c,
+                                                         min_sigma_factor=min_sigma_factor,
+                                                         temp_graph=temp_graph,
+                                                         broken_graph_allowed=acyclic_allowed,
+                                                         verbose=verbose, log_handler=log,
+                                                         debug=debug)
+            time_c = time.time()
+            if log:
+                log.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
+                if len(copy_results) > 1:
+                    log.info(str(len(copy_results)) + " set(s) of graph detected.")
+            else:
+                sys.stdout.write("\n\n>>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s\n")
+                if len(copy_results) > 1:
+                    sys.stdout.write(str(len(copy_results)) + " set(s) of graph detected.\n")
 
-        for go_res, copy_res in enumerate(copy_results):
-            idealized_graph = copy_res["graph"]
-            # should add making one-step-inversion pairs for paths,
-            # which would be used to identify existence of a certain isomer using mapping information
-            count_path = 0
-            for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
-                count_path += 1
-                open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + ".path_sequence.fasta",
-                     "w"). \
-                    write(idealized_graph.export_path(this_path).fasta_str())
-            idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
-        time_d = time.time()
-        if log:
-            log.info(">>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s")
-        else:
-            sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
+            degenerate_base_used = False
+            if acyclic_allowed:
+                for go_res, copy_res in enumerate(copy_results):
+                    broken_graph = copy_res["graph"]
+                    count_path = 0
+                    for this_paths, other_tag in broken_graph.get_all_paths(mode=mode, log_handler=log):
+                        count_path += 1
+                        all_contig_str = []
+                        for go_contig, this_p_part in enumerate(this_paths):
+                            this_contig = broken_graph.export_path(this_p_part)
+                            if DEGENERATE_BASES & set(this_contig.seq):
+                                degenerate_base_used = True
+                            all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label + "\n" +
+                                                  this_contig.seq + "\n")
+                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + 
+                             ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
+                    broken_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
+            else:
+                for go_res, copy_res in enumerate(copy_results):
+                    idealized_graph = copy_res["graph"]
+                    # should add making one-step-inversion pairs for paths,
+                    # which would be used to identify existence of a certain isomer using mapping information
+                    count_path = 0
+                    for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
+                        count_path += 1
+                        this_seq_obj = idealized_graph.export_path(this_path)
+                        if DEGENERATE_BASES & set(this_seq_obj.seq):
+                            degenerate_base_used = True
+                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + 
+                             ".path_sequence.fasta", "w").write(this_seq_obj.fasta_str())
+                    idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
+            if degenerate_base_used:
+                log.warning("Degenerate base(s) used!")
+            time_d = time.time()
+            if log:
+                log.info(">>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s")
+            else:
+                sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
 
     try:
         disentangle_circular_assembly(options.fastg_file, options.tab_file,
@@ -147,6 +186,7 @@ def main():
                                       degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
                                       degenerate_similarity=options.degenerate_similarity,
                                       min_sigma_factor=options.min_sigma_factor,
+                                      only_max_c=options.only_keep_max_cov, acyclic_allowed=options.acyclic_allowed,
                                       keep_temp=options.keep_temp_graph,
                                       log=log, verbose=options.verbose, debug=options.debug)
         log = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")

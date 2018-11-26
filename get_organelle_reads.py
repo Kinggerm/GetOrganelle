@@ -4,13 +4,12 @@ import datetime
 import sys
 import os
 from copy import deepcopy
-import math
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.seq_parser import *
 from Library.pipe_control_func import *
+from Library.seq_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 not_ref_path = os.path.join(path_of_this_script, "Library", "NotationReference")
 seq_ref_path = os.path.join(path_of_this_script, "Library", "SeqReference")
@@ -34,8 +33,8 @@ import subprocess
 
 dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
 word_size = 0
-max_ratio_rl_wl = 0.75
-global_min_wl = 49
+max_ratio_rl_ws = 0.75
+global_min_ws = 49
 
 
 def get_options(descriptions, version):
@@ -64,9 +63,9 @@ def get_options(descriptions, version):
                            help="Reference. Input fasta format file as initial seed or input bowtie index base name "
                                 "as pre-seed (see flag '--bs'). "
                                 "Default: '%default' (* depends on the value followed with flag '-F')")
-    group_inout.add_option("--bs", dest="bowtie2_seed",
-                           help="Input bowtie2 index base name as pre-seed. "
-                                "This flag serves as an alternation of the flag '-s'.")
+    # group_inout.add_option("--bs", dest="bowtie2_seed",
+    #                        help="Input bowtie2 index base name as pre-seed. "
+    #                             "This flag serves as an alternation of the flag '-s'.")
     group_inout.add_option("-a", dest="anti_seed", 
                            help="Anti-reference. Input fasta format file as anti-seed, where the extension process "
                                 "stop. Typically serves as excluding chloroplast reads when extending mitochondrial "
@@ -74,9 +73,9 @@ def get_options(descriptions, version):
                                 "because if the anti-seed includes some word in the target but not in the seed, "
                                 "the result would have gaps. Typically, use the mt and cp from the same "
                                 "species as seed and anti-seed.")
-    group_inout.add_option("--ba", dest="bowtie2_anti_seed",
-                           help="Input bowtie2 index base name as pre-anti-seed. "
-                                "This flag serves as an alternation of flag '-a'.")
+    # group_inout.add_option("--ba", dest="bowtie2_anti_seed",
+    #                        help="Input bowtie2 index base name as pre-anti-seed. "
+    #                             "This flag serves as an alternation of flag '-a'.")
     group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
                            help="Maximum number of reads to be used per file. "
                                 "Default: 1.5E7 (-F cp,nr) or 7.5E7 (-F mt)")
@@ -111,7 +110,7 @@ def get_options(descriptions, version):
                                  "(say a circular plastome) under this option, you need to adjust '-w' and '-k' "
                                  "carefully to confirm whether it was the problem of the dataset. ")
     group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
-                            help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-n-words 3E7\" "
+                            help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws\" "
                                  "This option is suggested for homogeneously and highly covered data (very fine data). "
                                  "You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--fast\" flag. "
@@ -130,6 +129,9 @@ def get_options(descriptions, version):
     group_extending = OptionGroup(parser, "EXTENDING OPTIONS", "Options on the performance of extending process")
     group_extending.add_option("-w", dest="word_size", type=float,
                                help="Word size (W) for pre-grouping (if not assigned by '--pre-w') and extending "
+                                    "process. This script would try to guess (auto-estimate) a proper W "
+                                    "using an empirical function based on average read length, reads quality, "
+                                    "target genome coverage, and other variables that might influence the extending "
                                     "process. You could assign the ratio (1>input>0) of W to "
                                     "read_length, based on which this script would estimate the W for you; "
                                     "or assign an absolute W value (read length>input>=35). Default: auto-estimated.")
@@ -173,6 +175,11 @@ def get_options(descriptions, version):
     group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=0, type=int,
                                help="The step of word size adjustment during extending process."
                                     "Use 0 to disable this automatic adjustment. Default: %default.")
+    group_extending.add_option("--larger-auto-ws", dest="larger_auto_ws", default=False, action="store_true",
+                               help="By using this flag, the empirical function for estimating W would tend to "
+                                    "produce a relative larger W, which would speed up the matching in extending, "
+                                    "reduce the memory cost in extending, but increase the risk of broken final "
+                                    "graph. Suggested when the data is good with high and homogenous coverage.")
     group_extending.add_option("--soft-max-words", dest="soft_max_words", type=float, default=8E7,
                                help="Maximum number of words to be used to test the fitness of a word size value."
                                     "Default: 8E7 (-F cp), 1.6E7 (-F nr) or 4E8 (-F mt)")
@@ -205,12 +212,12 @@ def get_options(descriptions, version):
                               help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
     group_assembly.add_option("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
                               help="Depth factor for confirming parallel contigs. Default: %default")
-    group_assembly.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.95, type=float,
+    group_assembly.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
                               help="Similarity threshold for confirming parallel contigs. Default: %default")
+    group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=600, type=float,
+                              help="Time limit (second) for each try of disentangling a graph file. Default: %default")
     # group 5
-    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "These options will NOT affect the final results. "
-                                                                    "Take easy to pick some according your "
-                                                                    "computer's flavour.")
+    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "")
     group_computational.add_option("-t", dest="threads", type=int, default=1,
                                    help="Maximum threads to use.")
     group_computational.add_option("-P", dest="pre_grouped", type=float, default=2E5,
@@ -252,13 +259,15 @@ def get_options(descriptions, version):
         parser.print_help()
         exit()
     elif "-h" in sys.argv:
-        for not_often_used in ("--bs", "-a", "--ba", "--max-reads", "--max-ignore-percent",
+        for not_often_used in ("-a", "--max-reads", "--max-ignore-percent", # "--ba", "--bs",
                                "--min-quality-score", "--prefix", "--out-per-round", "--keep-temp",
                                "--memory-save", "--memory-unlimited", "--pre-w", "-r", "--max-n-words",
-                               "-J", "-M", "--no-bowtie2", "--no-pre-reading", "--auto-wss", "--soft-max-words",
+                               "-J", "-M", "--no-bowtie2", "--no-pre-reading", "--auto-wss", "--larger-auto-ws",
+                               "--soft-max-words",
                                "--target-genome-size", "--spades-options", "--no-spades", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
-                               "--degenerate-depth", "--degenerate-similarity", "--continue", "--index-in-memory",
+                               "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
+                               "--continue", "--index-in-memory",
                                "--remove-duplicates", "--flush-frequency", "--verbose"):
             parser.remove_option(not_often_used)
         parser.remove_option("-1")
@@ -282,10 +291,12 @@ def get_options(descriptions, version):
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
-                               "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\"")
+                               "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125 "
+                               "--disentangle-time-limit 3600\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
-                          help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-words 3E7\"")
+                          help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
+                               "--disentangle-time-limit 180\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="75,85,95", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
@@ -309,7 +320,7 @@ def get_options(descriptions, version):
         sys.stdout.write("\n\"-h\" for more usage")
         exit()
     else:
-        if not ((options.seed_file or options.bowtie2_seed)
+        if not (options.seed_file # or options.bowtie2_seed)
                 and ((options.fq_file_1 and options.fq_file_2) or options.unpaired_fq_files)
                 and options.output_base):
             sys.stdout.write("\n############################################################################"
@@ -376,7 +387,7 @@ def get_options(descriptions, version):
             pass
         elif 0 < options.word_size < 1:
             pass
-        elif options.word_size >= global_min_wl:
+        elif options.word_size >= global_min_ws:
             options.word_size = int(options.word_size)
         else:
             log.error("Illegal word size (\"-w\") value!")
@@ -385,7 +396,7 @@ def get_options(descriptions, version):
         if options.pregroup_word_size:
             if 0 < options.pregroup_word_size < 1:
                 pass
-            elif options.pregroup_word_size >= global_min_wl:
+            elif options.pregroup_word_size >= global_min_ws:
                 options.pregroup_word_size = int(options.pregroup_word_size)
             else:
                 log.error("Illegal word size (\"--pre-w\") value!")
@@ -410,6 +421,8 @@ def get_options(descriptions, version):
                 options.maximum_n_words = 4E9
             if "-k" not in sys.argv:
                 options.spades_kmer = "55,65,75,85,95,105,115,125"
+            if "--disentangle-time-limit" not in sys.argv:
+                options.disentangle_time_limit = 3600
 
         if options.fast_strategy:
             if "-R" not in sys.argv and "--max-rounds" not in sys.argv:
@@ -424,6 +437,9 @@ def get_options(descriptions, version):
                 options.mesh_size = 7
             if "--max-n-words" not in sys.argv:
                 options.maximum_n_words = 3E7
+            options.larger_auto_ws = True
+            if "--disentangle-time-limit" not in sys.argv:
+                options.disentangle_time_limit = 180
             # if "--no-pre-reading" not in sys.argv:
             #     options.pre_reading = False
 
@@ -464,14 +480,14 @@ def get_options(descriptions, version):
             elif options.organelle_type == "nr":
                 options.target_genome_size /= 10.
 
-        if options.seed_file and options.bowtie2_seed:
-            log.error('Simultaneously using "-s" and "--bs" is not allowed!')
-            exit()
-        if options.anti_seed and options.bowtie2_anti_seed:
-            log.error('Simultaneously using "-a" and "--as" is not allowed!')
-            exit()
-        if options.bowtie2_seed or options.bowtie2_anti_seed:
-            options.utilize_mapping = True
+        # if options.seed_file and options.bowtie2_seed:
+        #     log.error('Simultaneously using "-s" and "--bs" is not allowed!')
+        #     exit()
+        # if options.anti_seed and options.bowtie2_anti_seed:
+        #     log.error('Simultaneously using "-a" and "--as" is not allowed!')
+        #     exit()
+        # if options.bowtie2_seed or options.bowtie2_anti_seed:
+        #     options.utilize_mapping = True
         if not options.pre_reading and not options.word_size:
             log.error("When '--no-pre-reading' was chosen, a user defined word size value ('-w') must be given!")
         if options.utilize_mapping:
@@ -553,9 +569,8 @@ def trans_word_cov(word_cov, base_cov, mean_base_error_rate, read_length):
 
 
 def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rate=0.015, log=None,
-                       max_discontinuous_prob=0.01, min_word_size=global_min_wl, max_effective_word_cov=60,
+                       max_discontinuous_prob=0.01, min_word_size=global_min_ws, max_effective_word_cov=60,
                        wc_bc_ratio_constant=0.35):
-    # e_natural = 2.718281828459045
     echo_problem = False
     all_word_sizes = []
     for base_cov in base_cov_values:
@@ -567,9 +582,9 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
         #    P(>=1 reads start in the interval) = 1-e^(-C*N/(G-L+1))
         #    P(the interval is not continuous) = 1-(1-e^(-N/(G-L+1)))^C
         #
-        # 1. The higher the base coverage is, the larger word size should be. # to exclude unnecessary contigs.
-        # 2. The longer the read length is, the larger word size should be
-        # 3. The higher the error rate is, the smaller word size should be
+        # 1. The higher the base coverage is, the larger the word size should be. # to exclude unnecessary contigs.
+        # 2. The longer the read length is, the larger the word size should be
+        # 3. The higher the error rate is, the smaller the word size should be
 
         # empirical functions:
         word_cov = min(max_effective_word_cov, base_cov * wc_bc_ratio_constant)
@@ -581,10 +596,10 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
             min_word_cov = base_cov * wc_bc_ratio_max
             echo_problem = True
         word_cov = max(min_word_cov, word_cov)
-        word_cov = trans_word_cov(word_cov, base_cov, mean_error_rate, read_length)
+        word_cov = trans_word_cov(word_cov, base_cov, mean_error_rate / 2., read_length)
         # 1. relationship between kmer coverage and base coverage, k_cov = base_cov * (read_len - k_len + 1) / read_len
         estimated_word_size = int(read_length * (1 - word_cov / base_cov)) + 1
-        estimated_word_size = min(int(read_length * max_ratio_rl_wl), max(min_word_size, estimated_word_size))
+        estimated_word_size = min(int(read_length * max_ratio_rl_ws), max(min_word_size, estimated_word_size))
         all_word_sizes.append(int(round(estimated_word_size, 0)))
     if echo_problem:
         if log:
@@ -599,9 +614,9 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
 def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log):
     if word_size_ratio < 1:
         new_word_size = int(round(word_size_ratio * mean_read_len, 0))
-        if new_word_size < global_min_wl:
-            new_word_size = global_min_wl
-            log.warning("Too small ratio " + str(new_word_size) + ", setting '-w " + str(global_min_wl) + "'")
+        if new_word_size < global_min_ws:
+            new_word_size = global_min_ws
+            log.warning("Too small ratio " + str(new_word_size) + ", setting '-w " + str(global_min_ws) + "'")
         else:
             log.info("Setting '-w " + str(new_word_size) + "'")
         return new_word_size
@@ -615,36 +630,46 @@ def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log):
 
 
 def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_word_size_step, mean_error_rate,
-                     target_genome_size, mean_read_len, max_read_len, spades_kmer, low_quality_pattern,
-                     log, wc_bc_ratio_constant=0.35):
+                     target_genome_size, mean_read_len, max_read_len, low_quality_pattern,
+                     log, wc_bc_ratio_constant=0.35, larger_auto_ws=False):
     global word_size
     if utilize_mapping:
         base_cov_values = get_query_cover(get_coverage_from_sam(os.path.join(out_base, "seed_bowtie.sam")))
-        log.info("Estimated " + organelle_type + " base-coverage: " + str(base_cov_values[1]))
+        log.info("Estimated " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
     else:
         organelle_base_percent = 0.05
         guessing_base_cov = organelle_base_percent * all_bases / target_genome_size
         base_cov_values = [guessing_base_cov * 0.8, guessing_base_cov, guessing_base_cov * 1.2]
-        log.info("Guessing " + organelle_type + " base-coverage: " + str(base_cov_values[1]))
+        log.info("Guessing " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
     if word_size is None:
-        # standard dev
-        min_word_size, word_size, max_word_size = estimate_word_size(
-            base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
-            mean_error_rate=mean_error_rate/2., log=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
+        if larger_auto_ws:
+            min_word_size, word_size, max_word_size = estimate_word_size(
+                base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
+                max_discontinuous_prob=0.05, min_word_size=70,
+                mean_error_rate=mean_error_rate, log=log, wc_bc_ratio_constant=wc_bc_ratio_constant - 0.03)
+        else:
+            # standard dev
+            min_word_size, word_size, max_word_size = estimate_word_size(
+                base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
+                max_discontinuous_prob=0.01, min_word_size=global_min_ws,
+                mean_error_rate=mean_error_rate, log=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
         log.info("Setting '-w " + str(word_size) + "'")
+        log.info("The automatically-estimated word size does not ensure the best choice.")
+        log.info("If the result graph is not a circular organelle genome, ")
+        log.info("you could adjust the word size for another new run.")
     elif word_size < 1:
         new_word_size = int(round(word_size * mean_read_len, 0))
-        if new_word_size < global_min_wl:
-            word_size = global_min_wl
-            log.warning("Too small ratio " + str(word_size) + ", setting '-w " + str(global_min_wl) + "'")
+        if new_word_size < global_min_ws:
+            word_size = global_min_ws
+            log.warning("Too small ratio " + str(word_size) + ", setting '-w " + str(global_min_ws) + "'")
         else:
             word_size = new_word_size
             log.info("Setting '-w " + str(word_size) + "'")
-        min_word_size = max(global_min_wl, word_size - auto_word_size_step * 4)
-        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_wl))
+        min_word_size = max(global_min_ws, word_size - auto_word_size_step * 4)
+        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_ws))
     else:
-        min_word_size = max(global_min_wl, word_size - auto_word_size_step * 4)
-        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_wl))
+        min_word_size = max(global_min_ws, word_size - auto_word_size_step * 4)
+        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_ws))
     # arbitrarily adjust word size range
     if not auto_word_size_step:
         min_word_size = max_word_size = word_size
@@ -655,24 +680,30 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
         keep_seq_parts = True
     else:
         keep_seq_parts = False
-    if spades_kmer:
+
+    return min_word_size, word_size, max_word_size, keep_seq_parts
+
+
+def check_kmers(kmer_str, word_s, max_r_len, log):
+    if kmer_str:
         # delete illegal kmer
-        kmer_values = [int(kmer_v) for kmer_v in spades_kmer.split(",")]
+        kmer_values = [int(kmer_v) for kmer_v in kmer_str.split(",")]
         # add kmer around estimated word_size
         k_tens_digits = [int(kmer_v / 10) for kmer_v in kmer_values]
-        w_tens_digit = int(word_size / 10)
+        w_tens_digit = int(word_s / 10)
         if w_tens_digit not in k_tens_digits:
             avail_tens_digits = k_tens_digits + [w_tens_digit]
             for add_tens_digit in range(min(avail_tens_digits), max(avail_tens_digits)):
                 if add_tens_digit not in k_tens_digits:
                     kmer_values.append(int(add_tens_digit * 10 + 5))
         # delete illegal kmer
-        kmer_values = [kmer_v for kmer_v in kmer_values if 21 <= kmer_v <= min(max_read_len, 127)]
+        kmer_values = [kmer_v for kmer_v in kmer_values if 21 <= kmer_v <= min(max_r_len, 127)]
 
         spades_kmer = ",".join([str(kmer_v) for kmer_v in sorted(kmer_values)])
         log.info("Setting '-k " + spades_kmer + "'")
-
-    return min_word_size, word_size, max_word_size, keep_seq_parts, spades_kmer
+        return spades_kmer
+    else:
+        return None
 
 
 # test whether an external binary is executable
@@ -780,7 +811,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
         decision_making.append((type_name, char_min, char_max, score_min, score_max,
                                 (max_quality - char_max) ** 2 + (min_quality - char_min) ** 2))
     the_form, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
-    log.info("Identified quality encoding format: " + the_form)
+    log.info("Identified quality encoding format = " + the_form)
     if max_quality > the_c_max:
         log.warning("Max quality score " + repr(chr(max_quality)) +
                     "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
@@ -807,7 +838,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
     if low_quality_score < the_c_min + min_quality_score - the_s_min:
         log.info("Resetting '--min-quality-score " + str(low_quality_score + the_s_min - the_c_min) + "'")
     if trimmed_quality_chars:
-        log.info("Trimming bases with qualities (" + "%.4f" % round(ignore_percent, 4) + "): " +
+        log.info("Trimming bases with qualities (" + "%.2f" % (ignore_percent * 100) + "%): " +
                  str(ord(min("".join(trimmed_quality_chars)))) + ".." + str(ord(max("".join(trimmed_quality_chars)))) +
                  "  " + "".join(trimmed_quality_chars))
     trimmed_quality_chars = "".join(trimmed_quality_chars)
@@ -818,7 +849,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
     error_prob_func = chose_error_prob_func[the_form]
     mean_error_rate = sum([error_prob_func(in_quality_char) * all_quality_char_dict[in_quality_char]
                            for in_quality_char in all_quality_char_dict]) / len_quality_chars_total
-    log.info("Mean error rate: " + str(round(mean_error_rate, 4)))
+    log.info("Mean error rate = " + str(round(mean_error_rate, 4)))
 
     return "[" + trimmed_quality_chars + "]", mean_error_rate, record_fq_beyond_read_num_limit  # , post_trimming_mean
 
@@ -884,7 +915,7 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
 
 
 def make_read_index(original_fq_files, direction_according_to_user_input, maximum_n_reads, rm_duplicates, output_base,
-                    anti_lines, pre_grouped, index_in_memory, bowtie2_anti_seed, anti_seed, keep_seq_parts,
+                    anti_lines, pre_grouped, index_in_memory, anti_seed, keep_seq_parts,
                     low_quality, echo_frequency, resume, log):
     # read original reads
     # line_cluster (list) ~ forward_reverse_reads
@@ -936,7 +967,7 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
             count_this_read_n = 0
             line = file_in.readline()
             # if anti seed input, name & direction should be recognized
-            if bowtie2_anti_seed or anti_seed:
+            if anti_seed:
                 while line and count_this_read_n < maximum_n_reads:
                     if line.startswith("@"):
                         count_this_read_n += 1
@@ -1788,31 +1819,28 @@ def get_heads_from_sam(bowtie_sam_file):
     return hit_heads
 
 
-def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, max_num_reads, original_fq_files,
-                         original_fq_beyond_read_limit, out_base, resume, verbose_log, threads, prefix, keep_temp, log):
-    if seed_file:
-        if os.path.exists(seed_file + '.index.1.bt2l'):
-            log.info("Bowtie2 index existed!")
-        else:
-            log.info("Making seed - bowtie2 index ...")
-            build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
-                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            if verbose_log:
-                log.info("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index')
-            output, err = build_seed_index.communicate()
-            if "unrecognized option" in output.decode("utf8"):
-                build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
-                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-                output, err = build_seed_index.communicate()
-            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
-                log.error('\n' + output.decode("utf8"))
-                exit()
-            if verbose_log:
-                log.info("\n" + output.decode("utf8").strip())
-            log.info("Making seed - bowtie2 index finished.")
-        seed_index_base = seed_file + '.index'
+def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files, original_fq_beyond_read_limit,
+                         out_base, resume, verbose_log, threads, prefix, keep_temp, log):
+    if os.path.exists(seed_file + '.index.1.bt2l'):
+        log.info("Bowtie2 index existed!")
     else:
-        seed_index_base = bowtie2_seed
+        log.info("Making seed - bowtie2 index ...")
+        build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
+                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        if verbose_log:
+            log.info("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index')
+        output, err = build_seed_index.communicate()
+        if "unrecognized option" in output.decode("utf8"):
+            build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
+                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            output, err = build_seed_index.communicate()
+        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+            log.error('\n' + output.decode("utf8"))
+            exit()
+        if verbose_log:
+            log.info("\n" + output.decode("utf8").strip())
+        log.info("Making seed - bowtie2 index finished.")
+    seed_index_base = seed_file + '.index'
 
     query_fq_files = []
     for count_fq, ori_fq in enumerate(original_fq_files):
@@ -1848,33 +1876,30 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
         else:
             log.error("Cannot find bowtie2 result!")
             exit()
-    if anti_seed or bowtie2_anti_seed:
-        if anti_seed:
-            if os.path.exists(anti_seed + '.index.1.bt2l'):
-                log.info("anti-seed - bowtie2 index existed!")
-            else:
-                log.info("Making anti-seed - bowtie2 index ...")
-                build_anti_index = subprocess.Popen(
-                    "bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-                if verbose_log:
-                    log.info("bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index')
-                output, err = build_anti_index.communicate()
-                if "unrecognized option" in output.decode("utf8"):
-                    build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_seed + '.index',
-                                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-                    if verbose_log:
-                        log.info("bowtie2-build " + anti_seed + " " + anti_seed + '.index')
-                    output, err = build_anti_index.communicate()
-                if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
-                    log.error('\n' + output.decode("utf8"))
-                    exit()
-                if verbose_log:
-                    log.info("\n" + output.decode("utf8").strip())
-                log.info("Making anti-seed - bowtie2 index finished.")
-            anti_index_base = anti_seed + '.index'
+    if anti_seed:
+        if os.path.exists(anti_seed + '.index.1.bt2l'):
+            log.info("anti-seed - bowtie2 index existed!")
         else:
-            anti_index_base = bowtie2_anti_seed
+            log.info("Making anti-seed - bowtie2 index ...")
+            build_anti_index = subprocess.Popen(
+                "bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            if verbose_log:
+                log.info("bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index')
+            output, err = build_anti_index.communicate()
+            if "unrecognized option" in output.decode("utf8"):
+                build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_seed + '.index',
+                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                if verbose_log:
+                    log.info("bowtie2-build " + anti_seed + " " + anti_seed + '.index')
+                output, err = build_anti_index.communicate()
+            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                log.error('\n' + output.decode("utf8"))
+                exit()
+            if verbose_log:
+                log.info("\n" + output.decode("utf8").strip())
+            log.info("Making anti-seed - bowtie2 index finished.")
+        anti_index_base = anti_seed + '.index'
 
         anti_seed_sam = [os.path.join(out_base, x + prefix + "anti_seed_bowtie.sam") for x in ("temp.", "")]
         if resume and os.path.exists(anti_seed_sam[1]):
@@ -1911,11 +1936,11 @@ def mapping_with_bowtie2(seed_file, bowtie2_seed, anti_seed, bowtie2_anti_seed, 
                 os.remove(query_fq)
     seed_fq_size = os.path.getsize(total_seed_fq[1])
     if seed_fq_size < 1024:
-        log.info("Seed reads made: " + seed_file + " (" + str(int(seed_fq_size)) + " bytes)")
+        log.info("Seed reads made: " + total_seed_fq[1] + " (" + str(int(seed_fq_size)) + " bytes)")
     elif 1024 * 1024 > seed_fq_size >= 1024:
-        log.info("Seed reads made: " + seed_file + " (" + "%.2f" % round(seed_fq_size / 1024, 2) + " K)")
+        log.info("Seed reads made: " + total_seed_fq[1] + " (" + "%.2f" % round(seed_fq_size / 1024, 2) + " K)")
     elif seed_fq_size >= 1024 * 1024:
-        log.info("Seed reads made: " + seed_file + " (" + "%.2f" % round(seed_fq_size / 1024 / 1024, 2) + " M)")
+        log.info("Seed reads made: " + total_seed_fq[1] + " (" + "%.2f" % round(seed_fq_size / 1024 / 1024, 2) + " M)")
     return total_seed_fq[1], anti_lines
 
 
@@ -2013,9 +2038,23 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
             log.error("Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split("In case you")[0])
             log.error('Assembling failed.')
             return False
-    else:
+    elif not os.path.exists(os.path.join(spades_out_put, "assembly_graph.fastg")):
         if verbose_log:
             log.info(output.decode("utf8"))
+        log.warning("Assembling exited halfway.\n")
+        return True
+    else:
+        spades_log = output.decode("utf8").split("\n")
+        if verbose_log:
+            log.info(output.decode("utf8"))
+        for line in spades_log:
+            line = line.strip()
+            if line.count(":") > 2 and "Insert size = " in line and \
+                    line.split()[0].replace(":", "").replace(".", "").isdigit():
+                try:
+                    log.info(line.split("   ")[-1].split(", read length =")[0].strip())
+                except IndexError:
+                    pass
         log.info('Assembling finished.\n')
         return True
 
@@ -2137,77 +2176,186 @@ def unzip(source, target, line_limit, verbose_log, log):
         raise NotImplementedError("unzipping failed!")
 
 
-@set_time_limit(300)
-def disentangle_circular_assembly(fastg_file, tab_file, output, weight_factor, log, type_factor=3.,
-                                  mode="cp", verbose=False,
-                                  contamination_depth=5., contamination_similarity=5.,
-                                  degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
-                                  hard_cov_threshold=10.,
-                                  min_sigma_factor=0.1):
-    from Library.assembly_parser import Assembly
-    log.info("Disentangling " + fastg_file + " ... ")
-    input_graph = Assembly(fastg_file)
-    target_results = input_graph.find_target_graph(tab_file,
-                                                   mode=mode, type_factor=type_factor,
-                                                   log_hard_cov_threshold=hard_cov_threshold,
-                                                   contamination_depth=contamination_depth,
-                                                   contamination_similarity=contamination_similarity,
-                                                   degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                   degenerate_similarity=degenerate_similarity,
-                                                   min_sigma_factor=min_sigma_factor,
-                                                   weight_factor=weight_factor,
-                                                   log_handler=log, verbose=verbose)
-    if len(target_results) > 1:
-        log.warning(str(len(target_results)) + " sets of graph detected!")
-    for go_res, res in enumerate(target_results):
-        go_res += 1
-        idealized_graph = res["graph"]
-        # average_kmer_cov = res["cov"]
-        # log.info("Detecting target graph" + str(go_res) +
-        #          " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, verbose, log, threads, options):
 
-        # should add making one-step-inversion pairs for paths,
-        # which would be used to identify existence of a certain isomer using mapping information
-        count_path = 0
-        for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
-            count_path += 1
-            out_n = output + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
-            open(out_n, "w").write(idealized_graph.export_path(this_path).fasta_str())
-            log.info("Writing PATH" + str(count_path) + " to " + out_n)
-        log.info("Writing GRAPH to " + output + ".graph" + str(go_res) + ".selected_graph.gfa")
-        idealized_graph.write_to_gfa(output + ".graph" + str(go_res) + ".selected_graph.gfa")
+    @set_time_limit(options.disentangle_time_limit)
+    def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log, type_factor=3., mode="cp",
+                             contamination_depth=5., contamination_similarity=5., degenerate=True, degenerate_depth=1.5,
+                             degenerate_similarity=1.5, hard_cov_threshold=10., min_sigma_factor=0.1,
+                             here_only_max_c=True, here_acyclic_allowed=False, here_verbose=False):
+        from Library.assembly_parser import Assembly
+        if here_acyclic_allowed:
+            log.info("Disentangling " + fastg_file + " as contig(s) ... ")
+        else:
+            log.info("Disentangling " + fastg_file + " as a circular genome ... ")
+        input_graph = Assembly(fastg_file)
+        target_results = input_graph.find_target_graph(tab_file,
+                                                       mode=mode, type_factor=type_factor,
+                                                       log_hard_cov_threshold=hard_cov_threshold,
+                                                       contamination_depth=contamination_depth,
+                                                       contamination_similarity=contamination_similarity,
+                                                       degenerate=degenerate, degenerate_depth=degenerate_depth,
+                                                       degenerate_similarity=degenerate_similarity,
+                                                       only_keep_max_cov=here_only_max_c,
+                                                       min_sigma_factor=min_sigma_factor,
+                                                       weight_factor=weight_factor,
+                                                       broken_graph_allowed=here_acyclic_allowed,
+                                                       log_handler=log, verbose=here_verbose)
+        if len(target_results) > 1:
+            log.warning(str(len(target_results)) + " sets of graph detected!")
+        degenerate_base_used = False
+        if here_acyclic_allowed:
+            contig_num = set()
+            for go_res, res in enumerate(target_results):
+                broken_graph = res["graph"]
+                count_path = 0
+                test_paths = broken_graph.get_all_paths(mode=mode, log_handler=log)
+                for this_paths, other_tag in test_paths:
+                    count_path += 1
+                    all_contig_str = []
+                    contig_num.add(len(this_paths))
+                    for go_contig, this_p_part in enumerate(this_paths):
+                        this_contig = broken_graph.export_path(this_p_part)
+                        if DEGENERATE_BASES & set(this_contig.seq):
+                            degenerate_base_used = True
+                        all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label + "\n" +
+                                              this_contig.seq + "\n")
+                    open(output + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                         ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
+                broken_graph.write_to_gfa(output + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
+            log.info("Result status: " + ",".join(sorted(contig_num)) + " contig(s)")
+        else:
+            for go_res, res in enumerate(target_results):
+                go_res += 1
+                idealized_graph = res["graph"]
+                # average_kmer_cov = res["cov"]
+                # log.info("Detecting target graph" + str(go_res) +
+                #          " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+                count_path = 0
+                for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
+                    count_path += 1
+                    out_n = output + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
+                    this_seq_obj = idealized_graph.export_path(this_path)
+                    if DEGENERATE_BASES & set(this_seq_obj.seq):
+                        degenerate_base_used = True
+                    open(out_n, "w").write(this_seq_obj.fasta_str())
+                    log.info("Writing PATH" + str(count_path) + " to " + out_n)
+                log.info("Writing GRAPH to " + output + ".graph" + str(go_res) + ".selected_graph.gfa")
+                idealized_graph.write_to_gfa(output + ".graph" + str(go_res) + ".selected_graph.gfa")
+            log.info("Result status: circular genome")
+        if degenerate_base_used:
+            log.warning("Degenerate base(s) used!")
 
-    log.info("Please visualize " + fastg_file + " to confirm the final result.")
+        os.system("cp " + os.path.join(os.path.split(fastg_file)[0], "assembly_graph.fastg") + " " +
+                  output + ".assembly_graph.fastg")
+        os.system("cp " + fastg_file + " " + output + "." + os.path.basename(fastg_file))
+        os.system("cp " + tab_file + " " + output + "." + os.path.basename(tab_file))
+        if not here_acyclic_allowed:
+            log.info("Please visualize " + output + "." + os.path.basename(fastg_file) + " to confirm the final result.")
 
+    # start
+    export_succeeded = False
+    kmer_vals = sorted([int(kmer_d[1:])
+                        for kmer_d in os.listdir(spades_output)
+                        if os.path.isdir(os.path.join(spades_output, kmer_d))
+                        and kmer_d.startswith("K")
+                        and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
+                       reverse=True)
+    kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
+    run_stat_set = set()
+    for go_k, kmer_dir in enumerate(kmer_dirs):
+        try:
+            running_stat = slim_spades_result(organelle_type, kmer_dir, verbose, log, threads=threads,
+                                              resume=options.script_resume)
+            """disentangle"""
+            if running_stat == 0:
+                out_fastg = sorted([os.path.join(kmer_dir, x)
+                                    for x in os.listdir(kmer_dir) if x.count(".fastg") == 2])[0]
+                out_csv = out_fastg[:-5] + "csv"
+                # if it is the first round (the largest kmer), copy the slimmed result to the main spades output folder
+                # if go_k == 0:
+                #     main_spades_folder = os.path.split(kmer_dir)[0]
+                #     os.system("cp " + out_fastg + " " + main_spades_folder)
+                #     os.system("cp " + out_csv + " " + main_spades_folder)
+                path_prefix = os.path.join(out_base, prefix + organelle_type)
+                disentangle_assembly(fastg_file=out_fastg, mode=organelle_type, tab_file=out_csv, output=path_prefix,
+                                     weight_factor=100, hard_cov_threshold=options.disentangle_depth_factor,
+                                     contamination_depth=options.contamination_depth,
+                                     contamination_similarity=options.contamination_similarity,
+                                     degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
+                                     degenerate_similarity=options.degenerate_similarity, here_only_max_c=True,
+                                     here_acyclic_allowed=False, here_verbose=verbose, log=log)
+        except ImportError:
+            log.warning("Disentangling failed: numpy/scipy/sympy not installed!")
+            break
+        except:
+            log.info("Disentangling failed.")
+        else:
+            if running_stat == 0:
+                export_succeeded = True
+                break
+            else:
+                run_stat_set.add(running_stat)
+    if not export_succeeded:
+        if run_stat_set == {2}:
+            log.warning("No target organelle contigs found!")
+            log.warning("This might due to a bug or unreasonable reference/parameter choices")
+            log.info("Please email jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
+            return export_succeeded
 
-def extract_organelle_genome(out_base, spades_output, go_round,
-                             prefix, organelle_type, verbose, log, threads, options):
-    running_stat = slim_spades_result(organelle_type, spades_output, verbose, log, threads=threads,
-                                      resume=options.script_resume)
-    """disentangle"""
-    if running_stat == 0:
-        out_fastg = sorted([os.path.join(spades_output, x)
-                            for x in os.listdir(spades_output) if x.count(".fastg") == 2])[0]
-        out_csv = out_fastg[:-5] + "csv"
-        # if it is the first round (the largest kmer), copy the slimmed result to the main spades output folder
-        if go_round == 0:
-            main_spades_folder = os.path.split(spades_output)[0]
-            os.system("cp " + out_fastg + " " + main_spades_folder)
-            os.system("cp " + out_csv + " " + main_spades_folder)
-
-        path_prefix = os.path.join(out_base, prefix + organelle_type)
-        disentangle_circular_assembly(fastg_file=out_fastg, mode=organelle_type,
-                                      tab_file=out_csv, output=path_prefix, weight_factor=100,
-                                      hard_cov_threshold=options.disentangle_depth_factor,
-                                      contamination_depth=options.contamination_depth,
-                                      contamination_similarity=options.contamination_similarity,
-                                      degenerate=options.degenerate,
-                                      degenerate_depth=options.degenerate_depth,
-                                      degenerate_similarity=options.degenerate_similarity,
-                                      verbose=verbose, log=log)
-        return 0
-    else:
-        return running_stat
+        largest_k_graph_f_exist = sorted([x for x in os.listdir(kmer_dirs[0]) if x.count(".fastg") == 2])
+        if kmer_dirs and largest_k_graph_f_exist:
+            for go_k, kmer_dir in enumerate(kmer_dirs):
+                try:
+                    """disentangle the graph as contig(s)"""
+                    out_fastg_list = sorted([os.path.join(kmer_dir, x)
+                                             for x in os.listdir(kmer_dir) if x.count(".fastg") == 2])
+                    if out_fastg_list:
+                        out_fastg = out_fastg_list[0]
+                        out_csv = out_fastg[:-5] + "csv"
+                        path_prefix = os.path.join(out_base, prefix + organelle_type)
+                        disentangle_assembly(fastg_file=out_fastg, mode=organelle_type, tab_file=out_csv,
+                                             output=path_prefix, weight_factor=100, here_verbose=verbose, log=log,
+                                             hard_cov_threshold=options.disentangle_depth_factor * 0.8,
+                                             contamination_depth=options.contamination_depth,
+                                             contamination_similarity=options.contamination_similarity,
+                                             degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
+                                             degenerate_similarity=options.degenerate_similarity,
+                                             here_only_max_c=True, here_acyclic_allowed=True)
+                except ImportError:
+                    break
+                # except:
+                #     log.info("Disentangling failed.")
+                else:
+                    export_succeeded = True
+                    out_fastg = largest_k_graph_f_exist[0]
+                    out_csv = out_fastg[:-5] + "csv"
+                    log.info("Please ...")
+                    log.info("load the graph file '" + out_fastg +
+                             "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                    log.info("load the CSV file '" + out_csv +
+                             "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                    log.info("visualize and confirm the incomplete result in Bandage.")
+                    log.info("-------------------------------------------------------")
+                    log.info("If the result is nearly complete, ")
+                    log.info("you can also adjust the arguments to try again.")
+                    log.info("-------------------------------------------------------")
+                    break
+            if not export_succeeded:
+                out_fastg = largest_k_graph_f_exist[0]
+                out_csv = out_fastg[:-5] + "csv"
+                log.info("Please ...")
+                log.info("load the graph file '" + out_fastg +
+                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                log.info("load the CSV file '" + out_csv +
+                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                log.info("visualize and export your result in Bandage.")
+        else:
+            # slim failed with unknown error
+            log.info("Please ...")
+            log.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
+            log.info("visualize and export your result in Bandage.")
+    return export_succeeded
 
 
 def main():
@@ -2223,10 +2371,19 @@ def main():
     out_base = options.output_base
     echo_frequency = options.echo_frequency
     reads_files_to_drop = []
+    global word_size
     try:
+        """ read previous res """
+        if resume:
+            try:
+                previous_attributes = LogInfo(out_base)
+                word_size = int(previous_attributes.w)
+            except AttributeError:
+                resume = False
+
         """ initialization """
-        global word_size
-        word_size = options.word_size
+        if not resume or options.word_size:
+            word_size = options.word_size
         if options.fq_file_1 and options.fq_file_2:
             reads_paired = {'input': True, 'pair_out': bool}
             original_fq_files = [options.fq_file_1, options.fq_file_2] + \
@@ -2253,11 +2410,18 @@ def main():
                  for i in range(2, len(original_fq_files))]),
             min([os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq')
                  for i in range(len(original_fq_files))]))
+
+        if resume:
+            try:
+                max_read_len = int(previous_attributes.max_read_len)
+            except AttributeError:
+                resume = False
+
         if not (resume and filtered_files_exist):
 
-            bowt_seed = options.bowtie2_seed
+            # bowt_seed = options.bowtie2_seed
             anti_seed = options.anti_seed
-            b_at_seed = options.bowtie2_anti_seed
+            # b_at_seed = options.bowtie2_anti_seed
             pre_grp = options.pre_grouped
             in_memory = options.index_in_memory
 
@@ -2298,29 +2462,26 @@ def main():
             log.info("Making seed reads ...")
             seed_file = check_fasta_seq_names(options.seed_file, log)
             if options.utilize_mapping:
-                seed_file, anti_lines = mapping_with_bowtie2(seed_file, bowt_seed, anti_seed,
-                                                             b_at_seed, options.maximum_n_reads, original_fq_files,
+                seed_file, anti_lines = mapping_with_bowtie2(seed_file, anti_seed, options.maximum_n_reads,
+                                                             original_fq_files,
                                                              original_fq_beyond_read_limit, out_base, resume,
                                                              verb_log, options.threads, options.prefix,
                                                              options.keep_temp_files, log)
             else:
                 anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
-                                               (anti_seed or b_at_seed),
+                                               bool(anti_seed),
                                                original_fq_files, log) if anti_seed else set()
             log.info("Making seed reads finished.\n")
 
             if options.pre_reading:
                 log.info("Checking seed reads and parameters ...")
-                min_word_size, word_size, max_word_size, keep_seq_parts, spades_kmer = \
+                min_word_size, word_size, max_word_size, keep_seq_parts = \
                     check_parameters(out_base=out_base, utilize_mapping=options.utilize_mapping,
                                      organelle_type=options.organelle_type, all_bases=all_bases,
                                      auto_word_size_step=options.auto_word_size_step, mean_error_rate=mean_error_rate,
                                      target_genome_size=options.target_genome_size, mean_read_len=mean_read_len,
-                                     max_read_len=max_read_len, spades_kmer=options.spades_kmer,
-                                     low_quality_pattern=low_quality_pattern, log=log,
-                                     wc_bc_ratio_constant=0.35)
-                if spades_kmer:
-                    options.spades_kmer = spades_kmer
+                                     max_read_len=max_read_len, low_quality_pattern=low_quality_pattern, log=log,
+                                     wc_bc_ratio_constant=0.35, larger_auto_ws=options.larger_auto_ws)
                 log.info("Checking seed reads and parameters finished.\n")
             else:
                 log.info("Estimating word size from given ratio ...")
@@ -2332,7 +2493,7 @@ def main():
             log.info("Making read index ...")
             fq_info_in_memory = make_read_index(original_fq_files, direction_according_to_user_input,
                                                 options.maximum_n_reads, options.rm_duplicates, out_base,
-                                                anti_lines, pre_grp, in_memory, b_at_seed, anti_seed,
+                                                anti_lines, pre_grp, in_memory, anti_seed,
                                                 keep_seq_parts=keep_seq_parts, low_quality=low_quality_pattern,
                                                 resume=resume, echo_frequency=echo_frequency, log=log)
             len_indices = fq_info_in_memory[2]
@@ -2412,7 +2573,7 @@ def main():
         """ assembly """
         if options.run_spades:
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
-                # resume = False
+                options.spades_kmer = check_kmers(options.spades_kmer, word_size, max_read_len, log)
                 log.info('Assembling using SPAdes ...')
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                      options.prefix, original_fq_files, reads_paired, options.verbose_log,
@@ -2421,72 +2582,25 @@ def main():
                 log.info('Assembling using SPAdes ... skipped.\n')
 
         """ export organelle """
-        if os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg')) \
-                and options.organelle_type != '0':
+        if options.organelle_type != '0':
             if resume and os.path.exists(os.path.join(out_base, options.organelle_type + ".graph1.selected_graph.gfa")):
-                log.info("Solving and unfolding graph ... skipped.")
+                log.info("Slimming and disentangling graph ... skipped.")
             else:
-                log.info("Solving and unfolding graph ...")
-                export_succeeded = False
-                kmer_vals = sorted([int(kmer_d[1:])
-                                    for kmer_d in os.listdir(spades_output)
-                                    if os.path.isdir(os.path.join(spades_output, kmer_d))
-                                    and kmer_d.startswith("K")
-                                    and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
-                                   reverse=True)
-                kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
-                run_stat_set = set()
-                for go_k, kmer_dir in enumerate(kmer_dirs):
-                    try:
-                        run_stat = extract_organelle_genome(out_base=out_base, spades_output=kmer_dir, go_round=go_k,
-                                                            prefix=options.prefix,
-                                                            organelle_type=options.organelle_type,
-                                                            verbose=options.verbose_log, log=log,
-                                                            threads=options.threads, options=options)
-                    except ImportError:
-                        log.warning("Disentangling failed: numpy/scipy/sympy not installed!")
-                        break
-                    except:
-                        log.info("Disentangling failed.")
-                    else:
-                        if run_stat == 0:
-                            export_succeeded = True
-                            break
-                        else:
-                            run_stat_set.add(run_stat)
-                if not export_succeeded:
-                    if run_stat_set == {2}:
-                        log.warning("No target organelle contigs found!")
-                        log.warning("This might due to a bug or unreasonable reference/parameter choices")
-                        log.info("Please email jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
-                    else:
-                        out_fastg = sorted([x for x in os.listdir(spades_output) if x.count(".fastg") == 2])
-                        if out_fastg:
-                            out_fastg = out_fastg[0]
-                            out_csv = out_fastg[:-5] + "csv"
-                            log.info("Please ...")
-                            log.info("load the graph file '" + out_fastg +
-                                     "' in " + "/".join(["K" + str(k_val) for k_val in kmer_vals]))
-                            log.info("load the CSV file '" + out_csv +
-                                     "' in " + "/".join(["K" + str(k_val) for k_val in kmer_vals]))
-                            log.info("visualize and export your result in Bandage.")
-                        else:
-                            log.info("Please ...")
-                            log.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
-                            log.info("visualize and export your result in Bandage.")
-                        log.info("The automatically-estimated word size does not ensure the best choice.")
-                        log.info("If the result is not a closed graph (circular organelle genome), ")
-                        log.info("you could adjust the word size for another new run.")
-                else:
-                    log.info("Solving and unfolding graph finished!")
+                log.info("Slimming and disentangling graph ...")
+                export_succeed = extract_organelle_genome(out_base=out_base, spades_output=spades_output,
+                                                          prefix=options.prefix, organelle_type=options.organelle_type,
+                                                          verbose=options.verbose_log, log=log,
+                                                          threads=options.threads, options=options)
+                if export_succeed:
+                    log.info("Slimming and disentangling graph finished!")
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
-        log.info("\nTotal Calc-cost " + str(time.time() - time0))
+        log.info("\nTotal cost " + "%.2f"%(time.time() - time0) + " s")
         log.info("Thank you!")
     except:
         log.exception("")
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
-        log.info("\nTotal cost " + str(time.time() - time0))
+        log.info("\nTotal cost " + "%.2f"%(time.time() - time0) + " s")
         log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!")
         log.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()

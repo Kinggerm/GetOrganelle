@@ -6,6 +6,18 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.3-beta",
+     "features": [
+         "1.get_organelle_reads.py: a bug in logging seed reads; moving re-setting kmers after extending;",
+         "2.disentangle_organelle_assembly.py & assembly_parser.py: "
+         "2a.'--acyclic-allowed' activated; "
+         "2b.'--continue' added; "
+         "2c.better output for polymorphyism-contained graph, default degenerate similarity threshold increased, "
+         "   print warning when degenerate base used; "
+         "2d.find_target_graph(broken_graph_allowed)",
+         "4.pip_control_func.py: LogInfo added",
+         "5.NotationReference: cp updated"
+     ]},
     {"number": "1.4.2",
      "features": [
          "1.get_organelle_reads.py: better seed fastq file log; "

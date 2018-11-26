@@ -272,7 +272,10 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         return difference, proper_end
 
 
-degenerate_dict = {  # degenerate
+DEGENERATE_BASES = {"N", "V", "H", "D", "B", "Y", "R", "K", "M", "S", "W"}
+
+
+DEGENERATE_DICT = {  # degenerate
     "N": ["A", "C", "G", "T"],
     "V": ["A", "C", "G"], "H": ["A", "C", "T"], "D": ["A", "G", "T"], "B": ["C", "G", "T"],
     "Y": ["C", "T"], "R": ["A", "G"], "K": ["G", "T"], "M": ["A", "C"],
@@ -285,7 +288,7 @@ degenerate_dict = {  # degenerate
     ('C', 'G'): 'S', ('A', 'T'): 'W',
     ('A',): 'A', ('C',): 'C', ('G',): 'G', ('T',): 'T'}
 
-degenerate_dict_digit = {  # degenerate
+DEGENERATE_DICT_DIGIT = {  # degenerate
     "N": [1, 2, 4, 8],
     "V": [1, 2, 4], "H": [1, 2, 8], "D": [1, 4, 8], "B": [2, 4, 8],
     "Y": [2, 8], "R": [1, 4], "K": [4, 8], "M": [1, 2],
@@ -305,8 +308,8 @@ def generate_consensus(*seq_str):
     for go_to_base in range(len(seq_str[0])):
         this_base_set = set()
         for go_to_seq in range(seq_num):
-            this_base_set.update(degenerate_dict_digit.get(seq_str[go_to_seq][go_to_base], []))
-        consensus_res.append(degenerate_dict_digit[sum(this_base_set)])
+            this_base_set.update(DEGENERATE_DICT_DIGIT.get(seq_str[go_to_seq][go_to_base], []))
+        consensus_res.append(DEGENERATE_DICT_DIGIT[sum(this_base_set)])
     return "".join(consensus_res)
 
 

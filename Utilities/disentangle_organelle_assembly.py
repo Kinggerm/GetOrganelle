@@ -56,7 +56,7 @@ def get_options(print_title):
                       help="Prefix of output files inside output directory. Default:%default")
     parser.add_option("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
                       help="export intermediate graph file.")
-    parser.add_option("--time-limit", dest="time_limit", default=1500, type=int,
+    parser.add_option("--time-limit", dest="time_limit", default=3600, type=int,
                       help="time limit for the disentangling process. Default:%default")
     parser.add_option("--continue", dest="resume", default=False, action="store_true",
                       help="continue mode.")

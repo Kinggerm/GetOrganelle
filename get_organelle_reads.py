@@ -2260,7 +2260,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
         os.system("cp " + tab_file + " " + output + "." + os.path.basename(tab_file))
         if not here_acyclic_allowed:
             log.info("Please visualize " + output + "." + os.path.basename(fastg_file) +" to confirm the final result.")
-        log.info("Writing output finished.\n")
+        log.info("Writing output finished.")
 
     # start
     export_succeeded = False
@@ -2348,6 +2348,8 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                     # log.info("-------------------------------------------------------")
                     log.info("If the result is nearly complete, ")
                     log.info("you can also adjust the arguments to try again.")
+                    log.info("If you have questions for us, "
+                             "please provide us with the get_org.log.txt file and the graph in the format you like!")
                     # log.info("-------------------------------------------------------")
                     break
             if not export_succeeded:
@@ -2359,11 +2361,15 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                 log.info("load the CSV file '" + out_csv +
                          "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
                 log.info("visualize and export your result in Bandage.")
+                log.info("If you have questions for us, "
+                         "please provide us with the get_org.log.txt file and the graph in the format you like!")
         else:
             # slim failed with unknown error
             log.info("Please ...")
             log.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
             log.info("visualize and export your result in Bandage.")
+            log.info("If you have questions for us, "
+                     "please provide us with the get_org.log.txt file and the graph in the format you like!")
     return export_succeeded
 
 

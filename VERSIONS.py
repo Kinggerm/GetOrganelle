@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.3",
+     "features": [
+         "1.get_organelle_reads.py: output renamed; fix a bug of logging",
+     ]},
     {"number": "1.4.3-beta",
      "features": [
          "1.get_organelle_reads.py: a bug in logging seed reads; moving re-setting kmers after extending;",

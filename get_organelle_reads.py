@@ -2020,8 +2020,8 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                 del real_kmer_values[real_kmer_values.index(failed_at_k)]
                 log.warning("GetOrganelle would continue to process results based on "
                             "kmer=" + ",".join(real_kmer_values) + ".")
-                os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
-                          + " " + spades_out_put)
+                # os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
+                #           + " " + spades_out_put)
                 log.info('Assembling finished with warnings.\n')
                 return True
             else:
@@ -2030,8 +2030,8 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                             os.path.join(spades_out_put, "spades.log") + " and contact SPAdes developers.")
                 log.warning("GetOrganelle would continue to process results based on "
                             "kmer=" + ",".join(real_kmer_values) + ".")
-                os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
-                          + " " + spades_out_put)
+                # os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
+                #           + " " + spades_out_put)
                 log.info('Assembling finished with warnings.\n')
                 return True
         else:
@@ -2184,6 +2184,8 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                              degenerate_similarity=1.5, hard_cov_threshold=10., min_sigma_factor=0.1,
                              here_only_max_c=True, here_acyclic_allowed=False, here_verbose=False):
         from Library.assembly_parser import Assembly
+        this_K = os.path.split(os.path.split(fastg_file)[0])[-1]
+        output += "." + this_K
         if here_acyclic_allowed:
             log.info("Disentangling " + fastg_file + " as contig(s) ... ")
         else:
@@ -2203,6 +2205,9 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                                                        log_handler=log, verbose=here_verbose)
         if len(target_results) > 1:
             log.warning(str(len(target_results)) + " sets of graph detected!")
+        log.info("Slimming and disentangling graph finished!\n")
+
+        log.info("Writing output ...")
         degenerate_base_used = False
         if here_acyclic_allowed:
             contig_num = set()
@@ -2220,10 +2225,14 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                             degenerate_base_used = True
                         all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label + "\n" +
                                               this_contig.seq + "\n")
-                    open(output + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                    open(output + ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
                          ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
-                broken_graph.write_to_gfa(output + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
-            log.info("Result status: " + ",".join(sorted(contig_num)) + " contig(s)")
+                    log.info("Writing PATH" + str(count_path) + " of " + mode + " contig(s) to " + output +
+                             ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                             ".path_sequence.fasta")
+                log.info("Writing GRAPH to " + output + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
+                broken_graph.write_to_gfa(output + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
+            log.info("Result status: " + ",".join(sorted([str(c_n) for c_n in contig_num])) + " contig(s)")
         else:
             for go_res, res in enumerate(target_results):
                 go_res += 1
@@ -2234,24 +2243,24 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                 count_path = 0
                 for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
                     count_path += 1
-                    out_n = output + ".graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
+                    out_n = output + ".complete.graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
                     this_seq_obj = idealized_graph.export_path(this_path)
                     if DEGENERATE_BASES & set(this_seq_obj.seq):
                         degenerate_base_used = True
                     open(out_n, "w").write(this_seq_obj.fasta_str())
-                    log.info("Writing PATH" + str(count_path) + " to " + out_n)
-                log.info("Writing GRAPH to " + output + ".graph" + str(go_res) + ".selected_graph.gfa")
-                idealized_graph.write_to_gfa(output + ".graph" + str(go_res) + ".selected_graph.gfa")
+                    log.info("Writing PATH" + str(count_path) + " of complete genome to " + out_n)
+                log.info("Writing GRAPH to " + output + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
+                idealized_graph.write_to_gfa(output + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
             log.info("Result status: circular genome")
         if degenerate_base_used:
             log.warning("Degenerate base(s) used!")
-
         os.system("cp " + os.path.join(os.path.split(fastg_file)[0], "assembly_graph.fastg") + " " +
                   output + ".assembly_graph.fastg")
         os.system("cp " + fastg_file + " " + output + "." + os.path.basename(fastg_file))
         os.system("cp " + tab_file + " " + output + "." + os.path.basename(tab_file))
         if not here_acyclic_allowed:
-            log.info("Please visualize " + output + "." + os.path.basename(fastg_file) + " to confirm the final result.")
+            log.info("Please visualize " + output + "." + os.path.basename(fastg_file) +" to confirm the final result.")
+        log.info("Writing output finished.\n")
 
     # start
     export_succeeded = False
@@ -2336,10 +2345,10 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                     log.info("load the CSV file '" + out_csv +
                              "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
                     log.info("visualize and confirm the incomplete result in Bandage.")
-                    log.info("-------------------------------------------------------")
+                    # log.info("-------------------------------------------------------")
                     log.info("If the result is nearly complete, ")
                     log.info("you can also adjust the arguments to try again.")
-                    log.info("-------------------------------------------------------")
+                    # log.info("-------------------------------------------------------")
                     break
             if not export_succeeded:
                 out_fastg = largest_k_graph_f_exist[0]
@@ -2591,8 +2600,6 @@ def main():
                                                           prefix=options.prefix, organelle_type=options.organelle_type,
                                                           verbose=options.verbose_log, log=log,
                                                           threads=options.threads, options=options)
-                if export_succeed:
-                    log.info("Slimming and disentangling graph finished!")
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal cost " + "%.2f"%(time.time() - time0) + " s")

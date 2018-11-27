@@ -1293,8 +1293,47 @@ class Assembly:
                           max_copy=8, min_sigma_factor=0.1,
                           log_hard_cov_threshold=10., contamination_depth=5., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
-                          broken_graph_allowed=False, temp_graph=None, verbose=True,
+                          broken_graph_allowed=False, temp_graph=None, verbose=True, read_len_for_log=None,
                           log_handler=None, debug=False):
+
+        def log_target_res(final_res_combinations_inside):
+            echo_graph_id = int(bool(len(final_res_combinations_inside) - 1))
+            for go_res, final_res_one in enumerate(final_res_combinations_inside):
+                this_graph = final_res_combinations_inside[go_res]["graph"]
+                this_k_cov = round(final_res_combinations_inside[go_res]["cov"], 3)
+                if read_len_for_log:
+                    this_b_cov = round(this_k_cov * read_len_for_log / (read_len_for_log - self.__kmer + 1), 3)
+                else:
+                    this_b_cov = None
+                if log_handler:
+                    if echo_graph_id:
+                        log_handler.info("Graph " + str(go_res + 1))
+                    for vertex_set in sorted(this_graph.vertex_clusters):
+                        copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
+                        if copies_in_a_set != {1}:
+                            for vertex_name in sorted(vertex_set):
+                                log_handler.info("Vertex_" + vertex_name + " #copy = " +
+                                                 str(this_graph.vertex_to_copy.get(vertex_name, 1)))
+
+                    log_handler.info("Average target kmer-coverage" +
+                                     ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_k_cov))
+                    if this_b_cov:
+                        log_handler.info("Average target base-coverage" +
+                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_b_cov))
+                else:
+                    if echo_graph_id:
+                        sys.stdout.write("Graph " + str(go_res + 1) + "\n")
+                    for vertex_set in sorted(this_graph.vertex_clusters):
+                        copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
+                        if copies_in_a_set != {1}:
+                            for vertex_name in sorted(vertex_set):
+                                sys.stdout.write("Vertex_" + vertex_name + " #copy = " +
+                                                 str(this_graph.vertex_to_copy.get(vertex_name, 1)) + "\n")
+                    sys.stdout.write("Average target kmer-coverage" +
+                                     ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_k_cov) + "\n")
+                    if this_b_cov:
+                        sys.stdout.write("Average target base-coverage" +
+                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_b_cov) + "\n")
 
         if broken_graph_allowed:
             weight_factor = 10000.
@@ -1528,39 +1567,15 @@ class Assembly:
                     for del_v_connection in new_assembly.vertex_info:
                         new_assembly.vertex_info[del_v_connection]["connections"] = {True: set(), False: set()}
                     new_assembly.update_vertex_clusters()
-                    return new_assembly.estimate_copy_and_depth_precisely(
+                    final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
                         maximum_copy_num=1, broken_graph_allowed=True, log_handler=log_handler,
                         verbose=verbose, debug=debug)
+                    log_target_res(final_res_combinations)
+                    return final_res_combinations
                 else:
                     raise Exception(e)
             else:
-                echo_graph_id = int(bool(len(final_res_combinations) - 1))
-                for go_res, final_res_one in enumerate(final_res_combinations):
-                    this_graph = final_res_combinations[go_res]["graph"]
-                    if log_handler:
-                        if echo_graph_id:
-                            log_handler.info("Graph " + str(go_res + 1))
-                        for vertex_set in sorted(this_graph.vertex_clusters):
-                            copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
-                            if copies_in_a_set != {1}:
-                                for vertex_name in sorted(vertex_set):
-                                    log_handler.info("Vertex_" + vertex_name + " #copy = " +
-                                                     str(this_graph.vertex_to_copy.get(vertex_name, 1)))
-                        log_handler.info("Average target kmer-coverage" +
-                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " +
-                                         str(round(final_res_combinations[go_res]["cov"], 2)))
-                    else:
-                        if echo_graph_id:
-                            sys.stdout.write("Graph " + str(go_res + 1) + "\n")
-                        for vertex_set in sorted(this_graph.vertex_clusters):
-                            copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
-                            if copies_in_a_set != {1}:
-                                for vertex_name in sorted(vertex_set):
-                                    sys.stdout.write("Vertex_" + vertex_name + " #copy = " +
-                                                     str(this_graph.vertex_to_copy.get(vertex_name, 1)) + "\n")
-                        sys.stdout.write("Average target kmer-coverage" +
-                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " +
-                                         str(round(final_res_combinations[go_res]["cov"], 2)) + "\n")
+                log_target_res(final_res_combinations)
                 return final_res_combinations
         except KeyboardInterrupt as e:
             if temp_graph:

@@ -2592,14 +2592,14 @@ def main():
 
         """ export organelle """
         if options.organelle_type != '0':
-            if resume and os.path.exists(os.path.join(out_base, options.organelle_type + ".graph1.selected_graph.gfa")):
+            graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base) if gfa_f.endswith(".selected_graph.gfa")])
+            if resume and graph_existed:
                 log.info("Slimming and disentangling graph ... skipped.")
             else:
                 log.info("Slimming and disentangling graph ...")
-                export_succeed = extract_organelle_genome(out_base=out_base, spades_output=spades_output,
-                                                          prefix=options.prefix, organelle_type=options.organelle_type,
-                                                          verbose=options.verbose_log, log=log,
-                                                          threads=options.threads, options=options)
+                extract_organelle_genome(out_base=out_base, spades_output=spades_output, prefix=options.prefix,
+                                         organelle_type=options.organelle_type, verbose=options.verbose_log, log=log,
+                                         threads=options.threads, options=options)
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal cost " + "%.2f"%(time.time() - time0) + " s")

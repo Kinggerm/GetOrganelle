@@ -9,6 +9,7 @@ versions = [
     {"number": "1.4.3",
      "features": [
          "1.get_organelle_reads.py: output renamed; fix a bug of logging",
+         "2.summary_get_organelle_output.py: added",
      ]},
     {"number": "1.4.3-beta",
      "features": [

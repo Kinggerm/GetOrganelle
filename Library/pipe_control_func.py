@@ -169,7 +169,8 @@ class LogInfo:
                        "degenerate_base_used", "library_size", "library_deviation", "library_left", "library_right",
                        "res_kmer", "res_kmer_cov", "res_base_cov", "res_path_count",
                        "res_len", "time", "mem_spades", "mem_max"]
-        this_record = {"sample": sample_out_dir, "circular": "no", "mem_max": 0, "degenerate_base_used": "no"}
+        this_record = {"sample": sample_out_dir, "circular": "no", "mem_max": 0, "degenerate_base_used": "no",
+                       "time": 0.}
         if os.path.exists(os.path.join(sample_out_dir, "get_org.log.txt")):
             log_contents = open(os.path.join(sample_out_dir, "get_org.log.txt"), "r").read().split("\n\n")
             for log_part in log_contents:
@@ -184,13 +185,13 @@ class LogInfo:
                         if " - INFO: " in line and line[:4].isdigit():
                             time_point, detail_record = line.strip().split(" - INFO:")
                             detail_record = detail_record.strip()
-                            if detail_record.startswith("Identified quality encoding format: "):
+                            if detail_record.startswith("Identified quality encoding format = "):
                                 this_record["fastq_format"] = detail_record.split(" = ")[-1]
                             elif detail_record.startswith("Trimming bases with qualities"):
                                 context, trimmed = detail_record.split(":")
                                 this_record["trim_percent"] = context.split("(")[-1].split(")")[0]
                                 this_record["trim_int"], this_record["trim_chars"] = trimmed.strip().split("  ")
-                            elif detail_record.startswith("Mean error rate: "):
+                            elif detail_record.startswith("Mean error rate = "):
                                 this_record["mean_error_rate"] = detail_record.split(" = ")[-1]
                             elif detail_record.startswith("Mean = "):
                                 this_record["mean_read_len"] = detail_record.split(" = ")[1].split(" bp")[0]
@@ -232,7 +233,7 @@ class LogInfo:
                                     mem = detail_record.split("Mem ")[-1].split(",")[0]
                                     this_record["mem_used"] = int(float(mem.split()[0]) * MEM_TRANS[mem.split()[1]])
                                     this_record["mem_max"] = max(this_record["mem_max"], this_record["mem_used"])
-                                this_record["dup/used"] = detail_record.split(", ")[-1].split(" ")[0]
+                                this_record["dup_used"] = detail_record.split(", ")[-1].split(" ")[0]
                             elif "groups made" in detail_record and "Mem" in detail_record:
                                 mem = detail_record.split("Mem ")[-1].split(",")[0]
                                 this_record["mem_group"] = int(float(mem.split()[0]) * MEM_TRANS[mem.split()[1]])
@@ -255,7 +256,7 @@ class LogInfo:
                                 this_record["rounds"] = r_num[:-1]
                                 this_record["accepted_lines"] = acc_i
                                 this_record["accepted_words"] = acc_w
-                elif "Assembling using SPAdes" in log_part:
+                elif "Assembling using SPAdes ..." in log_part:
                     for line in log_part.split("\n"):
                         if " - INFO: " in line and line[:4].isdigit():
                             time_point, detail_record = line.strip().split(" - INFO:")
@@ -271,48 +272,48 @@ class LogInfo:
                                 this_record["library_right"] = float(lib_parts[3].split(" = ")[-1])
                                 # except IndexError:
                                 #     pass
-                elif "Slimming and disentangling graph" in log_part:
-                    if "Writing PATH" in log_part:
-                        these_lines = log_part.split("\n")
-                        res_lengths = set()
-                        for go_l, line in enumerate(these_lines):
-                            if " - INFO: " in line and line[:4].isdigit():
-                                time_point, detail_record = line.strip().split(" - INFO:")
-                                detail_record = detail_record.strip()
-                                if detail_record.startswith("Vertex_") and "res_kmer" not in this_record:
-                                    step_back = 1
-                                    while go_l - step_back >= 0 and "- INFO:" not in these_lines[go_l - step_back]:
-                                        step_back += 1
-                                    this_record["res_kmer"] = these_lines[go_l - step_back].split("/")[-2][1:]
-                                elif detail_record.startswith("Average target kmer-coverage"):
-                                    this_record["res_kmer_cov"] = detail_record.split(" = ")[-1]
-                                    if "mean_read_len" in this_record:
-                                        k_c = float(this_record["res_kmer_cov"])
-                                        read_len = float(this_record["mean_read_len"])
-                                        kmer_len = int(this_record["res_kmer"])
-                                        this_record["res_base_cov"] = "%0.1f" % (
-                                                k_c * read_len / (read_len - kmer_len + 1))
-                                elif detail_record.startswith("Writing GRAPH to "):
-                                    if " - INFO: " in these_lines[go_l - 1] and these_lines[go_l - 1][:4].isdigit():
-                                        time_point, detail_record = these_lines[go_l - 1].split(" - INFO:")
-                                        detail_record = detail_record.strip()
-                                        this_record["res_path_count"] = detail_record.split("Writing PATH")[-1].split(" ")[0]
-                                        this_p_file = detail_record.split("Writing PATH")[-1].split(" to ")[-1]
-                                        this_p_file = os.path.join(os.path.split(sample_out_dir)[0], this_p_file)
-                                        if os.path.exists(this_p_file):
-                                            res_lengths.add(tuple(sorted([len(this_seq.seq)
-                                                                          for this_seq in SequenceList(this_p_file)])))
-                                elif detail_record.startswith("Result status"):
-                                    if "circular genome" in detail_record:
-                                        this_record["circular"] = "yes"
-                            elif " - WARNING: " in line and line[:4].isdigit():
-                                if "Degenerate base(s) used!" in line:
-                                    this_record["degenerate_base_used"] = "yes"
-                        this_record["res_len"] = ";".join([",".join([str(l) for l in l_l]) for l_l in sorted(res_lengths)])
+                elif "Slimming and disentangling graph ..." in log_part:
+                    these_lines = log_part.split("\n")
+                    for go_l, line in enumerate(these_lines):
+                        if " - INFO: " in line and line[:4].isdigit():
+                            time_point, detail_record = line.strip().split(" - INFO:")
+                            detail_record = detail_record.strip()
+                            if detail_record.startswith("Average target kmer-coverage"):
+                                this_record["res_kmer_cov"] = detail_record.split(" = ")[-1]
+                            elif detail_record.startswith("Average target base-coverage"):
+                                this_record["res_base_cov"] = detail_record.split(" = ")[-1]
+                elif "Writing output ..." in log_part:
+                    these_lines = log_part.split("\n")
+                    res_lengths = set()
+                    for go_l, line in enumerate(these_lines):
+                        if " - INFO: " in line and line[:4].isdigit():
+                            time_point, detail_record = line.strip().split(" - INFO:")
+                            detail_record = detail_record.strip()
+                            if detail_record.startswith("Writing GRAPH to "):
+                                if " - INFO: " in these_lines[go_l - 1] and these_lines[go_l - 1][:4].isdigit():
+                                    time_point, detail_record = these_lines[go_l - 1].split(" - INFO:")
+                                    detail_record = detail_record.strip()
+                                    for out_name in os.path.split(detail_record.split()[-1])[-1].split(".")[::-1]:
+                                        if out_name.startswith("K") and out_name[1:].isdigit():
+                                            this_record["res_kmer"] = int(out_name[1:])
+                                    this_record["res_path_count"] = detail_record.split("Writing PATH")[-1].split(" ")[0]
+                                    this_p_file = os.path.split(detail_record.split("Writing PATH")[-1].split(" to ")[-1])[-1]
+                                    this_p_file = os.path.join(os.path.split(sample_out_dir)[0], this_p_file)
+                                    if os.path.exists(this_p_file):
+                                        res_lengths.add(tuple(sorted([len(this_seq.seq)
+                                                                      for this_seq in SequenceList(this_p_file)])))
+                            elif detail_record.startswith("Result status"):
+                                if "circular genome" in detail_record:
+                                    this_record["circular"] = "yes"
+                        elif " - WARNING: " in line and line[:4].isdigit():
+                            if "Degenerate base(s) used!" in line:
+                                this_record["degenerate_base_used"] = "yes"
+                    print(res_lengths)
+                    this_record["res_len"] = ";".join([",".join([str(l) for l in list(l_l)]) for l_l in sorted(res_lengths)])
                 elif "Total cost " in log_part:
                     for line in log_part.split("\n"):
                         if "Total cost " in line:
-                            this_record["time"] = line.split("Total cost ")[-1].split(" ")[0]
+                            this_record["time"] += float(line.split("Total cost ")[-1].split(" ")[0])
         else:
             raise FileNotFoundError(os.path.join(sample_out_dir, "get_org.log.txt"))
         if os.path.exists(os.path.join(sample_out_dir, "filtered_spades", "spades.log")):
@@ -326,7 +327,7 @@ class LogInfo:
                                                             int(line[1][:-1]) * MEM_TRANS[line[1][-1]])
                 if "mem_spades" in this_record:
                     this_record["mem_max"] = max(this_record["mem_max"], this_record["mem_spades"])
-        self.__dict__ = this_record
+        self.__dict__.update(this_record)
 
     def get_all_values_as_tab_line(self):
         return "\t".join([self.__dict__.get(this_key, "") for this_key in self.header])

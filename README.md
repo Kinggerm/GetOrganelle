@@ -114,11 +114,11 @@ The `assembly_graph.fastg.extend+cp-mt.fastg` file along with the `assembly_grap
 
 For 2G raw data, 150 bp reads, to assembly chloroplast, typically I use:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 15 -k 75,85,95,105 --auto-wss 4
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 15 -k 75,85,95,105
 
 or in a draft way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 75,85,95,105
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 75,85,95,105 -w 0.68
 
 or in a slow and memory-economic way:
 

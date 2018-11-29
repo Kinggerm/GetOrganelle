@@ -168,7 +168,7 @@ def get_options(descriptions, version):
                             help="No pre-reading the read characteristics, nor estimating parameters (including '-w').")
     group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=0, type=int,
                                help="The step of word size adjustment during extending process."
-                                    "Use 0 to disable this automatic adjustment. Default: %default.")
+                                    "Use 0 to disable this automatic adjustment (NOT suggested). Default: %default.")
     group_extending.add_option("--larger-auto-ws", dest="larger_auto_ws", default=False, action="store_true",
                                help="By using this flag, the empirical function for estimating W would tend to "
                                     "produce a relative larger W, which would speed up the matching in extending, "

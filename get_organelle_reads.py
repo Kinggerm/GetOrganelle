@@ -93,7 +93,7 @@ def get_options(descriptions, version):
                                  "(mitochondria), nr (nuclear ribosomal RNA). Default: %default. ")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
                             help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
-                                 "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
+                                 "--max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
                                  "This option is suggested for lowly-covered or nonhomogeneously-covered data (poor "
                                  "data). You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--safe\" flag. "
@@ -287,7 +287,7 @@ def get_options(descriptions, version):
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
-                               "--auto-wss 2 --max-n-words 4E9 -k 55,65,75,85,95,105,115,125 "
+                               "--max-n-words 4E9 -k 55,65,75,85,95,105,115,125 "
                                "--disentangle-time-limit 3600\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
@@ -411,8 +411,8 @@ def get_options(descriptions, version):
                 options.min_quality_score = -5
             if "--max-ignore-percent" not in sys.argv:
                 options.maximum_ignore_percent = 0
-            if "--auto-wss" not in sys.argv:
-                options.auto_word_size_step = 2
+            # if "--auto-wss" not in sys.argv:
+            #     options.auto_word_size_step = 2
             if "--max-n-words" not in sys.argv:
                 options.maximum_n_words = 4E9
             if "-k" not in sys.argv:

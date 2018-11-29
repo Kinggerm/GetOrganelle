@@ -308,7 +308,8 @@ class LogInfo:
                         elif " - WARNING: " in line and line[:4].isdigit():
                             if "Degenerate base(s) used!" in line:
                                 this_record["degenerate_base_used"] = "yes"
-                    this_record["res_len"] = ";".join([",".join([str(l) for l in list(l_l)]) for l_l in sorted(res_lengths)])
+                    this_record["res_len"] = ";".join(["+".join([str(l) for l in list(l_l)])
+                                                       for l_l in sorted(res_lengths)])
                 elif "Total cost " in log_part:
                     for line in log_part.split("\n"):
                         if "Total cost " in line:

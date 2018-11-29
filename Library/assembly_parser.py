@@ -521,9 +521,9 @@ class Assembly:
                     self.copy_to_vertex[this_copy].add(vertex_name)
             if debug or verbose:
                 if log_handler:
-                    log_handler.info("updating average target kmer-coverage: " + str(round(new_val, 2)))
+                    log_handler.info("updating average" + mode + "kmer-coverage: " + str(round(new_val, 2)))
                 else:
-                    sys.stdout.write("updating average target kmer-coverage: " + str(round(new_val, 2)) + "\n")
+                    sys.stdout.write("updating average" + mode + " kmer-coverage: " + str(round(new_val, 2)) + "\n")
             return new_val
         else:
             # adjust this_copy according to user-defined depth
@@ -543,7 +543,8 @@ class Assembly:
             return given_average_cov
 
     def estimate_copy_and_depth_precisely(self, maximum_copy_num=10, broken_graph_allowed=False,
-                                          return_new_graphs=True, verbose=True, log_handler=None, debug=False):
+                                          return_new_graphs=True, verbose=True, log_handler=None, debug=False,
+                                          target_name_for_log="target"):
 
         def get_formula(from_vertex, from_end, to_vertex, to_end):
             result_form = vertex_to_symbols[from_vertex]
@@ -696,10 +697,10 @@ class Assembly:
                 else:
                     go_solution += 1
         if not copy_solution:
-            raise Exception("Incomplete/Complicated target graph (1)!")
+            raise Exception("Incomplete/Complicated " + target_name_for_log +" graph (1)!")
         elif type(copy_solution) == list:
             if len(copy_solution) > 2:
-                raise Exception("Incomplete/Complicated target graph (2)!")
+                raise Exception("Incomplete/Complicated " + target_name_for_log +" graph (2)!")
             else:
                 copy_solution = copy_solution[0]
 
@@ -769,7 +770,7 @@ class Assembly:
                 x: sum([(x[go_sym] - self.vertex_to_float_copy[symbols_to_vertex[symbol_used]]) ** 2
                         for go_sym, symbol_used in enumerate(all_v_symbols)]))
         else:
-            raise Exception("Incomplete/Complicated target graph (3)!")
+            raise Exception("Incomplete/Complicated " + target_name_for_log +" graph (3)!")
 
         if return_new_graphs:
             """ produce all possible vertex copy combinations """
@@ -839,9 +840,9 @@ class Assembly:
                     total_product += this_len * this_cov
                 new_val = total_product / total_len
                 if log_handler:
-                    log_handler.info("Average target kmer-coverage = " + str(round(new_val, 2)))
+                    log_handler.info("Average " + target_name_for_log +" kmer-coverage = " + str(round(new_val, 2)))
                 else:
-                    sys.stdout.write("Average target kmer-coverage = " + str(round(new_val, 2)) + "\n")
+                    sys.stdout.write("Average " + target_name_for_log +" kmer-coverage = " + str(round(new_val, 2)) + "\n")
 
     def tag_in_between(self, mode):
         # add those in between the tagged vertices to tagged_vertices, which offered the only connection
@@ -971,7 +972,7 @@ class Assembly:
                             self.tagged_vertices[next_t].remove(vertex_name)
 
         if len(self.tagged_vertices[mode]) == 0:
-            raise Exception("No available target information found in " + tab_file)
+            raise Exception("No available " + mode + " information found in " + tab_file)
 
     def filter_by_coverage(self, drop_num=1, mode="cp", log_hard_cov_threshold=10.,
                            weight_factor=100., min_sigma_factor=0.1,
@@ -1315,10 +1316,10 @@ class Assembly:
                                 log_handler.info("Vertex_" + vertex_name + " #copy = " +
                                                  str(this_graph.vertex_to_copy.get(vertex_name, 1)))
 
-                    log_handler.info("Average target kmer-coverage" +
+                    log_handler.info("Average " + mode + " kmer-coverage" +
                                      ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_k_cov))
                     if this_b_cov:
-                        log_handler.info("Average target base-coverage" +
+                        log_handler.info("Average " + mode + " base-coverage" +
                                          ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_b_cov))
                 else:
                     if echo_graph_id:
@@ -1329,10 +1330,10 @@ class Assembly:
                             for vertex_name in sorted(vertex_set):
                                 sys.stdout.write("Vertex_" + vertex_name + " #copy = " +
                                                  str(this_graph.vertex_to_copy.get(vertex_name, 1)) + "\n")
-                    sys.stdout.write("Average target kmer-coverage" +
+                    sys.stdout.write("Average " + mode + " kmer-coverage" +
                                      ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_k_cov) + "\n")
                     if this_b_cov:
-                        sys.stdout.write("Average target base-coverage" +
+                        sys.stdout.write("Average " + mode + " base-coverage" +
                                          ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_b_cov) + "\n")
 
         if broken_graph_allowed:
@@ -1368,7 +1369,7 @@ class Assembly:
                     cluster_trimmed = False
 
                     if len(new_assembly.vertex_clusters) == 0:
-                        raise Exception("No available target components detected!")
+                        raise Exception("No available " + mode + " components detected!")
                     elif len(new_assembly.vertex_clusters) == 1:
                         pass
                     else:
@@ -1404,7 +1405,8 @@ class Assembly:
                                 if temp_graph:
                                     new_assembly.write_to_gfa(temp_graph)
                                     new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                                raise Exception("Multiple isolated target components detected! Broken or contamination?")
+                                raise Exception("Multiple isolated" + mode + " components detected! "
+                                                "Broken or contamination?")
                             for j, w in enumerate(cluster_weights):
                                 if w == second:
                                     for del_v in new_assembly.vertex_clusters[j]:
@@ -1559,7 +1561,7 @@ class Assembly:
                 if temp_graph:
                     new_assembly.write_to_gfa(temp_graph)
                     new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                raise Exception("Complicated target graph! Detecting path(s) failed!\n")
+                raise Exception("Complicated" + mode + "graph! Detecting path(s) failed!\n")
             except Exception as e:
                 if broken_graph_allowed:
                     new_assembly.remove_vertex([check_v for check_v in list(new_assembly.vertex_info)

@@ -63,19 +63,13 @@ def get_options(descriptions, version):
                            help="Reference. Input fasta format file as initial seed or input bowtie index base name "
                                 "as pre-seed (see flag '--bs'). "
                                 "Default: '%default' (* depends on the value followed with flag '-F')")
-    # group_inout.add_option("--bs", dest="bowtie2_seed",
-    #                        help="Input bowtie2 index base name as pre-seed. "
-    #                             "This flag serves as an alternation of the flag '-s'.")
-    group_inout.add_option("-a", dest="anti_seed", 
+    group_inout.add_option("-a", dest="anti_seed",
                            help="Anti-reference. Input fasta format file as anti-seed, where the extension process "
                                 "stop. Typically serves as excluding chloroplast reads when extending mitochondrial "
                                 "reads, or the other way around. You should be cautious about using this option, "
                                 "because if the anti-seed includes some word in the target but not in the seed, "
                                 "the result would have gaps. Typically, use the mt and cp from the same "
                                 "species as seed and anti-seed.")
-    # group_inout.add_option("--ba", dest="bowtie2_anti_seed",
-    #                        help="Input bowtie2 index base name as pre-anti-seed. "
-    #                             "This flag serves as an alternation of flag '-a'.")
     group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
                            help="Maximum number of reads to be used per file. "
                                 "Default: 1.5E7 (-F cp,nr) or 7.5E7 (-F mt)")
@@ -191,14 +185,16 @@ def get_options(descriptions, version):
     group_assembly = OptionGroup(parser, "ASSEMBLY OPTIONS", "These options are about the assembly and "
                                                              "graph disentangling")
     group_assembly.add_option("-k", dest="spades_kmer", default="75,85,95",
-                              help="SPAdes kmer settings. Use the same format as in SPAdes. kmer larger than "
-                                   "maximum read length would be automatically discarded by GetOrganelle. "
+                              help="SPAdes kmer settings. Use the same format as in SPAdes. illegal kmer values "
+                                   "would be automatically discarded by GetOrganelle. "
                                    "Default: %default")
     group_assembly.add_option("--spades-options", dest="other_spades_options", default="",
                               help="Other SPAdes options. Use double quotation marks to include all the arguments "
                                    "and parameters.")
     group_assembly.add_option("--no-spades", dest="run_spades", action="store_false", default=True,
                               help="Disable SPAdes.")
+    group_assembly.add_option("--no-gradient-k", dest="auto_gradient_k", action="store_false", default=True,
+                              help="Disable adding an extra set of kmer values according to word size.")
     group_assembly.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
                               help="Depth factor for differentiate genome type of contigs. "
                                    "The genome type of contigs are determined by blast. "
@@ -259,13 +255,13 @@ def get_options(descriptions, version):
         parser.print_help()
         exit()
     elif "-h" in sys.argv:
-        for not_often_used in ("-a", "--max-reads", "--max-ignore-percent", # "--ba", "--bs",
+        for not_often_used in ("-a", "--max-reads", "--max-ignore-percent",
                                "--min-quality-score", "--prefix", "--out-per-round", "--keep-temp",
                                "--memory-save", "--memory-unlimited", "--pre-w", "-r", "--max-n-words",
                                "-J", "-M", "--no-bowtie2", "--no-pre-reading", "--auto-wss", "--larger-auto-ws",
-                               "--soft-max-words",
-                               "--target-genome-size", "--spades-options", "--no-spades", "--disentangle-df",
-                               "--contamination-depth", "--contamination-similarity", "--no-degenerate",
+                               "--soft-max-words", "--target-genome-size", "--spades-options", "--no-spades",
+                               "--no-gradient-k", "--disentangle-df", "--contamination-depth",
+                               "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
                                "--continue", "--index-in-memory",
                                "--remove-duplicates", "--flush-frequency", "--verbose"):
@@ -296,7 +292,7 @@ def get_options(descriptions, version):
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
                           help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
-                               "--disentangle-time-limit 180\"")
+                               "--disentangle-time-limit 180 --no-gradient-k\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="75,85,95", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
@@ -438,6 +434,7 @@ def get_options(descriptions, version):
             if "--max-n-words" not in sys.argv:
                 options.maximum_n_words = 3E7
             options.larger_auto_ws = True
+            options.auto_gradient_k = False
             if "--disentangle-time-limit" not in sys.argv:
                 options.disentangle_time_limit = 180
             # if "--no-pre-reading" not in sys.argv:
@@ -684,18 +681,21 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
     return min_word_size, word_size, max_word_size, keep_seq_parts
 
 
-def check_kmers(kmer_str, word_s, max_r_len, log):
+def check_kmers(kmer_str, auto_gradient_k, word_s, max_r_len, log):
     if kmer_str:
         # delete illegal kmer
         kmer_values = [int(kmer_v) for kmer_v in kmer_str.split(",")]
-        # add kmer around estimated word_size
-        k_tens_digits = [int(kmer_v / 10) for kmer_v in kmer_values]
-        w_tens_digit = int(word_s / 10)
-        if w_tens_digit not in k_tens_digits:
-            avail_tens_digits = k_tens_digits + [w_tens_digit]
-            for add_tens_digit in range(min(avail_tens_digits), max(avail_tens_digits)):
-                if add_tens_digit not in k_tens_digits:
-                    kmer_values.append(int(add_tens_digit * 10 + 5))
+
+        if auto_gradient_k:
+            # add kmer around estimated word_size
+            k_tens_digits = [int(kmer_v / 10) for kmer_v in kmer_values]
+            w_tens_digit = int(word_s / 10)
+            if w_tens_digit not in k_tens_digits:
+                # kmer_values.append(int(w_tens_digit * 10 + 5))
+                avail_tens_digits = k_tens_digits + [w_tens_digit]
+                for add_tens_digit in range(min(avail_tens_digits), max(avail_tens_digits)):
+                    if add_tens_digit not in k_tens_digits:
+                        kmer_values.append(int(add_tens_digit * 10 + 5))
         # delete illegal kmer
         kmer_values = [kmer_v for kmer_v in kmer_values if 21 <= kmer_v <= min(max_r_len, 127)]
 
@@ -2176,7 +2176,8 @@ def unzip(source, target, line_limit, verbose_log, log):
         raise NotImplementedError("unzipping failed!")
 
 
-def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, verbose, log, threads, options):
+def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, read_len_for_log,
+                             verbose, log, threads, options):
 
     @set_time_limit(options.disentangle_time_limit)
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log, type_factor=3., mode="cp",
@@ -2202,6 +2203,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ve
                                                        min_sigma_factor=min_sigma_factor,
                                                        weight_factor=weight_factor,
                                                        broken_graph_allowed=here_acyclic_allowed,
+                                                       read_len_for_log=read_len_for_log,
                                                        log_handler=log, verbose=here_verbose)
         if len(target_results) > 1:
             log.warning(str(len(target_results)) + " sets of graph detected!")
@@ -2429,6 +2431,7 @@ def main():
         if resume:
             try:
                 max_read_len = int(previous_attributes.max_read_len)
+                mean_read_len = float(previous_attributes.mean_read_len)
             except AttributeError:
                 resume = False
 
@@ -2588,7 +2591,8 @@ def main():
         """ assembly """
         if options.run_spades:
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
-                options.spades_kmer = check_kmers(options.spades_kmer, word_size, max_read_len, log)
+                options.spades_kmer = check_kmers(options.spades_kmer, options.auto_gradient_k, word_size,
+                                                  max_read_len, log)
                 log.info('Assembling using SPAdes ...')
                 assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                      options.prefix, original_fq_files, reads_paired, options.verbose_log,
@@ -2604,7 +2608,8 @@ def main():
             else:
                 log.info("Slimming and disentangling graph ...")
                 extract_organelle_genome(out_base=out_base, spades_output=spades_output, prefix=options.prefix,
-                                         organelle_type=options.organelle_type, verbose=options.verbose_log, log=log,
+                                         organelle_type=options.organelle_type, read_len_for_log=mean_read_len,
+                                         verbose=options.verbose_log, log=log,
                                          threads=options.threads, options=options)
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")

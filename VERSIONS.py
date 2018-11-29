@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.3a",
+     "features": [
+         "1.get_organelle_reads.py: check_kmers() modified; ",
+         "2.pipe_control_func.py: LogInfo() modified",
+     ]},
     {"number": "1.4.3",
      "features": [
          "1.get_organelle_reads.py: output renamed; fix a bug of logging",

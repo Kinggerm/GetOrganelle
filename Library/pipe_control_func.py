@@ -278,9 +278,9 @@ class LogInfo:
                         if " - INFO: " in line and line[:4].isdigit():
                             time_point, detail_record = line.strip().split(" - INFO:")
                             detail_record = detail_record.strip()
-                            if detail_record.startswith("Average target kmer-coverage"):
+                            if detail_record.startswith("Average ") and "kmer-coverage" in detail_record:
                                 this_record["res_kmer_cov"] = detail_record.split(" = ")[-1]
-                            elif detail_record.startswith("Average target base-coverage"):
+                            elif detail_record.startswith("Average ") and "base-coverage" in detail_record:
                                 this_record["res_base_cov"] = detail_record.split(" = ")[-1]
                 elif "Writing output ..." in log_part:
                     these_lines = log_part.split("\n")
@@ -297,7 +297,7 @@ class LogInfo:
                                         if out_name.startswith("K") and out_name[1:].isdigit():
                                             this_record["res_kmer"] = int(out_name[1:])
                                     this_record["res_path_count"] = detail_record.split("Writing PATH")[-1].split(" ")[0]
-                                    this_p_file = os.path.split(detail_record.split("Writing PATH")[-1].split(" to ")[-1])[-1]
+                                    this_p_file = detail_record.split("Writing PATH")[-1].split(" to ")[-1]
                                     this_p_file = os.path.join(os.path.split(sample_out_dir)[0], this_p_file)
                                     if os.path.exists(this_p_file):
                                         res_lengths.add(tuple(sorted([len(this_seq.seq)

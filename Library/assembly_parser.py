@@ -390,6 +390,7 @@ class Assembly:
             limited_vertices = sorted(self.vertex_info)
         else:
             limited_vertices = sorted(limited_vertices)
+        merged = False
         while limited_vertices:
             this_vertex = limited_vertices.pop()
             for this_end in (True, False):
@@ -398,6 +399,7 @@ class Assembly:
                     next_vertex, next_end = list(connected_set)[0]
                     if len(self.vertex_info[next_vertex]["connections"][next_end]) == 1 and this_vertex != next_vertex:
                         # reverse the names
+                        merged = True
                         if this_end:
                             if next_end:
                                 new_vertex = this_vertex + "_" + "_".join(next_vertex.split("_")[::-1])
@@ -473,6 +475,7 @@ class Assembly:
                         self.remove_vertex([this_vertex, next_vertex], update_cluster=False)
                         break
         self.update_vertex_clusters()
+        return merged
 
     def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="cp",
                                        log_handler=None, verbose=True, debug=False):
@@ -521,9 +524,9 @@ class Assembly:
                     self.copy_to_vertex[this_copy].add(vertex_name)
             if debug or verbose:
                 if log_handler:
-                    log_handler.info("updating average" + mode + "kmer-coverage: " + str(round(new_val, 2)))
+                    log_handler.info("updating average " + mode + " kmer-coverage: " + str(round(new_val, 2)))
                 else:
-                    sys.stdout.write("updating average" + mode + " kmer-coverage: " + str(round(new_val, 2)) + "\n")
+                    sys.stdout.write("updating average " + mode + " kmer-coverage: " + str(round(new_val, 2)) + "\n")
             return new_val
         else:
             # adjust this_copy according to user-defined depth
@@ -653,11 +656,11 @@ class Assembly:
                             except RecursionError:
                                 direct = ["_tail", "_head"]
                                 if log_handler:
-                                    log_handler.error("Formulating for: " +
-                                                      n_v + direct[n_e] + vertex_name + direct[this_end] + "!")
+                                    log_handler.warning("Formulating for: " +
+                                                        n_v + direct[n_e] + vertex_name + direct[this_end] + " failed!")
                                 else:
                                     sys.stdout.write("Formulating for: " +
-                                                      n_v + direct[n_e] + vertex_name + direct[this_end] + "!\n")
+                                                     n_v + direct[n_e] + vertex_name + direct[this_end] + " failed!\n")
                                 raise RecursionError
                         formulae.append(this_formula)
                     elif broken_graph_allowed:
@@ -975,8 +978,9 @@ class Assembly:
             raise Exception("No available " + mode + " information found in " + tab_file)
 
     def filter_by_coverage(self, drop_num=1, mode="cp", log_hard_cov_threshold=10.,
-                           weight_factor=100., min_sigma_factor=0.1,
+                           weight_factor=100., min_sigma_factor=0.1, min_cluster=1,
                            verbose=False, log_handler=None, debug=False):
+        changed = False
         log_hard_cov_threshold = abs(log(log_hard_cov_threshold))
         vertices = sorted(self.vertex_info)
         v_coverages = {this_v: self.vertex_info[this_v]["cov"] / self.vertex_to_copy.get(this_v, 1)
@@ -992,7 +996,10 @@ class Assembly:
             elif verbose or debug:
                 sys.stdout.write("removing extremely outlying coverage contigs: " + str(removing_low_cov) + "\n")
             self.remove_vertex(removing_low_cov)
-        self.merge_all_possible_vertices()
+            changed = True
+        merged = self.merge_all_possible_vertices()
+        if merged:
+            changed = True
         vertices = sorted(self.vertex_info)
         v_coverages = {this_v: self.vertex_info[this_v]["cov"] / self.vertex_to_copy.get(this_v, 1)
                        for this_v in vertices}
@@ -1011,8 +1018,8 @@ class Assembly:
             sys.stdout.write("Vertices: " + str(vertices) + "\n")
             sys.stdout.write("Coverages: " + str([float("%.1f" % cov_x) for cov_x in coverages]) + "\n")
         gmm_scheme = weighted_gmm_with_em_aic(coverages, data_weights=cover_weights,
-                                              maximum_cluster=6, cluster_limited=set_cluster,
-                                              min_sigma_factor=min_sigma_factor)
+                                              minimum_cluster=min_cluster, maximum_cluster=6,
+                                              cluster_limited=set_cluster, min_sigma_factor=min_sigma_factor)
         cluster_num = gmm_scheme["cluster_num"]
         parameters = gmm_scheme["parameters"]
         labels = gmm_scheme["labels"]
@@ -1092,8 +1099,6 @@ class Assembly:
                 else:
                     sys.stdout.write("removing outlying coverage contigs: " + str(vertices_to_del) + "\n")
             self.remove_vertex(vertices_to_del)
-        else:
-            changed = False
         return changed, [(parameters[lab_tp]["mu"], parameters[lab_tp]["sigma"]) for lab_tp in remained_label_type]
 
     def generate_consensus_vertex(self, vertices, directions, copy_tags=True, check_parallel_vertices=True,
@@ -1341,244 +1346,346 @@ class Assembly:
 
         self.parse_tab_file(tab_file, mode=mode, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
+        is_reasonable_res = False
+        data_contains_outlier = False
         try:
-            new_assembly.merge_all_possible_vertices()
-            new_assembly.tag_in_between(mode=mode)
-            new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
-                                                 contamination_similarity=contamination_similarity,
-                                                 degenerate=False, verbose=verbose, debug=debug, log_handler=log_handler)
-            changed = True
-            while changed:
-                changed = False
-                cluster_trimmed = True
-                while cluster_trimmed:
-                    # remove low coverages
-                    first_round = True
-                    delete_those_vertices = set()
-                    parameters = []
-                    while first_round or delete_those_vertices:
-                        changed, parameters = new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
-                                                                              log_hard_cov_threshold=log_hard_cov_threshold,
-                                                                              min_sigma_factor=min_sigma_factor,
-                                                                              log_handler=log_handler,
-                                                                              verbose=verbose, debug=debug)
-                        new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
-                                                                    log_handler=log_handler, verbose=verbose, mode=mode)
-                        first_round = False
-
-                    cluster_trimmed = False
-
-                    if len(new_assembly.vertex_clusters) == 0:
-                        raise Exception("No available " + mode + " components detected!")
-                    elif len(new_assembly.vertex_clusters) == 1:
-                        pass
-                    else:
-                        cluster_weights = [sum([new_assembly.vertex_info[x_v]["weight"][mode]
-                                                for x_v in x
-                                                if "weight" in new_assembly.vertex_info[x_v]
-                                                and mode in new_assembly.vertex_info[x_v]["weight"]])
-                                           for x in new_assembly.vertex_clusters]
-                        best = max(cluster_weights)
-                        best_id = cluster_weights.index(best)
-                        if broken_graph_allowed:
-                            id_remained = {best_id}
-                            for j, w in enumerate(cluster_weights):
-                                if w * weight_factor > best:
-                                    id_remained.add(j)
-                                else:
-                                    for del_v in new_assembly.vertex_clusters[j]:
-                                        if del_v in new_assembly.tagged_vertices[mode]:
-                                            new_cov = new_assembly.vertex_info[del_v]["cov"]
-                                            for mu, sigma in parameters:
-                                                if abs(new_cov - mu) < sigma:
-                                                    id_remained.add(j)
-                                                    break
-                                        if j in id_remained:
-                                            break
-                        else:
-                            # chose the target cluster (best rank)
-                            id_remained = {best_id}
-                            temp_cluster_weights = deepcopy(cluster_weights)
-                            del temp_cluster_weights[best_id]
-                            second = max(temp_cluster_weights)
-                            if best < second * weight_factor:
-                                if temp_graph:
-                                    new_assembly.write_to_gfa(temp_graph)
-                                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                                raise Exception("Multiple isolated" + mode + " components detected! "
-                                                "Broken or contamination?")
-                            for j, w in enumerate(cluster_weights):
-                                if w == second:
-                                    for del_v in new_assembly.vertex_clusters[j]:
-                                        if del_v in new_assembly.tagged_vertices[mode]:
-                                            new_cov = new_assembly.vertex_info[del_v]["cov"]
-                                            for mu, sigma in parameters:
-                                                if abs(new_cov - mu) < sigma:
-                                                    if temp_graph:
-                                                        new_assembly.write_to_gfa(temp_graph)
-                                                        new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                                                    raise Exception("Complicated graph: please check around EDGE_" + del_v + "!"
-                                                                    "\ntags: " + str(new_assembly.vertex_info[del_v]["tags"][mode]))
-
-                        # remove other clusters
-                        vertices_to_del = set()
-                        for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
-                            if go_cl not in id_remained:
-                                vertices_to_del |= v_2_del
-                        if vertices_to_del:
-                            if verbose or debug:
-                                if log_handler:
-                                    log_handler.info("removing other clusters: " + str(vertices_to_del))
-                                else:
-                                    sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
-                            new_assembly.remove_vertex(vertices_to_del)
-                            cluster_trimmed = True
-                            changed = True
-
-                # merge vertices
+            while not is_reasonable_res:
+                is_reasonable_res = True
+                # if verbose or debug:
+                #     if log_handler:
+                #         log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
+                #         log_handler.info("tagged coverage: " +
+                #                          str(["%.1f"%new_assembly.vertex_info[log_v]["cov"]
+                #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]))
+                #     else:
+                #         sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
+                #         log_handler.info("tagged coverage: " +
+                #                          str(["%.1f"%new_assembly.vertex_info[log_v]["cov"]
+                #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
                 new_assembly.merge_all_possible_vertices()
                 new_assembly.tag_in_between(mode=mode)
+                new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
+                                                     contamination_similarity=contamination_similarity,
+                                                     degenerate=False, verbose=verbose, debug=debug, log_handler=log_handler)
+                changed = True
+                count_large_round = 0
+                while changed:
+                    count_large_round += 1
+                    if verbose or debug:
+                        if log_handler:
+                            log_handler.info("===================== " + str(count_large_round) + " =====================")
+                        else:
+                            sys.stdout.write("===================== " + str(count_large_round) + " =====================\n")
+                    changed = False
+                    cluster_trimmed = True
+                    while cluster_trimmed:
+                        # remove low coverages
+                        first_round = True
+                        delete_those_vertices = set()
+                        parameters = []
+                        this_del = False
+                        new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
+                                                                    log_handler=log_handler, verbose=verbose, mode=mode)
+                        while first_round or delete_those_vertices or this_del:
+                            if data_contains_outlier:
+                                this_del, parameters =\
+                                    new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
+                                                                    log_hard_cov_threshold=log_hard_cov_threshold,
+                                                                    min_sigma_factor=min_sigma_factor,
+                                                                    min_cluster=2, log_handler=log_handler,
+                                                                    verbose=verbose, debug=debug)
+                                data_contains_outlier = False
+                            else:
+                                this_del, parameters = \
+                                    new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
+                                                                    log_hard_cov_threshold=log_hard_cov_threshold,
+                                                                    min_sigma_factor=min_sigma_factor,
+                                                                    log_handler=log_handler, verbose=verbose,
+                                                                    debug=debug)
+                            # if verbose or debug:
+                            #     if log_handler:
+                            #         log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
+                            #         log_handler.info("tagged coverage: " +
+                            #                          str(["%.1f"%new_assembly.vertex_info[log_v]["cov"]
+                            #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]))
+                            #     else:
+                            #         sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
+                            #         log_handler.info("tagged coverage: " +
+                            #                          str(["%.1f"%new_assembly.vertex_info[log_v]["cov"]
+                            #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
+                            new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
+                                                                        log_handler=log_handler, verbose=verbose, mode=mode)
+                            first_round = False
 
-                # no terminal vertices allowed
-                first_round = True
-                delete_those_vertices = set()
-                while first_round or delete_those_vertices:
-                    first_round = False
-                    delete_those_vertices = set()
-                    for vertex_name in new_assembly.vertex_info:
-                        # both ends must have edge(s)
-                        if sum([bool(len(cn))
-                                for cn in new_assembly.vertex_info[vertex_name]["connections"].values()]) != 2:
-                            if vertex_name in new_assembly.tagged_vertices[mode]:
-                                if broken_graph_allowed:
-                                    pass
-                                else:
+                        cluster_trimmed = False
+
+                        if len(new_assembly.vertex_clusters) == 0:
+                            raise Exception("No available " + mode + " components detected!")
+                        elif len(new_assembly.vertex_clusters) == 1:
+                            pass
+                        else:
+                            cluster_weights = [sum([new_assembly.vertex_info[x_v]["weight"][mode]
+                                                    for x_v in x
+                                                    if "weight" in new_assembly.vertex_info[x_v]
+                                                    and mode in new_assembly.vertex_info[x_v]["weight"]])
+                                               for x in new_assembly.vertex_clusters]
+                            best = max(cluster_weights)
+                            best_id = cluster_weights.index(best)
+                            if broken_graph_allowed:
+                                id_remained = {best_id}
+                                for j, w in enumerate(cluster_weights):
+                                    if w * weight_factor > best:
+                                        id_remained.add(j)
+                                    else:
+                                        for del_v in new_assembly.vertex_clusters[j]:
+                                            if del_v in new_assembly.tagged_vertices[mode]:
+                                                new_cov = new_assembly.vertex_info[del_v]["cov"]
+                                                for mu, sigma in parameters:
+                                                    if abs(new_cov - mu) < sigma:
+                                                        id_remained.add(j)
+                                                        break
+                                            if j in id_remained:
+                                                break
+                            else:
+                                # chose the target cluster (best rank)
+                                id_remained = {best_id}
+                                temp_cluster_weights = deepcopy(cluster_weights)
+                                del temp_cluster_weights[best_id]
+                                second = max(temp_cluster_weights)
+                                if best < second * weight_factor:
                                     if temp_graph:
                                         new_assembly.write_to_gfa(temp_graph)
                                         new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                                    raise Exception("Incomplete/Complicated graph: please check around EDGE_" +
-                                                    vertex_name + "!")
-                            else:
-                                delete_those_vertices.add(vertex_name)
-                    if delete_those_vertices:
-                        if verbose or debug:
-                            if log_handler:
-                                log_handler.info("removing terminal contigs: " + str(delete_those_vertices))
-                            else:
-                                sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
-                        new_assembly.remove_vertex(delete_those_vertices)
-                        changed = True
+                                    raise Exception("Multiple isolated" + mode + " components detected! "
+                                                    "Broken or contamination?")
+                                for j, w in enumerate(cluster_weights):
+                                    if w == second:
+                                        for del_v in new_assembly.vertex_clusters[j]:
+                                            if del_v in new_assembly.tagged_vertices[mode]:
+                                                new_cov = new_assembly.vertex_info[del_v]["cov"]
+                                                for mu, sigma in parameters:
+                                                    if abs(new_cov - mu) < sigma:
+                                                        if temp_graph:
+                                                            new_assembly.write_to_gfa(temp_graph)
+                                                            new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                                        raise Exception("Complicated graph: please check around EDGE_" + del_v + "!"
+                                                                        "\ntags: " + str(new_assembly.vertex_info[del_v]["tags"][mode]))
 
-                # # merge vertices
-                # new_assembly.merge_all_possible_vertices()
-                # new_assembly.tag_in_between(mode=mode)
-                # break self-connection if necessary
-                # for vertex_name in new_assembly.vertex_info:
-                #     if (vertex_name, True) in
-                # -> not finished!!
+                            # remove other clusters
+                            vertices_to_del = set()
+                            for go_cl, v_2_del in enumerate(new_assembly.vertex_clusters):
+                                if go_cl not in id_remained:
+                                    vertices_to_del |= v_2_del
+                            if vertices_to_del:
+                                if verbose or debug:
+                                    if log_handler:
+                                        log_handler.info("removing other clusters: " + str(vertices_to_del))
+                                    else:
+                                        sys.stdout.write("removing other clusters: " + str(vertices_to_del) + "\n")
+                                new_assembly.remove_vertex(vertices_to_del)
+                                cluster_trimmed = True
+                                changed = True
 
-                # merge vertices
-                new_assembly.merge_all_possible_vertices()
-                new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
-                                                     contamination_similarity=contamination_similarity,
-                                                     degenerate=False, degenerate_depth=degenerate_depth,
-                                                     degenerate_similarity=degenerate_similarity,
-                                                     verbose=verbose, debug=debug, log_handler=log_handler)
-                new_assembly.tag_in_between(mode=mode)
+                    # merge vertices
+                    new_assembly.merge_all_possible_vertices()
+                    new_assembly.tag_in_between(mode=mode)
 
+                    # no terminal vertices allowed
+                    first_round = True
+                    delete_those_vertices = set()
+                    while first_round or delete_those_vertices:
+                        first_round = False
+                        delete_those_vertices = set()
+                        for vertex_name in new_assembly.vertex_info:
+                            # both ends must have edge(s)
+                            if sum([bool(len(cn))
+                                    for cn in new_assembly.vertex_info[vertex_name]["connections"].values()]) != 2:
+                                if vertex_name in new_assembly.tagged_vertices[mode]:
+                                    if broken_graph_allowed:
+                                        pass
+                                    else:
+                                        if temp_graph:
+                                            new_assembly.write_to_gfa(temp_graph)
+                                            new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                        raise Exception("Incomplete/Complicated graph: please check around EDGE_" +
+                                                        vertex_name + "!")
+                                else:
+                                    delete_those_vertices.add(vertex_name)
+                        if delete_those_vertices:
+                            if verbose or debug:
+                                if log_handler:
+                                    log_handler.info("removing terminal contigs: " + str(delete_those_vertices))
+                                else:
+                                    sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
+                            new_assembly.remove_vertex(delete_those_vertices)
+                            changed = True
 
-            if temp_graph:
-                new_assembly.write_to_gfa(temp_graph)
-                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-            new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
-                                                 contamination_similarity=contamination_similarity,
-                                                 degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                 degenerate_similarity=degenerate_similarity,
-                                                 warning_count=1, only_keep_max_cov=only_keep_max_cov,
-                                                 verbose=verbose, debug=debug, log_handler=log_handler)
-            new_assembly.merge_all_possible_vertices()
-            if temp_graph:
-                new_assembly.write_to_gfa(temp_graph)
-                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                    # # merge vertices
+                    # new_assembly.merge_all_possible_vertices()
+                    # new_assembly.tag_in_between(mode=mode)
+                    # break self-connection if necessary
+                    # for vertex_name in new_assembly.vertex_info:
+                    #     if (vertex_name, True) in
+                    # -> not finished!!
 
-            # create idealized vertices and edges
-            new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(log_handler=log_handler, verbose=verbose,
-                                                                          mode="all", debug=debug)
-            try:
-                if verbose:
-                    if log_handler:
-                        log_handler.info("Estimating copy and depth precisely ...")
-                    else:
-                        sys.stdout.write("Estimating copy and depth precisely ...\n")
-                final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
-                    maximum_copy_num=max_copy, broken_graph_allowed=broken_graph_allowed, log_handler=log_handler,
-                    verbose=verbose, debug=debug)
-                absurd_copy_nums = True
-                no_single_copy = True
-                while absurd_copy_nums:
-                    go_graph = 0
-                    while go_graph < len(final_res_combinations):
-                        this_assembly_g = final_res_combinations[go_graph]["graph"]
-                        this_parallel_v_sets = [v_set for v_set in this_assembly_g.detect_parallel_vertices()]
-                        this_parallel_names = set([v_n for v_set in this_parallel_v_sets for v_n, v_e in v_set])
-                        if 1 not in this_assembly_g.copy_to_vertex:
-                            del final_res_combinations[go_graph]
-                        else:
-                            no_single_copy = False
-                            this_absurd = True
-                            for single_copy_v in this_assembly_g.copy_to_vertex[1]:
-                                if single_copy_v not in this_parallel_names:
-                                    this_absurd = False
-                            if not this_absurd:
-                                absurd_copy_nums = False
-                                go_graph += 1
-                            else:
-                                # add all combinations
-                                for index_set in generate_index_combinations([len(v_set)
-                                                                              for v_set in this_parallel_v_sets]):
-                                    new_possible_graph = deepcopy(this_assembly_g)
-                                    dropping_names = []
-                                    for go_set, this_v_set in enumerate(this_parallel_v_sets):
-                                        keep_this = index_set[go_set]
-                                        for go_ve, (this_name, this_end) in enumerate(this_v_set):
-                                            if go_ve != keep_this:
-                                                dropping_names.append(this_name)
-                                    # if log_handler:
-                                    #     log_handler.info("Dropping vertices " + " ".join(dropping_names))
-                                    # else:
-                                    #     log_handler.info("Dropping vertices " + "".join(dropping_names) + "\n")
-                                    new_possible_graph.remove_vertex(dropping_names)
-                                    final_res_combinations.extend(
-                                        new_possible_graph.estimate_copy_and_depth_precisely(
-                                            maximum_copy_num=max_copy, broken_graph_allowed=broken_graph_allowed,
-                                            log_handler=log_handler, verbose=verbose, debug=debug))
+                    # merge vertices
+                    new_assembly.merge_all_possible_vertices()
+                    new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
+                                                         contamination_similarity=contamination_similarity,
+                                                         degenerate=False, degenerate_depth=degenerate_depth,
+                                                         degenerate_similarity=degenerate_similarity,
+                                                         verbose=verbose, debug=debug, log_handler=log_handler)
+                    new_assembly.tag_in_between(mode=mode)
 
-                                del final_res_combinations[go_graph]
-
-                if no_single_copy:
-                    raise Exception("No single copy region?! Detecting path(s) failed!\n")
-            except RecursionError:
                 if temp_graph:
                     new_assembly.write_to_gfa(temp_graph)
                     new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                raise Exception("Complicated" + mode + "graph! Detecting path(s) failed!\n")
-            except Exception as e:
-                if broken_graph_allowed:
-                    new_assembly.remove_vertex([check_v for check_v in list(new_assembly.vertex_info)
-                                                if check_v not in new_assembly.tagged_vertices[mode]])
-                    for del_v_connection in new_assembly.vertex_info:
-                        new_assembly.vertex_info[del_v_connection]["connections"] = {True: set(), False: set()}
-                    new_assembly.update_vertex_clusters()
+                new_assembly.processing_polymorphism(contamination_depth=contamination_depth,
+                                                     contamination_similarity=contamination_similarity,
+                                                     degenerate=degenerate, degenerate_depth=degenerate_depth,
+                                                     degenerate_similarity=degenerate_similarity,
+                                                     warning_count=1, only_keep_max_cov=only_keep_max_cov,
+                                                     verbose=verbose, debug=debug, log_handler=log_handler)
+                new_assembly.merge_all_possible_vertices()
+                if temp_graph:
+                    new_assembly.write_to_gfa(temp_graph)
+                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+
+                # create idealized vertices and edges
+                new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(log_handler=log_handler, verbose=verbose,
+                                                                              mode="all", debug=debug)
+                try:
+                    if verbose:
+                        if log_handler:
+                            log_handler.info("Estimating copy and depth precisely ...")
+                        else:
+                            sys.stdout.write("Estimating copy and depth precisely ...\n")
                     final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
-                        maximum_copy_num=1, broken_graph_allowed=True, log_handler=log_handler,
+                        maximum_copy_num=max_copy, broken_graph_allowed=broken_graph_allowed, log_handler=log_handler,
                         verbose=verbose, debug=debug)
-                    log_target_res(final_res_combinations)
-                    return final_res_combinations
+                    absurd_copy_nums = True
+                    no_single_copy = True
+                    while absurd_copy_nums:
+                        go_graph = 0
+                        while go_graph < len(final_res_combinations):
+                            this_assembly_g = final_res_combinations[go_graph]["graph"]
+                            this_parallel_v_sets = [v_set for v_set in this_assembly_g.detect_parallel_vertices()]
+                            this_parallel_names = set([v_n for v_set in this_parallel_v_sets for v_n, v_e in v_set])
+                            if 1 not in this_assembly_g.copy_to_vertex:
+                                del final_res_combinations[go_graph]
+                            else:
+                                no_single_copy = False
+                                this_absurd = True
+                                for single_copy_v in this_assembly_g.copy_to_vertex[1]:
+                                    if single_copy_v not in this_parallel_names:
+                                        this_absurd = False
+                                if not this_absurd:
+                                    absurd_copy_nums = False
+                                    go_graph += 1
+                                else:
+                                    # add all combinations
+                                    for index_set in generate_index_combinations([len(v_set)
+                                                                                  for v_set in this_parallel_v_sets]):
+                                        new_possible_graph = deepcopy(this_assembly_g)
+                                        dropping_names = []
+                                        for go_set, this_v_set in enumerate(this_parallel_v_sets):
+                                            keep_this = index_set[go_set]
+                                            for go_ve, (this_name, this_end) in enumerate(this_v_set):
+                                                if go_ve != keep_this:
+                                                    dropping_names.append(this_name)
+                                        # if log_handler:
+                                        #     log_handler.info("Dropping vertices " + " ".join(dropping_names))
+                                        # else:
+                                        #     log_handler.info("Dropping vertices " + "".join(dropping_names) + "\n")
+                                        new_possible_graph.remove_vertex(dropping_names)
+                                        final_res_combinations.extend(
+                                            new_possible_graph.estimate_copy_and_depth_precisely(
+                                                maximum_copy_num=max_copy, broken_graph_allowed=broken_graph_allowed,
+                                                log_handler=log_handler, verbose=verbose, debug=debug))
+
+                                    del final_res_combinations[go_graph]
+
+                    if no_single_copy:
+                        raise Exception("No single copy region?! Detecting path(s) failed!\n")
+                except (RecursionError, Exception) as e:
+                    if broken_graph_allowed:
+                        new_assembly.remove_vertex([check_v for check_v in list(new_assembly.vertex_info)
+                                                    if check_v not in new_assembly.tagged_vertices[mode]])
+                        for del_v_connection in new_assembly.vertex_info:
+                            new_assembly.vertex_info[del_v_connection]["connections"] = {True: set(), False: set()}
+                        new_assembly.update_vertex_clusters()
+                        final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
+                            maximum_copy_num=1, broken_graph_allowed=True, log_handler=log_handler,
+                            verbose=verbose, debug=debug)
+                        log_target_res(final_res_combinations)
+                        test_first_g = final_res_combinations[0]["graph"]
+                        if 1 in test_first_g.copy_to_vertex:
+                            single_copy_percent = sum([test_first_g.vertex_info[s_v]["len"]
+                                                       for s_v in test_first_g.copy_to_vertex[1]]) \
+                                                  / float(sum([test_first_g.vertex_info[a_v]["len"]
+                                                               for a_v in test_first_g.vertex_info]))
+                            if single_copy_percent < 0.5:
+                                if verbose:
+                                    if log_handler:
+                                        log_handler.warning("Result with single copy vertex percentage < 50% is "
+                                                            "unacceptable, continue dropping suspicious vertices ...")
+                                    else:
+                                        sys.stdout.write("Warning: Result with single copy vertex percentage < 50% is "
+                                                         "unacceptable, continue dropping suspicious vertices ...")
+                                data_contains_outlier = True
+                                is_reasonable_res = False
+                                continue
+                            else:
+                                return final_res_combinations
+                        else:
+                            if verbose:
+                                if log_handler:
+                                    log_handler.warning("Result with single copy vertex percentage < 50% is "
+                                                        "unacceptable, continue dropping suspicious vertices ...")
+                                else:
+                                    sys.stdout.write("Warning: Result with single copy vertex percentage < 50% is "
+                                                     "unacceptable, continue dropping suspicious vertices ...")
+                            data_contains_outlier = True
+                            is_reasonable_res = False
+                            continue
+                    elif temp_graph:
+                        new_assembly.write_to_gfa(temp_graph)
+                        new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                        raise Exception("Complicated" + mode + "graph! Detecting path(s) failed!\n")
+                    else:
+                        raise Exception(e)
                 else:
-                    raise Exception(e)
-            else:
-                log_target_res(final_res_combinations)
-                return final_res_combinations
+                    log_target_res(final_res_combinations)
+                    test_first_g = final_res_combinations[0]["graph"]
+                    if 1 in test_first_g.copy_to_vertex:
+                        single_copy_percent = sum([test_first_g.vertex_info[s_v]["len"]
+                                                   for s_v in test_first_g.copy_to_vertex[1]]) \
+                                              / float(sum([test_first_g.vertex_info[a_v]["len"]
+                                                           for a_v in test_first_g.vertex_info]))
+                        if single_copy_percent < 0.5:
+                            if verbose:
+                                if log_handler:
+                                    log_handler.warning("Result with single copy vertex percentage < 50% is "
+                                                        "unacceptable, continue dropping suspicious vertices ...")
+                                else:
+                                    sys.stdout.write("Warning: Result with single copy vertex percentage < 50% is "
+                                                     "unacceptable, continue dropping suspicious vertices ...")
+                            data_contains_outlier = True
+                            is_reasonable_res = False
+                            continue
+                        else:
+                            return final_res_combinations
+                    else:
+                        if verbose:
+                            if log_handler:
+                                log_handler.warning("Result with single copy vertex percentage < 50% is "
+                                                    "unacceptable, continue dropping suspicious vertices ...")
+                            else:
+                                sys.stdout.write("Warning: Result with single copy vertex percentage < 50% is "
+                                                 "unacceptable, continue dropping suspicious vertices ...")
+                        data_contains_outlier = True
+                        is_reasonable_res = False
+                        continue
         except KeyboardInterrupt as e:
             if temp_graph:
                 new_assembly.write_to_gfa(temp_graph)

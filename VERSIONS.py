@@ -6,6 +6,13 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.4",
+     "features": [
+         "1.get_organelle_reads.py: fix a bug with --continue & --prefix when LogInfo() added; ",
+         "2.assembly_parser.py & statistical_func.py: "
+         "if single copy vertex percentage is < 50%, continue dropping suspicious vertices",
+         "3.pip_control_func.py: for --prefix",
+     ]},
     {"number": "1.4.3a",
      "features": [
          "1.get_organelle_reads.py: check_kmers() modified; ",

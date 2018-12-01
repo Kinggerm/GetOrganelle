@@ -18,7 +18,7 @@ def weighted_mean_and_std(values, weights):
     return mean, std
 
 
-def weighted_gmm_with_em_aic(data_array, data_weights=None, maximum_cluster=5, min_sigma_factor=1E-5,
+def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, maximum_cluster=5, min_sigma_factor=1E-5,
                              cluster_limited=None):
     min_sigma = min_sigma_factor * np.average(data_array, weights=data_weights)
 
@@ -109,8 +109,9 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, maximum_cluster=5, m
         freedom_dat_item = int(data_len) - sum([cls.count(cl_num) - 1 for cl_num in set(cls)])
     else:
         freedom_dat_item = int(data_len)
+    minimum_cluster = min(freedom_dat_item, minimum_cluster)
     maximum_cluster = min(freedom_dat_item, maximum_cluster)
-    for total_cluster_num in range(1, maximum_cluster + 1):
+    for total_cluster_num in range(minimum_cluster, maximum_cluster + 1):
         # initialization
         labels = np.random.choice(total_cluster_num, int(data_len))
         if cluster_limited:

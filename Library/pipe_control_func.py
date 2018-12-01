@@ -161,7 +161,7 @@ MEM_TRANS = {"K": 1000, "M": 1000000, "G":1000000000}
 
 
 class LogInfo:
-    def __init__(self, sample_out_dir):
+    def __init__(self, sample_out_dir, prefix=""):
         self.header = ["sample", "fastq_format", "mean_error_rate", "trim_percent", "trim_int", "trim_chars",
                        "mean_read_len", "max_read_len", "estimated_cp_base_coverage",
                        "w", "k", "pre_w", "mem_dup", "mem_used", "n_candidates", "n_reads", "n_bases", "dup_used",
@@ -169,17 +169,19 @@ class LogInfo:
                        "degenerate_base_used", "library_size", "library_deviation", "library_left", "library_right",
                        "res_kmer", "res_kmer_cov", "res_base_cov", "res_path_count",
                        "res_len", "time", "mem_spades", "mem_max"]
-        this_record = {"sample": sample_out_dir, "circular": "no", "mem_max": 0, "degenerate_base_used": "no",
-                       "time": 0.}
-        if os.path.exists(os.path.join(sample_out_dir, "get_org.log.txt")):
-            log_contents = open(os.path.join(sample_out_dir, "get_org.log.txt"), "r").read().split("\n\n")
+        this_record = {"sample": os.path.join(sample_out_dir, prefix).rstrip("/"), "circular": "no", "mem_max": 0,
+                       "degenerate_base_used": "no", "time": 0.}
+        command_recorded = False
+        if os.path.exists(os.path.join(sample_out_dir, prefix + "get_org.log.txt")):
+            log_contents = open(os.path.join(sample_out_dir, prefix + "get_org.log.txt"), "r").read().split("\n\n")
             for log_part in log_contents:
-                if "get_organelle_reads" in log_part:
+                if "get_organelle_reads" in log_part and not command_recorded:
                     command_line = log_part.split()
                     if "-w" in command_line:
                         this_record["w"] = command_line[command_line.index("-w") + 1]
                     if "-k" in command_line:
                         this_record["k"] = command_line[command_line.index("-k") + 1]
+                    command_recorded = True
                 if "Pre-reading fastq" in log_part:
                     for line in log_part.split("\n"):
                         if " - INFO: " in line and line[:4].isdigit():
@@ -315,9 +317,9 @@ class LogInfo:
                         if "Total cost " in line:
                             this_record["time"] += float(line.split("Total cost ")[-1].split(" ")[0])
         else:
-            raise FileNotFoundError(os.path.join(sample_out_dir, "get_org.log.txt"))
-        if os.path.exists(os.path.join(sample_out_dir, "filtered_spades", "spades.log")):
-            with open(os.path.join(sample_out_dir, "filtered_spades", "spades.log"), "r") as spades_log:
+            sys.stdout.write(os.path.join(sample_out_dir, prefix + "get_org.log.txt") + " not found!\n")
+        if os.path.exists(os.path.join(sample_out_dir, prefix + "filtered_spades", "spades.log")):
+            with open(os.path.join(sample_out_dir, prefix + "filtered_spades", "spades.log"), "r") as spades_log:
                 for line in spades_log:
                     line = line.strip()
                     if line.count(":") > 2:

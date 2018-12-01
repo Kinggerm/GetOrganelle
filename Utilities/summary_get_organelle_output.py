@@ -27,15 +27,23 @@ def get_options():
 
 def main():
     options, argv = get_options()
-    first_sample = LogInfo(argv[0])
+    # detect prefix
+    dir_prefix_pairs = []
+    for folder in argv:
+        if os.path.isdir(folder):
+            prefix_list = [log_f[:-len("get_org.log.txt")]
+                           for log_f in os.listdir(folder) if log_f.endswith("get_org.log.txt")]
+            for this_prefix in prefix_list:
+                dir_prefix_pairs.append((folder, this_prefix))
+    first_sample = LogInfo(sample_out_dir=dir_prefix_pairs[0][0], prefix=dir_prefix_pairs[0][1])
     header = first_sample.header
     # if options.verbose:
     #     header.remove()
     with open(options.output, "w") as output_handler:
         res_out = csv.DictWriter(output_handler, fieldnames=header, delimiter="\t", extrasaction="ignore")
         res_out.writeheader()
-        for sample_d in argv:
-            res_out.writerow(LogInfo(sample_d).__dict__)
+        for sample_d, sample_p in dir_prefix_pairs:
+            res_out.writerow(LogInfo(sample_out_dir=sample_d, prefix=sample_p).__dict__)
 
 
 if __name__ == '__main__':

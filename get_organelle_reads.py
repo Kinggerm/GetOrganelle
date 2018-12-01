@@ -365,9 +365,15 @@ def get_options(descriptions, version):
         if options.memory_save and options.memory_unlimited:
             sys.stdout.write("\n############################################################################"
                              "\nERROR: \"--memory-save\" and \"--memory-unlimited\" are not compatible!")
+        options.prefix = os.path.basename(options.prefix)
+        if options.script_resume and os.path.isdir(options.output_base):
+            previous_attributes = LogInfo(options.output_base, options.prefix)
+        else:
+            previous_attributes = None
+            options.script_resume = False
         if not os.path.isdir(options.output_base):
             os.mkdir(options.output_base)
-        options.prefix = os.path.basename(options.prefix)
+            options.script_resume = False
         log = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
         log.info("")
         log.info(descriptions)
@@ -536,7 +542,7 @@ def get_options(descriptions, version):
         if options.max_rounds and options.max_rounds < 3:
             log.warning("illegal maximum rounds! Been set to default: unlimited.")
             options.max_rounds = None
-        return options, log
+        return options, log, previous_attributes
 
 
 def combination_res(all_choices_num, chosen_num):
@@ -2382,7 +2388,7 @@ def main():
             "\ngets organelle reads and genomes from genome skimming data by extending." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
-    options, log = get_options(descriptions=title, version=get_versions())
+    options, log, previous_attributes = get_options(descriptions=title, version=get_versions())
     resume = options.script_resume
     verb_log = options.verbose_log
     out_base = options.output_base
@@ -2393,9 +2399,8 @@ def main():
         """ read previous res """
         if resume:
             try:
-                previous_attributes = LogInfo(out_base)
                 word_size = int(previous_attributes.w)
-            except AttributeError:
+            except (AttributeError, ValueError):
                 resume = False
 
         """ initialization """
@@ -2432,7 +2437,7 @@ def main():
             try:
                 max_read_len = int(previous_attributes.max_read_len)
                 mean_read_len = float(previous_attributes.mean_read_len)
-            except AttributeError:
+            except (AttributeError, ValueError):
                 resume = False
 
         if not (resume and filtered_files_exist):

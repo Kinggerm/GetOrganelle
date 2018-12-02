@@ -1456,7 +1456,7 @@ class Assembly:
                                     if temp_graph:
                                         new_assembly.write_to_gfa(temp_graph)
                                         new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                                    raise Exception("Multiple isolated" + mode + " components detected! "
+                                    raise Exception("Multiple isolated " + mode + " components detected! "
                                                     "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
                                     if w == second:

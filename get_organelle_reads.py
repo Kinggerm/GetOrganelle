@@ -210,8 +210,9 @@ def get_options(descriptions, version):
                               help="Depth factor for confirming parallel contigs. Default: %default")
     group_assembly.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
                               help="Similarity threshold for confirming parallel contigs. Default: %default")
-    group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=600, type=float,
-                              help="Time limit (second) for each try of disentangling a graph file. Default: %default")
+    group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=600, type=int,
+                              help="Time limit (second) for each try of disentangling a graph file as a circular "
+                                   "genome. Disentangling a graph as contigs is not limited. Default: %default")
     # group 5
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "")
     group_computational.add_option("-t", dest="threads", type=int, default=1,
@@ -2183,92 +2184,102 @@ def unzip(source, target, line_limit, verbose_log, log):
 
 
 def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, read_len_for_log,
-                             verbose, log, threads, options):
+                             verbose, log_in, threads, options):
+    def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
+                             mode="cp", contamination_depth=5., contamination_similarity=5., degenerate=True,
+                             degenerate_depth=1.5, degenerate_similarity=1.5, hard_cov_threshold=10.,
+                             min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
+                             here_verbose=False, timeout_flag_str="'--disentangle-time-limit'"):
+        @set_time_limit(time_limit, flag_str=timeout_flag_str)
+        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="cp", c_d=5., c_s=5., deg=True,
+                               deg_dep=1.5, deg_sim=1.5, hard_c_t=10., min_s_f=0.1, max_c_in=True,
+                               acyclic_allowed_in=False, verbose_in=False):
+            from Library.assembly_parser import Assembly
+            this_K = os.path.split(os.path.split(fastg_f)[0])[-1]
+            o_p += "." + this_K
+            if acyclic_allowed_in:
+                log_in.info("Disentangling " + fastg_f + " as contig(s) ... ")
+            else:
+                log_in.info("Disentangling " + fastg_f + " as a circular genome ... ")
+            input_graph = Assembly(fastg_f)
+            target_results = input_graph.find_target_graph(tab_f,
+                                                           mode=mode_in, type_factor=type_f,
+                                                           log_hard_cov_threshold=hard_c_t,
+                                                           contamination_depth=c_d,
+                                                           contamination_similarity=c_s,
+                                                           degenerate=deg, degenerate_depth=deg_dep,
+                                                           degenerate_similarity=deg_sim,
+                                                           only_keep_max_cov=max_c_in,
+                                                           min_sigma_factor=min_s_f,
+                                                           weight_factor=w_f,
+                                                           broken_graph_allowed=acyclic_allowed_in,
+                                                           read_len_for_log=read_len_for_log,
+                                                           log_handler=log_in, verbose=verbose_in)
+            if len(target_results) > 1:
+                log_in.warning(str(len(target_results)) + " sets of graph detected!")
+            log_in.info("Slimming and disentangling graph finished!\n")
 
-    @set_time_limit(options.disentangle_time_limit)
-    def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log, type_factor=3., mode="cp",
-                             contamination_depth=5., contamination_similarity=5., degenerate=True, degenerate_depth=1.5,
-                             degenerate_similarity=1.5, hard_cov_threshold=10., min_sigma_factor=0.1,
-                             here_only_max_c=True, here_acyclic_allowed=False, here_verbose=False):
-        from Library.assembly_parser import Assembly
-        this_K = os.path.split(os.path.split(fastg_file)[0])[-1]
-        output += "." + this_K
-        if here_acyclic_allowed:
-            log.info("Disentangling " + fastg_file + " as contig(s) ... ")
-        else:
-            log.info("Disentangling " + fastg_file + " as a circular genome ... ")
-        input_graph = Assembly(fastg_file)
-        target_results = input_graph.find_target_graph(tab_file,
-                                                       mode=mode, type_factor=type_factor,
-                                                       log_hard_cov_threshold=hard_cov_threshold,
-                                                       contamination_depth=contamination_depth,
-                                                       contamination_similarity=contamination_similarity,
-                                                       degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                       degenerate_similarity=degenerate_similarity,
-                                                       only_keep_max_cov=here_only_max_c,
-                                                       min_sigma_factor=min_sigma_factor,
-                                                       weight_factor=weight_factor,
-                                                       broken_graph_allowed=here_acyclic_allowed,
-                                                       read_len_for_log=read_len_for_log,
-                                                       log_handler=log, verbose=here_verbose)
-        if len(target_results) > 1:
-            log.warning(str(len(target_results)) + " sets of graph detected!")
-        log.info("Slimming and disentangling graph finished!\n")
-
-        log.info("Writing output ...")
-        degenerate_base_used = False
-        if here_acyclic_allowed:
-            contig_num = set()
-            for go_res, res in enumerate(target_results):
-                broken_graph = res["graph"]
-                count_path = 0
-                test_paths = broken_graph.get_all_paths(mode=mode, log_handler=log)
-                for this_paths, other_tag in test_paths:
-                    count_path += 1
-                    all_contig_str = []
-                    contig_num.add(len(this_paths))
-                    for go_contig, this_p_part in enumerate(this_paths):
-                        this_contig = broken_graph.export_path(this_p_part)
-                        if DEGENERATE_BASES & set(this_contig.seq):
+            log_in.info("Writing output ...")
+            degenerate_base_used = False
+            if acyclic_allowed_in:
+                contig_num = set()
+                for go_res, res in enumerate(target_results):
+                    broken_graph = res["graph"]
+                    count_path = 0
+                    test_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in)
+                    for this_paths, other_tag in test_paths:
+                        count_path += 1
+                        all_contig_str = []
+                        contig_num.add(len(this_paths))
+                        for go_contig, this_p_part in enumerate(this_paths):
+                            this_contig = broken_graph.export_path(this_p_part)
+                            if DEGENERATE_BASES & set(this_contig.seq):
+                                degenerate_base_used = True
+                            all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label + "\n" +
+                                                  this_contig.seq + "\n")
+                        open(o_p + ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                             ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
+                        log_in.info("Writing PATH" + str(count_path) + " of " + mode_in + " contig(s) to " + o_p +
+                                 ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                                 ".path_sequence.fasta")
+                    log_in.info("Writing GRAPH to " + o_p + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
+                    broken_graph.write_to_gfa(o_p + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
+                log_in.info("Result status: " + ",".join(sorted([str(c_n) for c_n in contig_num])) + " contig(s)")
+            else:
+                for go_res, res in enumerate(target_results):
+                    go_res += 1
+                    idealized_graph = res["graph"]
+                    # average_kmer_cov = res["cov"]
+                    # log.info("Detecting target graph" + str(go_res) +
+                    #          " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
+                    count_path = 0
+                    for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode_in, log_handler=log_in):
+                        count_path += 1
+                        out_n = o_p + ".complete.graph" + str(go_res) + "." + str(count_path) + other_tag + \
+                                ".path_sequence.fasta"
+                        this_seq_obj = idealized_graph.export_path(this_path)
+                        if DEGENERATE_BASES & set(this_seq_obj.seq):
                             degenerate_base_used = True
-                        all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label + "\n" +
-                                              this_contig.seq + "\n")
-                    open(output + ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
-                         ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
-                    log.info("Writing PATH" + str(count_path) + " of " + mode + " contig(s) to " + output +
-                             ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
-                             ".path_sequence.fasta")
-                log.info("Writing GRAPH to " + output + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
-                broken_graph.write_to_gfa(output + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
-            log.info("Result status: " + ",".join(sorted([str(c_n) for c_n in contig_num])) + " contig(s)")
-        else:
-            for go_res, res in enumerate(target_results):
-                go_res += 1
-                idealized_graph = res["graph"]
-                # average_kmer_cov = res["cov"]
-                # log.info("Detecting target graph" + str(go_res) +
-                #          " finished with average kmer coverage: " + str(round(average_kmer_cov, 4)))
-                count_path = 0
-                for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log):
-                    count_path += 1
-                    out_n = output + ".complete.graph" + str(go_res) + "." + str(count_path) + other_tag + ".path_sequence.fasta"
-                    this_seq_obj = idealized_graph.export_path(this_path)
-                    if DEGENERATE_BASES & set(this_seq_obj.seq):
-                        degenerate_base_used = True
-                    open(out_n, "w").write(this_seq_obj.fasta_str())
-                    log.info("Writing PATH" + str(count_path) + " of complete genome to " + out_n)
-                log.info("Writing GRAPH to " + output + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
-                idealized_graph.write_to_gfa(output + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
-            log.info("Result status: circular genome")
-        if degenerate_base_used:
-            log.warning("Degenerate base(s) used!")
-        os.system("cp " + os.path.join(os.path.split(fastg_file)[0], "assembly_graph.fastg") + " " +
-                  output + ".assembly_graph.fastg")
-        os.system("cp " + fastg_file + " " + output + "." + os.path.basename(fastg_file))
-        os.system("cp " + tab_file + " " + output + "." + os.path.basename(tab_file))
-        if not here_acyclic_allowed:
-            log.info("Please visualize " + output + "." + os.path.basename(fastg_file) +" to confirm the final result.")
-        log.info("Writing output finished.")
+                        open(out_n, "w").write(this_seq_obj.fasta_str())
+                        log_in.info("Writing PATH" + str(count_path) + " of complete genome to " + out_n)
+                    log_in.info("Writing GRAPH to " + o_p + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
+                    idealized_graph.write_to_gfa(o_p + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
+                log_in.info("Result status: circular genome")
+            if degenerate_base_used:
+                log_in.warning("Degenerate base(s) used!")
+            os.system("cp " + os.path.join(os.path.split(fastg_f)[0], "assembly_graph.fastg") + " " +
+                      o_p + ".assembly_graph.fastg")
+            os.system("cp " + fastg_f + " " + o_p + "." + os.path.basename(fastg_f))
+            os.system("cp " + tab_f + " " + o_p + "." + os.path.basename(tab_f))
+            if not acyclic_allowed_in:
+                log_in.info("Please visualize " + o_p + "." + os.path.basename(fastg_f) + " to confirm the final result.")
+            log_in.info("Writing output finished.")
+
+        disentangle_inside(fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
+                           type_f=type_factor, mode_in=mode, c_d=contamination_depth, c_s=contamination_similarity,
+                           deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
+                           hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
+                           acyclic_allowed_in=here_acyclic_allowed, verbose_in=here_verbose)
 
     # start
     export_succeeded = False
@@ -2280,9 +2291,10 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                        reverse=True)
     kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
     run_stat_set = set()
+    timeout_flag = "'--disentangle-time-limit'"
     for go_k, kmer_dir in enumerate(kmer_dirs):
         try:
-            running_stat = slim_spades_result(organelle_type, kmer_dir, verbose, log, threads=threads,
+            running_stat = slim_spades_result(organelle_type, kmer_dir, verbose, log_in, threads=threads,
                                               resume=options.script_resume)
             """disentangle"""
             if running_stat == 0:
@@ -2301,12 +2313,16 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                                      contamination_similarity=options.contamination_similarity,
                                      degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
                                      degenerate_similarity=options.degenerate_similarity, here_only_max_c=True,
-                                     here_acyclic_allowed=False, here_verbose=verbose, log=log)
+                                     here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_in,
+                                     time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag)
+                # currently time is not limited for exporting contigs
         except ImportError:
-            log.warning("Disentangling failed: numpy/scipy/sympy not installed!")
+            log_in.warning("Disentangling failed: numpy/scipy/sympy not installed!")
             break
-        except:
-            log.info("Disentangling failed.")
+        except RuntimeError:
+            log_in.info("Disentangling timeout. (see " + timeout_flag + " for more)")
+        except Exception as e:
+            log_in.info("Disentangling failed: " + str(e).strip())
         else:
             if running_stat == 0:
                 export_succeeded = True
@@ -2315,9 +2331,9 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                 run_stat_set.add(running_stat)
     if not export_succeeded:
         if run_stat_set == {2}:
-            log.warning("No target organelle contigs found!")
-            log.warning("This might due to a bug or unreasonable reference/parameter choices")
-            log.info("Please email jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
+            log_in.warning("No target organelle contigs found!")
+            log_in.warning("This might due to a bug or unreasonable reference/parameter choices")
+            log_in.info("Please email jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
             return export_succeeded
 
         largest_k_graph_f_exist = sorted([x for x in os.listdir(kmer_dirs[0]) if x.count(".fastg") == 2])
@@ -2332,52 +2348,55 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                         out_csv = out_fastg[:-5] + "csv"
                         path_prefix = os.path.join(out_base, prefix + organelle_type)
                         disentangle_assembly(fastg_file=out_fastg, mode=organelle_type, tab_file=out_csv,
-                                             output=path_prefix, weight_factor=100, here_verbose=verbose, log=log,
-                                             hard_cov_threshold=options.disentangle_depth_factor * 0.8,
+                                             output=path_prefix, weight_factor=100, here_verbose=verbose,
+                                             log_dis=log_in, hard_cov_threshold=options.disentangle_depth_factor * 0.8,
                                              contamination_depth=options.contamination_depth,
                                              contamination_similarity=options.contamination_similarity,
                                              degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
                                              degenerate_similarity=options.degenerate_similarity,
-                                             here_only_max_c=True, here_acyclic_allowed=True)
+                                             here_only_max_c=True, here_acyclic_allowed=True,
+                                             time_limit=3600, timeout_flag_str=timeout_flag)
                 except ImportError:
                     break
-                # except:
-                #     log.info("Disentangling failed.")
+                except RuntimeError:
+                    log_in.info("Disentangling timeout. (see " + timeout_flag + " for more)")
+                except Exception as e:
+                    log_in.info("Disentangling failed: " + str(e).strip())
                 else:
                     export_succeeded = True
                     out_fastg = largest_k_graph_f_exist[0]
                     out_csv = out_fastg[:-5] + "csv"
-                    log.info("Please ...")
-                    log.info("load the graph file '" + out_fastg +
-                             "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
-                    log.info("load the CSV file '" + out_csv +
-                             "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
-                    log.info("visualize and confirm the incomplete result in Bandage.")
+                    log_in.info("Please ...")
+                    log_in.info("load the graph file '" + out_fastg +
+                                "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                    log_in.info("load the CSV file '" + out_csv +
+                                "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                    log_in.info("visualize and confirm the incomplete result in Bandage.")
                     # log.info("-------------------------------------------------------")
-                    log.info("If the result is nearly complete, ")
-                    log.info("you can also adjust the arguments to try again.")
-                    log.info("If you have questions for us, "
-                             "please provide us with the get_org.log.txt file and the graph in the format you like!")
+                    log_in.info("If the result is nearly complete, ")
+                    log_in.info("you can also adjust the arguments to try again.")
+                    log_in.info("If you have questions for us, "
+                                "please provide us with the get_org.log.txt file and the graph in the format you like!")
                     # log.info("-------------------------------------------------------")
                     break
             if not export_succeeded:
                 out_fastg = largest_k_graph_f_exist[0]
                 out_csv = out_fastg[:-5] + "csv"
-                log.info("Please ...")
-                log.info("load the graph file '" + out_fastg +
-                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
-                log.info("load the CSV file '" + out_csv +
-                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
-                log.info("visualize and export your result in Bandage.")
-                log.info("If you have questions for us, "
-                         "please provide us with the get_org.log.txt file and the graph in the format you like!")
+                log_in.info("Please ...")
+                log_in.info("load the graph file '" + out_fastg +
+                            "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                log_in.info("load the CSV file '" + out_csv +
+                            "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                log_in.info("visualize and export your result in Bandage.")
+                log_in.info("If you have questions for us, "
+                            "please provide us with the get_org.log.txt file and the graph in the format you like!")
         else:
             # slim failed with unknown error
-            log.info("Please ...")
-            log.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
-            log.info("visualize and export your result in Bandage.")
-            log.info("If you have questions for us, "
-                     "please provide us with the get_org.log.txt file and the graph in the format you like!")
+            log_in.info("Please ...")
+            log_in.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
+            log_in.info("visualize and export your result in Bandage.")
+            log_in.info("If you have questions for us, "
+                        "please provide us with the get_org.log.txt file and the graph in the format you like!")
     return export_succeeded
 
 
@@ -2614,7 +2633,7 @@ def main():
                 log.info("Slimming and disentangling graph ...")
                 extract_organelle_genome(out_base=out_base, spades_output=spades_output, prefix=options.prefix,
                                          organelle_type=options.organelle_type, read_len_for_log=mean_read_len,
-                                         verbose=options.verbose_log, log=log,
+                                         verbose=options.verbose_log, log_in=log,
                                          threads=options.threads, options=options)
 
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")

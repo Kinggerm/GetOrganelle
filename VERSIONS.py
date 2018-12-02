@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.4a",
+     "features": [
+         "time limit works only for disentangling graph as a circular genome",
+         "more informative log info for disentangling",
+     ]},
     {"number": "1.4.4",
      "features": [
          "1.get_organelle_reads.py: fix a bug with --continue & --prefix when LogInfo() added; ",

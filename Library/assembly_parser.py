@@ -633,6 +633,16 @@ class Assembly:
             return best_para_val
 
         vertices_list = sorted(self.vertex_info)
+        if len(vertices_list) == 1:
+            cov_ = self.vertex_info[vertices_list[0]]["cov"]
+            if return_new_graphs:
+                return [{"graph": deepcopy(self), "cov": cov_}]
+            else:
+                if log_handler:
+                    log_handler.info("Average " + target_name_for_log +" kmer-coverage = " + str(round(cov_, 2)))
+                else:
+                    sys.stdout.write("Average " + target_name_for_log +" kmer-coverage = " + str(round(cov_, 2)) + "\n")
+                return
 
         """ create constraints by creating multivariate equations """
         vertex_to_symbols = {vertex_name: Symbol("V"+vertex_name, integer=True)  # positive=True)
@@ -1651,7 +1661,7 @@ class Assembly:
                     elif temp_graph:
                         new_assembly.write_to_gfa(temp_graph)
                         new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
-                        raise Exception("Complicated" + mode + "graph! Detecting path(s) failed!\n")
+                        raise Exception("Complicated " + mode + " graph! Detecting path(s) failed!\n")
                     else:
                         raise Exception(e)
                 else:
@@ -1699,6 +1709,20 @@ class Assembly:
             # print("ongoing_path", ongoing_path)
             # print("next_connect", next_connections)
             # print("vertices_lef", vertices_left)
+            if not vertices_left:
+                new_path = deepcopy(ongoing_path)
+                if check_all_kinds:
+                    rev_path = [(this_v, not this_e) for this_v, this_e in new_path[::-1]]
+                    this_path_derived = [new_path, rev_path]
+                    for change_start in range(1, len(new_path)):
+                        this_path_derived.append(new_path[change_start:] + new_path[:change_start])
+                        this_path_derived.append(rev_path[change_start:] + rev_path[:change_start])
+                    standardized_path = tuple(sorted(this_path_derived)[0])
+                    paths.add(tuple(standardized_path))
+                else:
+                    paths.add(tuple(new_path))
+                return
+
             for next_vertex, next_end in next_connections:
                 # print("next_vertex", next_vertex)
                 if next_vertex in vertices_left:
@@ -1779,8 +1803,10 @@ class Assembly:
                         sys.stdout.write("Warning: Multiple repeat patterns appeared in your data, "
                                          "a more balanced pattern (always the repeat_pattern1) would be suggested "
                                          "for plastomes with inverted repeats!\n")
-                sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
-                                for this_path, acc_distance in sorted_paths]
+                    sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
+                                    for this_path, acc_distance in sorted_paths]
+                else:
+                    sorted_paths = [(this_path, "") for this_path in sorted(paths)]
             else:
                 sorted_paths = [(this_path, "") for this_path in sorted(paths)]
 
@@ -1837,6 +1863,11 @@ class Assembly:
             # print("next_connect", next_connections)
             # print("vertices_lef", vertices_left)
             # print("vertices_lef", len(vertices_left))
+            if not vertices_left:
+                new_paths = deepcopy(ongoing_paths)
+                paths.append(standardize_paths(new_paths))
+                return
+
             find_next = False
             for next_vertex, next_end in next_connections:
                 # print("next_vertex", next_vertex, next_end)
@@ -1954,8 +1985,10 @@ class Assembly:
                                              "for plastomes with inverted repeats!\n")
                         else:
                             sys.stdout.write("Warning: Multiple repeat patterns appeared in your data.\n")
-                sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
-                                for this_path, acc_distance in sorted_paths]
+                    sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
+                                    for this_path, acc_distance in sorted_paths]
+                else:
+                    sorted_paths = [(this_path, "") for this_path in sorted(paths)]
             else:
                 sorted_paths = [(this_path, "") for this_path in sorted(paths)]
 

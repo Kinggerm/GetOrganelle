@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.4.4b",
+     "features": [
+         "1.assembly_parser.py: fix a bug for disentangling single-contig graph; remove redundant 'repeat_pattern';",
+     ]},
     {"number": "1.4.4a",
      "features": [
          "time limit works only for disentangling graph as a circular genome",

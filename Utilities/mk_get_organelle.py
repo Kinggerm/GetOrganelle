@@ -11,7 +11,7 @@ parser.add_option('-o', dest='output_base',
 parser.add_option('-p', dest='other_arguments',
                   help='Other arguments that get_organelle_reads.py would take.'
                        'Use double quotation marks to include all the arguments'
-                       'Example: "-s chloroplast.fasta -a mitochondrial.fasta -F cp -w 105"')
+                       'Example: "-s chloroplast.fasta -a mitochondrial.fasta -F plant_cp -w 105"')
 parser.add_option('--all', dest='skip_done', default=True, action='store_false',
                   help='Choose to make command for all samples including samples with results.'
                        'Default: skip those with results.')

@@ -39,15 +39,15 @@ global_min_ws = 49
 
 def get_options(descriptions, version):
     version = version
-    usage = "\n###  Plastome, Normal, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
+    usage = "\n###  Plant Plastome, Normal, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o plastome_output " \
             " -R 15 -k 75,85,95,105\n" \
-            "###  Mitochondria\n" + str(os.path.basename(__file__)) + \
+            "###  Plant Mitochondria\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output " \
-            " -R 30 -k 65,75,85,95,105 -F mt\n" \
-            "###  Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
+            " -R 30 -k 65,75,85,95,105 -F plant_mt\n" \
+            "###  Plant Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -o nr_output " \
-            " -R 7 -k 95,105,115 -P 0 -F nr"
+            " -R 7 -k 95,105,115 -P 0 -F plant_nr"
     parser = OptionParser(usage=usage, version=version, description=descriptions, add_help_option=False)
     # group 1
     group_inout = OptionGroup(parser, "IN-OUT OPTIONS", "Options on inputs and outputs")
@@ -68,11 +68,11 @@ def get_options(descriptions, version):
                                 "stop. Typically serves as excluding chloroplast reads when extending mitochondrial "
                                 "reads, or the other way around. You should be cautious about using this option, "
                                 "because if the anti-seed includes some word in the target but not in the seed, "
-                                "the result would have gaps. Typically, use the mt and cp from the same "
-                                "species as seed and anti-seed.")
+                                "the result would have gaps. For example, use the plant_mt and plant_cp from the same "
+                                "plant-species as seed and anti-seed.")
     group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
                            help="Maximum number of reads to be used per file. "
-                                "Default: 1.5E7 (-F cp,nr) or 7.5E7 (-F mt)")
+                                "Default: 1.5E7 (-F plant_cp,plant_nr) or 7.5E7 (-F plant_mt)")
     group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
                                 "Default: %default")
@@ -88,9 +88,9 @@ def get_options(descriptions, version):
                            help="Choose to keep the running temp/index files.")
     # group 2
     group_scheme = OptionGroup(parser, "SCHEME OPTIONS", "Options on running schemes.")
-    group_scheme.add_option("-F", dest="organelle_type", default="cp",
-                            help="This flag should be followed with cp (if you want get chloroplast), mt "
-                                 "(mitochondria), nr (nuclear ribosomal RNA). Default: %default. ")
+    group_scheme.add_option("-F", dest="organelle_type", default="plant_cp",
+                            help="This flag should be followed with plant_cp (chloroplast), plant_mt "
+                                 "(mitochondria), plant_nr (nuclear ribosomal RNA). Default: %default. ")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
                             help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
                                  "--max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
@@ -142,7 +142,7 @@ def get_options(descriptions, version):
                                     "Default: %default")
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
-                                    "Default: 4E8 (-F cp), 8E7 (-F nr) or 2E9 (-F mt)")
+                                    "Default: 4E8 (-F plant_cp), 8E7 (-F plant_nr) or 2E9 (-F plant_mt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=3,
                                help="The wide of steps of checking words in reads during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
@@ -176,11 +176,12 @@ def get_options(descriptions, version):
                                     "graph. Suggested when the data is good with high and homogenous coverage.")
     group_extending.add_option("--soft-max-words", dest="soft_max_words", type=float, default=8E7,
                                help="Maximum number of words to be used to test the fitness of a word size value."
-                                    "Default: 8E7 (-F cp), 1.6E7 (-F nr) or 4E8 (-F mt)")
+                                    "Default: 8E7 (-F plant_cp), 1.6E7 (-F plant_nr) or 4E8 (-F plant_mt)")
     group_extending.add_option("--target-genome-size", dest="target_genome_size", default=130000, type=int,
                                help="Hypothetical value of target genome single copy region size for estimating "
                                     "word size when '--no-bowtie2' is chosen and no '-w word_size' is given. "
-                                    "Default: 130000 (-F cp) or 290000 (-F mt) or 13000 (-F nr) ")
+                                    "Default: 130000 (-F plant_cp) or 290000 (-F plant_mt) or "
+                                    "13000 (-F plant_nr) ")
     # group 4
     group_assembly = OptionGroup(parser, "ASSEMBLY OPTIONS", "These options are about the assembly and "
                                                              "graph disentangling")
@@ -283,8 +284,8 @@ def get_options(descriptions, version):
         parser.remove_option("-R")
         parser.add_option("-R", dest="max_rounds", help="Maximum running rounds (>=3). Default: unlimited")
         parser.remove_option("-F")
-        parser.add_option("-F", dest="organelle_type", default="cp",
-                          help="Target organelle genome type: cp/mt/nr. Default: %default")
+        parser.add_option("-F", dest="organelle_type", default="plant_cp",
+                          help="Target organelle genome type: plant_cp/plant_mt/plant_nr. Default: %default")
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
@@ -328,9 +329,9 @@ def get_options(descriptions, version):
             sys.stdout.write("\n############################################################################"
                              "\nERROR: unbalanced paired reads!\n\n")
             exit()
-        if options.organelle_type not in {"cp", "mt", "nr"}:
+        if options.organelle_type not in {"plant_cp", "plant_mt", "plant_nr"}:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: \"-F\" MUST be one of 'cp', 'mt', 'nr'!")
+                             "\nERROR: \"-F\" MUST be one of 'plant_cp', 'plant_mt', 'plant_nr'!")
         if "*" in options.seed_file:
             options.seed_file = options.seed_file.replace("*", options.organelle_type)
         for check_file in (options.fq_file_1, options.fq_file_2, options.seed_file, options.anti_seed):
@@ -2083,13 +2084,14 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
                     log.info("Slimming      " + graph_file + " ... skipped.")
                 return 0
     scheme_translation = {
-        'cp': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference',
-                                                    'cp') + ' --exclude ' + os.path.join(path_of_this_script, 'Library',
-                                                                                         'NotationReference', 'mt'),
-        'mt': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference',
-                                                    'mt') + ' --exclude ' + os.path.join(path_of_this_script, 'Library',
-                                                                                         'NotationReference', 'cp'),
-        'nr': ' --include-priority ' + os.path.join(path_of_this_script, 'Library', 'NotationReference', 'nr')}
+        'plant_cp': ' --include-priority ' +
+                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_cp') + ' --exclude ' +
+                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_mt'),
+        'plant_mt': ' --include-priority ' +
+                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_mt') + ' --exclude ' +
+                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_cp'),
+        'plant_nr': ' --include-priority ' +
+                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_nr')}
     if scheme in scheme_translation:
         run_command = scheme_translation[scheme]
     else:
@@ -2186,13 +2188,13 @@ def unzip(source, target, line_limit, verbose_log, log):
 def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, read_len_for_log,
                              verbose, log_in, threads, options):
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
-                             mode="cp", contamination_depth=5., contamination_similarity=5., degenerate=True,
+                             mode="plant_cp", contamination_depth=5., contamination_similarity=5., degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=1.5, hard_cov_threshold=10.,
                              min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'"):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
-        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="cp", c_d=5., c_s=5., deg=True,
-                               deg_dep=1.5, deg_sim=1.5, hard_c_t=10., min_s_f=0.1, max_c_in=True,
+        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="plant_cp", c_d=5., c_s=5.,
+                               deg=True, deg_dep=1.5, deg_sim=1.5, hard_c_t=10., min_s_f=0.1, max_c_in=True,
                                acyclic_allowed_in=False, verbose_in=False):
             from Library.assembly_parser import Assembly
             this_K = os.path.split(os.path.split(fastg_f)[0])[-1]

@@ -477,13 +477,13 @@ class Assembly:
         self.update_vertex_clusters()
         return merged
 
-    def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="cp",
+    def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="plant_cp",
                                        log_handler=None, verbose=True, debug=False):
-        if mode == "cp":
+        if mode == "plant_cp":
             max_majority_cov = 2
-        elif mode == "mt":
+        elif mode == "plant_mt":
             max_majority_cov = 4
-        elif mode == "nr":
+        elif mode == "plant_nr":
             max_majority_cov = 1
         elif mode == "all":
             max_majority_cov = 100
@@ -987,7 +987,7 @@ class Assembly:
         if len(self.tagged_vertices[mode]) == 0:
             raise Exception("No available " + mode + " information found in " + tab_file)
 
-    def filter_by_coverage(self, drop_num=1, mode="cp", log_hard_cov_threshold=10.,
+    def filter_by_coverage(self, drop_num=1, mode="plant_cp", log_hard_cov_threshold=10.,
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1,
                            verbose=False, log_handler=None, debug=False):
         changed = False
@@ -1305,7 +1305,7 @@ class Assembly:
                     sys.stdout.write("Warning: Only the contig with the max cov was kept for each of those " +
                                      str(count_using_only_max) + " polymorphic loci.\n")
 
-    def find_target_graph(self, tab_file, mode="cp", type_factor=3, weight_factor=100.0,
+    def find_target_graph(self, tab_file, mode="plant_cp", type_factor=3, weight_factor=100.0,
                           max_copy=8, min_sigma_factor=0.1,
                           log_hard_cov_threshold=10., contamination_depth=5., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
@@ -1702,7 +1702,7 @@ class Assembly:
                 new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
             raise KeyboardInterrupt
 
-    def get_all_circular_paths(self, mode="cp", library_info=None, log_handler=None):
+    def get_all_circular_paths(self, mode="plant_cp", library_info=None, log_handler=None):
 
         def circular_directed_graph_solver(ongoing_path, next_connections, vertices_left, check_all_kinds):
             # print("-----------------------------")
@@ -1810,7 +1810,7 @@ class Assembly:
             else:
                 sorted_paths = [(this_path, "") for this_path in sorted(paths)]
 
-            if mode == "cp":
+            if mode == "plant_cp":
                 if len(sorted_paths) > 2 and not (100000 < len(self.export_path(sorted_paths[0][0]).seq) < 200000):
                     if log_handler:
                         log_handler.warning("Multiple circular genome structures with abnormal length produced!")
@@ -1838,7 +1838,7 @@ class Assembly:
                                          "simply flip-flop configurations!\n")
             return sorted_paths
 
-    def get_all_paths(self, mode="cp", log_handler=None):
+    def get_all_paths(self, mode="plant_cp", log_handler=None):
 
         def standardize_paths(raw_paths):
             standardized_path = []
@@ -1972,14 +1972,14 @@ class Assembly:
                                 in enumerate(sorted(set([x[1] for x in sorted_paths]), reverse=True))}
                 if len(pattern_dict) > 1:
                     if log_handler:
-                        if mode == "cp":
+                        if mode == "plant_cp":
                             log_handler.warning("Multiple repeat patterns appeared in your data, "
                                                 "a more balanced pattern (always the repeat_pattern1) would be "
                                                 "suggested for plastomes with inverted repeats!")
                         else:
                             log_handler.warning("Multiple repeat patterns appeared in your data.")
                     else:
-                        if mode == "cp":
+                        if mode == "plant_cp":
                             sys.stdout.write("Warning: Multiple repeat patterns appeared in your data, "
                                              "a more balanced pattern (always the repeat_pattern1) would be suggested "
                                              "for plastomes with inverted repeats!\n")
@@ -1992,7 +1992,7 @@ class Assembly:
             else:
                 sorted_paths = [(this_path, "") for this_path in sorted(paths)]
 
-            if mode == "cp":
+            if mode == "plant_cp":
                 if len(sorted_paths) > 2 and \
                         not (100000 < sum([len(self.export_path(part_p).seq) for part_p in sorted_paths[0][0]]) < 200000):
                     if log_handler:

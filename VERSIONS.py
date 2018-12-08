@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0-pre",
+     "features": [
+         "cp -> plant_cp; mt -> plant_mt; nr -> plant_nr; for adding animals",
+         "Comparison url (https://github.com/Kinggerm/GetOrganelleComparison) added",
+     ]},
     {"number": "1.4.4b",
      "features": [
          "1.assembly_parser.py: fix a bug for disentangling single-contig graph; remove redundant 'repeat_pattern';",

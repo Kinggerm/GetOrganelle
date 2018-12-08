@@ -21,8 +21,8 @@ def get_options(print_title):
                            "produced by slim_fastg.py.")
     parser.add_option("-o", dest="output_directory",
                       help="output directory.")
-    parser.add_option("-m", dest="mode", default="cp",
-                      help="organelle mode: cp, mt, or nt. Default:%default")
+    parser.add_option("-m", dest="mode", default="plant_cp",
+                      help="organelle mode: plant_cp, plant_mt, or plant_nr. Default:%default")
     parser.add_option("--acyclic-allowed", dest="acyclic_allowed", default=False, action="store_true",
                       help="By default, this script would only disentangle the circular graph (the complete circular "
                            "organelle genome), and would directly give up linear/broken graphs). Choose this option "
@@ -86,7 +86,7 @@ def main():
     options, log = get_options(print_title)
 
     @set_time_limit(options.time_limit)
-    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="cp",
+    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="plant_cp",
                                       log_hard_cov_threshold=10.,
                                       contamination_depth=5., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,

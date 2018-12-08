@@ -163,7 +163,7 @@ MEM_TRANS = {"K": 1000, "M": 1000000, "G":1000000000}
 class LogInfo:
     def __init__(self, sample_out_dir, prefix=""):
         self.header = ["sample", "fastq_format", "mean_error_rate", "trim_percent", "trim_int", "trim_chars",
-                       "mean_read_len", "max_read_len", "estimated_cp_base_coverage",
+                       "mean_read_len", "max_read_len", "estimated_base_coverage",
                        "w", "k", "pre_w", "mem_dup", "mem_used", "n_candidates", "n_reads", "n_bases", "dup_used",
                        "mem_group", "rounds", "accepted_lines", "accepted_words", "mem_extending", "circular",
                        "degenerate_base_used", "library_size", "library_deviation", "library_left", "library_right",
@@ -203,8 +203,8 @@ class LogInfo:
                         if " - INFO: " in line and line[:4].isdigit():
                             time_point, detail_record = line.strip().split(" - INFO:")
                             detail_record = detail_record.strip()
-                            if detail_record.startswith("Estimated cp base-coverage = "):
-                                this_record["estimated_cp_base_coverage"] = detail_record.split("coverage = ")[-1]
+                            if detail_record.startswith("Estimated ") and "base-coverage = " in detail_record:
+                                this_record["estimated_base_coverage"] = detail_record.split("coverage = ")[-1]
                             elif detail_record.startswith("Setting '-w "):
                                 this_record["w"] = detail_record.split("-w ")[-1][:-1]
                             elif detail_record.startswith("Setting '-k "):

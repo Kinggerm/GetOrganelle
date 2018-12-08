@@ -103,9 +103,9 @@ Take your input reference (fasta or bowtie index; the default is `Library/SeqRef
 
 <b>Producing Result</b>
 
-By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+cp-mt.fastg` if -F cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend+cp-mt.csv`). 
+By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` if -F plant_cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend+plant_cp-plant_mt.csv`). 
 
-The `assembly_graph.fastg.extend+cp-mt.fastg` file along with the `assembly_graph.fastg.extend+cp-mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path, you have to manually view `assembly_graph.fastg.extend+cp-mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
+The `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` file along with the `assembly_graph.fastg.extend+plant_cp-plant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
 [Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
 
 
@@ -126,15 +126,22 @@ or in a slow and memory-economic way:
 
 For 2G raw data, 150 bp reads, to assembly mitochondria
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output -R 50 -k 65,75,85,95,105 -P 1000000 -F mt 
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output -R 50 -k 65,75,85,95,105 -P 1000000 -F plant_mt 
     
 For 2G raw data, 150 bp reads, to assembly nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -o nr_output -R 7 -k 95,105,115 -P 0 -F nr
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -o nr_output -R 7 -k 95,105,115 -P 0 -F plant_nr
 
 See the detailed illustrations of those arguments by typing in:
 
+    get_organelle_reads.py -h
+    
+or see verbose illustrations:
+    
     get_organelle_reads.py --help
+
+Also see [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) for a benchmark test of `GetOrganelle` and `NOVOPlasty` using 50 online samples.
+
 
 ## Published Works Using GetOrganelle
 

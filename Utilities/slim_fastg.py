@@ -45,21 +45,22 @@ def require_commands():
     if makeblastdb_in_path[0] == 32512:
         sys.stdout.write('\nError: makeblastdb not in the path!')
         exit()
-    usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -F cp')
+    usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -F plant_cp')
     parser = OptionParser(usage=usage)
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters
-    parser.add_option('-F', dest='builtin_mode', default='cp',
-                      help='followed with mode cp, mt, nr (which means chloroplast, mitochondria, nrDNA'
+    parser.add_option('-F', dest='builtin_mode', default='plant_cp',
+                      help='followed with mode plant_cp, plant_mt, plant_nr (which means plant '
+                           'chloroplast, mitochondria, nrDNA '
                            'separately; corresponding to certain arguments as following listed). '
                            'Modify the arguments activated by this flag with your more custom options.'
                            '\t'
                            ' ------------------------------------------------------ '
-                           '\ncp \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')+'"'
+                           '\nplant_cp \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')+'"'
                            ' ------------------------------------------------------ '
-                           '\nmt \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')+'"'
+                           '\nplant_mt \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')+'"'
                            ' ------------------------------------------------------ '
-                           '\nnr \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'nr')+'"'
+                           '\nplant_nr \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_nr')+'"'
                            ' ------------------------------------------------------ ')
     parser.add_option('--no-hits', dest='treat_no_hits', default='ex_no_con',
                       help='Provide treatment for non-hitting contigs.\t'
@@ -138,14 +139,14 @@ def require_commands():
             if ex_chosen == 1 and in_chosen == 0 and (options.treat_no_hits in {"ex_no_con", "ex_no_hit"}):
                 sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
                 exit()
-        elif options.builtin_mode == 'cp':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')
-            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')
-        elif options.builtin_mode == 'mt':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'mt')
-            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'cp')
-        elif options.builtin_mode == 'nr':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'nr')
+        elif options.builtin_mode == 'plant_cp':
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')
+            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')
+        elif options.builtin_mode == 'plant_mt':
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')
+            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')
+        elif options.builtin_mode == 'plant_nr':
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_nr')
         else:
             sys.stdout.write('\n\nOption Error: illegal value for builtin mode!\n')
             exit()

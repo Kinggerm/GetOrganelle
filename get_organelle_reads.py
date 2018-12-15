@@ -701,7 +701,7 @@ def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, orig
                 exit()
         base_cov_values = get_cover_range(all_coverages, guessing_percent=0.07)  # top 0.07 from mapped reads
         log.info("Estimated " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
-        if base_cov_values[0] < 50 and organelle_type in {"animal_mt", "fungus_mt", "anonym"}:
+        if base_cov_values[0] < 100 and organelle_type in {"animal_mt", "fungus_mt", "anonym"}:
             log.info("Re-estimating " + organelle_type + " base-coverage using word frequency counting ...")
             counting_word_size = min(49, 2 * int(mean_read_len * 0.35) - 1)
             smp_percent = min(1., max(0.2, 2E7/all_bases))  # at least 20M raw data should be used

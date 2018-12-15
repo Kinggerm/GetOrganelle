@@ -485,6 +485,10 @@ class Assembly:
             max_majority_cov = 4
         elif mode == "plant_nr":
             max_majority_cov = 1
+        elif mode == "animal_mt":
+            max_majority_cov = 8
+        elif mode == "fungus_mt":
+            max_majority_cov = 20
         elif mode == "all":
             max_majority_cov = 100
         else:
@@ -1309,7 +1313,8 @@ class Assembly:
                           max_copy=8, min_sigma_factor=0.1,
                           log_hard_cov_threshold=10., contamination_depth=5., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
-                          broken_graph_allowed=False, temp_graph=None, verbose=True, read_len_for_log=None,
+                          broken_graph_allowed=False, temp_graph=None, verbose=True,
+                          read_len_for_log=None, kmer_for_log=None,
                           log_handler=None, debug=False):
 
         def log_target_res(final_res_combinations_inside):
@@ -1317,8 +1322,8 @@ class Assembly:
             for go_res, final_res_one in enumerate(final_res_combinations_inside):
                 this_graph = final_res_combinations_inside[go_res]["graph"]
                 this_k_cov = round(final_res_combinations_inside[go_res]["cov"], 3)
-                if read_len_for_log:
-                    this_b_cov = round(this_k_cov * read_len_for_log / (read_len_for_log - self.__kmer + 1), 3)
+                if read_len_for_log and kmer_for_log:
+                    this_b_cov = round(this_k_cov * read_len_for_log / (read_len_for_log - kmer_for_log + 1), 3)
                 else:
                     this_b_cov = None
                 if log_handler:

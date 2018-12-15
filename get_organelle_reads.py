@@ -6,47 +6,46 @@ import os
 from copy import deepcopy
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from Library.pipe_control_func import *
 from Library.seq_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-not_ref_path = os.path.join(path_of_this_script, "Library", "NotationReference")
-seq_ref_path = os.path.join(path_of_this_script, "Library", "SeqReference")
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+NOT_REF_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Library", "NotationReference")
+SEQ_REF_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Library", "SeqReference")
 import time
 
 
-major_version, minor_version = sys.version_info[:2]
-if major_version == 2 and minor_version >= 7:
-    python_version = "2.7+"
-elif major_version == 3 and minor_version >= 5:
-    python_version = "3.5+"
+MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
+if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
+    PYTHON_VERSION = "2.7+"
+elif MAJOR_VERSION == 3 and MINOR_VERSION >= 5:
+    PYTHON_VERSION = "3.5+"
 else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
 
-if python_version == "2.7+":
+if PYTHON_VERSION == "2.7+":
     from commands import getstatusoutput
 else:
     from subprocess import getstatusoutput
 import subprocess
 
-dead_code = {"2.7+": 32512, "3.5+": 127}[python_version]
-word_size = 0
-max_ratio_rl_ws = 0.75
-global_min_ws = 49
+DEAD_CODE = {"2.7+": 32512, "3.5+": 127}[PYTHON_VERSION]
+MAX_RATIO_RL_WS = 0.75
+GLOBAL_MIN_WS = 49
 
 
 def get_options(descriptions, version):
     version = version
     usage = "\n###  Plant Plastome, Normal, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o plastome_output " \
-            " -R 15 -k 75,85,95,105\n" \
+            " -R 15 -k 75,85,95,105 -F plant_cp\n" \
             "###  Plant Mitochondria\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output " \
             " -R 30 -k 65,75,85,95,105 -F plant_mt\n" \
             "###  Plant Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -o nr_output " \
+            " -1 sample_1.fq -2 sample_2.fq -o nr_output " \
             " -R 7 -k 95,105,115 -P 0 -F plant_nr"
     parser = OptionParser(usage=usage, version=version, description=descriptions, add_help_option=False)
     # group 1
@@ -59,12 +58,14 @@ def get_options(descriptions, version):
                            help="Input file(s) with unpaired (single-end) reads to be added to the pool. "
                                 "files could be comma-separated lists such as 'seq1,seq2'.")
     group_inout.add_option("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
-    group_inout.add_option("-s", dest="seed_file", default=os.path.join(seq_ref_path, "*.fasta"),
-                           help="Reference. Input fasta format file as initial seed or input bowtie index base name "
-                                "as pre-seed (see flag '--bs'). "
+    group_inout.add_option("-s", dest="seed_file", default=os.path.join(SEQ_REF_PATH, "*.fasta"),
+                           help="Reference. Input fasta format file as initial seed. "
+                                "A reference sequence in GetOrganelle is only used for identifying initial "
+                                "organelle reads. The assembly process is purely de novo."
                                 "Default: '%default' (* depends on the value followed with flag '-F')")
     group_inout.add_option("-a", dest="anti_seed",
-                           help="Anti-reference. Input fasta format file as anti-seed, where the extension process "
+                           help="Anti-reference. Not suggested unless what you really know what you are doing. "
+                                "Input fasta format file as anti-seed, where the extension process "
                                 "stop. Typically serves as excluding chloroplast reads when extending mitochondrial "
                                 "reads, or the other way around. You should be cautious about using this option, "
                                 "because if the anti-seed includes some word in the target but not in the seed, "
@@ -72,7 +73,8 @@ def get_options(descriptions, version):
                                 "plant-species as seed and anti-seed.")
     group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
                            help="Maximum number of reads to be used per file. "
-                                "Default: 1.5E7 (-F plant_cp,plant_nr) or 7.5E7 (-F plant_mt)")
+                                "Default: 1.5E7 (-F plant_cp/plant_nr/animal_mt/fungus_mt) "
+                                "or 7.5E7 (-F plant_mt/anonym)")
     group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
                                 "Default: %default")
@@ -88,9 +90,13 @@ def get_options(descriptions, version):
                            help="Choose to keep the running temp/index files.")
     # group 2
     group_scheme = OptionGroup(parser, "SCHEME OPTIONS", "Options on running schemes.")
-    group_scheme.add_option("-F", dest="organelle_type", default="plant_cp",
+    group_scheme.add_option("-F", dest="organelle_type",
                             help="This flag should be followed with plant_cp (chloroplast), plant_mt "
-                                 "(mitochondria), plant_nr (nuclear ribosomal RNA). Default: %default. ")
+                                 "(plant mitochondrion), plant_nr (plant nuclear ribosomal RNA), animal_mt "
+                                 "(animal mitochondrion), fungus_mt (fungus mitochondrion), "
+                                 "or anonym (uncertain organelle genome type, with customized gene database "
+                                 "('--genes'), which is suggested only when the above database is genetically distant "
+                                 "from your sample).")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
                             help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
                                  "--max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
@@ -134,15 +140,16 @@ def get_options(descriptions, version):
                                     "a certain value during pregrouping process and later changed during reads "
                                     "extending process. Similar to word size. Default: auto-estimated.")
     group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=100,
-                               help="Maximum number of running rounds (>=3). Default: %default.")
+                               help="Maximum number of running rounds (>=2). Default: %default.")
     group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
-                               help="Minimum number of running rounds (>=3). If 'auto_word_size_step' is enabled "
+                               help="Minimum number of running rounds (>=1). If 'auto_word_size_step' is enabled "
                                     "(see '--auto-wss' for more) and extending stopped before finishing the designed "
                                     "minimum rounds, automatically restart extending with a smaller word size. "
                                     "Default: %default")
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
-                                    "Default: 4E8 (-F plant_cp), 8E7 (-F plant_nr) or 2E9 (-F plant_mt)")
+                                    "Default: 4E8 (-F plant_cp), 8E7 (-F plant_nr/animal_mt/fungus_mt), "
+                                    "2E9 (-F plant_mt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=3,
                                help="The wide of steps of checking words in reads during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
@@ -164,8 +171,11 @@ def get_options(descriptions, version):
                                     "to acquire the initial seed. This requires bowtie2 to be installed "
                                     "(and thus Linux/Unix only). It is suggested to keep mapping as default "
                                     "when the seed is too diverse from target.")
-    group_scheme.add_option("--no-pre-reading", dest="pre_reading", default=True, action="store_false",
-                            help="No pre-reading the read characteristics, nor estimating parameters (including '-w').")
+    group_extending.add_option("--bowtie2-options", dest="bowtie2_options", default="--very-fast -t",
+                               help="Bowtie2 options, such as '--ma 3 --mp 5,2 --very-fast -t'. Default: %default.")
+    group_extending.add_option("--rough-pre-reading", dest="pre_reading", default=True, action="store_false",
+                               help="Roughly pre-reading the read characteristics, in which case a user-defined "
+                                    "word size should be given. Default: Fa")
     group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=0, type=int,
                                help="The step of word size adjustment during extending process."
                                     "Use 0 to disable this automatic adjustment (NOT suggested). Default: %default.")
@@ -176,12 +186,13 @@ def get_options(descriptions, version):
                                     "graph. Suggested when the data is good with high and homogenous coverage.")
     group_extending.add_option("--soft-max-words", dest="soft_max_words", type=float, default=8E7,
                                help="Maximum number of words to be used to test the fitness of a word size value."
-                                    "Default: 8E7 (-F plant_cp), 1.6E7 (-F plant_nr) or 4E8 (-F plant_mt)")
+                                    "Default: 8E7 (-F plant_cp), 1.6E7 (-F plant_nr/animal_mt/fungus_mt), "
+                                    "4E8 (-F plant_mt)")
     group_extending.add_option("--target-genome-size", dest="target_genome_size", default=130000, type=int,
-                               help="Hypothetical value of target genome single copy region size for estimating "
-                                    "word size when '--no-bowtie2' is chosen and no '-w word_size' is given. "
-                                    "Default: 130000 (-F plant_cp) or 290000 (-F plant_mt) or "
-                                    "13000 (-F plant_nr) ")
+                               help="Hypothetical value of target genome size. This is only used for estimating "
+                                    "word size when no '-w word_size' is given. No need to be precise."
+                                    "Default: 130000 (-F plant_cp) or 390000 (-F plant_mt/anonym) or "
+                                    "65000 (-F fungus_mt) or 13000 (-F plant_nr/animal_mt) ")
     # group 4
     group_assembly = OptionGroup(parser, "ASSEMBLY OPTIONS", "These options are about the assembly and "
                                                              "graph disentangling")
@@ -196,11 +207,18 @@ def get_options(descriptions, version):
                               help="Disable SPAdes.")
     group_assembly.add_option("--no-gradient-k", dest="auto_gradient_k", action="store_false", default=True,
                               help="Disable adding an extra set of kmer values according to word size.")
+    group_assembly.add_option("--genes", dest="genes_fasta",
+                              help="Customized database (fasta format) containing ONE set of protein coding genes "
+                                   "and ribosomal RNAs from ONE reference genome. "
+                                   "This database is only used for identifying/tagging target organelle contigs, "
+                                   "while the gene order of output, meaning the scaffolding/disentangling process "
+                                   "is purely decided by the topology of de Bruijn graph and the coverage info. "
+                                   "Used when '-F anonym'.")
     group_assembly.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
                               help="Depth factor for differentiate genome type of contigs. "
                                    "The genome type of contigs are determined by blast. "
                                    "You can also make the blast index by your self and add those index to '" +
-                                   not_ref_path + "'. Default: %default")
+                                   NOT_REF_PATH + "'. Default: %default")
     group_assembly.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
                               help="Depth factor for confirming contamination in parallel contigs. Default: %default")
     group_assembly.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
@@ -260,9 +278,10 @@ def get_options(descriptions, version):
         for not_often_used in ("-a", "--max-reads", "--max-ignore-percent",
                                "--min-quality-score", "--prefix", "--out-per-round", "--keep-temp",
                                "--memory-save", "--memory-unlimited", "--pre-w", "-r", "--max-n-words",
-                               "-J", "-M", "--no-bowtie2", "--no-pre-reading", "--auto-wss", "--larger-auto-ws",
+                               "-J", "-M", "--no-bowtie2", "--bowtie2-options", "--rough-pre-reading",
+                               "--auto-wss", "--larger-auto-ws",
                                "--soft-max-words", "--target-genome-size", "--spades-options", "--no-spades",
-                               "--no-gradient-k", "--disentangle-df", "--contamination-depth",
+                               "--no-gradient-k", "--genes", "--disentangle-df", "--contamination-depth",
                                "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
                                "--continue", "--index-in-memory",
@@ -278,14 +297,15 @@ def get_options(descriptions, version):
         parser.add_option("-o", dest="output_base", help="Output directory.")
         parser.remove_option("-s")
         parser.add_option("-s", dest="seed_file", help="Reference. Input fasta format file as initial seed. "
-                                                       "Default: " + os.path.join(seq_ref_path, "*.fasta"))
+                                                       "Default: " + os.path.join(SEQ_REF_PATH, "*.fasta"))
         parser.remove_option("-w")
         parser.add_option("-w", dest="word_size", help="Word size (W) for extension. Default: auto-estimated")
         parser.remove_option("-R")
-        parser.add_option("-R", dest="max_rounds", help="Maximum running rounds (>=3). Default: unlimited")
+        parser.add_option("-R", dest="max_rounds", help="Maximum running rounds (>=2). Default: unlimited")
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type", default="plant_cp",
-                          help="Target organelle genome type: plant_cp/plant_mt/plant_nr. Default: %default")
+                          help="Target organelle genome type: "
+                               "plant_cp/plant_mt/plant_nr/animal_mt/fungus_mt/anonym. Default: %default")
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
@@ -320,7 +340,7 @@ def get_options(descriptions, version):
     else:
         if not (options.seed_file # or options.bowtie2_seed)
                 and ((options.fq_file_1 and options.fq_file_2) or options.unpaired_fq_files)
-                and options.output_base):
+                and options.output_base and options.organelle_type):
             sys.stdout.write("\n############################################################################"
                              "\nERROR: Insufficient arguments!\nUsage:")
             sys.stdout.write(usage + "\n\n")
@@ -329,11 +349,26 @@ def get_options(descriptions, version):
             sys.stdout.write("\n############################################################################"
                              "\nERROR: unbalanced paired reads!\n\n")
             exit()
-        if options.organelle_type not in {"plant_cp", "plant_mt", "plant_nr"}:
+        if options.organelle_type not in {"plant_cp", "plant_mt", "plant_nr", "animal_mt", "fungus_mt", "anonym"}:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: \"-F\" MUST be one of 'plant_cp', 'plant_mt', 'plant_nr'!")
+                             "\nERROR: \"-F\" MUST be one of 'plant_cp', 'plant_mt', 'plant_nr', "
+                             "'animal_mt', 'fungus_mt', 'anonym'!\n\n")
         if "*" in options.seed_file:
-            options.seed_file = options.seed_file.replace("*", options.organelle_type)
+            if options.organelle_type == "anonym":
+                sys.stdout.write("\n############################################################################"
+                                 "\nERROR: \"-s\" and \"--genes\" must be specified when \"-F anonym\"!\n\n")
+                exit()
+            elif options.organelle_type == "animal_mt":
+                sys.stdout.write("\n############################################################################"
+                                 "\nERROR: Currently \"-s\" and \"--genes\" must be specified when "
+                                 "\"-F animal_mt\"!\n\n")
+                exit()
+            else:
+                options.seed_file = options.seed_file.replace("*", options.organelle_type)
+        if options.organelle_type in {"anonym", "animal_mt"} and not options.genes_fasta:
+            sys.stdout.write("\n############################################################################"
+                             "\nERROR: \"-s\" and \"--genes\" must be specified when \"-F anonym\"!\n\n")
+            exit()
         for check_file in (options.fq_file_1, options.fq_file_2, options.seed_file, options.anti_seed):
             if check_file:
                 if not os.path.exists(check_file):
@@ -391,7 +426,7 @@ def get_options(descriptions, version):
             pass
         elif 0 < options.word_size < 1:
             pass
-        elif options.word_size >= global_min_ws:
+        elif options.word_size >= GLOBAL_MIN_WS:
             options.word_size = int(options.word_size)
         else:
             log.error("Illegal word size (\"-w\") value!")
@@ -400,7 +435,7 @@ def get_options(descriptions, version):
         if options.pregroup_word_size:
             if 0 < options.pregroup_word_size < 1:
                 pass
-            elif options.pregroup_word_size >= global_min_ws:
+            elif options.pregroup_word_size >= GLOBAL_MIN_WS:
                 options.pregroup_word_size = int(options.pregroup_word_size)
             else:
                 log.error("Illegal word size (\"--pre-w\") value!")
@@ -445,8 +480,6 @@ def get_options(descriptions, version):
             options.auto_gradient_k = False
             if "--disentangle-time-limit" not in sys.argv:
                 options.disentangle_time_limit = 180
-            # if "--no-pre-reading" not in sys.argv:
-            #     options.pre_reading = False
 
         if options.memory_save:
             if "-P" not in sys.argv:
@@ -465,36 +498,49 @@ def get_options(descriptions, version):
                 options.maximum_ignore_percent = 0
         
         options.auto_word_size_step = abs(options.auto_word_size_step)
+
+        if options.organelle_type in ("animal_mt", "fungus_mt"):
+            log.warning("Currently GetOrganelle had been tested on limited animal & fungus samples!")
+            log.warning("The default references for animal & fungus are for temporary usage!")
+            log.warning("No guarantee for success rate in animal & fungus samples!")
+            if options.organelle_type == "fungus_mt":
+                log.warning("Too improve this, a customized close-related reference (-s reference.fasta) with its "
+                            "protein coding & ribosomal genes extracted (--genes reference.genes.fasta) is "
+                            "highly suggested for your own animal & fungus samples!\n")
+
         # using the default
         if "--max-reads" not in sys.argv:
-            if options.organelle_type == "mt":
+            if options.organelle_type == ("plant_mt", "anonym"):
                 options.maximum_n_reads *= 5
         if "--max-n-words" not in sys.argv:
-            if options.organelle_type == "mt":
+            if options.organelle_type in ("plant_mt", "anonym"):
                 options.maximum_n_words *= 5
-            elif options.organelle_type == "nr":
+            elif options.organelle_type in ("plant_nr", "animal_mt", "fungus_mt"):
                 options.maximum_n_words /= 5
         if "--soft-max-words" not in sys.argv:
-            if options.organelle_type == "mt":
+            if options.organelle_type in ("plant_mt", "anonym"):
                 options.soft_max_words *= 5
-            elif options.organelle_type == "nr":
+            elif options.organelle_type in ("plant_nr", "animal_mt", "fungus_mt"):
                 options.soft_max_words /= 5
         if "--target-genome-size" not in sys.argv:
-            if options.organelle_type == "mt":
+            if options.organelle_type == "plant_mt":
                 options.target_genome_size *= 3
-            elif options.organelle_type == "nr":
+            elif options.organelle_type == "fungus_mt":
+                options.target_genome_size /= 2.
+            elif options.organelle_type in ("plant_nr", "animal_mt"):
                 options.target_genome_size /= 10.
+            elif options.organelle_type == "anonym":
+                ref_seqs = read_fasta(options.genes_fasta)[1]
+                options.target_genome_size = 2 * sum([len(this_seq) for this_seq in ref_seqs])
+                log.info("Setting '--target-genome-size " + str(options.target_genome_size) +
+                         "' for estimating the word size value.")
+        if options.organelle_type in ("fungus_mt", "anonym"):
+            global MAX_RATIO_RL_WS
+            MAX_RATIO_RL_WS = 0.8
 
-        # if options.seed_file and options.bowtie2_seed:
-        #     log.error('Simultaneously using "-s" and "--bs" is not allowed!')
-        #     exit()
-        # if options.anti_seed and options.bowtie2_anti_seed:
-        #     log.error('Simultaneously using "-a" and "--as" is not allowed!')
-        #     exit()
-        # if options.bowtie2_seed or options.bowtie2_anti_seed:
-        #     options.utilize_mapping = True
         if not options.pre_reading and not options.word_size:
-            log.error("When '--no-pre-reading' was chosen, a user defined word size value ('-w') must be given!")
+            log.error("When '--rough-pre-reading' was chosen, a user defined word size value ('-w') must be given!")
+            exit()
         if options.utilize_mapping:
             if not executable("bowtie2"):
                 options.utilize_mapping = False
@@ -533,17 +579,21 @@ def get_options(descriptions, version):
             if not executable("spades.py -h"):
                 log.warning("spades.py not found in the path. Only get the reads and skip assembly.")
                 options.run_spades = False
+            if not executable("blastn"):
+                log.warning("blastn not found in the path!")
+            if options.organelle_type == "anonym" and not executable("makeblastdb"):
+                log.warning("makeblastdb not found in the path!")
         options.rm_duplicates = int(options.rm_duplicates)
         options.pre_grouped = int(options.pre_grouped)
         if not options.rm_duplicates and options.pre_grouped:
             log.warning("removing duplicates was inactive, so that the pre-grouping was disabled.")
             options.pre_grouped = False
-        if options.min_rounds < 3:
-            log.warning("illegal minimum rounds! Been set to default: 3.")
-            options.min_rounds = 3
-        if options.max_rounds and options.max_rounds < 3:
-            log.warning("illegal maximum rounds! Been set to default: unlimited.")
-            options.max_rounds = None
+        if options.min_rounds < 1:
+            log.warning("illegal minimum rounds! Set to default: 1.")
+            options.min_rounds = 1
+        if options.max_rounds and options.max_rounds < 2:
+            log.warning("illegal maximum rounds! Set to minimum: 2")
+            options.max_rounds = 2
         return options, log, previous_attributes
 
 
@@ -574,7 +624,7 @@ def trans_word_cov(word_cov, base_cov, mean_base_error_rate, read_length):
 
 
 def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rate=0.015, log=None,
-                       max_discontinuous_prob=0.01, min_word_size=global_min_ws, max_effective_word_cov=60,
+                       max_discontinuous_prob=0.01, min_word_size=GLOBAL_MIN_WS, max_effective_word_cov=60,
                        wc_bc_ratio_constant=0.35):
     echo_problem = False
     all_word_sizes = []
@@ -604,7 +654,7 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
         word_cov = trans_word_cov(word_cov, base_cov, mean_error_rate / 2., read_length)
         # 1. relationship between kmer coverage and base coverage, k_cov = base_cov * (read_len - k_len + 1) / read_len
         estimated_word_size = int(read_length * (1 - word_cov / base_cov)) + 1
-        estimated_word_size = min(int(read_length * max_ratio_rl_ws), max(min_word_size, estimated_word_size))
+        estimated_word_size = min(int(read_length * MAX_RATIO_RL_WS), max(min_word_size, estimated_word_size))
         all_word_sizes.append(int(round(estimated_word_size, 0)))
     if echo_problem:
         if log:
@@ -619,9 +669,9 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
 def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log):
     if word_size_ratio < 1:
         new_word_size = int(round(word_size_ratio * mean_read_len, 0))
-        if new_word_size < global_min_ws:
-            new_word_size = global_min_ws
-            log.warning("Too small ratio " + str(new_word_size) + ", setting '-w " + str(global_min_ws) + "'")
+        if new_word_size < GLOBAL_MIN_WS:
+            new_word_size = GLOBAL_MIN_WS
+            log.warning("Too small ratio " + str(new_word_size) + ", setting '-w " + str(GLOBAL_MIN_WS) + "'")
         else:
             log.info("Setting '-w " + str(new_word_size) + "'")
         return new_word_size
@@ -634,13 +684,45 @@ def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log):
         return word_size_ratio
 
 
-def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_word_size_step, mean_error_rate,
+def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, original_fq_files,
+                     organelle_type, all_bases, auto_word_size_step, mean_error_rate,
                      target_genome_size, mean_read_len, max_read_len, low_quality_pattern,
                      log, wc_bc_ratio_constant=0.35, larger_auto_ws=False):
-    global word_size
     if utilize_mapping:
-        base_cov_values = get_query_cover(get_coverage_from_sam(os.path.join(out_base, "seed_bowtie.sam")))
+        coverage_info = get_coverage_from_sam(os.path.join(out_base, "seed_bowtie.sam"))
+        all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]
+                         if coverage_info[ref][pos] > 2]
+        if not all_coverages:
+            all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]]
+            if not all_coverages:
+                if log:
+                    log.error("No seed reads found!")
+                    log.error("Please check your raw data or change your reference!")
+                exit()
+        base_cov_values = get_cover_range(all_coverages, guessing_percent=0.07)  # top 0.07 from mapped reads
         log.info("Estimated " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
+        if base_cov_values[0] < 50 and organelle_type in {"animal_mt", "fungus_mt", "anonym"}:
+            log.info("Re-estimating " + organelle_type + " base-coverage using word frequency counting ...")
+            counting_word_size = min(49, 2 * int(mean_read_len * 0.35) - 1)
+            smp_percent = min(1., max(0.2, 2E7/all_bases))  # at least 20M raw data should be used
+            words_dict = chop_seqs_as_empty_dict(
+                fq_seq_simple_generator(os.path.join(out_base, "Initial.mapped.fq")), word_size=counting_word_size)
+            counting_words(fq_seq_simple_generator(original_fq_files,
+                                                   max_n_reads=all_bases/mean_read_len * smp_percent),
+                           words_initial_dict=words_dict, word_size=counting_word_size)
+            all_word_coverages = []
+            for this_word in list(words_dict):
+                if this_word in words_dict:
+                    reverse_word = complementary_seq(this_word)
+                    if reverse_word == this_word:
+                        all_word_coverages.append(words_dict.pop(this_word))
+                    else:
+                        all_word_coverages.append(words_dict.pop(this_word) + words_dict.pop(reverse_word))
+            word_cov_values = get_cover_range(all_word_coverages, guessing_percent=0.5)  # mean from kmer counting
+            base_cov_values = [round(this_word_cov * mean_read_len / (mean_read_len - counting_word_size + 1)
+                                     / smp_percent, 2)
+                               for this_word_cov in word_cov_values]
+            log.info("Estimated " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
     else:
         organelle_base_percent = 0.05
         guessing_base_cov = organelle_base_percent * all_bases / target_genome_size
@@ -656,7 +738,7 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
             # standard dev
             min_word_size, word_size, max_word_size = estimate_word_size(
                 base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
-                max_discontinuous_prob=0.01, min_word_size=global_min_ws,
+                max_discontinuous_prob=0.01, min_word_size=GLOBAL_MIN_WS,
                 mean_error_rate=mean_error_rate, log=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
         log.info("Setting '-w " + str(word_size) + "'")
         log.info("The automatically-estimated word size does not ensure the best choice.")
@@ -664,17 +746,17 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
         log.info("you could adjust the word size for another new run.")
     elif word_size < 1:
         new_word_size = int(round(word_size * mean_read_len, 0))
-        if new_word_size < global_min_ws:
-            word_size = global_min_ws
-            log.warning("Too small ratio " + str(word_size) + ", setting '-w " + str(global_min_ws) + "'")
+        if new_word_size < GLOBAL_MIN_WS:
+            word_size = GLOBAL_MIN_WS
+            log.warning("Too small ratio " + str(word_size) + ", setting '-w " + str(GLOBAL_MIN_WS) + "'")
         else:
             word_size = new_word_size
             log.info("Setting '-w " + str(word_size) + "'")
-        min_word_size = max(global_min_ws, word_size - auto_word_size_step * 4)
-        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_ws))
+        min_word_size = max(GLOBAL_MIN_WS, word_size - auto_word_size_step * 4)
+        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * MAX_RATIO_RL_WS))
     else:
-        min_word_size = max(global_min_ws, word_size - auto_word_size_step * 4)
-        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * max_ratio_rl_ws))
+        min_word_size = max(GLOBAL_MIN_WS, word_size - auto_word_size_step * 4)
+        max_word_size = min(word_size + auto_word_size_step * 4, int(mean_read_len * MAX_RATIO_RL_WS))
     # arbitrarily adjust word size range
     if not auto_word_size_step:
         min_word_size = max_word_size = word_size
@@ -685,7 +767,6 @@ def check_parameters(out_base, utilize_mapping, organelle_type, all_bases, auto_
         keep_seq_parts = True
     else:
         keep_seq_parts = False
-
     return min_word_size, word_size, max_word_size, keep_seq_parts
 
 
@@ -716,7 +797,7 @@ def check_kmers(kmer_str, auto_gradient_k, word_s, max_r_len, log):
 
 # test whether an external binary is executable
 def executable(test_this):
-    return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != dead_code else False
+    return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != DEAD_CODE else False
 
 
 try:
@@ -725,35 +806,6 @@ except ImportError:
     this_process = None
 else:
     this_process = psutil.Process(os.getpid())
-
-
-def chop_seqs(seq_generator_or_list):
-    return_words = set()
-    for seed in seq_generator_or_list:
-        this_seq_len = len(seed)
-        if this_seq_len >= word_size:
-            cpt_seed = complementary_seq(seed)
-            for i in range(0, this_seq_len - word_size + 1):
-                forward = seed[i:i + word_size]
-                return_words.add(forward)
-                reverse = cpt_seed[i:i + word_size]
-                return_words.add(reverse)
-    return return_words
-
-
-def chop_seq_list(seq_generator_or_list):
-    return_words = set()
-    for seed in seq_generator_or_list:
-        for seq_part in seed:
-            this_seq_len = len(seq_part)
-            if this_seq_len >= word_size:
-                cpt_seed = complementary_seq(seq_part)
-                for i in range(0, this_seq_len - word_size + 1):
-                    forward = seq_part[i:i + word_size]
-                    return_words.add(forward)
-                    reverse = cpt_seed[i:i + word_size]
-                    return_words.add(reverse)
-    return return_words
 
 
 def get_read_len_mean_max_count(fq_files, maximum_n_reads, sampling_percent=1.):
@@ -801,7 +853,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
             if quality_str:
                 log.info("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + os.path.basename(fq_f)
                          + ", only top " + str(int(maximum_n_reads))
-                         + " reads are used in downstream analysis (suggested, ).")
+                         + " reads are used in downstream analysis.")
                 record_fq_beyond_read_num_limit[-1] = True
             break
     all_quality_chars = "".join(all_quality_chars_list)
@@ -923,7 +975,7 @@ def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2
 
 
 def make_read_index(original_fq_files, direction_according_to_user_input, maximum_n_reads, rm_duplicates, output_base,
-                    anti_lines, pre_grouped, index_in_memory, anti_seed, keep_seq_parts,
+                    word_size, anti_lines, pre_grouped, index_in_memory, anti_seed, keep_seq_parts,
                     low_quality, echo_frequency, resume, log):
     # read original reads
     # line_cluster (list) ~ forward_reverse_reads
@@ -1366,19 +1418,18 @@ class NoMoreReads(Exception):
         return repr(self.value)
 
 
-def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_grouped,
+def extending_reads(word_size, seed_file, seed_is_fq, original_fq_files, len_indices, pre_grouped,
                     groups_of_duplicate_lines, lines_with_duplicates, fq_info_in_memory, output_base,
                     max_rounds, min_rounds, fg_out_per_round, jump_step, mesh_size, verbose, resume,
                     maximum_n_reads, maximum_n_words,
                     auto_word_size_step, soft_max_n_words, max_word_size, min_word_size,
                     keep_seq_parts, low_quality_pattern, echo_frequency, log):
-    global word_size
     used_word_sizes = {word_size}
     temp_max_n_words = soft_max_n_words
     not_reasonable_word_size = True
 
     check_times = 1000
-    check_frequency = int(len_indices/check_times)
+    check_frequency = int(len_indices / check_times)
 
     while not_reasonable_word_size:
         # adding initial word
@@ -1386,11 +1437,12 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
         if seed_is_fq:
             if keep_seq_parts:
                 accepted_words = chop_seq_list(
-                    fq_seq_simple_generator(seed_file, split_pattern=low_quality_pattern, min_sub_seq=word_size))
+                    fq_seq_simple_generator(seed_file, split_pattern=low_quality_pattern, min_sub_seq=word_size),
+                    word_size)
             else:
-                accepted_words = chop_seqs(fq_seq_simple_generator(seed_file))
+                accepted_words = chop_seqs(fq_seq_simple_generator(seed_file), word_size)
         else:
-            accepted_words = chop_seqs(read_fasta(seed_file)[1])
+            accepted_words = chop_seqs(read_fasta(seed_file)[1], word_size)
         log.info("AW " + str(len(accepted_words)))
 
         accepted_contig_id = set()
@@ -1427,9 +1479,11 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                     # clear former accepted words from memory
                     del acc_words
                     # then add new accepted words into memory
-                    acc_words = chop_seqs(fq_seq_simple_generator(
-                        [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
-                         range(len(original_fq_files))], split_pattern=low_quality_pattern, min_sub_seq=word_size))
+                    acc_words = chop_seqs(
+                        fq_seq_simple_generator(
+                            [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
+                             range(len(original_fq_files))], split_pattern=low_quality_pattern, min_sub_seq=word_size),
+                        word_size)
                     acc_contig_id_this_round = set()
                 log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(
                     len_al) + " AW " + str(len_aw) + inside_memory_usage)
@@ -1442,7 +1496,7 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                     raise RoundLimitException(r_count)
                 r_count += 1
                 return acc_words, acc_contig_id_this_round, pre_aw, r_count, acc_num_words
-    
+
             def check_words_limit(inside_max_n_words):
                 if accumulated_num_words + len(accepted_words) - previous_aw_count > inside_max_n_words:
                     if inside_max_n_words == maximum_n_words:
@@ -1484,7 +1538,7 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
             while True:
                 if verbose:
                     log.info("Round " + str(round_count) + ": Start ...")
-    
+
                 if fq_info_in_memory:
                     reads_generator = (this_read for this_read in fq_info_in_memory[0])
                 else:
@@ -1559,8 +1613,9 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                                 else:
                                     if check_words_limit(temp_max_n_words):
                                         temp_max_n_words = maximum_n_words
-                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
-                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words \
+                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count,
+                                              round_count,
                                               accumulated_num_words, unique_read_id)
                     else:
                         for unique_read_id in range(len_indices):
@@ -1603,8 +1658,9 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                                 else:
                                     if check_words_limit(temp_max_n_words):
                                         temp_max_n_words = maximum_n_words
-                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
-                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words \
+                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count,
+                                              round_count,
                                               accumulated_num_words, unique_read_id)
                 else:
                     if pre_grouped and g_duplicate_lines:
@@ -1661,8 +1717,9 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                                 else:
                                     if check_words_limit(temp_max_n_words):
                                         temp_max_n_words = maximum_n_words
-                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
-                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words \
+                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count,
+                                              round_count,
                                               accumulated_num_words, unique_read_id)
                     else:
                         for unique_read_id in range(len_indices):
@@ -1699,16 +1756,18 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
                                 else:
                                     if check_words_limit(temp_max_n_words):
                                         temp_max_n_words = maximum_n_words
-                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words\
-                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count,
+                        accepted_words, accepted_contig_id_this_round, previous_aw_count, round_count, accumulated_num_words \
+                            = summarise_round(accepted_words, accepted_contig_id_this_round, previous_aw_count,
+                                              round_count,
                                               accumulated_num_words, unique_read_id)
                 reads_generator.close()
         except KeyboardInterrupt:
             reads_generator.close()
             sys.stdout.write(' ' * 100 + '\b' * 100)
             sys.stdout.flush()
-            log.info("Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
-                len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)))
+            log.info(
+                "Round " + str(round_count) + ': ' + str(unique_read_id + 1) + '/' + str(len_indices) + " AI " + str(
+                    len(accepted_contig_id_this_round)) + " AW " + str(len(accepted_words)))
             log.info("KeyboardInterrupt")
         except NoMoreReads:
             reads_generator.close()
@@ -1759,7 +1818,7 @@ def extending_reads(seed_file, seed_is_fq, original_fq_files, len_indices, pre_g
     return accepted_contig_id
 
 
-def get_anti_with_fas(anti_words, anti_input, original_fq_files, log):
+def get_anti_with_fas(word_size, anti_words, anti_input, original_fq_files, log):
     anti_lines = set()
     pre_reading = [open(fq_file, 'rU') for fq_file in original_fq_files]
     line_count = 0
@@ -1828,7 +1887,7 @@ def get_heads_from_sam(bowtie_sam_file):
 
 
 def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files, original_fq_beyond_read_limit,
-                         out_base, resume, verbose_log, threads, prefix, keep_temp, log):
+                         out_base, resume, verbose_log, threads, prefix, keep_temp, bowtie2_other_options, log):
     if os.path.exists(seed_file + '.index.1.bt2l'):
         log.info("Bowtie2 index existed!")
     else:
@@ -1865,9 +1924,9 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
         log.info("Initial seeds existed!")
     else:
         log.info("Mapping reads to seed - bowtie2 index ...")
-        this_command = "bowtie2 -p " + str(threads) + " --very-fast --al " + total_seed_fq[0] + \
+        this_command = "bowtie2 -p " + str(threads) + " " + bowtie2_other_options + " --al " + total_seed_fq[0] + \
                        " -x " + seed_index_base + " -U " + ",".join(query_fq_files) + " -S " + total_seed_sam[0] + \
-                       " --no-unal --no-hd --no-sq -t"
+                       " --no-unal --no-hd --no-sq"
         make_seed_bowtie2 = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         if verbose_log:
             log.info(this_command)
@@ -1914,8 +1973,8 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed - bowtie2 index ...")
-            this_command = "bowtie2 -p " + str(threads) + " --very-fast -x " + anti_index_base + " -U " +\
-                           ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + " --no-unal --no-hd --no-sq -t"
+            this_command = "bowtie2 -p " + str(threads) + " " + bowtie2_other_options + " -x " + anti_index_base + \
+                           " -U " + ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + " --no-unal --no-hd --no-sq"
             make_anti_seed_bowtie2 = subprocess.Popen(this_command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log:
@@ -1943,6 +2002,11 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
             if original_fq_beyond_read_limit[count_fq]:
                 os.remove(query_fq)
     seed_fq_size = os.path.getsize(total_seed_fq[1])
+    if not seed_fq_size:
+        if log:
+            log.error("No seed reads found!")
+            log.error("Please check your raw data or change your reference!")
+        exit()
     if seed_fq_size < 1024:
         log.info("Seed reads made: " + total_seed_fq[1] + " (" + str(int(seed_fq_size)) + " bytes)")
     elif 1024 * 1024 > seed_fq_size >= 1024:
@@ -2067,7 +2131,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         return True
 
 
-def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_threshold=0, resume=False):
+def slim_spades_result(scheme, custom_db, spades_output, verbose_log, log, threads, depth_threshold=0, resume=False):
     if not executable("blastn"):
         if log:
             log.warning('blastn not in the path! Skip slimming assembly result ...')
@@ -2085,18 +2149,24 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
                 return 0
     scheme_translation = {
         'plant_cp': ' --include-priority ' +
-                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_cp') + ' --exclude ' +
-                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_mt'),
+                    os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'plant_cp') + ' --exclude ' +
+                    os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'plant_mt'),
         'plant_mt': ' --include-priority ' +
-                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_mt') + ' --exclude ' +
-                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_cp'),
+                    os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'plant_mt') + ' --exclude ' +
+                    os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'plant_cp'),
         'plant_nr': ' --include-priority ' +
-                        os.path.join(path_of_this_script, 'Library', 'NotationReference', 'plant_nr')}
+                    os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'plant_nr'),
+        'animal_mt': ' --include-priority ' +
+                     os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'animal_mt'),
+        'fungus_mt': ' --include-priority ' +
+                     os.path.join(PATH_OF_THIS_SCRIPT, 'Library', 'NotationReference', 'fungus_mt'),
+        'anonym': ' -F anonym --genes ' + custom_db if custom_db else ""
+    }
     if scheme in scheme_translation:
         run_command = scheme_translation[scheme]
     else:
         run_command = scheme
-    run_command = os.path.join(path_of_this_script, 'Utilities', 'slim_fastg.py') + ' -t ' + str(threads) + ' ' \
+    run_command = os.path.join(PATH_OF_THIS_SCRIPT, 'Utilities', 'slim_fastg.py') + ' -t ' + str(threads) + ' ' \
                   + graph_file + run_command  #\
                   # + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -2107,11 +2177,11 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
         if log:
             if verbose_log:
-                log.warning(os.path.join(path_of_this_script, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
+                log.warning(os.path.join(PATH_OF_THIS_SCRIPT, "Utilities", "slim_spades_fastg_by_blast.py") + ' not found!')
                 log.warning(output.decode("utf8"))
             log.warning("Slimming      " + graph_file + " failed.")
         return 1
-    elif "failed" in output.decode("utf8") or "error" in output.decode("utf8"):
+    elif "failed" in output.decode("utf8") or "error" in output.decode("utf8") or "Error" in output.decode("utf8"):
         if log:
             if verbose_log:
                 log.error(output.decode("utf8"))
@@ -2131,7 +2201,7 @@ def slim_spades_result(scheme, spades_output, verbose_log, log, threads, depth_t
 
 def separate_fq_by_pair(out_base, prefix, verbose_log, log):
     log.info("Separating filtered fastq file ... ")
-    run_command = os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py") \
+    run_command = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities", "get_pair_reads.py") \
                   + ' ' + os.path.join(out_base, prefix + "filtered_1.fq") \
                   + ' ' + os.path.join(out_base, prefix + "filtered_2.fq")
     separating = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -2140,7 +2210,7 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log):
     output, err = separating.communicate()
     if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8"):
         if verbose_log:
-            log.warning(os.path.join(path_of_this_script, "Utilities", "get_pair_reads.py") + "not found!")
+            log.warning(os.path.join(PATH_OF_THIS_SCRIPT, "Utilities", "get_pair_reads.py") + "not found!")
             log.warning(output.decode("utf8"))
         log.warning("Separating filtered fastq file failed.")
         return False
@@ -2185,7 +2255,7 @@ def unzip(source, target, line_limit, verbose_log, log):
         raise NotImplementedError("unzipping failed!")
 
 
-def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, read_len_for_log,
+def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ref_seq, read_len_for_log,
                              verbose, log_in, threads, options):
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
                              mode="plant_cp", contamination_depth=5., contamination_similarity=5., degenerate=True,
@@ -2216,6 +2286,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                                                            weight_factor=w_f,
                                                            broken_graph_allowed=acyclic_allowed_in,
                                                            read_len_for_log=read_len_for_log,
+                                                           kmer_for_log=int(this_K[1:]),
                                                            log_handler=log_in, verbose=verbose_in)
             if len(target_results) > 1:
                 log_in.warning(str(len(target_results)) + " sets of graph detected!")
@@ -2296,8 +2367,9 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
     timeout_flag = "'--disentangle-time-limit'"
     for go_k, kmer_dir in enumerate(kmer_dirs):
         try:
-            running_stat = slim_spades_result(organelle_type, kmer_dir, verbose, log_in, threads=threads,
+            running_stat = slim_spades_result(organelle_type, ref_seq, kmer_dir, verbose, log_in, threads=threads,
                                               resume=options.script_resume)
+            run_stat_set.add(running_stat)
             """disentangle"""
             if running_stat == 0:
                 out_fastg = sorted([os.path.join(kmer_dir, x)
@@ -2329,8 +2401,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
             if running_stat == 0:
                 export_succeeded = True
                 break
-            else:
-                run_stat_set.add(running_stat)
+
     if not export_succeeded:
         if run_stat_set == {2}:
             log_in.warning("No target organelle contigs found!")
@@ -2385,7 +2456,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                 out_fastg = largest_k_graph_f_exist[0]
                 out_csv = out_fastg[:-5] + "csv"
                 log_in.info("Please ...")
-                log_in.info("load the graph file '" + out_fastg +
+                log_in.info("load the graph file '" + out_fastg + "/assembly_graph.fastg" +
                             "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
                 log_in.info("load the CSV file '" + out_csv +
                             "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
@@ -2415,18 +2486,9 @@ def main():
     out_base = options.output_base
     echo_frequency = options.echo_frequency
     reads_files_to_drop = []
-    global word_size
+    # global word_size
+    word_size = None
     try:
-        """ read previous res """
-        if resume:
-            try:
-                word_size = int(previous_attributes.w)
-            except (AttributeError, ValueError):
-                resume = False
-
-        """ initialization """
-        if not resume or options.word_size:
-            word_size = options.word_size
         if options.fq_file_1 and options.fq_file_2:
             reads_paired = {'input': True, 'pair_out': bool}
             original_fq_files = [options.fq_file_1, options.fq_file_2] + \
@@ -2460,9 +2522,15 @@ def main():
                 mean_read_len = float(previous_attributes.mean_read_len)
             except (AttributeError, ValueError):
                 resume = False
+            try:
+                word_size = int(previous_attributes.w)
+            except (AttributeError, ValueError):
+                if filtered_files_exist:
+                    resume = False
+                else:
+                    pass
 
         if not (resume and filtered_files_exist):
-
             # bowt_seed = options.bowtie2_seed
             anti_seed = options.anti_seed
             # b_at_seed = options.bowtie2_anti_seed
@@ -2479,28 +2547,49 @@ def main():
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
 
-            sampling_percent = 0.1
-            if options.pre_reading:
-                # pre-reading fastq
-                log.info("Pre-reading fastq ...")
-                log.info("Counting read qualities ...")
-                low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
-                    get_read_quality_info(original_fq_files, options.maximum_n_reads, options.min_quality_score, log,
-                                          maximum_ignore_percent=options.maximum_ignore_percent,
-                                          sampling_percent=sampling_percent)
-                log.info("Counting read lengths ...")
-                mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
-                                                                                        options.maximum_n_reads)
-                all_bases = mean_read_len * all_read_num
-                log.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
+            log.info("Pre-reading fastq ...")
+            if resume:
+                try:
+                    original_fq_beyond_read_limit = [previous_attributes.record_fq_beyond_limit
+                                                     for j in range(len(original_fq_files))]
+                    all_read_num = int(previous_attributes.num_reads)
+                except (AttributeError, ValueError):
+                    resume = False
+                else:
+                    try:
+                        low_quality_pattern = "[" + previous_attributes.trim_chars + "]"
+                        mean_error_rate = float(previous_attributes.mean_error_rate)
+                    except (AttributeError, ValueError):
+                        low_quality_pattern = "[]"
+                        mean_error_rate = None
+                    all_bases = mean_read_len * all_read_num
+            if not resume:
+                sampling_percent = 0.1
+                if options.pre_reading:
+                    # pre-reading fastq
+                    log.info("Counting read qualities ...")
+                    low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
+                        get_read_quality_info(original_fq_files, options.maximum_n_reads, options.min_quality_score,
+                                              log, maximum_ignore_percent=options.maximum_ignore_percent,
+                                              sampling_percent=sampling_percent)
+                    log.info("Counting read lengths ...")
+                    mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
+                                                                                            options.maximum_n_reads)
+                    all_bases = mean_read_len * all_read_num
+                    log.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
+                    log.info("Reads used = " + str(all_read_num))
+                else:
+                    low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
+                        "[]", None, [True for j in range(len(original_fq_files))]
+                    mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
+                                                                                            options.maximum_n_reads,
+                                                                                            sampling_percent)
+                    log.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " + str(max_read_len) + " bp.")
+                    log.info("Reads used = " + str(all_read_num))
+                    all_bases = None
                 log.info("Pre-reading fastq finished.\n")
             else:
-                low_quality_pattern, mean_error_rate, original_fq_beyond_read_limit = \
-                    "[]", None, [True for j in range(len(original_fq_files))]
-                mean_read_len, max_read_len, all_read_num = get_read_len_mean_max_count(original_fq_files,
-                                                                                        options.maximum_n_reads,
-                                                                                        sampling_percent)
-                all_bases = None
+                log.info("Pre-reading fastq skipped.\n")
 
             # reading seeds
             log.info("Making seed reads ...")
@@ -2510,33 +2599,36 @@ def main():
                                                              original_fq_files,
                                                              original_fq_beyond_read_limit, out_base, resume,
                                                              verb_log, options.threads, options.prefix,
-                                                             options.keep_temp_files, log)
-            else:
-                anti_lines = get_anti_with_fas(chop_seqs(read_fasta(anti_seed)[1]),
-                                               bool(anti_seed),
-                                               original_fq_files, log) if anti_seed else set()
+                                                             options.keep_temp_files,
+                                                             bowtie2_other_options=options.bowtie2_options,
+                                                             log=log)
             log.info("Making seed reads finished.\n")
 
+            log.info("Checking seed reads and parameters ...")
+            if not resume or options.word_size:
+                word_size = options.word_size
             if options.pre_reading:
-                log.info("Checking seed reads and parameters ...")
                 min_word_size, word_size, max_word_size, keep_seq_parts = \
-                    check_parameters(out_base=out_base, utilize_mapping=options.utilize_mapping,
+                    check_parameters(word_size=word_size, out_base=out_base, utilize_mapping=options.utilize_mapping,
+                                     maximum_n_reads=options.maximum_n_reads, original_fq_files=original_fq_files,
                                      organelle_type=options.organelle_type, all_bases=all_bases,
                                      auto_word_size_step=options.auto_word_size_step, mean_error_rate=mean_error_rate,
                                      target_genome_size=options.target_genome_size, mean_read_len=mean_read_len,
                                      max_read_len=max_read_len, low_quality_pattern=low_quality_pattern, log=log,
                                      wc_bc_ratio_constant=0.35, larger_auto_ws=options.larger_auto_ws)
-                log.info("Checking seed reads and parameters finished.\n")
             else:
-                log.info("Estimating word size from given ratio ...")
                 word_size = calculate_word_size_according_to_ratio(word_size, mean_read_len, log)
                 min_word_size, max_word_size, keep_seq_parts = word_size, word_size, False
-                log.info("Estimating word size from given ratio finished.\n")
+            log.info("Checking seed reads and parameters finished.\n")
 
             # make read index
             log.info("Making read index ...")
+            if not options.utilize_mapping:
+                anti_lines = get_anti_with_fas(word_size, chop_seqs(read_fasta(anti_seed)[1], word_size),
+                                               bool(anti_seed),
+                                               original_fq_files, log) if anti_seed else set()
             fq_info_in_memory = make_read_index(original_fq_files, direction_according_to_user_input,
-                                                options.maximum_n_reads, options.rm_duplicates, out_base,
+                                                options.maximum_n_reads, options.rm_duplicates, out_base, word_size,
                                                 anti_lines, pre_grp, in_memory, anti_seed,
                                                 keep_seq_parts=keep_seq_parts, low_quality=low_quality_pattern,
                                                 resume=resume, echo_frequency=echo_frequency, log=log)
@@ -2563,7 +2655,8 @@ def main():
                 if options.maximum_n_words <= options.soft_max_words:
                     log.info("Setting '--soft-max-words " + str(int(options.maximum_n_words)) + "'")
                     options.soft_max_words = options.maximum_n_words
-            accepted_contig_id = extending_reads(seed_file=seed_file, seed_is_fq=options.utilize_mapping,
+            accepted_contig_id = extending_reads(word_size=word_size, seed_file=seed_file,
+                                                 seed_is_fq=options.utilize_mapping,
                                                  original_fq_files=original_fq_files, len_indices=len_indices,
                                                  pre_grouped=pre_grp, groups_of_duplicate_lines=groups_of_lines,
                                                  lines_with_duplicates=lines_in_a_group,
@@ -2615,26 +2708,30 @@ def main():
                 log.info("Separating filtered fastq file ... skipped.\n")
 
         """ assembly """
+        is_assembled = False
         if options.run_spades:
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
                 options.spades_kmer = check_kmers(options.spades_kmer, options.auto_gradient_k, word_size,
                                                   max_read_len, log)
                 log.info('Assembling using SPAdes ...')
-                assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
-                                     options.prefix, original_fq_files, reads_paired, options.verbose_log,
-                                     resume, options.threads, log)
+                is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
+                                                    options.prefix, original_fq_files, reads_paired,
+                                                    options.verbose_log, resume, options.threads, log)
             else:
+                is_assembled = True
                 log.info('Assembling using SPAdes ... skipped.\n')
 
         """ export organelle """
-        if options.organelle_type != '0':
+        if is_assembled and options.organelle_type != '0':
             graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base) if gfa_f.endswith(".selected_graph.gfa")])
             if resume and graph_existed:
                 log.info("Slimming and disentangling graph ... skipped.")
             else:
                 log.info("Slimming and disentangling graph ...")
                 extract_organelle_genome(out_base=out_base, spades_output=spades_output, prefix=options.prefix,
-                                         organelle_type=options.organelle_type, read_len_for_log=mean_read_len,
+                                         organelle_type=options.organelle_type,
+                                         ref_seq=options.genes_fasta,
+                                         read_len_for_log=mean_read_len,
                                          verbose=options.verbose_log, log_in=log,
                                          threads=options.threads, options=options)
 

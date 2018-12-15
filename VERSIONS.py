@@ -6,6 +6,15 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0-pre2",
+     "features": [
+         "-F anonym added",
+         "-F fungus_mt added",
+         "-F animal_mt added but not activated",
+         "re-estimate base coverage by counting seed word frequencies if the result (directly from sam) < 50",
+         "fix a bug for logging base-coverage when no kmer detected from graph",
+         "fix a bug of --continue",
+     ]},
     {"number": "1.5.0-pre",
      "features": [
          "cp -> plant_cp; mt -> plant_mt; nr -> plant_nr; for adding animals",

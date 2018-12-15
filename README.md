@@ -68,6 +68,8 @@ It is also very IMPORTANT to keep updated (if you find your version is out of da
     
     cd $GetOrganellePATH/GetOrganelle
 
+    rm Library/SeqReference/*index*
+    
     git pull
 
 You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
@@ -84,7 +86,7 @@ However, to get a complete organelle genome (such as a plastome) rather than org
 
 * <a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST+</a> is used to filter target-like contigs and simplify the final assembly graph
 
-* <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (*.fastg/*.gfa).
+* <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (`*.fastg`/`*.gfa`).
 
 Besides, if you installed python library psutil (pip install psutil), the memory cost of get_organelle_reads.py will be automatically logged.
 
@@ -103,9 +105,9 @@ Take your input reference (fasta or bowtie index; the default is `Library/SeqRef
 
 <b>Producing Result</b>
 
-By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` if -F plant_cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend+plant_cp-plant_mt.csv`). 
+By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` if -F plant_cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend_plant_cp-del_plant_mt.csv`). 
 
-The `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` file along with the `assembly_graph.fastg.extend+plant_cp-plant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` and load the `assembly_graph.fastg.extend+cp-mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
+The `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` file along with the `assembly_graph.fastg.extend_plant_cp-del_plant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` and load the `assembly_graph.fastg.extend_plant_cp-del_plant_mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
 [Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
 
 
@@ -114,23 +116,31 @@ The `assembly_graph.fastg.extend+plant_cp-plant_mt.fastg` file along with the `a
 
 For 2G raw data, 150 bp reads, to assembly chloroplast, typically I use:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 15 -k 75,85,95,105
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output -R 15 -k 75,85,95,105 -F plant_cp
 
 or in a draft way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 75,85,95,105 -w 0.68
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 75,85,95,105 -w 0.68 -F plant_cp
 
 or in a slow and memory-economic way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 10 -k 75,85,95,105 --memory-save  -a mitochondria.fasta
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 30 -k 75,85,95,105  -F plant_cp --memory-save  -a mitochondria.fasta
 
-For 2G raw data, 150 bp reads, to assembly mitochondria
+For 2G raw data, 150 bp reads, to assembly plant mitochondria
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output -R 50 -k 65,75,85,95,105 -P 1000000 -F plant_mt 
     
-For 2G raw data, 150 bp reads, to assembly nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)
+For 2G raw data, 150 bp reads, to assembly plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s nr_reference.fasta -o nr_output -R 7 -k 95,105,115 -P 0 -F plant_nr
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 7 -k 95,105,115 -P 0 -F plant_nr
+
+For 1G raw data, 150 bp reads, to assembly fungus mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
+
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_reference.fasta --genes fungus_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F fungus_mt
+
+For 1G raw data, 150 bp reads, to assembly animal mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
+
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_reference.fasta --genes animal_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F animal_mt
 
 See the detailed illustrations of those arguments by typing in:
 

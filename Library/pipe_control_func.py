@@ -163,7 +163,7 @@ MEM_TRANS = {"K": 1000, "M": 1000000, "G":1000000000}
 class LogInfo:
     def __init__(self, sample_out_dir, prefix=""):
         self.header = ["sample", "fastq_format", "mean_error_rate", "trim_percent", "trim_int", "trim_chars",
-                       "mean_read_len", "max_read_len", "estimated_base_coverage",
+                       "mean_read_len", "max_read_len", "num_reads", "estimated_base_coverage",
                        "w", "k", "pre_w", "mem_dup", "mem_used", "n_candidates", "n_reads", "n_bases", "dup_used",
                        "mem_group", "rounds", "accepted_lines", "accepted_words", "mem_extending", "circular",
                        "degenerate_base_used", "library_size", "library_deviation", "library_left", "library_right",
@@ -187,8 +187,12 @@ class LogInfo:
                         if " - INFO: " in line and line[:4].isdigit():
                             time_point, detail_record = line.strip().split(" - INFO:")
                             detail_record = detail_record.strip()
-                            if detail_record.startswith("Identified quality encoding format = "):
+                            if detail_record.startswith("Number of reads exceeded "):
+                                this_record["record_fq_beyond_limit"] = True
+                            elif detail_record.startswith("Identified quality encoding format = "):
                                 this_record["fastq_format"] = detail_record.split(" = ")[-1]
+                                if "record_fq_beyond_limit" not in this_record:
+                                    this_record["record_fq_beyond_limit"] = False
                             elif detail_record.startswith("Trimming bases with qualities"):
                                 context, trimmed = detail_record.split(":")
                                 this_record["trim_percent"] = context.split("(")[-1].split(")")[0]
@@ -198,6 +202,8 @@ class LogInfo:
                             elif detail_record.startswith("Mean = "):
                                 this_record["mean_read_len"] = detail_record.split(" = ")[1].split(" bp")[0]
                                 this_record["max_read_len"] = detail_record.split(" = ")[-1].split(" bp")[0]
+                            elif detail_record.startswith("Reads used = "):
+                                this_record["num_reads"] = detail_record.split(" = ")[-1]
                 elif "Checking seed reads and parameters" in log_part:
                     for line in log_part.split("\n"):
                         if " - INFO: " in line and line[:4].isdigit():

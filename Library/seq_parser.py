@@ -328,29 +328,87 @@ def split_seq_by_quality_pattern(sequence, quality_str, low_quality_pattern, min
     return tuple(seq_list)
 
 
-def fq_seq_simple_generator(fq_dir_list, go_to_line=1, split_pattern=None, min_sub_seq=0):
+def fq_seq_simple_generator(fq_dir_list, go_to_line=1, split_pattern=None, min_sub_seq=0, max_n_reads=float("inf")):
     if not ((type(fq_dir_list) is list) or (type(fq_dir_list) is tuple)):
         fq_dir_list = [fq_dir_list]
+    max_n_lines = 4 * max_n_reads
     if split_pattern and len(split_pattern) > 2:
         for fq_dir in fq_dir_list:
             count = 0
-            fq_handler = open(fq_dir, 'rU')
-            seq_line = fq_handler.readline()
-            while seq_line:
-                if count % 4 == go_to_line:
-                    fq_handler.readline()
-                    quality_str = fq_handler.readline()[:-1]
-                    count += 2
-                    yield split_seq_by_quality_pattern(seq_line[:-1], quality_str, split_pattern, min_sub_seq)
-                count += 1
+            with open(fq_dir, 'rU') as fq_handler:
                 seq_line = fq_handler.readline()
+                while seq_line:
+                    if count % 4 == go_to_line:
+                        fq_handler.readline()
+                        quality_str = fq_handler.readline()[:-1]
+                        count += 2
+                        yield split_seq_by_quality_pattern(seq_line[:-1], quality_str, split_pattern, min_sub_seq)
+                    count += 1
+                    if count >= max_n_lines:
+                        break
+                    seq_line = fq_handler.readline()
     else:
         for fq_dir in fq_dir_list:
             count = 0
-            for fq_line in open(fq_dir, 'rU'):
-                if count % 4 == go_to_line:
-                    yield fq_line[:-1]
-                count += 1
+            with open(fq_dir, 'rU') as fq_handler:
+                for fq_line in fq_handler:
+                    if count % 4 == go_to_line:
+                        yield fq_line[:-1]
+                    if count >= max_n_lines:
+                        break
+                    count += 1
+
+
+def chop_seqs(seq_generator_or_list, word_size):
+    return_words = set()
+    for seed in seq_generator_or_list:
+        this_seq_len = len(seed)
+        if this_seq_len >= word_size:
+            cpt_seed = complementary_seq(seed)
+            for i in range(0, this_seq_len - word_size + 1):
+                forward = seed[i:i + word_size]
+                return_words.add(forward)
+                reverse = cpt_seed[i:i + word_size]
+                return_words.add(reverse)
+    return return_words
+
+
+def chop_seqs_as_empty_dict(seq_generator_or_list, word_size):
+    return_words = dict()
+    for seed in seq_generator_or_list:
+        this_seq_len = len(seed)
+        if this_seq_len >= word_size:
+            cpt_seed = complementary_seq(seed)
+            for i in range(0, this_seq_len - word_size + 1):
+                forward = seed[i:i + word_size]
+                return_words[forward] = 0
+                reverse = cpt_seed[i:i + word_size]
+                return_words[reverse] = 0
+    return return_words
+
+
+def chop_seq_list(seq_generator_or_list, word_size):
+    return_words = set()
+    for seed in seq_generator_or_list:
+        for seq_part in seed:
+            this_seq_len = len(seq_part)
+            if this_seq_len >= word_size:
+                cpt_seed = complementary_seq(seq_part)
+                for i in range(0, this_seq_len - word_size + 1):
+                    forward = seq_part[i:i + word_size]
+                    return_words.add(forward)
+                    reverse = cpt_seed[i:i + word_size]
+                    return_words.add(reverse)
+    return return_words
+
+
+def counting_words(seq_generator, words_initial_dict, word_size):
+    for seq in seq_generator:
+        for i in range(0, len(seq) - word_size + 1):
+            this_word = seq[i: i + word_size]
+            if this_word in words_initial_dict:
+                words_initial_dict[this_word] += 1
+    return words_initial_dict
 
 
 def check_fasta_seq_names(original_fas, log=None):
@@ -404,21 +462,13 @@ def get_coverage_from_sam(bowtie_sam_file):
     return coverage
 
 
-def get_query_cover(coverage_info, log=None, percent=0.07):
+def get_cover_range(all_coverages, guessing_percent=0.07):
     # empirical value
-    center_p = 0.93
-    all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]
-                     if coverage_info[ref][pos] > 2]
+    center_p = 1 - guessing_percent
     all_coverages.sort()
-    if not all_coverages:
-        all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]]
-        if not all_coverages:
-            if log:
-                log.error("No seed reads found!")
-            exit()
     total_len = len(all_coverages)
-    start_cov_pos = int((center_p - percent/2) * total_len)
-    end_cov_pos = min(int((center_p + percent/2) * total_len), total_len)
+    start_cov_pos = max(int((center_p - guessing_percent / 2) * total_len), 0)
+    end_cov_pos = min(int((center_p + guessing_percent / 2) * total_len), total_len)
     used_len = end_cov_pos-start_cov_pos
     used_points = all_coverages[start_cov_pos:end_cov_pos]
     mean = sum(used_points) / used_len

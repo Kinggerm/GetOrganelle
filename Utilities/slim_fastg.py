@@ -36,23 +36,15 @@ def require_commands():
     if blast_in_path[0] == 32512:
         sys.stdout.write('\nError: blastn not in the path!')
         exit()
-    try:
-        # python3
-        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
-    except AttributeError:
-        # python2
-        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
-    if makeblastdb_in_path[0] == 32512:
-        sys.stdout.write('\nError: makeblastdb not in the path!')
-        exit()
     usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -F plant_cp')
     parser = OptionParser(usage=usage)
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters
     parser.add_option('-F', dest='builtin_mode', default='plant_cp',
-                      help='followed with mode plant_cp, plant_mt, plant_nr (which means plant '
-                           'chloroplast, mitochondria, nrDNA '
-                           'separately; corresponding to certain arguments as following listed). '
+                      help='followed with mode plant_cp, plant_mt, plant_nr, animal_mt, fungus_mt (which means plant '
+                           'chloroplast, plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion '
+                           'separately; corresponding to certain arguments as following listed), or anonym (input '
+                           'a fasta file as the "--include-priority" database using "--seed-file"). '
                            'Modify the arguments activated by this flag with your more custom options.'
                            '\t'
                            ' ------------------------------------------------------ '
@@ -61,7 +53,14 @@ def require_commands():
                            '\nplant_mt \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')+' --exclude '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')+'"'
                            ' ------------------------------------------------------ '
                            '\nplant_nr \t " --include-priority '+os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_nr')+'"'
-                           ' ------------------------------------------------------ ')
+                           ' ------------------------------------------------------ '
+                           '\nanimal_mt \t " --include-priority ' + os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'animal_mt') + '"'
+                           ' ------------------------------------------------------ '
+                           '\nfungus_mt \t " --include-priority ' + os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'fungus_mt') + '"'
+                           ' ------------------------------------------------------ '
+                      )
+    parser.add_option("--genes", dest="genes_fasta",
+                      help="A customized file used when '-F anonym' was chosen.")
     parser.add_option('--no-hits', dest='treat_no_hits', default='ex_no_con',
                       help='Provide treatment for non-hitting contigs.\t'
                            ' ------------------------------------------------------ '
@@ -134,21 +133,44 @@ def require_commands():
                 sys.stdout.write('\n\nOption Error: you can not simultaneously choose two "--exclude-*" options!')
                 exit()
             if in_chosen == 1 and ex_chosen == 1 and priority_chosen == 0:
-                sys.stdout.write('\n\nOption Error: since you have include and exclude chosen, one of them should be assigned priority!')
+                sys.stdout.write('\n\nOption Error: since you have include and exclude chosen, '
+                                 'one of them should be assigned priority!')
                 exit()
             if ex_chosen == 1 and in_chosen == 0 and (options.treat_no_hits in {"ex_no_con", "ex_no_hit"}):
                 sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
                 exit()
         elif options.builtin_mode == 'plant_cp':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')
-            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                                    'NotationReference', 'plant_cp')
+            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                           'NotationReference', 'plant_mt')
         elif options.builtin_mode == 'plant_mt':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_mt')
-            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_cp')
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                                    'NotationReference', 'plant_mt')
+            options.exclude = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                           'NotationReference', 'plant_cp')
         elif options.builtin_mode == 'plant_nr':
-            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library', 'NotationReference', 'plant_nr')
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                                    'NotationReference', 'plant_nr')
+        elif options.builtin_mode == 'animal_mt':
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                                    'NotationReference', 'animal_mt')
+        elif options.builtin_mode == 'fungus_mt':
+            options.include_priority = os.path.join(os.path.split(path_of_this_script)[0], 'Library',
+                                                    'NotationReference', 'fungus_mt')
+        elif options.builtin_mode == 'anonym':
+            if options.genes_fasta is None:
+                sys.stdout.write("\n\nOption Error: an additional fasta file or blast database (after '--genes') "
+                                 "should be input if '-F anonym' was chosen!\n")
+                exit()
+            elif sum([os.path.exists(options.genes_fasta + postfix) for postfix in (".nsq", ".nin", ".nhr")]) != 3 \
+                    and not os.path.isfile(options.genes_fasta):
+                sys.stdout.write("\n\nOption Error: " + options.genes_fasta + " not found!\n")
+                exit()
+            else:
+                options.include_priority = options.genes_fasta
         else:
-            sys.stdout.write('\n\nOption Error: illegal value for builtin mode!\n')
+            sys.stdout.write('\n\nOption Error: illegal value for -F!\n')
             exit()
         if not len(args):
             sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!\n')
@@ -156,17 +178,38 @@ def require_commands():
         sys.stdout.write('\n'+' '.join(sys.argv)+'\n')
 
 
-def check_db(options):
+def check_db(here_options):
     in_index = ""
     ex_index = ""
-    if options.include_priority:
-        in_index = options.include_priority
-    elif options.include:
-        in_index = options.include
-    if options.exclude_priority:
-        ex_index = options.exclude_priority
-    elif options.exclude:
-        ex_index = options.exclude
+    if here_options.include_priority:
+        in_index = here_options.include_priority
+    elif here_options.include:
+        in_index = here_options.include
+    if here_options.exclude_priority:
+        ex_index = here_options.exclude_priority
+    elif here_options.exclude:
+        ex_index = here_options.exclude
+    for check_blast_db in (in_index, ex_index):
+        if sum([os.path.exists(check_blast_db + postfix) for postfix in (".nsq", ".nin", ".nhr")]) != 3:
+            try:
+                # python3
+                makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
+            except AttributeError:
+                # python2
+                makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
+            if makeblastdb_in_path[0] == 32512:
+                sys.stdout.write('\nError: makeblastdb not in the path!')
+                exit()
+            sys.stdout.write("\nMaking BLAST database ... \n")
+            mk_blast_db_run = subprocess.Popen(
+                "makeblastdb -in " + check_blast_db + " -out " + check_blast_db +
+                " -title anonym -dbtype nucl",
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            output, err = mk_blast_db_run.communicate()
+            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                sys.stdout.write('\n' + output.decode("utf8"))
+                exit()
+            sys.stdout.write("Making BLAST database finished.\n")
     return in_index, ex_index
 
 
@@ -641,9 +684,18 @@ def main():
         del_complementary(fas_file, is_fastg)
         # make blast database if not made
         include_index, exclude_index = check_db(options)
-        in_ex_info = 'only' * int(options.treat_no_hits == 'ex_no_hit') + 'extend' * int(
-            options.treat_no_hits == 'ex_no_con') + '+' + os.path.split(include_index)[-1] + '-' + \
-            os.path.split(exclude_index)[-1]
+        if options.builtin_mode == "anonym":
+            in_ex_info = 'only' * int(options.treat_no_hits == 'ex_no_hit') + \
+                         'extend' * int(options.treat_no_hits == 'ex_no_con') + \
+                         '_anonym'
+        else:
+            be_including = int(bool(os.path.split(include_index)[-1]))
+            be_excluding = int(bool(os.path.split(exclude_index)[-1]))
+            joint_char = "." * int(be_including + be_excluding == 2)
+            in_ex_info = 'only' * int(options.treat_no_hits == 'ex_no_hit') + \
+                         'extend' * int(options.treat_no_hits == 'ex_no_con') + \
+                         ('_' + os.path.split(include_index)[-1]) * be_including + joint_char + \
+                         ('del_' + os.path.split(exclude_index)[-1]) * be_excluding
         # make blast
         try:
             in_names = blast_and_call_names(fasta_file=fas_file, index_files=include_index,
@@ -671,6 +723,8 @@ def main():
             write_fasta(out_dir=out_fas,
                         matrix=fasta_matrix, overwrite=options.overwrite)
             # write out hits tab according to blast
+            if options.builtin_mode == "anonym":
+                include_index = "anonym"
             write_hits_tab_for_bandage(in_names=in_names, include_file=include_index, ex_names=ex_names,
                                        exclude_file=exclude_index, out_file=out_csv, overwrite=options.overwrite,
                                        is_fastg=is_fastg)

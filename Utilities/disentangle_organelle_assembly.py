@@ -13,7 +13,7 @@ path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
 def get_options(print_title):
-    parser = OptionParser("disentangle_organelle_assembly.py -g input.fastg -t input.tab -o output_dir")
+    parser = OptionParser("disentangle_organelle_assembly.py -F plant_cp -g input.fastg -t input.tab -o output_dir")
     parser.add_option("-g", dest="fastg_file",
                       help="input fastg format file.")
     parser.add_option("-t", dest="tab_file",
@@ -21,8 +21,8 @@ def get_options(print_title):
                            "produced by slim_fastg.py.")
     parser.add_option("-o", dest="output_directory",
                       help="output directory.")
-    parser.add_option("-m", dest="mode", default="plant_cp",
-                      help="organelle mode: plant_cp, plant_mt, or plant_nr. Default:%default")
+    parser.add_option("-F", dest="mode",
+                      help="organelle type: plant_cp/plant_mt/plant_nr/animal_mt/fungus_mt/anonym.")
     parser.add_option("--acyclic-allowed", dest="acyclic_allowed", default=False, action="store_true",
                       help="By default, this script would only disentangle the circular graph (the complete circular "
                            "organelle genome), and would directly give up linear/broken graphs). Choose this option "
@@ -65,7 +65,8 @@ def get_options(print_title):
     parser.add_option("--debug", dest="debug", default=False, action="store_true",
                       help="for debug.")
     options, argv = parser.parse_args()
-    if (options.fastg_file is None) or (options.tab_file is None) or (options.output_directory is None):
+    if (options.fastg_file is None) or (options.tab_file is None) or (options.output_directory is None) \
+            or (options.mode is None):
         parser.print_help()
         sys.stdout.write("Insufficient arguments!\n")
         sys.exit()

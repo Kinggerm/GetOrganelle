@@ -11,7 +11,7 @@ versions = [
          "-F anonym added",
          "-F fungus_mt added",
          "-F animal_mt added but not activated",
-         "re-estimate base coverage by counting seed word frequencies if the result (directly from sam) < 50",
+         "re-estimate base coverage by counting seed word frequencies if the result (directly from sam) < 200",
          "fix a bug for logging base-coverage when no kmer detected from graph",
          "fix a bug of --continue",
      ]},

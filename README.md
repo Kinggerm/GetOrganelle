@@ -80,7 +80,7 @@ However, to get a complete organelle genome (such as a plastome) rather than org
     
     pip install numpy scipy sympy
 
-* <a href='http://bioinf.spbau.ru/spades'>SPAdes</a> is the assembler
+* <a href='http://cab.spbu.ru/software/spades/'>SPAdes</a> is the assembler
 
 * <a href='http://bowtie-bio.sourceforge.net/bowtie2/index.shtml'>Bowtie2</a> is used to speed up initial recruitment of target-like reads
 

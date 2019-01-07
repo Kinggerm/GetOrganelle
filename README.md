@@ -88,7 +88,7 @@ However, to get a complete organelle genome (such as a plastome) rather than org
 
 * <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (`*.fastg`/`*.gfa`).
 
-Besides, if you installed python library psutil (pip install psutil), the memory cost of get_organelle_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `Utilities/evaluate_assembly_using_mapping.py` and `Utilities/round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
+[NOT necessary] If you installed python library psutil (pip install psutil), the memory cost of get_organelle_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
 
 
 ## How To

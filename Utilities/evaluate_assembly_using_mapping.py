@@ -38,8 +38,6 @@ def get_options():
                       help="Default: `the file name of the input fasta`")
     parser.add_option("--plot-transparent", dest="plot_transparent", default=False,
                       help="Default: False")
-    parser.add_option("--max-coverage-tick", dest="max_cov_tick", type=int,
-                      help="default: auto-estimated.")
     options, argv = parser.parse_args()
     if not (options.fasta and options.original_fq_1 and options.original_fq_2 and options.output_base):
         sys.stderr.write("Insufficient arguments!\n")

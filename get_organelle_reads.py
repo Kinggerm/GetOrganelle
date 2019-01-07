@@ -10,6 +10,7 @@ PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from Library.pipe_control_func import *
 from Library.seq_parser import *
+from Library.sam_parser import *
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 NOT_REF_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Library", "NotationReference")
 SEQ_REF_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Library", "SeqReference")
@@ -148,7 +149,7 @@ def get_options(descriptions, version):
                                     "Default: %default")
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
-                                    "Default: 4E8 (-F plant_cp), 8E7 (-F plant_nr/animal_mt/fungus_mt), "
+                                    "Default: 4E8 (-F plant_cp), 8E7 (-F plant_nr/fungus_mt), 4E7 (-F animal_mt), "
                                     "2E9 (-F plant_mt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=3,
                                help="The wide of steps of checking words in reads during extending process "
@@ -515,8 +516,10 @@ def get_options(descriptions, version):
         if "--max-n-words" not in sys.argv:
             if options.organelle_type in ("plant_mt", "anonym"):
                 options.maximum_n_words *= 5
-            elif options.organelle_type in ("plant_nr", "animal_mt", "fungus_mt"):
+            elif options.organelle_type in ("plant_nr", "fungus_mt"):
                 options.maximum_n_words /= 5
+            elif options.organelle_type == "animal_mt":
+                options.maximum_n_words /= 10
         if "--soft-max-words" not in sys.argv:
             if options.organelle_type in ("plant_mt", "anonym"):
                 options.soft_max_words *= 5
@@ -534,7 +537,7 @@ def get_options(descriptions, version):
                 options.target_genome_size = 2 * sum([len(this_seq) for this_seq in ref_seqs])
                 log.info("Setting '--target-genome-size " + str(options.target_genome_size) +
                          "' for estimating the word size value.")
-        if options.organelle_type in ("fungus_mt", "anonym"):
+        if options.organelle_type in ("fungus_mt", "animal_mt", "anonym"):
             global MAX_RATIO_RL_WS
             MAX_RATIO_RL_WS = 0.8
 
@@ -689,7 +692,7 @@ def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, orig
                      target_genome_size, mean_read_len, max_read_len, low_quality_pattern,
                      log, wc_bc_ratio_constant=0.35, larger_auto_ws=False):
     if utilize_mapping:
-        coverage_info = get_coverage_from_sam(os.path.join(out_base, "seed_bowtie.sam"))
+        coverage_info = get_coverage_from_sam_fast(os.path.join(out_base, "seed_bowtie.sam"))
         all_coverages = [coverage_info[ref][pos] for ref in coverage_info for pos in coverage_info[ref]
                          if coverage_info[ref][pos] > 2]
         if not all_coverages:
@@ -806,112 +809,6 @@ except ImportError:
     this_process = None
 else:
     this_process = psutil.Process(os.getpid())
-
-
-def get_read_len_mean_max_count(fq_files, maximum_n_reads, sampling_percent=1.):
-    read_lengths = []
-    all_count = 0
-    if sampling_percent == 1:
-        for fq_f in fq_files:
-            count_r = 0
-            for seq in fq_seq_simple_generator(fq_f):
-                count_r += 1
-                read_lengths.append(len(seq.strip("N")))
-                if count_r >= maximum_n_reads:
-                    break
-            all_count += count_r
-    else:
-        sampling_percent = int(1 / sampling_percent)
-        for fq_f in fq_files:
-            count_r = 0
-            for seq in fq_seq_simple_generator(fq_f):
-                count_r += 1
-                if count_r % sampling_percent == 0:
-                    read_lengths.append(len(seq.strip("N")))
-                if count_r >= maximum_n_reads:
-                    break
-            all_count += count_r
-    return sum(read_lengths)/len(read_lengths), max(read_lengths), all_count
-
-
-def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
-                          maximum_ignore_percent=0.05, sampling_percent=0.1):
-    sampling_percent = int(1 / sampling_percent)
-    all_quality_chars_list = []
-    record_fq_beyond_read_num_limit = []
-    for fq_f in fq_files:
-        count_r = 0
-        record_fq_beyond_read_num_limit.append(False)
-        this_fq_generator = fq_seq_simple_generator(fq_f, go_to_line=3)
-        for quality_str in this_fq_generator:
-            if count_r % sampling_percent == 0:
-                all_quality_chars_list.append(quality_str)
-            count_r += 1
-            if count_r >= maximum_n_reads:
-                break
-        for quality_str in this_fq_generator:
-            if quality_str:
-                log.info("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + os.path.basename(fq_f)
-                         + ", only top " + str(int(maximum_n_reads))
-                         + " reads are used in downstream analysis.")
-                record_fq_beyond_read_num_limit[-1] = True
-            break
-    all_quality_chars = "".join(all_quality_chars_list)
-    len_quality_chars_total = float(len(all_quality_chars))
-    max_quality = max(all_quality_chars)
-    min_quality = min(all_quality_chars)
-    max_quality = ord(max_quality)
-    min_quality = ord(min_quality)
-    decision_making = []
-    for type_name, char_min, char_max, score_min, score_max in [("Sanger", 33, 73, 0, 40),
-                                                                ("Solexa", 59, 104, -5, 40),
-                                                                ("Illumina 1.3+", 64, 104, 0, 40),
-                                                                ("Illumina 1.5+", 67, 105, 3, 41),
-                                                                ("Illumina 1.8+", 33, 74, 0, 41)]:
-        decision_making.append((type_name, char_min, char_max, score_min, score_max,
-                                (max_quality - char_max) ** 2 + (min_quality - char_min) ** 2))
-    the_form, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
-    log.info("Identified quality encoding format = " + the_form)
-    if max_quality > the_c_max:
-        log.warning("Max quality score " + repr(chr(max_quality)) +
-                    "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
-                    ") in your fastq file exceeds the usual boundary " + str((the_c_min, the_c_max)))
-    if min_quality < the_c_min:
-        log.warning("Min quality score " + repr(chr(min_quality)) +
-                    "(" + str(min_quality) + ":" + str(min_quality - the_c_min + the_s_min) +
-                    ") in your fastq file is under the usual lower boundary " + str((the_c_min, the_c_max)))
-
-    # increase --min-quality-score if ignoring too much data.
-    low_quality_score = min(the_c_min, min_quality)
-    ignore_percent = 0
-    trimmed_quality_chars = []
-
-    while low_quality_score < the_c_min + min_quality_score - the_s_min:
-        ignore_this_time = all_quality_chars.count(chr(low_quality_score)) / len_quality_chars_total
-        ignore_percent += ignore_this_time
-        if ignore_percent > maximum_ignore_percent:
-            ignore_percent -= ignore_this_time
-            break
-        else:
-            trimmed_quality_chars.append(chr(low_quality_score))
-        low_quality_score += 1
-    if low_quality_score < the_c_min + min_quality_score - the_s_min:
-        log.info("Resetting '--min-quality-score " + str(low_quality_score + the_s_min - the_c_min) + "'")
-    if trimmed_quality_chars:
-        log.info("Trimming bases with qualities (" + "%.2f" % (ignore_percent * 100) + "%): " +
-                 str(ord(min("".join(trimmed_quality_chars)))) + ".." + str(ord(max("".join(trimmed_quality_chars)))) +
-                 "  " + "".join(trimmed_quality_chars))
-    trimmed_quality_chars = "".join(trimmed_quality_chars)
-
-    # calculate mean error rate
-    all_quality_char_dict = {in_quality_char: all_quality_chars.count(in_quality_char)
-                             for in_quality_char in set(all_quality_chars)}
-    error_prob_func = chose_error_prob_func[the_form]
-    mean_error_rate = sum([error_prob_func(in_quality_char) * all_quality_char_dict[in_quality_char]
-                           for in_quality_char in all_quality_char_dict]) / len_quality_chars_total
-    log.info("Mean error rate = " + str(round(mean_error_rate, 4)))
-
-    return "[" + trimmed_quality_chars + "]", mean_error_rate, record_fq_beyond_read_num_limit  # , post_trimming_mean
 
 
 def write_fq_results(original_fq_files, accepted_contig_id, out_file_name, temp2_clusters_dir, fq_info_in_memory,
@@ -1207,9 +1104,9 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
                     line = file_in.readline()
             line = file_in.readline()
             file_in.close()
-            # if line:
-            #     log.warning("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + file_name + ", only "
-            #                 "top " +str(int(maximum_n_reads)) + " reads are used in downstream analysis (suggested).")
+            if line:
+                log.warning("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + file_name + ", only "
+                            "top " + str(int(maximum_n_reads)) + " reads are used in downstream analysis.")
         if not index_in_memory:
             temp1_contig_out.close()
             os.rename(temp1_contig_dir[0], temp1_contig_dir[1])
@@ -1924,9 +1821,9 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
         log.info("Initial seeds existed!")
     else:
         log.info("Mapping reads to seed - bowtie2 index ...")
-        this_command = "bowtie2 -p " + str(threads) + " " + bowtie2_other_options + " --al " + total_seed_fq[0] + \
+        this_command = "bowtie2 --mm -p " + str(threads) + " " + bowtie2_other_options + " --al " + total_seed_fq[0] + \
                        " -x " + seed_index_base + " -U " + ",".join(query_fq_files) + " -S " + total_seed_sam[0] + \
-                       " --no-unal --no-hd --no-sq"
+                       " --no-unal --no-hd --no-sq --omit-sec-seq"
         make_seed_bowtie2 = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         if verbose_log:
             log.info(this_command)
@@ -1973,8 +1870,9 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed - bowtie2 index ...")
-            this_command = "bowtie2 -p " + str(threads) + " " + bowtie2_other_options + " -x " + anti_index_base + \
-                           " -U " + ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + " --no-unal --no-hd --no-sq"
+            this_command = "bowtie2 --mm -p " + str(threads) + " " + bowtie2_other_options + " -x " + anti_index_base + \
+                           " -U " + ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + \
+                           " --no-unal --no-hd --no-sq --omit-sec-seq"
             make_anti_seed_bowtie2 = subprocess.Popen(this_command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log:
@@ -2406,7 +2304,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
         if run_stat_set == {2}:
             log_in.warning("No target organelle contigs found!")
             log_in.warning("This might due to a bug or unreasonable reference/parameter choices")
-            log_in.info("Please email jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
+            log_in.info("Please email phylojianjun@163.com or jinjianjun@mail.kib.ac.cn with the get_org.log.txt file.")
             return export_succeeded
 
         largest_k_graph_f_exist = sorted([x for x in os.listdir(kmer_dirs[0]) if x.count(".fastg") == 2])
@@ -2742,7 +2640,7 @@ def main():
         log.exception("")
         log = simple_log(log, out_base, prefix=options.prefix + "get_org.")
         log.info("\nTotal cost " + "%.2f"%(time.time() - time0) + " s")
-        log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!")
+        log.info("Please email phylojianjun@163.com or jinjianjun@mail.kib.ac.cn if you find bugs!")
         log.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()
 

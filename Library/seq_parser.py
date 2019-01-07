@@ -437,29 +437,110 @@ def check_fasta_seq_names(original_fas, log=None):
             return new_fas
 
 
-# does not deal with multiple hits!
-def get_coverage_from_sam(bowtie_sam_file):
-    coverage = {}
-    for line in open(bowtie_sam_file):
-        if line.strip() and not line.startswith('@'):
-            line_split = line.strip().split('\t')
-            start_position = int(line_split[3])
-            if start_position:
-                flag = int(line_split[1])
-                reference = line_split[2]
-                direction = 1 if flag % 32 < 16 else -1
-                read_len = len(line_split[9])
-                if reference in coverage:
-                    for position in range(max(1, start_position), max(1, start_position + read_len * direction), direction):
-                        if position in coverage[reference]:
-                            coverage[reference][position] += 1
-                        else:
-                            coverage[reference][position] = 1
-                else:
-                    coverage[reference] = {}
-                    for position in range(max(1, start_position), max(1, start_position + read_len * direction), direction):
-                        coverage[reference][position] = 1
-    return coverage
+def get_read_len_mean_max_count(fq_files, maximum_n_reads, sampling_percent=1.):
+    read_lengths = []
+    all_count = 0
+    if sampling_percent == 1:
+        for fq_f in fq_files:
+            count_r = 0
+            for seq in fq_seq_simple_generator(fq_f):
+                count_r += 1
+                read_lengths.append(len(seq.strip("N")))
+                if count_r >= maximum_n_reads:
+                    break
+            all_count += count_r
+    else:
+        sampling_percent = int(1 / sampling_percent)
+        for fq_f in fq_files:
+            count_r = 0
+            for seq in fq_seq_simple_generator(fq_f):
+                count_r += 1
+                if count_r % sampling_percent == 0:
+                    read_lengths.append(len(seq.strip("N")))
+                if count_r >= maximum_n_reads:
+                    break
+            all_count += count_r
+    return sum(read_lengths)/len(read_lengths), max(read_lengths), all_count
+
+
+def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log,
+                          maximum_ignore_percent=0.05, sampling_percent=0.1):
+    sampling_percent = int(1 / sampling_percent)
+    all_quality_chars_list = []
+    record_fq_beyond_read_num_limit = []
+    for fq_f in fq_files:
+        count_r = 0
+        record_fq_beyond_read_num_limit.append(False)
+        this_fq_generator = fq_seq_simple_generator(fq_f, go_to_line=3)
+        for quality_str in this_fq_generator:
+            if count_r % sampling_percent == 0:
+                all_quality_chars_list.append(quality_str)
+            count_r += 1
+            if count_r >= maximum_n_reads:
+                break
+        for quality_str in this_fq_generator:
+            if quality_str:
+                log.info("Number of reads exceeded " + str(int(maximum_n_reads)) + " in " + os.path.basename(fq_f)
+                         + ", only top " + str(int(maximum_n_reads))
+                         + " reads are used in downstream analysis.")
+                record_fq_beyond_read_num_limit[-1] = True
+            break
+    all_quality_chars = "".join(all_quality_chars_list)
+    len_quality_chars_total = float(len(all_quality_chars))
+    max_quality = max(all_quality_chars)
+    min_quality = min(all_quality_chars)
+    max_quality = ord(max_quality)
+    min_quality = ord(min_quality)
+    decision_making = []
+    for type_name, char_min, char_max, score_min, score_max in [("Sanger", 33, 73, 0, 40),
+                                                                ("Solexa", 59, 104, -5, 40),
+                                                                ("Illumina 1.3+", 64, 104, 0, 40),
+                                                                ("Illumina 1.5+", 67, 105, 3, 41),
+                                                                ("Illumina 1.8+", 33, 74, 0, 41)]:
+        decision_making.append((type_name, char_min, char_max, score_min, score_max,
+                                (max_quality - char_max) ** 2 + (min_quality - char_min) ** 2))
+    the_form, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
+    log.info("Identified quality encoding format = " + the_form)
+    if max_quality > the_c_max:
+        log.warning("Max quality score " + repr(chr(max_quality)) +
+                    "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
+                    ") in your fastq file exceeds the usual boundary " + str((the_c_min, the_c_max)))
+    if min_quality < the_c_min:
+        log.warning("Min quality score " + repr(chr(min_quality)) +
+                    "(" + str(min_quality) + ":" + str(min_quality - the_c_min + the_s_min) +
+                    ") in your fastq file is under the usual lower boundary " + str((the_c_min, the_c_max)))
+
+    # increase --min-quality-score if ignoring too much data.
+    low_quality_score = min(the_c_min, min_quality)
+    ignore_percent = 0
+    trimmed_quality_chars = []
+
+    while low_quality_score < the_c_min + min_quality_score - the_s_min:
+        ignore_this_time = all_quality_chars.count(chr(low_quality_score)) / len_quality_chars_total
+        ignore_percent += ignore_this_time
+        if ignore_percent > maximum_ignore_percent:
+            ignore_percent -= ignore_this_time
+            break
+        else:
+            trimmed_quality_chars.append(chr(low_quality_score))
+        low_quality_score += 1
+    if low_quality_score < the_c_min + min_quality_score - the_s_min:
+        log.info("Resetting '--min-quality-score " + str(low_quality_score + the_s_min - the_c_min) + "'")
+    if trimmed_quality_chars:
+        log.info("Trimming bases with qualities (" + "%.2f" % (ignore_percent * 100) + "%): " +
+                 str(ord(min("".join(trimmed_quality_chars)))) + ".." + str(ord(max("".join(trimmed_quality_chars)))) +
+                 "  " + "".join(trimmed_quality_chars))
+    trimmed_quality_chars = "".join(trimmed_quality_chars)
+
+    # calculate mean error rate
+    all_quality_char_dict = {in_quality_char: all_quality_chars.count(in_quality_char)
+                             for in_quality_char in set(all_quality_chars)}
+    error_prob_func = chose_error_prob_func[the_form]
+    mean_error_rate = sum([error_prob_func(in_quality_char) * all_quality_char_dict[in_quality_char]
+                           for in_quality_char in all_quality_char_dict]) / len_quality_chars_total
+    log.info("Mean error rate = " + str(round(mean_error_rate, 4)))
+
+    return "[" + trimmed_quality_chars + "]", mean_error_rate, record_fq_beyond_read_num_limit  # , post_trimming_mean
 
 
 def get_cover_range(all_coverages, guessing_percent=0.07):

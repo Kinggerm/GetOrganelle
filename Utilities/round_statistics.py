@@ -3,18 +3,17 @@
 from optparse import OptionParser
 import os
 import sys
-import subprocess
-import logging
 from math import ceil
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.seq_parser import *
 from Library.pipe_control_func import *
+from Library.seq_parser import *
+from Library.sam_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
 def get_options():
-    parser = OptionParser("this_script.py -f fasta_file -s sam_file")
+    parser = OptionParser("round_statistics.py -f fasta_file -d output_per_round_folder -i Initial_mapped.fq -o output")
     parser.add_option("-f", dest="fasta",
                       help="input fasta file.")
     parser.add_option("-d", dest="output_per_round_dir",
@@ -31,7 +30,8 @@ def get_options():
                       help="sites with coverage above the threshold would be marked as covered. default:[%default]")
     parser.add_option("--continue", dest="resume", default=False, action="store_true")
     parser.add_option("--keep-temp", dest="keep_temp", default=False, action="store_true")
-    parser.add_option("--draw", dest="draw_plot", default=False, action="store_true")
+    parser.add_option("--draw", dest="draw_plot", default=False, action="store_true",
+                      help="Draw density plot using matplotlib, which should be installed.")
     parser.add_option("--max-coverage-tick", dest="max_cov_tick")
     # parser.add_option("--average", default=False, action="store_true",
     #                   help="output average coverage.")
@@ -41,10 +41,10 @@ def get_options():
         sys.exit()
     if not os.path.isdir(options.output_base):
         os.mkdir(options.output_base)
-    log = simple_log(logging.getLogger(), options.output_base)
+    log = simple_log(logging.getLogger(), options.output_base, "")
     log.info("")
     log.info(' '.join(sys.argv) + '\n')
-    log = timed_log(log, options.output_base)
+    log = timed_log(log, options.output_base, "")
     return options, log
 
 
@@ -71,9 +71,9 @@ def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threa
     if not (resume and os.path.exists(total_seed_file[1])):
         # log.info("Mapping reads to seed bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 -p " + str(threads) + " --very-fast-local --al " + total_seed_file[
+            "bowtie2 --mm -p " + str(threads) + " --very-fast-local --al " + total_seed_file[
                 0] + " -x " + seed_index_base + " -U " +
-            ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq -t",
+            ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq --omit-sec-seq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
         if "(ERR)" in str(output) or "Error:" in str(output):
@@ -136,7 +136,7 @@ def main():
         mapping_with_bowtie2(options.fasta, real_fq, bowtie_base, options.resume, options.threads, log)
         this_result = [fq_pairs[0].replace("_1.fq", "")]
         # this round coverage
-        this_coverage = get_coverage_from_sam(bowtie_base + ".sam")
+        this_coverage = get_coverage_from_sam_fast(bowtie_base + ".sam")
         if this_coverage:
             if not this_coverage and not options.round:
                 log.info("No more target found! Exiting ..")

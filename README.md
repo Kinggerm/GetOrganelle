@@ -9,7 +9,7 @@ This pipeline assemblies organelle genome from genomic skimming data.
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
-<b>Bug&Usage contact:</b> [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
+<b>Bug&Usage contact:</b> [phylojianjun@163.com](mailto:phylojianjun@163.com); [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
 
 Please cite the dependencies if they are used:
 
@@ -26,7 +26,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 This pipeline was written in python 3.5.1, but compatible with 2.7.11. GetOrganelle is more efficient under Python 3.*.
 
-Execute following simple git commands to download the latest version (suggested) or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
+Execute following simple git commands to download the latest version or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
 
     # Supposing you are going to install it at ~/Applications/bin
     
@@ -114,7 +114,7 @@ The `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` file along with th
 
 ## Example
 
-For 2G raw data, 150 bp reads, to assembly chloroplast, typically I use:
+To assembly chloroplast (e.g. using 2G raw data of 150 bp paired reads), typically I use:
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output -R 15 -k 75,85,95,105 -F plant_cp
 
@@ -126,19 +126,19 @@ or in a slow and memory-economic way:
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 30 -k 75,85,95,105  -F plant_cp --memory-save  -a mitochondria.fasta
 
-For 2G raw data, 150 bp reads, to assembly plant mitochondria
+To assembly plant mitochondria (usually you need more than 5G raw data):
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output -R 50 -k 65,75,85,95,105 -P 1000000 -F plant_mt 
     
-For 2G raw data, 150 bp reads, to assembly plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)
+To assembly plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 7 -k 95,105,115 -P 0 -F plant_nr
 
-For 1G raw data, 150 bp reads, to assembly fungus mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
+To assembly fungus mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_reference.fasta --genes fungus_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F fungus_mt
 
-For 1G raw data, 150 bp reads, to assembly animal mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
+To assembly animal mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_reference.fasta --genes animal_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F animal_mt
 
@@ -157,7 +157,7 @@ Also see [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleCompar
 
 It was previously cited as GetOrganelle (https://github.com/Kinggerm/GetOrganelle), but now we have a report paper (<a href="#citation">see above</a>) to cite.
 
-Yu Song, Wen-Bin Yu, Yun-Bong Tan, Bing Liu, Xin Yao, Jian-Jun Jin, Michael Padmanaba, Jun-Bo Yang, Richard T. Corlett. 2017. Evolutionary comparisons of the chloroplast genome in Lauraceae and insights into loss events in the Magnoliids. Genome biology and evolution. 9(9): 2354-64. doi: [https://doi.org/10.1093/gbe/evx180](https://doi.org/10.1093/gbe/evx180)
+Yu Song, Wen-Bin Yu, Yun-Bong Tan, Bing Liu, Xin Yao, Jian-Jun Jin, Michael Padmanaba, Jun-Bo Yang, Richard T. Corlett. 2017. Evolutionary comparisons of the chloroplast genome in Lauraceae and insights into loss events in the Magnoliids. Genome Biology and Evolution. 9(9): 2354-64. doi: [https://doi.org/10.1093/gbe/evx180](https://doi.org/10.1093/gbe/evx180)
 
 Twyford AD, Ness RW. 2017. Strategies for complete plastid genome sequencing. Molecular Ecology Resources. 17(5):858-68. doi: [https://doi.org/10.1111/1755-0998.12626](https://doi.org/10.1111/1755-0998.12626)
 

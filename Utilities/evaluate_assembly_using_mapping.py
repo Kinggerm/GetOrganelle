@@ -20,8 +20,11 @@ def get_options():
     parser.add_option("-2", dest="original_fq_2")
     parser.add_option("--max-lib-len", dest="max_lib_len", type=int, default=1200,
                       help="default: %default.")
-    parser.add_option("-c", dest="is_circular", default=False, action="store_true",
-                      help="input assembly result is circular.")  # detect by endswith "circular"
+    parser.add_option("-c", dest="is_circular", default="auto",
+                      help="(yes/no/auto) input fasta is circular. "
+                           "If auto was chosen, the input fasta would be treated as circular when the sequence name "
+                           "ends with '(circular)'."
+                           "Default: auto")
     parser.add_option("-o", dest="output_base",
                       help="output folder.")
     parser.add_option("-t", dest="threads", type=int, default=2,
@@ -83,10 +86,23 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
 
 
 def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
-    if is_circular:
+    if is_circular == "yes":
         fasta_ob = SequenceList(original_fasta)
         for record in fasta_ob:
             if len(record.seq):
+                to_add = record.seq[:max_lib_len]
+                added_len = len(to_add)
+                record.seq += to_add
+                # in case ref is extremely short
+                while added_len < max_lib_len:
+                    to_add = record.seq[:(max_lib_len - added_len)]
+                    added_len += len(to_add)
+                    record.seq += to_add
+        fasta_ob.write_fasta(new_fasta)
+    elif is_circular == "auto":
+        fasta_ob = SequenceList(original_fasta)
+        for record in fasta_ob:
+            if len(record.seq) and record.label.endswith("(circular)"):
                 to_add = record.seq[:max_lib_len]
                 added_len = len(to_add)
                 record.seq += to_add

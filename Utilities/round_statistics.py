@@ -190,6 +190,8 @@ def main():
         log.info("\t".join([str(val) for val in this_result]))
     # draw
     if options.draw_plot:
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         len_round = len(results_to_draw)
         figure = plt.figure(figsize=(50, len_round*3))

@@ -163,14 +163,16 @@ def main():
     new_fasta = os.path.join(options.output_base, "modified.fasta")
     if not (options.resume and os.path.exists(new_fasta)):
         modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
-    mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
-                         bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
-                         resume=options.resume, threads=options.threads, log=log_handler)
+    # mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
+    #                      bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
+    #                      resume=options.resume, threads=options.threads, log=log_handler)
     ref_lengths = {record.label.split()[0]: len(record.seq) for record in SequenceList(options.fasta)}
     mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
     sequence_statistics = mapping_records.get_customized_mapping_characteristics()
 
     if options.draw_plot:
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         # make data and default settings
         gap_len = 1000

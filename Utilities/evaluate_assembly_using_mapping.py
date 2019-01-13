@@ -59,6 +59,8 @@ def get_options():
                       help="Default: %default")
     # parser.add_option("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
     #                   help="Default: %default")
+    parser.add_option("--debug", dest="debug_mode", default=False, action="store_true",
+                      help="Turn on debug mode.")
     options, argv = parser.parse_args()
     if not (options.fasta and options.original_fq_1 and options.original_fq_2 and options.output_base):
         sys.stderr.write("Insufficient arguments!\n")
@@ -72,22 +74,37 @@ def get_options():
     return options, log
 
 
-def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, max_lib_len, resume, threads, log):
+def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, max_lib_len,
+                         resume, threads, log_handler, debug):
     if not (os.path.exists(seed_file + '.index.1.bt2l')):
+        if debug:
+            log_handler.info("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index')
         build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = build_seed_index.communicate()
         if "unrecognized option" in str(output):
+            if debug:
+                log_handler.info("Failed. Retry ...")
+                log_handler.info("bowtie2-build " + seed_file + " " + seed_file + '.index')
             build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
+            if debug:
+                log_handler.info('\n' + str(output))
         if "(ERR)" in str(output) or "Error:" in str(output) or "error" in str(output):
-            log.error('\n' + str(output))
+            log_handler.error('\n' + str(output))
             exit()
+        elif debug:
+            log_handler.info('\n' + str(output))
     seed_index_base = seed_file + '.index'
     res_path_name, res_base_name = os.path.split(bowtie_out)
     total_seed_sam = [os.path.join(res_path_name, x + res_base_name + ".sam") for x in ("temp.", "")]
     if not (resume and os.path.exists(total_seed_sam[1])):
+        if debug:
+            log_handler.info("bowtie2 --mm -p " + str(threads) + " -X " + str(max_lib_len) +
+                             " --no-discordant --dovetail" + " --sensitive -x " + seed_index_base +
+                             " -1 " + original_fq_1 + " -2 " + original_fq_2 + " -S " + total_seed_sam[0] +
+                             " --no-unal --omit-sec-seq -t")
         make_seed_bowtie2 = subprocess.Popen(
             "bowtie2 --mm -p " + str(threads) + " -X " + str(max_lib_len) + " --no-discordant --dovetail" +
             " --sensitive -x " + seed_index_base + " -1 " + original_fq_1 + " -2 " + original_fq_2 +
@@ -95,12 +112,14 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
         if "(ERR)" in str(output) or "Error:" in str(output):
-            log.error('\n' + str(output))
+            log_handler.error('\n' + str(output))
             exit()
+        elif debug:
+            log_handler.info('\n' + str(output))
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
         else:
-            log.error("Cannot find bowtie2 result!")
+            log_handler.error("Cannot find bowtie2 result!")
             exit()
 
 
@@ -211,7 +230,7 @@ def main():
         modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
     mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
                          bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
-                         resume=options.resume, threads=options.threads, log=log_handler)
+                         resume=options.resume, threads=options.threads, log_handler=log_handler, debug=options.debug_mode)
     ref_lengths = {record.label.split()[0]: len(record.seq) for record in SequenceList(options.fasta)}
     mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
     sequence_statistics = mapping_records.get_customized_mapping_characteristics()
@@ -294,6 +313,9 @@ def main():
         plt.title("  " + (options.plot_title if options.plot_title else options.fasta), fontsize=18, loc='left')
         subtitle_x_pos = x_data_len + (1 - plot_area_r) * fig_width * options.plot_x_density
         subtitle_y_pos = max_y_dat * (1 + (1. / (1 - 2 * title_height_percent) - 1) / 8)
+
+        # !!! plot # of mapped reads/paired mapped reads
+
         for subtitle_str in [sub_str.strip() for sub_str in options.plot_subtitle.split("    ")]:
             plt.text(subtitle_x_pos, subtitle_y_pos, subtitle_str, fontsize=12, alpha=0.7,
                      horizontalalignment='right', verticalalignment='center', multialignment='center')

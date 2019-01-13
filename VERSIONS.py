@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0b",
+     "features": [
+         "1.evaluate_assembly_using_mapping.py: --debug added",
+         "2.slim_fastg.py: compatible with older python version"
+     ]},
     {"number": "1.5.0a",
      "features": [
          "1.evaluate_assembly_using_mapping.py: modifying the layout; plot options added",

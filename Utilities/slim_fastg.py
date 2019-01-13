@@ -113,7 +113,7 @@ def require_commands():
         sys.stdout.write('\n\n"-h" for more usage')
         exit()
     else:
-        if options.treat_no_hits not in {"ex_no_con", "ex_no_hit", "keep_all"}:
+        if options.treat_no_hits not in ["ex_no_con", "ex_no_hit", "keep_all"]:
             sys.stdout.write('\n\nOption Error: you should choose assign one of "ex_no_con", "ex_no_hit"'
                              ' and "keep_all" to variable treat_no_hits')
             exit()
@@ -136,7 +136,7 @@ def require_commands():
                 sys.stdout.write('\n\nOption Error: since you have include and exclude chosen, '
                                  'one of them should be assigned priority!')
                 exit()
-            if ex_chosen == 1 and in_chosen == 0 and (options.treat_no_hits in {"ex_no_con", "ex_no_hit"}):
+            if ex_chosen == 1 and in_chosen == 0 and (options.treat_no_hits in ["ex_no_con", "ex_no_hit"]):
                 sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!')
                 exit()
         elif options.builtin_mode == 'plant_cp':
@@ -488,7 +488,7 @@ def map_names(in_names, ex_names, candidates, is_fastg, aver_in_dep, coverages, 
                 short_candidates[this_short] = [candidate]
     accepted = set()
     if options.exclude_priority:
-        if options.treat_no_hits in {"ex_no_con", "ex_no_hit"}:
+        if options.treat_no_hits in ["ex_no_con", "ex_no_hit"]:
             for this_short, full_name in short_candidates.items():
                 if this_short in ex_names:
                     pass
@@ -505,7 +505,7 @@ def map_names(in_names, ex_names, candidates, is_fastg, aver_in_dep, coverages, 
                     for name in full_name:
                         accepted.add(name)
     elif options.include_priority or options.include:
-        if options.treat_no_hits in {"ex_no_con", "ex_no_hit"}:
+        if options.treat_no_hits in ["ex_no_con", "ex_no_hit"]:
             for this_short, full_name in short_candidates.items():
                 if this_short in in_names:
                     for name in full_name:

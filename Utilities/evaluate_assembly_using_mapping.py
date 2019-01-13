@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# coding:utf8
 
 from optparse import OptionParser
 import os
@@ -9,7 +10,15 @@ from Library.pipe_control_func import *
 from Library.seq_parser import *
 from Library.sam_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-from math import ceil
+from sympy import Interval
+import sys
+
+try:
+    # python2 UnicodeDecodeError ±
+    reload(sys)
+    sys.setdefaultencoding('utf8')
+except NameError:
+    pass
 
 
 def get_options():
@@ -36,8 +45,20 @@ def get_options():
                       help='Default: pdf,png')
     parser.add_option("--plot-title", dest="plot_title",
                       help="Default: `the file name of the input fasta`")
+    parser.add_option("--plot-subtitle", dest="plot_subtitle", default="",
+                      help="A 4-space indicates a line break. Default: None")
     parser.add_option("--plot-transparent", dest="plot_transparent", default=False,
                       help="Default: False")
+    parser.add_option("--plot-x-density", dest="plot_x_density", default=12000., type=float,
+                      help="Default: %default")
+    parser.add_option("--plot-x-sliding-window", dest="sliding_window_size", default=1, type=int,
+                      help="Default: %default")
+    parser.add_option("--plot-x-gap-dots", dest="gap_len", default=3000, type=int,
+                      help="Number of sites added in-between isolated contigs. Default: %default")
+    parser.add_option("--plot-figure-height", dest="figure_height", default=5., type=float,
+                      help="Default: %default")
+    # parser.add_option("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
+    #                   help="Default: %default")
     options, argv = parser.parse_args()
     if not (options.fasta and options.original_fq_1 and options.original_fq_2 and options.output_base):
         sys.stderr.write("Insufficient arguments!\n")
@@ -114,7 +135,7 @@ def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
         os.system("cp " + original_fasta + " " + new_fasta)
 
 
-def adjust_horizontally(max_val, min_val=0, soft_min_gap=20, *y_positions):
+def adjust_horizontally_in_one_line(max_val, min_val=0, soft_min_gap=20., *y_positions):
     record_original_order = [[this_y_pos, raw_order] for raw_order, this_y_pos in enumerate(y_positions)]
     record_original_order.sort()
     len_val = len(record_original_order)
@@ -158,14 +179,39 @@ def adjust_horizontally(max_val, min_val=0, soft_min_gap=20, *y_positions):
     return [new_val[0] for new_val in record_original_order]
 
 
+def adjust_horizontally_in_different_lines(middle_y, min_graph_dist, x_factor=1., y_factor=1., *sorted_x_y_positions):
+    x_y_positions = deepcopy(sorted_x_y_positions)
+    for go_p, (x_pos, y_pos) in enumerate(x_y_positions):
+        if go_p > 0 and (x_pos - x_y_positions[go_p - 1][0]) * x_factor < min_graph_dist:
+            go_back = go_p - 1
+            constraints = Interval(-inf, inf)
+            while go_back >= 0 and (x_pos - x_y_positions[go_back][0]) * x_factor < min_graph_dist:
+                prev_x = x_y_positions[go_back][0]
+                if len(x_y_positions[go_back][1]):
+                    prev_y = sum(x_y_positions[go_back][1]) / len(x_y_positions[go_back][1])
+                else:
+                    prev_y = 0.
+                y_move = (min_graph_dist ** 2 - ((x_pos - prev_x) * x_factor) ** 2) ** 0.5 / y_factor
+                constraints &= (Interval(-inf, prev_y - y_move) | Interval(prev_y + y_move, inf))
+                go_back -= 1
+            if middle_y not in constraints:
+                new_average_y = sorted(constraints.boundary, key=lambda cons_y: abs(cons_y-middle_y))[0]
+                if len(y_pos):
+                    old_y = sum(y_pos) / len(y_pos)
+                else:
+                    old_y = 0.
+                x_y_positions[go_p][1] = x_y_positions[go_p][1] - (old_y - new_average_y)
+    return x_y_positions
+
+
 def main():
     options, log_handler = get_options()
     new_fasta = os.path.join(options.output_base, "modified.fasta")
     if not (options.resume and os.path.exists(new_fasta)):
         modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
-    # mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
-    #                      bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
-    #                      resume=options.resume, threads=options.threads, log=log_handler)
+    mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
+                         bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
+                         resume=options.resume, threads=options.threads, log=log_handler)
     ref_lengths = {record.label.split()[0]: len(record.seq) for record in SequenceList(options.fasta)}
     mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
     sequence_statistics = mapping_records.get_customized_mapping_characteristics()
@@ -175,13 +221,18 @@ def main():
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         # make data and default settings
-        gap_len = 1000
-        slide_window_size = 1
+        gap_len = options.gap_len
+        extra_width = 3.  # options.extra_width
+        sliding_w_size = options.sliding_window_size
         x_data_len = gap_len * (len(mapping_records.references) - 1) \
-                     + sum([ceil(mapping_records.references[ref]["real_len"]/float(slide_window_size))
-                            for ref in mapping_records.references])
-        fig_width, fig_height = x_data_len * slide_window_size / 10000, 5
-        plot_area_l, plot_area_r, plot_area_b, plot_area_t = 0.06, 0.88, 0.09, 0.91
+                     + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
+        fig_width = extra_width + x_data_len / options.plot_x_density
+        fig_height = options.figure_height
+        extra_percent = extra_width / fig_width
+        title_height_percent = 0.09
+        add_extra_to_left = 0.27   # for extra_width==3
+        plot_area_l, plot_area_r = extra_percent * add_extra_to_left, 1 - extra_percent * (1 - add_extra_to_left)
+        plot_area_b, plot_area_t = title_height_percent, 1 - title_height_percent
         cigar_chars = ["M", "X", "I", "D"]
         cigar_char_dict = {"M": "Aligned", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
         color_used = {"M": [(0.133, 0.616, 0.361), 0.5],
@@ -193,6 +244,7 @@ def main():
         y_data = {}
         # log mean and std
         y_stat = {}
+        max_y_dat = 0
         for cigar_char in cigar_chars:
             y_stat[cigar_char] = {"subset": [], "all": []}
             this_cover = []
@@ -202,18 +254,26 @@ def main():
                 ref = ref_list.pop(0)
                 averaged_cover = sequence_statistics[cigar_char][ref]
                 this_mean, this_std = round(np.average(averaged_cover), 2), round(float(np.std(averaged_cover)), 2)
+
                 y_stat[cigar_char]["subset"].append((this_mean, this_std, len(averaged_cover)))
-                if slide_window_size != 1:
-                    averaged_cover = np.array([np.average(averaged_cover[j: j + slide_window_size])
-                                               for j in range(0, len(averaged_cover), slide_window_size)])
+                if sliding_w_size != 1:
+                    new_averaged_cover = []
+                    for j in range(len(averaged_cover)):
+                        if j % sliding_w_size:
+                            new_averaged_cover.append(0)
+                        else:
+                            new_averaged_cover.append(np.average(averaged_cover[j: j + sliding_w_size]))
+                    averaged_cover = np.array(new_averaged_cover)
                 this_cover.extend(averaged_cover)
                 this_cover_for_stat.extend(averaged_cover)
+                max_y_dat = max(max(averaged_cover), max_y_dat)
                 if ref_list:
                     this_cover.extend([0] * gap_len)
             y_data[cigar_char] = np.ma.masked_where(np.array(this_cover) <= 0, this_cover)
             y_stat[cigar_char]["all"] = \
                 round(np.average(this_cover_for_stat), 2), round(float(np.std(this_cover_for_stat)), 2)
-        max_y_dat = max([max(y_data[temp_sub]) for temp_sub in y_data])
+        if not max_y_dat:
+            raise ValueError("No mapped reads found!")
 
         # create figure
         fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
@@ -221,6 +281,8 @@ def main():
         # ax.spines['bottom'].set_visible(False)
         ax.spines['right'].set_visible(False)
         # ax.spines['left'].set_visible(False)
+        plt.setp(ax.get_xticklabels(), fontsize=12)
+        plt.setp(ax.get_yticklabels(), fontsize=12)
         fig.subplots_adjust(left=plot_area_l, right=plot_area_r, bottom=plot_area_b, top=plot_area_t)
 
         lines = plt.plot(x_data, y_data["M"], 'o',
@@ -228,8 +290,14 @@ def main():
                          x_data, y_data["I"], 'o',
                          x_data, y_data["D"], 'o')
         for go_to, this_char in enumerate(cigar_chars):
-            plt.setp(lines[go_to], color=color_used[this_char][0], alpha=color_used[this_char][1], markersize=0.18)  # linewidth=0.3
-        plt.title(options.plot_title if options.plot_title else options.fasta, fontsize=18)
+            plt.setp(lines[go_to], color=color_used[this_char][0], alpha=color_used[this_char][1], markersize=0.2)
+        plt.title("  " + (options.plot_title if options.plot_title else options.fasta), fontsize=18, loc='left')
+        subtitle_x_pos = x_data_len + (1 - plot_area_r) * fig_width * options.plot_x_density
+        subtitle_y_pos = max_y_dat * (1 + (1. / (1 - 2 * title_height_percent) - 1) / 8)
+        for subtitle_str in [sub_str.strip() for sub_str in options.plot_subtitle.split("    ")]:
+            plt.text(subtitle_x_pos, subtitle_y_pos, subtitle_str, fontsize=12, alpha=0.7,
+                     horizontalalignment='right', verticalalignment='center', multialignment='center')
+            subtitle_y_pos -= max_y_dat / options.figure_height / 4.  # for fontsize==2
 
         # write to log
         line_labels = {c_: full_name + ": " + "%.2f" % y_stat[c_]["all"][0] + "±" + "%.2f" % y_stat[c_]["all"][1]
@@ -243,21 +311,38 @@ def main():
             log_handler.info(log_line)
 
         # plot txt
-        new_y_pos = adjust_horizontally(max_y_dat, 0, 20,
-                                        y_stat["M"]["subset"][-1][0],
-                                        y_stat["X"]["subset"][-1][0],
-                                        y_stat["I"]["subset"][-1][0],
-                                        y_stat["D"]["subset"][-1][0])
+        new_y_pos = adjust_horizontally_in_one_line(max_y_dat, 0, max_y_dat / 20,
+                                                    y_stat["M"]["subset"][-1][0],
+                                                    y_stat["X"]["subset"][-1][0],
+                                                    y_stat["I"]["subset"][-1][0],
+                                                    y_stat["D"]["subset"][-1][0])
         for go_to, this_char in enumerate(cigar_chars):
-            plt.text(x_data_len * 1.01, new_y_pos[go_to], line_labels[this_char],
+            plt.text(x_data_len + 0.05 * options.plot_x_density, new_y_pos[go_to], line_labels[this_char],
                      color=color_used[this_char][0], fontsize=12)
-        middle_pos = (y_stat["M"]["subset"][-1][0] - y_stat["M"]["subset"][-1][1] +
-                      y_stat["X"]["subset"][-1][0] + y_stat["X"]["subset"][-1][1]) / 2
-        middle_set = middle_pos + 27, middle_pos + 9, middle_pos - 9, middle_pos - 27
+        if max_y_dat / y_stat["M"]["subset"][-1][0] > 2.:
+            middle_pos = (y_stat["M"]["subset"][-1][0] + y_stat["M"]["subset"][-1][1] + max_y_dat) / 2
+        else:
+            middle_pos = (y_stat["M"]["subset"][-1][0] - y_stat["M"]["subset"][-1][1] +
+                          y_stat["X"]["subset"][-1][0] + y_stat["X"]["subset"][-1][1]) / 2
+        middle_set = np.array([middle_pos + max_y_dat/15, middle_pos + max_y_dat/45,
+                               middle_pos - max_y_dat/45, middle_pos - max_y_dat/15])
+        x_y_pos = []
+        this_accumulated_pos = 0
+        for this_mean_cov, this_std_cov, this_len in y_stat["M"]["subset"]:
+            x_y_pos.append([this_accumulated_pos + this_len / 2, deepcopy(middle_set)])
+            this_accumulated_pos += this_len + gap_len
+        width_over_x = (fig_width - extra_width) / x_data_len
+        height_over_y = fig_height / max_y_dat
+        new_x_y_pos = adjust_horizontally_in_different_lines(np.average(middle_set),
+                                                             (fig_height**2 + (fig_width - extra_width)**2)**0.5 / 10,
+                                                             width_over_x, height_over_y,
+                                                             *x_y_pos)
+        label_x_offset = -0.3 / width_over_x
         for go_to, this_char in enumerate(cigar_chars):
             accumulated_pos = 0
-            for this_mean_cov, this_std_cov, this_len in y_stat[this_char]["subset"]:
-                plt.text(accumulated_pos + this_len / 2, middle_set[go_to],
+            for go_subset, (this_mean_cov, this_std_cov, this_len) in enumerate(y_stat[this_char]["subset"]):
+                this_x, this_y = new_x_y_pos[go_subset]
+                plt.text(this_x + label_x_offset, this_y[go_to],
                          "%.2f" % this_mean_cov + "±" + "%.2f" % this_std_cov,
                          color=color_used[this_char][0], fontsize=9)
                 accumulated_pos += this_len + gap_len

@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0a",
+     "features": [
+         "1.evaluate_assembly_using_mapping.py: modifying the layout; plot options added",
+     ]},
     {"number": "1.5.0",
      "features": [
          "1.evaluate_assembly_using_mapping.py added",

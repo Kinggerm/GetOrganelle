@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0c",
+     "features": [
+         "1.evaluate_assembly_using_mapping.py & sam_parser.py: mapped reads counted; echo bug correctly",
+     ]},
     {"number": "1.5.0b",
      "features": [
          "1.evaluate_assembly_using_mapping.py: --debug added",

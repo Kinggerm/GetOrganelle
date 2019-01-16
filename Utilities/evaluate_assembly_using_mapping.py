@@ -82,7 +82,7 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
         build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = build_seed_index.communicate()
-        if "unrecognized option" in str(output):
+        if "unrecognized option" in output.decode("utf8"):
             if debug:
                 log_handler.info("Failed. Retry ...")
                 log_handler.info("bowtie2-build " + seed_file + " " + seed_file + '.index')
@@ -90,12 +90,12 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
             if debug:
-                log_handler.info('\n' + str(output))
-        if "(ERR)" in str(output) or "Error:" in str(output) or "error" in str(output):
-            log_handler.error('\n' + str(output))
+                log_handler.info('\n' + output.decode("utf8"))
+        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8") or "error" in output.decode("utf8"):
+            log_handler.error('\n' + output.decode("utf8"))
             exit()
         elif debug:
-            log_handler.info('\n' + str(output))
+            log_handler.info('\n' + output.decode("utf8"))
     seed_index_base = seed_file + '.index'
     res_path_name, res_base_name = os.path.split(bowtie_out)
     total_seed_sam = [os.path.join(res_path_name, x + res_base_name + ".sam") for x in ("temp.", "")]
@@ -111,11 +111,11 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
             " -S " + total_seed_sam[0] + " --no-unal --omit-sec-seq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
-        if "(ERR)" in str(output) or "Error:" in str(output):
-            log_handler.error('\n' + str(output))
+        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+            log_handler.error('\n' + output.decode("utf8"))
             exit()
         elif debug:
-            log_handler.info('\n' + str(output))
+            log_handler.info('\n' + output.decode("utf8"))
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
         else:
@@ -234,6 +234,8 @@ def main():
     ref_lengths = {record.label.split()[0]: len(record.seq) for record in SequenceList(options.fasta)}
     mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
     sequence_statistics = mapping_records.get_customized_mapping_characteristics()
+    num_mapped_reads = mapping_records.get_number_of_mapped_reads()
+    num_paired, num_single = num_mapped_reads["paired"], num_mapped_reads["single"]
 
     if options.draw_plot:
         import matplotlib
@@ -314,9 +316,12 @@ def main():
         subtitle_x_pos = x_data_len + (1 - plot_area_r) * fig_width * options.plot_x_density
         subtitle_y_pos = max_y_dat * (1 + (1. / (1 - 2 * title_height_percent) - 1) / 8)
 
-        # !!! plot # of mapped reads/paired mapped reads
-
-        for subtitle_str in [sub_str.strip() for sub_str in options.plot_subtitle.split("    ")]:
+        mapped_str = []
+        if num_paired:
+            mapped_str.append("# mapped pairs: " + str(int(num_paired / 2)))
+        if num_single:
+            mapped_str.append("# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
+        for subtitle_str in [sub_str.strip() for sub_str in options.plot_subtitle.split("    ")] + mapped_str:
             plt.text(subtitle_x_pos, subtitle_y_pos, subtitle_str, fontsize=12, alpha=0.7,
                      horizontalalignment='right', verticalalignment='center', multialignment='center')
             subtitle_y_pos -= max_y_dat / options.figure_height / 4.  # for fontsize==2
@@ -329,6 +334,8 @@ def main():
             " (" + ", ".join(["%.2f" % here_mean + "±" + "%.2f" % here_std
                               for here_mean, here_std, here_len in y_stat[cigar_char]["subset"]]) + ")"
             for cigar_char in cigar_chars]
+        echo_statistics.insert(0, "# mapped pairs: " + str(int(num_paired / 2)))
+        echo_statistics.insert(0, "# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
         for log_line in echo_statistics:
             log_handler.info(log_line)
 

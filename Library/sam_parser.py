@@ -182,6 +182,21 @@ class MapRecords:
                     self.coverages[ref][merge_pos_0based % this_real_len] += self.coverages[ref][merge_pos_0based]
                 del self.coverages[ref][this_real_len:]
 
+    def get_number_of_mapped_reads(self):
+        paired_reads_mapped = 0
+        single_end_mapped = 0
+        for query_key in self.queries:
+            is_this_mapped = False
+            is_next_mapped = False
+            for map_info in self.queries[query_key]:
+                is_this_mapped |= map_info.is_mapped
+                is_next_mapped |= map_info.is_mapped_next
+            if is_this_mapped and is_next_mapped:
+                paired_reads_mapped += 1
+            elif is_this_mapped:
+                single_end_mapped += 1
+        return {"paired": paired_reads_mapped, "single": single_end_mapped}
+
     def get_customized_mapping_characteristics(self, cigar_char_list=CIGAR_ALPHA, multiple_hits_mode="best"):
         mapping_statistics = {cigar_char: {ref: [0 for foo in range(self.references[ref]["index_len"])]
                                            for ref in self.references}

@@ -33,7 +33,7 @@ def get_options(print_title):
                       help="Depth factor for excluding non-target contigs. Default:%default")
     parser.add_option("--type-f", dest="type_factor", type=float, default=3.,
                       help="Type factor for identifying genome type tag. Default:%default")
-    parser.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
+    parser.add_option("--contamination-depth", dest="contamination_depth", default=3., type=float,
                       help="Depth factor for confirming contaminating contigs. Default:%default")
     parser.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
                       help="Similarity threshold for confirming contaminating contigs. Default:%default")
@@ -43,9 +43,15 @@ def get_options(print_title):
                       help="Depth factor for confirming parallel contigs. Default:%default")
     parser.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
                       help="Similarity threshold for confirming parallel contigs. Default:%default")
+    parser.add_option("--expected-max-size", dest="expected_max_size", default=200000, type=int,
+                      help="Expected maximum target genome size. Default: 200000 (-F plant_cp/fungus_mt), "
+                           "50000 (-F plant_nr/animal_mt/fungus_mt), 600000 (-F plant_mt)")
+    parser.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
+                      help="Expected mininum target genome size. Default: %default")
     parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
                       help="By default, this script would pick the contig with highest coverage among all parallel "
-                           "(polymorphic) contigs. Choose this flag to export all combinations.")
+                           "(polymorphic) contigs when degenerating was not applicable. "
+                           "Choose this flag to export all combinations.")
     parser.add_option("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
                       help="Minimum deviation factor for excluding non-target contigs. Default:%default")
     parser.add_option("--min-depth", dest="min_cov", type=float, default=0.,
@@ -77,6 +83,11 @@ def get_options(print_title):
         log.info(print_title)
         log.info(' '.join(sys.argv) + '\n')
         log = timed_log(log, options.output_directory, options.prefix + ".disentangle.")
+        if "--expected-max-size" not in sys.argv:
+            if options.mode == "plant_mt":
+                options.expected_max_size *= 3
+            elif options.mode in ("plant_nr", "animal_mt", "fungus_mt"):
+                options.expected_max_size /= 4
         return options, log
 
 
@@ -88,8 +99,8 @@ def main():
 
     @set_time_limit(options.time_limit)
     def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="plant_cp",
-                                      log_hard_cov_threshold=10.,
-                                      contamination_depth=5., contamination_similarity=5.,
+                                      log_hard_cov_threshold=10., expected_max_size=inf, expected_min_size=0,
+                                      contamination_depth=3., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
                                       min_sigma_factor=0.1, only_max_c=True, keep_temp=False, acyclic_allowed=False,
                                       verbose=False, log=None, debug=False):
@@ -120,6 +131,8 @@ def main():
                                                          contamination_similarity=contamination_similarity,
                                                          degenerate=degenerate, degenerate_depth=degenerate_depth,
                                                          degenerate_similarity=degenerate_similarity,
+                                                         expected_max_size=expected_max_size,
+                                                         expected_min_size=expected_min_size,
                                                          only_keep_max_cov=only_max_c,
                                                          min_sigma_factor=min_sigma_factor,
                                                          temp_graph=temp_graph,
@@ -186,6 +199,8 @@ def main():
                                       contamination_similarity=options.contamination_similarity,
                                       degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
                                       degenerate_similarity=options.degenerate_similarity,
+                                      expected_max_size=options.expected_max_size,
+                                      expected_min_size=options.expected_min_size,
                                       min_sigma_factor=options.min_sigma_factor,
                                       only_max_c=options.only_keep_max_cov, acyclic_allowed=options.acyclic_allowed,
                                       keep_temp=options.keep_temp_graph,

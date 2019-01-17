@@ -1186,7 +1186,7 @@ class Assembly:
                 log_handler.info("Consensus made: " + new_vertex + "\n")
 
     def processing_polymorphism(self, limited_vertices=None,
-                                contamination_depth=5., contamination_similarity=0.95,
+                                contamination_depth=3., contamination_similarity=0.95,
                                 degenerate=False, degenerate_depth=1.5, degenerate_similarity=0.98, warning_count=4,
                                 only_keep_max_cov=False, verbose=False, debug=False, log_handler=None):
         parallel_vertices_list = self.detect_parallel_vertices(limited_vertices=limited_vertices)
@@ -1205,6 +1205,8 @@ class Assembly:
         removing_contaminating_v = set()
         count_contamination_or_degenerate = 0
         count_using_only_max = 0
+        sub_sampling = 10000
+        half_kmer = int(self.__kmer/2)
         for prl_vertices in parallel_vertices_list:
             this_contamination_or_polymorphic = False
             this_using_only_max = False
@@ -1215,17 +1217,19 @@ class Assembly:
             polymorphic_vertices_with_directions = {(max_cov_vertex, direction_remained)}
             # hard to clearly identify the biological factors
             for this_v, this_direction in prl_vertices:
+                this_seq = self.vertex_info[this_v]["seq"][this_direction]
                 this_cov = self.vertex_info[this_v]["cov"]
                 if abs(log(this_cov/max_cov)) > contamination_depth:
-                    this_seq = self.vertex_info[this_v]["seq"][this_direction]
                     if abs(len(this_seq) - len(max_cov_seq)) / float(len(this_seq)) <= contamination_dif:
                         # too long to calculate, too long to be polymorphic
-                        if len(max(max_cov_seq, this_seq)) > 1E6:
+                        if max(len(max_cov_seq), len(this_seq)) > 1E5:
                             removing_irrelevant_v.add(this_v)
                         else:
-                            base_dif, proper_end = \
-                                find_string_difference(max_cov_seq, this_seq, max(2, int(len(this_seq) * 0.005)))
-                            if float(base_dif) / len(this_seq) < contamination_dif:
+                            seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
+                            seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
+                            base_dif, proper_end = find_string_difference(
+                                seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                            if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < contamination_dif:
                                 removing_contaminating_v.add(this_v)
                                 this_contamination_or_polymorphic = True
                             else:
@@ -1233,15 +1237,16 @@ class Assembly:
                     else:
                         removing_irrelevant_v.add(this_v)
                 elif degenerate and abs(log(this_cov/max_cov)) < degenerate_depth:
-                    this_seq = self.vertex_info[this_v]["seq"][this_direction]
                     if abs(len(this_seq) - len(max_cov_seq)) / float(len(this_seq)) <= degenerate_dif:
                         # too long to calculate, too long to be polymorphic
-                        if len(max(max_cov_seq, this_seq)) > 1E6:
+                        if max(len(max_cov_seq), len(this_seq)) > 1E5:
                             continue
                         else:
-                            base_dif, proper_end = \
-                                find_string_difference(max_cov_seq, this_seq, max(2, int(len(this_seq) * 0.005)))
-                            if float(base_dif) / len(this_seq) < degenerate_dif:
+                            seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
+                            seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
+                            base_dif, proper_end = find_string_difference(
+                                seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                            if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < degenerate_dif:
                                 this_contamination_or_polymorphic = True
                                 if len(this_seq) == len(max_cov_seq):
                                     polymorphic_vertices_with_directions.add((this_v, this_direction))
@@ -1251,18 +1256,28 @@ class Assembly:
                                 else:
                                     raise Exception("Cannot degenerate inequal-length polymorphic contigs: EDGE_" +
                                                     max_cov_vertex + " and EDGE_" + this_v + "!")
-                            elif only_keep_max_cov:
+                            elif only_keep_max_cov and float(base_dif)*2/(len(seq_1) + len(seq_2)) < contamination_dif:
                                 removing_irrelevant_v.add(this_v)
                                 this_contamination_or_polymorphic = True
                                 this_using_only_max = True
                     elif only_keep_max_cov:
+                        seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
+                        seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
+                        base_dif, proper_end = find_string_difference(
+                            seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                        if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < contamination_dif:
+                            removing_irrelevant_v.add(this_v)
+                            this_contamination_or_polymorphic = True
+                            this_using_only_max = True
+                elif only_keep_max_cov:
+                    seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
+                    seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
+                    base_dif, proper_end = find_string_difference(
+                        seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                    if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < contamination_dif:
                         removing_irrelevant_v.add(this_v)
                         this_contamination_or_polymorphic = True
                         this_using_only_max = True
-                elif only_keep_max_cov:
-                    removing_irrelevant_v.add(this_v)
-                    this_contamination_or_polymorphic = True
-                    this_using_only_max = True
             if len(polymorphic_vertices_with_directions) > 1:
                 self.generate_consensus_vertex([v_d[0] for v_d in polymorphic_vertices_with_directions],
                                                [v_d[1] for v_d in polymorphic_vertices_with_directions],
@@ -1310,8 +1325,8 @@ class Assembly:
                                      str(count_using_only_max) + " polymorphic loci.\n")
 
     def find_target_graph(self, tab_file, mode="plant_cp", type_factor=3, weight_factor=100.0,
-                          max_copy=8, min_sigma_factor=0.1,
-                          log_hard_cov_threshold=10., contamination_depth=5., contamination_similarity=0.95,
+                          max_copy=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
+                          log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
                           broken_graph_allowed=False, temp_graph=None, verbose=True,
                           read_len_for_log=None, kmer_for_log=None,
@@ -1594,7 +1609,12 @@ class Assembly:
                                 for single_copy_v in this_assembly_g.copy_to_vertex[1]:
                                     if single_copy_v not in this_parallel_names:
                                         this_absurd = False
-                                if not this_absurd:
+                                draft_size_estimates = 0
+                                for inside_v in this_assembly_g.vertex_info:
+                                    draft_size_estimates += \
+                                        (this_assembly_g.vertex_info[inside_v]["len"] - this_assembly_g.kmer()) * \
+                                        this_assembly_g.vertex_to_copy[inside_v]
+                                if not this_absurd or expected_min_size < draft_size_estimates < expected_max_size:
                                     absurd_copy_nums = False
                                     go_graph += 1
                                 else:
@@ -1619,7 +1639,8 @@ class Assembly:
                                                 log_handler=log_handler, verbose=verbose, debug=debug))
 
                                     del final_res_combinations[go_graph]
-
+                        if not final_res_combinations and absurd_copy_nums:
+                            raise Exception("Complicated graph! Detecting path(s) failed!\n")
                     if no_single_copy:
                         raise Exception("No single copy region?! Detecting path(s) failed!\n")
                 except (RecursionError, Exception) as e:

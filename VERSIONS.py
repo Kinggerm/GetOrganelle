@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0d",
+     "features": [
+         "1.disentangle: parallel contigs remained; --contamination-depth",
+         "2.seq_parser.py: find_string_dif adjusted",
+     ]},
     {"number": "1.5.0c",
      "features": [
          "1.evaluate_assembly_using_mapping.py & sam_parser.py: mapped reads counted; echo bug correctly",

@@ -220,7 +220,7 @@ def get_options(descriptions, version):
                                    "The genome type of contigs are determined by blast. "
                                    "You can also make the blast index by your self and add those index to '" +
                                    NOT_REF_PATH + "'. Default: %default")
-    group_assembly.add_option("--contamination-depth", dest="contamination_depth", default=5., type=float,
+    group_assembly.add_option("--contamination-depth", dest="contamination_depth", default=3., type=float,
                               help="Depth factor for confirming contamination in parallel contigs. Default: %default")
     group_assembly.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
                               help="Similarity threshold for confirming contaminating contigs. Default: %default")
@@ -233,6 +233,11 @@ def get_options(descriptions, version):
     group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=600, type=int,
                               help="Time limit (second) for each try of disentangling a graph file as a circular "
                                    "genome. Disentangling a graph as contigs is not limited. Default: %default")
+    group_assembly.add_option("--expected-max-size", dest="expected_max_size", default=200000, type=int,
+                              help="Expected maximum target genome size. Default: 200000 (-F plant_cp/fungus_mt), "
+                                   "50000 (-F plant_nr/animal_mt/fungus_mt), 600000 (-F plant_mt)")
+    group_assembly.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
+                              help="Expected mininum target genome size. Default: %default")
     # group 5
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "")
     group_computational.add_option("-t", dest="threads", type=int, default=1,
@@ -285,7 +290,7 @@ def get_options(descriptions, version):
                                "--no-gradient-k", "--genes", "--disentangle-df", "--contamination-depth",
                                "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--continue", "--index-in-memory",
+                               "--expected-max-size", "--expected-min-size", "--continue", "--index-in-memory",
                                "--remove-duplicates", "--flush-frequency", "--verbose"):
             parser.remove_option(not_often_used)
         parser.remove_option("-1")
@@ -537,6 +542,12 @@ def get_options(descriptions, version):
                 options.target_genome_size = 2 * sum([len(this_seq) for this_seq in ref_seqs])
                 log.info("Setting '--target-genome-size " + str(options.target_genome_size) +
                          "' for estimating the word size value.")
+        if "--expected-max-size" not in sys.argv:
+            if options.organelle_type == "plant_mt":
+                options.expected_max_size *= 3
+            elif options.organelle_type in ("plant_nr", "animal_mt", "fungus_mt"):
+                options.expected_max_size /= 4
+
         if options.organelle_type in ("fungus_mt", "animal_mt", "anonym"):
             global MAX_RATIO_RL_WS
             MAX_RATIO_RL_WS = 0.8
@@ -2156,14 +2167,15 @@ def unzip(source, target, line_limit, verbose_log, log):
 def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, ref_seq, read_len_for_log,
                              verbose, log_in, threads, options):
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
-                             mode="plant_cp", contamination_depth=5., contamination_similarity=5., degenerate=True,
-                             degenerate_depth=1.5, degenerate_similarity=1.5, hard_cov_threshold=10.,
+                             mode="plant_cp", contamination_depth=3., contamination_similarity=0.95, degenerate=True,
+                             degenerate_depth=1.5, degenerate_similarity=0.98,
+                             expected_max_size=inf, expected_min_size=0, hard_cov_threshold=10.,
                              min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'"):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
-        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="plant_cp", c_d=5., c_s=5.,
-                               deg=True, deg_dep=1.5, deg_sim=1.5, hard_c_t=10., min_s_f=0.1, max_c_in=True,
-                               acyclic_allowed_in=False, verbose_in=False):
+        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="plant_cp", c_d=3., c_s=0.95,
+                               deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
+                               max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False):
             from Library.assembly_parser import Assembly
             this_K = os.path.split(os.path.split(fastg_f)[0])[-1]
             o_p += "." + this_K
@@ -2179,6 +2191,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                                                            contamination_similarity=c_s,
                                                            degenerate=deg, degenerate_depth=deg_dep,
                                                            degenerate_similarity=deg_sim,
+                                                           expected_max_size=max_s, expected_min_size=min_s,
                                                            only_keep_max_cov=max_c_in,
                                                            min_sigma_factor=min_s_f,
                                                            weight_factor=w_f,
@@ -2211,8 +2224,8 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                         open(o_p + ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
                         log_in.info("Writing PATH" + str(count_path) + " of " + mode_in + " contig(s) to " + o_p +
-                                 ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
-                                 ".path_sequence.fasta")
+                                    ".contigs.graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                                    ".path_sequence.fasta")
                     log_in.info("Writing GRAPH to " + o_p + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
                     broken_graph.write_to_gfa(o_p + ".contigs.graph" + str(go_res + 1) + ".selected_graph.gfa")
                 log_in.info("Result status: " + ",".join(sorted([str(c_n) for c_n in contig_num])) + " contig(s)")
@@ -2250,6 +2263,7 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                            type_f=type_factor, mode_in=mode, c_d=contamination_depth, c_s=contamination_similarity,
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
                            hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
+                           max_s=expected_max_size, min_s=expected_min_size,
                            acyclic_allowed_in=here_acyclic_allowed, verbose_in=here_verbose)
 
     # start
@@ -2284,7 +2298,10 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                                      contamination_depth=options.contamination_depth,
                                      contamination_similarity=options.contamination_similarity,
                                      degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
-                                     degenerate_similarity=options.degenerate_similarity, here_only_max_c=True,
+                                     degenerate_similarity=options.degenerate_similarity,
+                                     expected_max_size=options.expected_max_size,
+                                     expected_min_size=options.expected_min_size,
+                                     here_only_max_c=True,
                                      here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_in,
                                      time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag)
                 # currently time is not limited for exporting contigs
@@ -2325,6 +2342,8 @@ def extract_organelle_genome(out_base, spades_output, prefix, organelle_type, re
                                              contamination_similarity=options.contamination_similarity,
                                              degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
                                              degenerate_similarity=options.degenerate_similarity,
+                                             expected_max_size=options.expected_max_size,
+                                             expected_min_size=options.expected_min_size,
                                              here_only_max_c=True, here_acyclic_allowed=True,
                                              time_limit=3600, timeout_flag_str=timeout_flag)
                 except ImportError:

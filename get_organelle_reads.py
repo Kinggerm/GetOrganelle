@@ -2641,7 +2641,8 @@ def main():
         """ export organelle """
         if is_assembled and options.organelle_type != '0':
             graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base) if gfa_f.endswith(".selected_graph.gfa")])
-            if resume and graph_existed:
+            fasta_existed = bool([fas_f for fas_f in os.listdir(out_base) if fas_f.endswith(".path_sequence.fasta")])
+            if resume and graph_existed and fasta_existed:
                 log.info("Slimming and disentangling graph ... skipped.")
             else:
                 log.info("Slimming and disentangling graph ...")

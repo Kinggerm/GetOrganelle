@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0e",
+     "features": [
+         "1.get_organelle_reads.py: --continue skip disentangling when *.gfa & *.fasta",
+     ]},
     {"number": "1.5.0d",
      "features": [
          "1.disentangle: parallel contigs remained; --contamination-depth",

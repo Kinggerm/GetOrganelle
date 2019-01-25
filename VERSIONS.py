@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0f",
+     "features": [
+         "1.disentangle: more instructive log.",
+         "2.round_statistics.py: set larger value to max_cov_tick",
+     ]},
     {"number": "1.5.0e",
      "features": [
          "1.get_organelle_reads.py: --continue skip disentangling when *.gfa & *.fasta",

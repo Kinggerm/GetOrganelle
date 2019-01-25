@@ -24,7 +24,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation
 
-This pipeline was written in python 3.5.1, but compatible with 2.7.11. GetOrganelle is more efficient under Python 3.*.
+This pipeline was written in python 3.5.1, but compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is more efficient under Python 3.*.
 
 Execute following simple git commands to download the latest version or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
 
@@ -46,6 +46,8 @@ then add GetOrganelle to the path:
     
     echo "export PATH" >> ~/.bash_profile
     
+    source ~/.bash_profile
+    
     # for Linux
     
     echo "PATH=$GetOrganellePATH/GetOrganelle:\$PATH" >> ~/.bashrc
@@ -53,6 +55,8 @@ then add GetOrganelle to the path:
     echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:\$PATH" >> ~/.bashrc
     
     echo "export PATH" >> ~/.bashrc
+    
+    source ~/.bashrc
     
 and make them writable/executable if they are not:
     
@@ -105,7 +109,7 @@ Take your input reference (fasta or bowtie index; the default is `Library/SeqRef
 
 <b>Producing Result</b>
 
-By default, SPAdes is automatically called and produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` if -F plant_cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend_plant_cp-del_plant_mt.csv`). 
+By default, SPAdes is automatically called to produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` if -F plant_cp been used) along with a tab-format annotation file (`assembly_graph.fastg.extend_plant_cp-del_plant_mt.csv`). 
 
 The `assembly_graph.fastg.extend_plant_cp-del_plant_mt.fastg` file along with the `assembly_graph.fastg.extend_plant_cp-del_plant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. 
 

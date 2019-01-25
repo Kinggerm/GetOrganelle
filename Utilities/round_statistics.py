@@ -206,6 +206,9 @@ def main():
                                  for n in range(0, len(y_values_list[-1]), width)]
         if options.max_cov_tick:
             y_tick_max = int(options.max_cov_tick)
+            # set larger value to max_cov_tick
+            for check_go in range(len(y_values_list)):
+                y_values_list[check_go] = min(y_tick_max, y_values_list[check_go])
         else:
             y_tick_max = ceil(max([max(y_v) for y_v in y_values_list])/100.) * 100
         y_ticks = [int(y_tick_max/3), int(y_tick_max*2/3), y_tick_max]

@@ -143,7 +143,8 @@ def get_options(descriptions, version):
     group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=100,
                                help="Maximum number of running rounds (>=2). Default: %default.")
     group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
-                               help="Minimum number of running rounds (>=1). If 'auto_word_size_step' is enabled "
+                               help="Minimum number of running rounds (>=1). (NOT suggested) "
+                                    "If 'auto_word_size_step' is enabled "
                                     "(see '--auto-wss' for more) and extending stopped before finishing the designed "
                                     "minimum rounds, automatically restart extending with a smaller word size. "
                                     "Default: %default")
@@ -178,8 +179,8 @@ def get_options(descriptions, version):
                                help="Roughly pre-reading the read characteristics, in which case a user-defined "
                                     "word size should be given. Default: Fa")
     group_extending.add_option("--auto-wss", dest="auto_word_size_step", default=0, type=int,
-                               help="The step of word size adjustment during extending process."
-                                    "Use 0 to disable this automatic adjustment (NOT suggested). Default: %default.")
+                               help="(NOT suggested) The step of word size adjustment during extending process."
+                                    "Use 0 to disable this automatic adjustment. Default: %default.")
     group_extending.add_option("--larger-auto-ws", dest="larger_auto_ws", default=False, action="store_true",
                                help="By using this flag, the empirical function for estimating W would tend to "
                                     "produce a relative larger W, which would speed up the matching in extending, "
@@ -1693,7 +1694,7 @@ def extending_reads(word_size, seed_file, seed_is_fq, original_fq_files, len_ind
                                     "'-w " + str(word_size + auto_word_size_step) + "'")
                 else:
                     log.info("No more reads found and terminated ...")
-                    log.warning("Terminated at an insufficient number of rounds, see '--auto-wss' and '-r' for more.")
+                    log.warning("Terminated at an insufficient number of rounds")  # see '--auto-wss' and '-r'.")
             else:
                 log.info("No more reads found and terminated ...")
         except WordsLimitException:
@@ -1704,7 +1705,7 @@ def extending_reads(word_size, seed_file, seed_is_fq, original_fq_files, len_ind
                     log.warning("Terminated at an insufficient number of rounds while '-w " + str(word_size) + "'")
                 else:
                     log.info("Hit the words limit and terminated ...")
-                    log.warning("Terminated at an insufficient number of rounds, see '--auto-wss', '-r' and "
+                    log.warning("Terminated at an insufficient number of rounds, see "
                                 "'--max-n-words' for more.")
             else:
                 log.info("Hit the words limit and terminated ...")

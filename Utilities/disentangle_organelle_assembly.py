@@ -208,8 +208,14 @@ def main():
         log = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
 
         log.info('\nTotal cost: ' + str(round(time.time() - time0, 4)) + 's\n')
-    except:
-        log.exception("")
+    except Exception as e:
+        if options.debug:
+            log.exception("")
+        else:
+            log.exception(str(e))
+        log.exception("Disentangling failed!")
+        if not options.acyclic_allowed:
+            log.info("You might try again with '--acyclic-allowed' to export contig(s) instead of circular genome.")
         log = simple_log(log, options.output_directory, options.prefix + ".disentangle.")
         log.info("\nTotal cost " + str(time.time() - time0))
         log.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")

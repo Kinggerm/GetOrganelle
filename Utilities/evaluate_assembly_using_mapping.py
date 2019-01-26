@@ -67,10 +67,14 @@ def get_options():
         sys.exit()
     if not os.path.isdir(options.output_base):
         os.mkdir(options.output_base)
-    log = simple_log(logging.getLogger(), options.output_base, "")
+    if options.debug:
+        log_level = "DEBUG"
+    else:
+        log_level = "INFO"
+    log = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
     log.info("")
     log.info(' '.join(sys.argv) + '\n')
-    log = timed_log(log, options.output_base, "")
+    log = timed_log(log, options.output_base, "", log_level=log_level)
     return options, log
 
 

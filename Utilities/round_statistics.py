@@ -35,16 +35,22 @@ def get_options():
     parser.add_option("--max-coverage-tick", dest="max_cov_tick")
     # parser.add_option("--average", default=False, action="store_true",
     #                   help="output average coverage.")
+    parser.add_option("--debug", dest="debug",
+                      help="Debug mode.")
     options, argv = parser.parse_args()
     if not (options.fasta and options.initial_mapped and options.output_base and options.output_per_round_dir):
         sys.stderr.write("Insufficient arguments!\n")
         sys.exit()
     if not os.path.isdir(options.output_base):
         os.mkdir(options.output_base)
-    log = simple_log(logging.getLogger(), options.output_base, "")
+    if options.debug:
+        log_level = "DEBUG"
+    else:
+        log_level = "INFO"
+    log = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
     log.info("")
     log.info(' '.join(sys.argv) + '\n')
-    log = timed_log(log, options.output_base, "")
+    log = timed_log(log, options.output_base, "", log_level=log_level)
     return options, log
 
 

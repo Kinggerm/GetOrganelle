@@ -121,7 +121,8 @@ def get_options(descriptions, version):
     group_scheme.add_option("--memory-save", dest="memory_save", default=False, action="store_true",
                             help="=\"--out-per-round -P 0 --remove-duplicates 0\" "
                                  "You can overwrite the value of a specific option listed above by adding "
-                                 "that option along with the \"--memory-save\" flag. ")
+                                 "that option along with the \"--memory-save\" flag. A larger '-R' value is suggested "
+                                 "when \"--memory-save\" is chosen.")
     group_scheme.add_option("--memory-unlimited", dest="memory_unlimited", default=False, action="store_true",
                             help="=\"-P 1E7 --index-in-memory --remove-duplicates 2E8 "
                                  "--min-quality-score -5 --max-ignore-percent 0\" "

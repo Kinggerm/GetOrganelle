@@ -10,6 +10,7 @@ versions = [
      "features": [
          "1.get_organelle_reads.py: fix a bug in --out-per-round & --min-quality-score, chop_seqs -> chop_seq_list",
          "2.get_organelle_reads.py: expand user-defined word size scope, 49 -> 29 (AUTO_MIN_WS, GLOBAL_MIN_WS)",
+         "3.README.md: updated",
      ]},
     {"number": "1.5.0f",
      "features": [

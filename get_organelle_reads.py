@@ -34,7 +34,8 @@ import subprocess
 
 DEAD_CODE = {"2.7+": 32512, "3.5+": 127}[PYTHON_VERSION]
 MAX_RATIO_RL_WS = 0.75
-GLOBAL_MIN_WS = 49
+AUTO_MIN_WS = 49
+GLOBAL_MIN_WS = 29
 
 
 def get_options(descriptions, version):
@@ -638,8 +639,8 @@ def trans_word_cov(word_cov, base_cov, mean_base_error_rate, read_length):
     return word_cov
 
 
-def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rate=0.015, log=None,
-                       max_discontinuous_prob=0.01, min_word_size=GLOBAL_MIN_WS, max_effective_word_cov=60,
+def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rate=0.015, log_handler=None,
+                       max_discontinuous_prob=0.01, min_word_size=AUTO_MIN_WS, max_effective_word_cov=60,
                        wc_bc_ratio_constant=0.35):
     echo_problem = False
     all_word_sizes = []
@@ -672,9 +673,9 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
         estimated_word_size = min(int(read_length * MAX_RATIO_RL_WS), max(min_word_size, estimated_word_size))
         all_word_sizes.append(int(round(estimated_word_size, 0)))
     if echo_problem:
-        if log:
-            log.warning("Guessing that you are using too few data for assembly!")
-            log.warning("GetOrganelle is still trying ...")
+        if log_handler:
+            log_handler.warning("Guessing that you are using too few data for assembly!")
+            log_handler.warning("GetOrganelle is still trying ...")
         else:
             sys.stdout.write("Guessing that you are using too few data for assembly!\n")
             sys.stdout.write("GetOrganelle is still trying ...\n")
@@ -748,13 +749,13 @@ def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, orig
             min_word_size, word_size, max_word_size = estimate_word_size(
                 base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
                 max_discontinuous_prob=0.05, min_word_size=70,
-                mean_error_rate=mean_error_rate, log=log, wc_bc_ratio_constant=wc_bc_ratio_constant - 0.03)
+                mean_error_rate=mean_error_rate, log_handler=log, wc_bc_ratio_constant=wc_bc_ratio_constant - 0.03)
         else:
             # standard dev
             min_word_size, word_size, max_word_size = estimate_word_size(
                 base_cov_values=base_cov_values, read_length=mean_read_len, target_size=target_genome_size,
-                max_discontinuous_prob=0.01, min_word_size=GLOBAL_MIN_WS,
-                mean_error_rate=mean_error_rate, log=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
+                max_discontinuous_prob=0.01, min_word_size=AUTO_MIN_WS,
+                mean_error_rate=mean_error_rate, log_handler=log, wc_bc_ratio_constant=wc_bc_ratio_constant)
         log.info("Setting '-w " + str(word_size) + "'")
         log.info("The automatically-estimated word size does not ensure the best choice.")
         log.info("If the result graph is not a circular organelle genome, ")
@@ -1388,11 +1389,19 @@ def extending_reads(word_size, seed_file, seed_is_fq, original_fq_files, len_ind
                     # clear former accepted words from memory
                     del acc_words
                     # then add new accepted words into memory
-                    acc_words = chop_seqs(
-                        fq_seq_simple_generator(
-                            [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
-                             range(len(original_fq_files))], split_pattern=low_quality_pattern, min_sub_seq=word_size),
-                        word_size)
+                    if keep_seq_parts:
+                        acc_words = chop_seq_list(
+                            fq_seq_simple_generator(
+                                [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
+                                 range(len(original_fq_files))],
+                                split_pattern=low_quality_pattern, min_sub_seq=word_size),
+                            word_size)
+                    else:
+                        acc_words = chop_seqs(
+                            fq_seq_simple_generator(
+                                [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
+                                 range(len(original_fq_files))]),
+                            word_size)
                     acc_contig_id_this_round = set()
                 log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(
                     len_al) + " AW " + str(len_aw) + inside_memory_usage)

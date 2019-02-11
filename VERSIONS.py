@@ -8,7 +8,8 @@ def get_versions():
 versions = [
     {"number": "1.5.0h",
      "features": [
-         "re-organize importing codes",
+         "1. re-organize importing codes",
+         "2. minimum of -R: 2 -> 1",
      ]},
     {"number": "1.5.0g",
      "features": [

@@ -144,7 +144,7 @@ def get_options(descriptions, version):
                                     "a certain value during pregrouping process and later changed during reads "
                                     "extending process. Similar to word size. Default: auto-estimated.")
     group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=100,
-                               help="Maximum number of running rounds (>=2). Default: %default.")
+                               help="Maximum number of running rounds (suggested: >=2). Default: %default.")
     group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
                                help="Minimum number of running rounds (>=1). (NOT suggested) "
                                     "If 'auto_word_size_step' is enabled "
@@ -311,7 +311,7 @@ def get_options(descriptions, version):
         parser.remove_option("-w")
         parser.add_option("-w", dest="word_size", help="Word size (W) for extension. Default: auto-estimated")
         parser.remove_option("-R")
-        parser.add_option("-R", dest="max_rounds", help="Maximum running rounds (>=2). Default: unlimited")
+        parser.add_option("-R", dest="max_rounds", help="Maximum running rounds (suggested: >=2). Default: unlimited")
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type", default="plant_cp",
                           help="Target organelle genome type: "
@@ -609,9 +609,9 @@ def get_options(descriptions, version):
         if options.min_rounds < 1:
             log.warning("illegal minimum rounds! Set to default: 1.")
             options.min_rounds = 1
-        if options.max_rounds and options.max_rounds < 2:
-            log.warning("illegal maximum rounds! Set to minimum: 2")
-            options.max_rounds = 2
+        if options.max_rounds and options.max_rounds < 1:
+            log.warning("illegal maximum rounds! Set to infinite")
+            options.max_rounds = inf
         return options, log, previous_attributes
 
 

@@ -9,6 +9,7 @@ sys.path.append(os.path.join(path_of_this_script, ".."))
 from Library.pipe_control_func import *
 from Library.seq_parser import *
 from Library.sam_parser import *
+from Library.statistical_func import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 from sympy import Interval
 import sys

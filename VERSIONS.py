@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.0h",
+     "features": [
+         "re-organize importing codes",
+     ]},
     {"number": "1.5.0g",
      "features": [
          "1.get_organelle_reads.py: fix a bug in --out-per-round & --min-quality-score, chop_seqs -> chop_seq_list",

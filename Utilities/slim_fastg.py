@@ -78,7 +78,7 @@ def require_commands():
                       help='Remove redundant low-coverage contigs that largely overlap some high-coverage contigs.')
     parser.add_option('--depth-cutoff', dest='depth_cutoff', default=10000.0, type=float,
                       help='After detection for target coverage, those beyond certain times (depth cutoff) of the'
-                           ' detected coverage would be excluded. Default: 100.0')
+                           ' detected coverage would be excluded. Default: 10000.0')
     parser.add_option('--min-depth', dest='min_depth', default=0., type=float,
                       help='Input a float or integer number. Filter fastg file by a minimum depth. Default: %default.')
     parser.add_option('--max-depth', dest='max_depth', default=inf, type=float,

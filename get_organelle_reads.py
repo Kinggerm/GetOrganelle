@@ -4,6 +4,7 @@ import datetime
 import sys
 import os
 from copy import deepcopy
+from math import inf
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
@@ -660,9 +661,11 @@ def estimate_word_size(base_cov_values, read_length, target_size, mean_error_rat
 
         # empirical functions:
         word_cov = min(max_effective_word_cov, base_cov * wc_bc_ratio_constant)
+        # min_word_cov = log(-1/(max_discontinuous_prob**(1/target_size) - 1))
         min_word_cov = 5
         while 1 - (1 - math.e ** (-min_word_cov)) ** target_size > max_discontinuous_prob:
             min_word_cov += 0.05
+        #
         wc_bc_ratio_max = 1 - (min_word_size - 1) / read_length
         if base_cov * wc_bc_ratio_max < min_word_cov:
             min_word_cov = base_cov * wc_bc_ratio_max
@@ -2472,6 +2475,8 @@ def main():
                         target_fq = read_file + ".fastq"
                         if not (os.path.exists(target_fq) and resume):
                             unzip(read_file, target_fq, int(4 * options.maximum_n_reads), options.verbose_log, log)
+                        if os.path.getsize(target_fq) == 0:
+                            raise ValueError("Empty file " + target_fq)
                         original_fq_files[file_id] = target_fq
                         reads_files_to_drop.append(target_fq)
 

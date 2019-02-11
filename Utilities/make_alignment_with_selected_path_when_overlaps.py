@@ -2,8 +2,8 @@
 # coding: utf8
 import os
 import sys
-import string
-import math
+# import string
+# import math
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))

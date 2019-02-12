@@ -40,7 +40,7 @@ def require_commands():
     parser = OptionParser(usage=usage)
     # parser.add_option('-o', dest='out_fastg_file', help='Output file')
     # filters
-    parser.add_option('-F', dest='builtin_mode', default='plant_cp',
+    parser.add_option('-F', dest='builtin_mode',
                       help='followed with mode plant_cp, plant_mt, plant_nr, animal_mt, fungus_mt (which means plant '
                            'chloroplast, plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion '
                            'separately; corresponding to certain arguments as following listed), or anonym (input '
@@ -170,7 +170,9 @@ def require_commands():
             else:
                 options.include_priority = options.genes_fasta
         else:
-            sys.stdout.write('\n\nOption Error: illegal value for -F!\n')
+            sys.stdout.write("\n############################################################################"
+                             "\nERROR: \"-F\" MUST be one of 'plant_cp', 'plant_mt', 'plant_nr', "
+                             "'animal_mt', 'fungus_mt', 'anonym'!\n\n")
             exit()
         if not len(args):
             sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!\n')

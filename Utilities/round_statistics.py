@@ -27,7 +27,7 @@ def get_options():
     parser.add_option("-t", dest="threads", type=int, default=2,
                       help="threads.")
     parser.add_option("--threshold", dest="threshold", default="0,10",
-                      help="sites with coverage above the threshold would be marked as covered. default:[%default]")
+                      help="sites with coverage above the threshold would be marked as covered. default: %default")
     parser.add_option("--continue", dest="resume", default=False, action="store_true")
     parser.add_option("--keep-temp", dest="keep_temp", default=False, action="store_true")
     parser.add_option("--draw", dest="draw_plot", default=False, action="store_true",
@@ -156,7 +156,7 @@ def main():
                 for site in range(1, len_ref_seq + 1):
                     if site in this_coverage[ref_bowtie] and this_coverage[ref_bowtie][site] > threshold:
                         count_site += 1
-                this_result.append(round(float(count_site) / len_ref_seq, 3))
+                this_result.append(float(count_site) / len_ref_seq)
             results_to_draw.append(this_coverage)
             # merge
             for ref in this_coverage:
@@ -176,7 +176,7 @@ def main():
                 for site in range(1, len_ref_seq + 1):
                     if site in all_coverages[ref_bowtie] and all_coverages[ref_bowtie][site] > threshold:
                         count_site += 1
-                this_result.append(round(float(count_site) / len_ref_seq, 3))
+                this_result.append(float(count_site) / len_ref_seq)
         else:
             for threshold in thresholds:
                 this_result.append("-")

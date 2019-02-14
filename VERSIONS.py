@@ -11,6 +11,7 @@ versions = [
          "1. re-organize importing codes",
          "2. minimum of -R: 2 -> 1",
          "3. slim_fastg.py: remove default -F",
+         "4. round_statistics.py: increase significant digits",
      ]},
     {"number": "1.5.0g",
      "features": [

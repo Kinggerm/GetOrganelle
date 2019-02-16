@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.1",
+     "features": [
+         "1. fix a bug in get_organelle_reads.py: pre_grouping(): generate_forward_and_reverse()",
+     ]},
     {"number": "1.5.0h",
      "features": [
          "1. re-organize importing codes",

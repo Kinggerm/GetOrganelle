@@ -9,6 +9,7 @@ versions = [
     {"number": "1.5.1",
      "features": [
          "1. fix a bug in get_organelle_reads.py: pre_grouping(): generate_forward_and_reverse()",
+         "2. fix a bug in evaluate_assembly_using_mapping.py: --debug",
      ]},
     {"number": "1.5.0h",
      "features": [

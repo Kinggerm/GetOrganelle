@@ -68,7 +68,7 @@ def get_options():
         sys.exit()
     if not os.path.isdir(options.output_base):
         os.mkdir(options.output_base)
-    if options.debug:
+    if options.debug_mode:
         log_level = "DEBUG"
     else:
         log_level = "INFO"

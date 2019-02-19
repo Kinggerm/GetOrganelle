@@ -172,7 +172,7 @@ def mapping_with_bowtie2_for_library(graph_fasta, fq_1, fq_2, out_base, threads,
             return False
 
 
-MEM_TRANS = {"K": 1000, "M": 1000000, "G":1000000000}
+MEM_TRANS = {"K": 1024, "M": 1048576, "G": 1073741824}
 
 
 class LogInfo:

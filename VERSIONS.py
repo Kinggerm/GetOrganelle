@@ -6,6 +6,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.1a",
+     "features": [
+         "1. get_organelle_reads.py: from math import inf is not compatible with Python2; -R default set to 1000",
+         "2. pipe_control_func.py: MEM_TRANS, influence summary_get_organelle_output.py",
+     ]},
     {"number": "1.5.1",
      "features": [
          "1. fix a bug in get_organelle_reads.py: pre_grouping(): generate_forward_and_reverse()",

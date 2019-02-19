@@ -4,7 +4,10 @@ import datetime
 import sys
 import os
 from copy import deepcopy
-from math import inf
+try:
+    from math import inf
+except ImportError:
+    inf = float("inf")
 from optparse import OptionParser, OptionGroup
 from VERSIONS import get_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
@@ -143,7 +146,7 @@ def get_options(descriptions, version):
                                help="Word size (W) for pre-grouping. Used to reproduce result when word size is "
                                     "a certain value during pregrouping process and later changed during reads "
                                     "extending process. Similar to word size. Default: auto-estimated.")
-    group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=100,
+    group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=1000,
                                help="Maximum number of running rounds (suggested: >=2). Default: %default.")
     group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
                                help="Minimum number of running rounds (>=1). (NOT suggested) "

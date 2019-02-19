@@ -148,11 +148,11 @@ To assembly animal mitochondria (currently only tested on limited samples, sugge
 
     get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_reference.fasta --genes animal_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F animal_mt
 
-See the detailed illustrations of those arguments by typing in:
+See a brief illustrations of those arguments by typing in:
 
     get_organelle_reads.py -h
     
-or see verbose illustrations:
+or see the detailed illustrations:
     
     get_organelle_reads.py --help
 

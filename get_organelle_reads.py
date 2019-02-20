@@ -159,14 +159,14 @@ def get_options(descriptions, version):
                                     "Default: 4E8 (-F plant_cp), 8E7 (-F plant_nr/fungus_mt), 4E7 (-F animal_mt), "
                                     "2E9 (-F plant_mt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=3,
-                               help="The wide of steps of checking words in reads during extending process "
+                               help="The length of step for checking words in reads during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
                                     "the faster the extension will be, "
                                     "the more risk of missing reads in low coverage area. "
                                     "Choose 1 to choose the slowest but safest extension strategy. Default: %default")
     group_extending.add_option("-M", dest="mesh_size", type=int, default=2,
                                help="(Beta parameter) "
-                                    "The wide of steps of building words from seeds during extending process "
+                                    "The length of step for building words from seeds during extending process "
                                     "(integer >= 1). When you have reads of high quality, the larger the number is, "
                                     "the faster the extension will be, "
                                     "the more risk of missing reads in low coverage area. "
@@ -1385,6 +1385,7 @@ def extending_reads(word_size, seed_file, seed_is_fq, original_fq_files, len_ind
             def summarise_round(acc_words, acc_contig_id_this_round, pre_aw, r_count, acc_num_words, unique_id):
                 len_aw = len(acc_words)
                 len_al = len(acc_contig_id_this_round)
+                # for check words limit; memory control
                 acc_num_words += len_aw - pre_aw
                 if this_process:
                     inside_memory_usage = " Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3))
@@ -1404,13 +1405,13 @@ def extending_reads(word_size, seed_file, seed_is_fq, original_fq_files, len_ind
                                 [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
                                  range(len(original_fq_files))],
                                 split_pattern=low_quality_pattern, min_sub_seq=word_size),
-                            word_size)
+                            word_size, mesh_size)
                     else:
                         acc_words = chop_seqs(
                             fq_seq_simple_generator(
                                 [os.path.join(round_dir, "Round." + str(r_count) + '_' + str(x + 1) + '.fq') for x in
                                  range(len(original_fq_files))]),
-                            word_size)
+                            word_size, mesh_size)
                     acc_contig_id_this_round = set()
                 log.info("Round " + str(r_count) + ': ' + str(unique_id + 1) + '/' + str(len_indices) + " AI " + str(
                     len_al) + " AW " + str(len_aw) + inside_memory_usage)
@@ -2588,7 +2589,7 @@ def main():
 
             # extending process
             log.info("Extending ...")
-            accepted_ids = set()
+            # accepted_ids = set()
             if options.auto_word_size_step:
                 if options.maximum_n_words <= options.soft_max_words:
                     log.info("Setting '--soft-max-words " + str(int(options.maximum_n_words)) + "'")

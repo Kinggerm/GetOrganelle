@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.1b",
+     "features": [
+         "1. get_organelle_reads.py: value of mesh size should have effect on --out-per-round (fix a bug since 1.4.2)",
+     ]},
     {"number": "1.5.1a",
      "features": [
          "1. get_organelle_reads.py: from math import inf is not compatible with Python2; -R default set to 1000",

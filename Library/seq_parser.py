@@ -347,46 +347,43 @@ def fq_seq_simple_generator(fq_dir_list, go_to_line=1, split_pattern=None, min_s
                     count += 1
 
 
-def chop_seqs(seq_generator_or_list, word_size):
+def chop_seqs(seq_generator_or_list, word_size, mesh_size=1):
     return_words = set()
     for seed in seq_generator_or_list:
         this_seq_len = len(seed)
         if this_seq_len >= word_size:
             cpt_seed = complementary_seq(seed)
-            for i in range(0, this_seq_len - word_size + 1):
-                forward = seed[i:i + word_size]
-                return_words.add(forward)
-                reverse = cpt_seed[i:i + word_size]
-                return_words.add(reverse)
+            temp_length = this_seq_len - word_size
+            for i in range(0, this_seq_len - word_size + 1, mesh_size):
+                return_words.add(seed[i:i + word_size])
+                return_words.add(cpt_seed[temp_length - i:this_seq_len - i])
     return return_words
 
 
-def chop_seqs_as_empty_dict(seq_generator_or_list, word_size):
+def chop_seqs_as_empty_dict(seq_generator_or_list, word_size, mesh_size=1):
     return_words = dict()
     for seed in seq_generator_or_list:
         this_seq_len = len(seed)
         if this_seq_len >= word_size:
             cpt_seed = complementary_seq(seed)
-            for i in range(0, this_seq_len - word_size + 1):
-                forward = seed[i:i + word_size]
-                return_words[forward] = 0
-                reverse = cpt_seed[i:i + word_size]
-                return_words[reverse] = 0
+            temp_length = this_seq_len - word_size
+            for i in range(0, this_seq_len - word_size + 1, mesh_size):
+                return_words[seed[i:i + word_size]] = 0
+                return_words[cpt_seed[temp_length - i:this_seq_len - i]] = 0
     return return_words
 
 
-def chop_seq_list(seq_generator_or_list, word_size):
+def chop_seq_list(seq_generator_or_list, word_size, mesh_size=1):
     return_words = set()
     for seed in seq_generator_or_list:
         for seq_part in seed:
             this_seq_len = len(seq_part)
             if this_seq_len >= word_size:
                 cpt_seed = complementary_seq(seq_part)
-                for i in range(0, this_seq_len - word_size + 1):
-                    forward = seq_part[i:i + word_size]
-                    return_words.add(forward)
-                    reverse = cpt_seed[i:i + word_size]
-                    return_words.add(reverse)
+                temp_length = this_seq_len - word_size
+                for i in range(0, this_seq_len - word_size + 1, mesh_size):
+                    return_words.add(seq_part[i:i + word_size])
+                    return_words.add(cpt_seed[temp_length - i:this_seq_len - i])
     return return_words
 
 

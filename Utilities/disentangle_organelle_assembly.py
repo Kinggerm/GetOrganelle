@@ -10,6 +10,7 @@ from Library.assembly_parser import *
 from Library.seq_parser import *
 from Library.pipe_control_func import logging, timed_log, simple_log, set_time_limit
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+import random
 
 
 def get_options(print_title):
@@ -64,6 +65,8 @@ def get_options(print_title):
                       help="export intermediate graph file.")
     parser.add_option("--time-limit", dest="time_limit", default=3600, type=int,
                       help="time limit for the disentangling process. Default:%default")
+    parser.add_option("--random-seed", dest="random_seed", default=12345, type=int,
+                      help="Random seed (only for disentangling at this moment). Default: %default")
     parser.add_option("--continue", dest="resume", default=False, action="store_true",
                       help="continue mode.")
     parser.add_option("--verbose", dest="verbose", default=False, action="store_true",
@@ -88,6 +91,8 @@ def get_options(print_title):
                 options.expected_max_size *= 3
             elif options.mode in ("plant_nr", "animal_mt", "fungus_mt"):
                 options.expected_max_size /= 4
+        random.seed(options.random_seed)
+        np.random.seed(options.random_seed)
         return options, log
 
 

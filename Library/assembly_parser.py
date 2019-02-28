@@ -1036,6 +1036,9 @@ class Assembly:
                                               cluster_limited=set_cluster, min_sigma_factor=min_sigma_factor)
         cluster_num = gmm_scheme["cluster_num"]
         parameters = gmm_scheme["parameters"]
+        print('testing', end="\n")
+        for temp in parameters:
+            print("  ", temp, end="\n")
         labels = gmm_scheme["labels"]
         if log_handler and (debug or verbose):
             log_handler.info("Labels: " + str(labels))
@@ -1493,6 +1496,8 @@ class Assembly:
                                         for del_v in new_assembly.vertex_clusters[j]:
                                             if del_v in new_assembly.tagged_vertices[mode]:
                                                 new_cov = new_assembly.vertex_info[del_v]["cov"]
+                                                print(new_cov)
+                                                print(parameters)
                                                 for mu, sigma in parameters:
                                                     if abs(new_cov - mu) < sigma:
                                                         if temp_graph:
@@ -1520,7 +1525,7 @@ class Assembly:
                     new_assembly.merge_all_possible_vertices()
                     new_assembly.tag_in_between(mode=mode)
 
-                    # no terminal vertices allowed
+                    # no tip contigs allowed
                     first_round = True
                     delete_those_vertices = set()
                     while first_round or delete_those_vertices:

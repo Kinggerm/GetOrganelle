@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.1c",
+     "features": [
+         "1. get_organelle_reads.py & disentangle_organelle_assembly.py: --random-seed added with default value 12345",
+     ]},
     {"number": "1.5.1b",
      "features": [
          "1. get_organelle_reads.py: value of mesh size should have effect on --out-per-round (fix a bug since 1.4.2)",

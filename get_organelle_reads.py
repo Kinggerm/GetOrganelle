@@ -19,6 +19,7 @@ PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 NOT_REF_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Library", "NotationReference")
 SEQ_REF_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Library", "SeqReference")
 import time
+import random
 
 
 MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
@@ -65,12 +66,12 @@ def get_options(descriptions, version):
                                 "files could be comma-separated lists such as 'seq1,seq2'.")
     group_inout.add_option("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
     group_inout.add_option("-s", dest="seed_file", default=os.path.join(SEQ_REF_PATH, "*.fasta"),
-                           help="Reference. Input fasta format file as initial seed. "
-                                "A reference sequence in GetOrganelle is only used for identifying initial "
+                           help="Seed sequence(s)/reference(s). Input fasta format file as initial seed. "
+                                "A seed sequence in GetOrganelle is only used for identifying initial "
                                 "organelle reads. The assembly process is purely de novo."
                                 "Default: '%default' (* depends on the value followed with flag '-F')")
     group_inout.add_option("-a", dest="anti_seed",
-                           help="Anti-reference. Not suggested unless what you really know what you are doing. "
+                           help="Anti-seed(s). Not suggested unless what you really know what you are doing. "
                                 "Input fasta format file as anti-seed, where the extension process "
                                 "stop. Typically serves as excluding chloroplast reads when extending mitochondrial "
                                 "reads, or the other way around. You should be cautious about using this option, "
@@ -272,6 +273,8 @@ def get_options(descriptions, version):
                                         "the calling of replicate reads. Default: %default.")
     group_computational.add_option("--flush-frequency", dest="echo_frequency", default=54321, type=int,
                                    help="Flush frequency for presenting progress. Default: %default")
+    group_computational.add_option("--random-seed", dest="random_seed", default=12345, type=int,
+                                   help="Random seed (only for disentangling at this moment). Default: %default")
     group_computational.add_option("--verbose", dest="verbose_log", action="store_true", default=False,
                                    help="Verbose output. Choose to enable verbose running log.")
 
@@ -514,7 +517,7 @@ def get_options(descriptions, version):
 
         if options.organelle_type in ("animal_mt", "fungus_mt"):
             log.warning("Currently GetOrganelle had been tested on limited animal & fungus samples!")
-            log.warning("The default references for animal & fungus are for temporary usage!")
+            log.warning("The default seed/references for animal & fungus are for temporary usage!")
             log.warning("No guarantee for success rate in animal & fungus samples!\n")
             if options.organelle_type == "fungus_mt":
                 log.warning("Too improve this, a customized close-related reference (-s reference.fasta) with its "
@@ -615,6 +618,13 @@ def get_options(descriptions, version):
         if options.max_rounds and options.max_rounds < 1:
             log.warning("illegal maximum rounds! Set to infinite")
             options.max_rounds = inf
+        random.seed(options.random_seed)
+        try:
+            import numpy as np
+        except ImportError:
+            pass
+        else:
+            np.random.seed(options.random_seed)
         return options, log, previous_attributes
 
 

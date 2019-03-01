@@ -1036,9 +1036,10 @@ class Assembly:
                                               cluster_limited=set_cluster, min_sigma_factor=min_sigma_factor)
         cluster_num = gmm_scheme["cluster_num"]
         parameters = gmm_scheme["parameters"]
-        print('testing', end="\n")
-        for temp in parameters:
-            print("  ", temp, end="\n")
+        # for debug
+        # print('testing', end="\n")
+        # for temp in parameters:
+        #     print("  ", temp, end="\n")
         labels = gmm_scheme["labels"]
         if log_handler and (debug or verbose):
             log_handler.info("Labels: " + str(labels))
@@ -1496,15 +1497,16 @@ class Assembly:
                                         for del_v in new_assembly.vertex_clusters[j]:
                                             if del_v in new_assembly.tagged_vertices[mode]:
                                                 new_cov = new_assembly.vertex_info[del_v]["cov"]
-                                                print(new_cov)
-                                                print(parameters)
+                                                # for debug
+                                                # print(new_cov)
+                                                # print(parameters)
                                                 for mu, sigma in parameters:
                                                     if abs(new_cov - mu) < sigma:
                                                         if temp_graph:
                                                             new_assembly.write_to_gfa(temp_graph)
                                                             new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
                                                         raise Exception("Complicated graph: please check around EDGE_" + del_v + "!"
-                                                                        "\ntags: " + str(new_assembly.vertex_info[del_v]["tags"][mode]))
+                                                                        "# tags: " + str(new_assembly.vertex_info[del_v]["tags"][mode]))
 
                             # remove other clusters
                             vertices_to_del = set()

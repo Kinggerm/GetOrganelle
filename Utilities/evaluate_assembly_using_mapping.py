@@ -251,7 +251,7 @@ def main():
         # make data and default settings
         gap_len = options.gap_len
         extra_width = 3.  # options.extra_width
-        sliding_w_size = 1  # options.sliding_window_size
+        sliding_w_size = 1   # options.sliding_window_size
         x_data_len = gap_len * (len(mapping_records.references) - 1) \
                      + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
         fig_width = extra_width + x_data_len / options.plot_x_density

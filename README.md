@@ -82,7 +82,7 @@ However, to get a complete organelle genome (such as a plastome) rather than org
 
 * Python libraries numpy, scipy, sympy are used to solve the assembly graph, and could be easily installed by typing in:
     
-    `pip install numpy scipy sympy` or `pip install --user numpy scipy sympy`
+    `pip install numpy scipy sympy` or `pip install --user numpy scipy sympy` 
 
 * <a href='http://cab.spbu.ru/software/spades/'>SPAdes</a> is the assembler
 

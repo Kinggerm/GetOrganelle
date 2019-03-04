@@ -82,13 +82,13 @@ However, to get a complete organelle genome (such as a plastome) rather than org
 
 * Python libraries numpy, scipy, sympy are used to solve the assembly graph, and could be easily installed by typing in:
     
-    pip install numpy scipy sympy
+    `pip install numpy scipy sympy` or `pip install --user numpy scipy sympy`
 
 * <a href='http://cab.spbu.ru/software/spades/'>SPAdes</a> is the assembler
 
 * <a href='http://bowtie-bio.sourceforge.net/bowtie2/index.shtml'>Bowtie2</a> is used to speed up initial recruitment of target-like reads
 
-* <a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST+</a> is used to filter target-like contigs and simplify the final assembly graph
+* <a href='http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastNews'>BLAST+</a> is used to filter target-like contigs and simplify the assembly graph
 
 * <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is suggested to view the final contig graph (`*.fastg`/`*.gfa`).
 

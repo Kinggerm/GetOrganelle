@@ -9,6 +9,7 @@ versions = [
     {"number": "1.5.1c",
      "features": [
          "1. get_organelle_reads.py & disentangle_organelle_assembly.py: --random-seed added with default value 12345",
+         "2. evaluate_assembly_using_mapping.py: customized error rate info",
      ]},
     {"number": "1.5.1b",
      "features": [

@@ -52,14 +52,16 @@ def get_options():
                       help="Default: False")
     parser.add_option("--plot-x-density", dest="plot_x_density", default=12000., type=float,
                       help="Default: %default")
-    parser.add_option("--plot-x-sliding-window", dest="sliding_window_size", default=1, type=int,
-                      help="Default: %default")
+    # parser.add_option("--plot-x-sliding-window", dest="sliding_window_size", default=1, type=int,
+    #                   help="Default: %default")
     parser.add_option("--plot-x-gap-dots", dest="gap_len", default=3000, type=int,
                       help="Number of sites added in-between isolated contigs. Default: %default")
     parser.add_option("--plot-figure-height", dest="figure_height", default=5., type=float,
                       help="Default: %default")
     # parser.add_option("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
     #                   help="Default: %default")
+    parser.add_option("--disable-customized-error-rate", dest="customized_error_rate", default=True,
+                      action="store_true")
     parser.add_option("--debug", dest="debug_mode", default=False, action="store_true",
                       help="Turn on debug mode.")
     options, argv = parser.parse_args()
@@ -249,7 +251,7 @@ def main():
         # make data and default settings
         gap_len = options.gap_len
         extra_width = 3.  # options.extra_width
-        sliding_w_size = options.sliding_window_size
+        sliding_w_size = 1  # options.sliding_window_size
         x_data_len = gap_len * (len(mapping_records.references) - 1) \
                      + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
         fig_width = extra_width + x_data_len / options.plot_x_density
@@ -269,37 +271,69 @@ def main():
         x_data = np.array(range(x_data_len))
         y_data = {}
         # log mean and std
-        y_stat = {}
+        y_stat = dict()
         max_y_dat = 0
+        # start @20190304: add extra error rate @20190304
+        err_all_cover = np.array([])
+        err_subset_cover = [np.array([]) for foo in range(len(sequence_statistics["M"]))]
+        # end @20190304
         for cigar_char in cigar_chars:
             y_stat[cigar_char] = {"subset": [], "all": []}
             this_cover = []
             this_cover_for_stat = []
             ref_list = sorted(list(sequence_statistics[cigar_char]))
+            go_to_subset = 0
             while ref_list:
                 ref = ref_list.pop(0)
-                averaged_cover = sequence_statistics[cigar_char][ref]
-                this_mean, this_std = round(np.average(averaged_cover), 2), round(float(np.std(averaged_cover)), 2)
+                smoothed_cover_per_site = sequence_statistics[cigar_char][ref]
+                this_mean, this_std = float(np.average(smoothed_cover_per_site)), float(np.std(smoothed_cover_per_site))
 
-                y_stat[cigar_char]["subset"].append((this_mean, this_std, len(averaged_cover)))
+                y_stat[cigar_char]["subset"].append((this_mean, this_std, len(smoothed_cover_per_site)))
+                this_cover_for_stat.extend(smoothed_cover_per_site)
+                # start @20190304
+                if options.customized_error_rate:
+                    if cigar_char in {"X", "I", "D"}:
+                        if len(err_subset_cover[go_to_subset]):
+                            err_subset_cover[go_to_subset] += np.array(smoothed_cover_per_site)
+                        else:
+                            err_subset_cover[go_to_subset] = np.array(smoothed_cover_per_site)
+                # end @20190304
                 if sliding_w_size != 1:
                     new_averaged_cover = []
-                    for j in range(len(averaged_cover)):
+                    for j in range(len(smoothed_cover_per_site)):
                         if j % sliding_w_size:
                             new_averaged_cover.append(0)
                         else:
-                            new_averaged_cover.append(np.average(averaged_cover[j: j + sliding_w_size]))
-                    averaged_cover = np.array(new_averaged_cover)
-                this_cover.extend(averaged_cover)
-                this_cover_for_stat.extend(averaged_cover)
-                max_y_dat = max(max(averaged_cover), max_y_dat)
+                            new_averaged_cover.append(np.average(smoothed_cover_per_site[j: j + sliding_w_size]))
+                    smoothed_cover_per_site = np.array(new_averaged_cover)
+                this_cover.extend(smoothed_cover_per_site)
+                max_y_dat = max(max(smoothed_cover_per_site), max_y_dat)
                 if ref_list:
                     this_cover.extend([0] * gap_len)
+                go_to_subset += 1
             y_data[cigar_char] = np.ma.masked_where(np.array(this_cover) <= 0, this_cover)
-            y_stat[cigar_char]["all"] = \
-                round(np.average(this_cover_for_stat), 2), round(float(np.std(this_cover_for_stat)), 2)
+            y_stat[cigar_char]["all"] = float(np.average(this_cover_for_stat)), float(np.std(this_cover_for_stat))
+            # start @20190304
+            if options.customized_error_rate:
+                if cigar_char in {"X", "I", "D"}:
+                    if len(err_all_cover):
+                        err_all_cover += np.array(this_cover_for_stat)
+                    else:
+                        err_all_cover = np.array(this_cover_for_stat)
+            # end @20190304
+
         if not max_y_dat:
             raise ValueError("No mapped reads found!")
+
+        # start @20190304
+        if options.customized_error_rate:
+            y_stat["error"] = {"all": [np.average(err_all_cover) / y_stat["M"]["all"][0],
+                                       np.std(err_all_cover) / y_stat["M"]["all"][0]],
+                               "subset": [[np.average(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
+                                           np.std(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
+                                           y_stat["M"]["subset"][go_to_sb][2]]
+                                          for go_to_sb in range(len(sequence_statistics["M"]))]}
+        # end @20190304
 
         # create figure
         fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
@@ -339,6 +373,13 @@ def main():
             " (" + ", ".join(["%.2f" % here_mean + "±" + "%.2f" % here_std
                               for here_mean, here_std, here_len in y_stat[cigar_char]["subset"]]) + ")"
             for cigar_char in cigar_chars]
+        if options.customized_error_rate:
+            echo_statistics.append("Customized error rate: " +
+                                   "%.4f" % y_stat["error"]["all"][0] + "±" + "%.4f" % y_stat["error"]["all"][1] +
+                                   " (" +
+                                   ", ".join(["%.4f" % here_mean + "±" + "%.4f" % here_std
+                                              for here_mean, here_std, here_len in y_stat["error"]["subset"]]) +
+                                   ")")
         echo_statistics.insert(0, "# mapped pairs: " + str(int(num_paired / 2)))
         echo_statistics.insert(0, "# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
         for log_line in echo_statistics:

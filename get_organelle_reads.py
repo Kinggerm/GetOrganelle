@@ -47,13 +47,13 @@ def get_options(descriptions, version):
     version = version
     usage = "\n###  Plant Plastome, Normal, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o plastome_output " \
-            " -R 15 -k 75,85,95,105 -F plant_cp\n" \
+            " -R 15 -k 45,65,85,105 -F plant_cp\n" \
             "###  Plant Mitochondria\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output " \
-            " -R 30 -k 65,75,85,95,105 -F plant_mt\n" \
+            " -R 30 -k 45,65,85,105 -F plant_mt\n" \
             "###  Plant Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -o nr_output " \
-            " -R 7 -k 95,105,115 -P 0 -F plant_nr"
+            " -R 7 -k 95,115 -P 0 -F plant_nr"
     parser = OptionParser(usage=usage, version=version, description=descriptions, add_help_option=False)
     # group 1
     group_inout = OptionGroup(parser, "IN-OUT OPTIONS", "Options on inputs and outputs")

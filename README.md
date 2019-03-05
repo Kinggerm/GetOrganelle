@@ -122,31 +122,31 @@ Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produc
 
 To assembly chloroplast (e.g. using 2G raw data of 150 bp paired reads), typically I use:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output -R 15 -k 75,85,95,105 -F plant_cp
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output -R 15 -k 45,65,85,105 -F plant_cp
 
 or in a draft way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 75,85,95,105 -w 0.68 -F plant_cp
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o chloroplast_output --fast -k 45,85,127 -w 0.68 -F plant_cp
 
 or in a slow and memory-economic way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 30 -k 75,85,95,105  -F plant_cp --memory-save  -a mitochondria.fasta
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o chloroplast_output -R 30 -k 45,65,85,105  -F plant_cp --memory-save  -a mitochondria.fasta
 
 To assembly plant mitochondria (usually you need more than 5G raw data):
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output -R 50 -k 65,75,85,95,105 -P 1000000 -F plant_mt 
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output -R 50 -k 45,65,85,105 -P 1000000 -F plant_mt 
     
 To assembly plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 7 -k 95,105,115 -P 0 -F plant_nr
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 7 -k 95,115 -P 0 -F plant_nr
 
 To assembly fungus mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_reference.fasta --genes fungus_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F fungus_mt
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_reference.fasta --genes fungus_mt_genes.fasta -R 3 -k 45,65,85,105 -F fungus_mt
 
 To assembly animal mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_reference.fasta --genes animal_mt_genes.fasta -R 3 -k 65,75,85,95,105 -F animal_mt
+    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_reference.fasta --genes animal_mt_genes.fasta -R 3 -k 45,65,85,105 -F animal_mt
 
 See a brief illustrations of those arguments by typing in:
 

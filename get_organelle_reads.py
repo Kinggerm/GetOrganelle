@@ -205,7 +205,7 @@ def get_options(descriptions, version):
     # group 4
     group_assembly = OptionGroup(parser, "ASSEMBLY OPTIONS", "These options are about the assembly and "
                                                              "graph disentangling")
-    group_assembly.add_option("-k", dest="spades_kmer", default="75,85,95",
+    group_assembly.add_option("-k", dest="spades_kmer", default="45,65,85,105",
                               help="SPAdes kmer settings. Use the same format as in SPAdes. illegal kmer values "
                                    "would be automatically discarded by GetOrganelle. "
                                    "Default: %default")
@@ -332,7 +332,7 @@ def get_options(descriptions, version):
                           help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
                                "--disentangle-time-limit 180 --no-gradient-k\"")
         parser.remove_option("-k")
-        parser.add_option("-k", dest="spades_kmer", default="75,85,95", help="SPAdes kmer settings. Default: %default")
+        parser.add_option("-k", dest="spades_kmer", default="45,65,85,105", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
         parser.add_option("-t", dest="threads", type=int, default=1, help="Maximum threads to use. Default: %default")
         parser.remove_option("-P")

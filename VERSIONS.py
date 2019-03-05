@@ -10,7 +10,7 @@ versions = [
      "features": [
          "1. get_organelle_reads.py & disentangle_organelle_assembly.py: --random-seed added with default value 12345",
          "2. evaluate_assembly_using_mapping.py: customized error rate info added",
-         "3. change suggested kmers",
+         "3. get_organelle_reads.py: change default & suggested kmers",
      ]},
     {"number": "1.5.1b",
      "features": [

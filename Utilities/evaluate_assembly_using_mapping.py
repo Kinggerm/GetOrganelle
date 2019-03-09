@@ -131,8 +131,19 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
 
 
 def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
+    # duplicated seq names would cause error in downstream analysis
+    count_name_freq = {}
+    fasta_ob = SequenceList(original_fasta)
+    for record in fasta_ob:
+        if record.label in count_name_freq:
+            count_name_freq[record.label] += 1
+        else:
+            count_name_freq[record.label] = 1
+        record.seq = record.seq.replace("*", "N").replace("-", "N")
+    duplicated_name_go = {seq_name: 0 for seq_name in count_name_freq if count_name_freq[seq_name] > 1}
+
+    #
     if is_circular == "yes":
-        fasta_ob = SequenceList(original_fasta)
         for record in fasta_ob:
             if len(record.seq):
                 to_add = record.seq[:max_lib_len]
@@ -143,9 +154,12 @@ def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
                     to_add = record.seq[:(max_lib_len - added_len)]
                     added_len += len(to_add)
                     record.seq += to_add
+            if record.label in duplicated_name_go:
+                duplicated_name_go[record.label] += 1
+                record.label = record.label.split(" ")[0] + "--" + str(duplicated_name_go[record.label])  # \
+                # + " ".join(record.label.split(" ")[1:])
         fasta_ob.write_fasta(new_fasta)
     elif is_circular == "auto":
-        fasta_ob = SequenceList(original_fasta)
         for record in fasta_ob:
             if len(record.seq) and record.label.endswith("(circular)"):
                 to_add = record.seq[:max_lib_len]
@@ -156,12 +170,41 @@ def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
                     to_add = record.seq[:(max_lib_len - added_len)]
                     added_len += len(to_add)
                     record.seq += to_add
+            if record.label in duplicated_name_go:
+                duplicated_name_go[record.label] += 1
+                record.label = record.label.split(" ")[0] + "--" + str(duplicated_name_go[record.label])  # \
+                # + " ".join(record.label.split(" ")[1:])
         fasta_ob.write_fasta(new_fasta)
     else:
-        os.system("cp " + original_fasta + " " + new_fasta)
+        for record in fasta_ob:
+            if record.label in duplicated_name_go:
+                duplicated_name_go[record.label] += 1
+                record.label = record.label.split(" ")[0] + "--" + str(duplicated_name_go[record.label])  # \
+                # + " ".join(record.label.split(" ")[1:])
+        fasta_ob.write_fasta(new_fasta)
 
 
-def adjust_horizontally_in_one_line(max_val, min_val=0, soft_min_gap=20., *y_positions):
+def get_lengths_with_seq_names_modified(raw_fasta_file, log_handler=None):
+    # duplicated seq names would cause error in downstream analysis
+    count_name_freq = {}
+    fasta_ob = SequenceList(raw_fasta_file)
+    for record in fasta_ob:
+        if record.label in count_name_freq:
+            count_name_freq[record.label] += 1
+        else:
+            count_name_freq[record.label] = 1
+    duplicated_name_go = {seq_name: 0 for seq_name in count_name_freq if count_name_freq[seq_name] > 1}
+    for record in fasta_ob:
+        if record.label in duplicated_name_go:
+            duplicated_name_go[record.label] += 1
+            record.label = record.label.split(" ")[0] + "--" + str(duplicated_name_go[record.label])
+    if log_handler:
+        lengths = [len(rc.seq) for rc in fasta_ob]
+        log_handler.info("Reference length: " + str(sum(lengths)) + " (" + ", ".join([str(l) for l in lengths]) + ")")
+    return {record.label: len(record.seq) for record in fasta_ob}
+
+
+def adjust_vertically_in_one_line(max_val, min_val=0, soft_min_gap=20., *y_positions):
     record_original_order = [[this_y_pos, raw_order] for raw_order, this_y_pos in enumerate(y_positions)]
     record_original_order.sort()
     len_val = len(record_original_order)
@@ -205,7 +248,7 @@ def adjust_horizontally_in_one_line(max_val, min_val=0, soft_min_gap=20., *y_pos
     return [new_val[0] for new_val in record_original_order]
 
 
-def adjust_horizontally_in_different_lines(middle_y, min_graph_dist, x_factor=1., y_factor=1., *sorted_x_y_positions):
+def adjust_vertically_in_different_lines(middle_y, min_graph_dist, x_factor=1., y_factor=1., *sorted_x_y_positions):
     x_y_positions = deepcopy(sorted_x_y_positions)
     for go_p, (x_pos, y_pos) in enumerate(x_y_positions):
         if go_p > 0 and (x_pos - x_y_positions[go_p - 1][0]) * x_factor < min_graph_dist:
@@ -232,209 +275,218 @@ def adjust_horizontally_in_different_lines(middle_y, min_graph_dist, x_factor=1.
 
 def main():
     options, log_handler = get_options()
-    new_fasta = os.path.join(options.output_base, "modified.fasta")
-    if not (options.resume and os.path.exists(new_fasta)):
-        modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
-    mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
-                         bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
-                         resume=options.resume, threads=options.threads, log_handler=log_handler, debug=options.debug_mode)
-    ref_lengths = {record.label.split()[0]: len(record.seq) for record in SequenceList(options.fasta)}
-    mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
-    sequence_statistics = mapping_records.get_customized_mapping_characteristics()
-    num_mapped_reads = mapping_records.get_number_of_mapped_reads()
-    num_paired, num_single = num_mapped_reads["paired"], num_mapped_reads["single"]
+    try:
+        new_fasta = os.path.join(options.output_base, "modified.fasta")
+        if not (options.resume and os.path.exists(new_fasta)):
+            modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
+        mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
+                             bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
+                             resume=options.resume, threads=options.threads, log_handler=log_handler, debug=options.debug_mode)
+        ref_lengths = get_lengths_with_seq_names_modified(options.fasta, log_handler)
+        mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
+        sequence_statistics = mapping_records.get_customized_mapping_characteristics()
+        num_mapped_reads = mapping_records.get_number_of_mapped_reads()
+        num_paired, num_single = num_mapped_reads["paired"], num_mapped_reads["single"]
 
-    if options.draw_plot:
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        # make data and default settings
-        gap_len = options.gap_len
-        extra_width = 3.  # options.extra_width
-        sliding_w_size = 1   # options.sliding_window_size
-        x_data_len = gap_len * (len(mapping_records.references) - 1) \
-                     + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
-        fig_width = extra_width + x_data_len / options.plot_x_density
-        fig_height = options.figure_height
-        extra_percent = extra_width / fig_width
-        title_height_percent = 0.09
-        add_extra_to_left = 0.27   # for extra_width==3
-        plot_area_l, plot_area_r = extra_percent * add_extra_to_left, 1 - extra_percent * (1 - add_extra_to_left)
-        plot_area_b, plot_area_t = title_height_percent, 1 - title_height_percent
-        cigar_chars = ["M", "X", "I", "D"]
-        cigar_char_dict = {"M": "Aligned", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
-        color_used = {"M": [(0.133, 0.616, 0.361), 0.5],
-                      "X": [(0.145, 0.651, 0.961), 0.3],
-                      "I": [(0.996, 0.804, 0.322), 0.8],
-                      "D": [(0.831, 0.310, 0.275), 0.5]}
+        if options.draw_plot:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            # make data and default settings
+            gap_len = options.gap_len
+            extra_width = 3.  # options.extra_width
+            sliding_w_size = 1   # options.sliding_window_size
+            x_data_len = gap_len * (len(mapping_records.references) - 1) \
+                         + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
+            fig_width = extra_width + x_data_len / options.plot_x_density
+            fig_height = options.figure_height
+            extra_percent = extra_width / fig_width
+            title_height_percent = 0.09
+            add_extra_to_left = 0.27   # for extra_width==3
+            plot_area_l, plot_area_r = extra_percent * add_extra_to_left, 1 - extra_percent * (1 - add_extra_to_left)
+            plot_area_b, plot_area_t = title_height_percent, 1 - title_height_percent
+            cigar_chars = ["M", "X", "I", "D"]
+            cigar_char_dict = {"M": "Aligned", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
+            color_used = {"M": [(0.133, 0.616, 0.361), 0.5],
+                          "X": [(0.145, 0.651, 0.961), 0.3],
+                          "I": [(0.996, 0.804, 0.322), 0.8],
+                          "D": [(0.831, 0.310, 0.275), 0.5]}
 
-        x_data = np.array(range(x_data_len))
-        y_data = {}
-        # log mean and std
-        y_stat = dict()
-        max_y_dat = 0
-        # start @20190304: add extra error rate @20190304
-        err_all_cover = np.array([])
-        err_subset_cover = [np.array([]) for foo in range(len(sequence_statistics["M"]))]
-        # end @20190304
-        for cigar_char in cigar_chars:
-            y_stat[cigar_char] = {"subset": [], "all": []}
-            this_cover = []
-            this_cover_for_stat = []
-            ref_list = sorted(list(sequence_statistics[cigar_char]))
-            go_to_subset = 0
-            while ref_list:
-                ref = ref_list.pop(0)
-                smoothed_cover_per_site = sequence_statistics[cigar_char][ref]
-                this_mean, this_std = float(np.average(smoothed_cover_per_site)), float(np.std(smoothed_cover_per_site))
+            x_data = np.array(range(x_data_len))
+            y_data = {}
+            # log mean and std
+            y_stat = dict()
+            max_y_dat = 0
+            # start @20190304: add extra error rate @20190304
+            err_all_cover = np.array([])
+            err_subset_cover = [np.array([]) for foo in range(len(sequence_statistics["M"]))]
+            # end @20190304
+            for cigar_char in cigar_chars:
+                y_stat[cigar_char] = {"subset": [], "all": []}
+                this_cover = []
+                this_cover_for_stat = []
+                ref_list = sorted(list(sequence_statistics[cigar_char]))
+                go_to_subset = 0
+                while ref_list:
+                    ref = ref_list.pop(0)
+                    smoothed_cover_per_site = sequence_statistics[cigar_char][ref]
+                    this_mean, this_std = float(np.average(smoothed_cover_per_site)), float(np.std(smoothed_cover_per_site))
 
-                y_stat[cigar_char]["subset"].append((this_mean, this_std, len(smoothed_cover_per_site)))
-                this_cover_for_stat.extend(smoothed_cover_per_site)
+                    y_stat[cigar_char]["subset"].append((this_mean, this_std, len(smoothed_cover_per_site)))
+                    this_cover_for_stat.extend(smoothed_cover_per_site)
+                    # start @20190304
+                    if options.customized_error_rate:
+                        if cigar_char in {"X", "I", "D"}:
+                            if len(err_subset_cover[go_to_subset]):
+                                err_subset_cover[go_to_subset] += np.array(smoothed_cover_per_site)
+                            else:
+                                err_subset_cover[go_to_subset] = np.array(smoothed_cover_per_site)
+                    # end @20190304
+                    if sliding_w_size != 1:
+                        new_averaged_cover = []
+                        for j in range(len(smoothed_cover_per_site)):
+                            if j % sliding_w_size:
+                                new_averaged_cover.append(0)
+                            else:
+                                new_averaged_cover.append(np.average(smoothed_cover_per_site[j: j + sliding_w_size]))
+                        smoothed_cover_per_site = np.array(new_averaged_cover)
+                    this_cover.extend(smoothed_cover_per_site)
+                    max_y_dat = max(max(smoothed_cover_per_site), max_y_dat)
+                    if ref_list:
+                        this_cover.extend([0] * gap_len)
+                    go_to_subset += 1
+                y_data[cigar_char] = np.ma.masked_where(np.array(this_cover) <= 0, this_cover)
+                y_stat[cigar_char]["all"] = float(np.average(this_cover_for_stat)), float(np.std(this_cover_for_stat))
                 # start @20190304
                 if options.customized_error_rate:
                     if cigar_char in {"X", "I", "D"}:
-                        if len(err_subset_cover[go_to_subset]):
-                            err_subset_cover[go_to_subset] += np.array(smoothed_cover_per_site)
+                        if len(err_all_cover):
+                            err_all_cover += np.array(this_cover_for_stat)
                         else:
-                            err_subset_cover[go_to_subset] = np.array(smoothed_cover_per_site)
+                            err_all_cover = np.array(this_cover_for_stat)
                 # end @20190304
-                if sliding_w_size != 1:
-                    new_averaged_cover = []
-                    for j in range(len(smoothed_cover_per_site)):
-                        if j % sliding_w_size:
-                            new_averaged_cover.append(0)
-                        else:
-                            new_averaged_cover.append(np.average(smoothed_cover_per_site[j: j + sliding_w_size]))
-                    smoothed_cover_per_site = np.array(new_averaged_cover)
-                this_cover.extend(smoothed_cover_per_site)
-                max_y_dat = max(max(smoothed_cover_per_site), max_y_dat)
-                if ref_list:
-                    this_cover.extend([0] * gap_len)
-                go_to_subset += 1
-            y_data[cigar_char] = np.ma.masked_where(np.array(this_cover) <= 0, this_cover)
-            y_stat[cigar_char]["all"] = float(np.average(this_cover_for_stat)), float(np.std(this_cover_for_stat))
+
+            if not max_y_dat:
+                raise ValueError("No mapped reads found!")
+
             # start @20190304
             if options.customized_error_rate:
-                if cigar_char in {"X", "I", "D"}:
-                    if len(err_all_cover):
-                        err_all_cover += np.array(this_cover_for_stat)
-                    else:
-                        err_all_cover = np.array(this_cover_for_stat)
+                y_stat["error"] = {"all": [np.average(err_all_cover) / y_stat["M"]["all"][0],
+                                           np.std(err_all_cover) / y_stat["M"]["all"][0]],
+                                   "subset": [[np.average(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
+                                               np.std(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
+                                               y_stat["M"]["subset"][go_to_sb][2]]
+                                              for go_to_sb in range(len(sequence_statistics["M"]))]}
             # end @20190304
 
-        if not max_y_dat:
-            raise ValueError("No mapped reads found!")
+            # create figure
+            fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
+            ax.spines['top'].set_visible(False)
+            # ax.spines['bottom'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            # ax.spines['left'].set_visible(False)
+            plt.setp(ax.get_xticklabels(), fontsize=12)
+            plt.setp(ax.get_yticklabels(), fontsize=12)
+            fig.subplots_adjust(left=plot_area_l, right=plot_area_r, bottom=plot_area_b, top=plot_area_t)
 
-        # start @20190304
-        if options.customized_error_rate:
-            y_stat["error"] = {"all": [np.average(err_all_cover) / y_stat["M"]["all"][0],
-                                       np.std(err_all_cover) / y_stat["M"]["all"][0]],
-                               "subset": [[np.average(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
-                                           np.std(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
-                                           y_stat["M"]["subset"][go_to_sb][2]]
-                                          for go_to_sb in range(len(sequence_statistics["M"]))]}
-        # end @20190304
+            lines = plt.plot(x_data, y_data["M"], 'o',
+                             x_data, y_data["X"], 'o',
+                             x_data, y_data["I"], 'o',
+                             x_data, y_data["D"], 'o')
+            for go_to, this_char in enumerate(cigar_chars):
+                plt.setp(lines[go_to], color=color_used[this_char][0], alpha=color_used[this_char][1], markersize=0.2)
+            plt.title("  " + (options.plot_title if options.plot_title else options.fasta), fontsize=18, loc='left')
+            subtitle_x_pos = x_data_len + (1 - plot_area_r) * fig_width * options.plot_x_density
+            subtitle_y_pos = max_y_dat * (1 + (1. / (1 - 2 * title_height_percent) - 1) / 8)
 
-        # create figure
-        fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
-        ax.spines['top'].set_visible(False)
-        # ax.spines['bottom'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        # ax.spines['left'].set_visible(False)
-        plt.setp(ax.get_xticklabels(), fontsize=12)
-        plt.setp(ax.get_yticklabels(), fontsize=12)
-        fig.subplots_adjust(left=plot_area_l, right=plot_area_r, bottom=plot_area_b, top=plot_area_t)
+            mapped_str = []
+            if num_paired:
+                mapped_str.append("# mapped pairs: " + str(int(num_paired / 2)))
+            if num_single:
+                mapped_str.append("# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
+            for subtitle_str in [sub_str.strip() for sub_str in options.plot_subtitle.split("    ")] + mapped_str:
+                plt.text(subtitle_x_pos, subtitle_y_pos, subtitle_str, fontsize=12, alpha=0.7,
+                         horizontalalignment='right', verticalalignment='center', multialignment='center')
+                subtitle_y_pos -= max_y_dat / options.figure_height / 4.  # for fontsize==2
 
-        lines = plt.plot(x_data, y_data["M"], 'o',
-                         x_data, y_data["X"], 'o',
-                         x_data, y_data["I"], 'o',
-                         x_data, y_data["D"], 'o')
-        for go_to, this_char in enumerate(cigar_chars):
-            plt.setp(lines[go_to], color=color_used[this_char][0], alpha=color_used[this_char][1], markersize=0.2)
-        plt.title("  " + (options.plot_title if options.plot_title else options.fasta), fontsize=18, loc='left')
-        subtitle_x_pos = x_data_len + (1 - plot_area_r) * fig_width * options.plot_x_density
-        subtitle_y_pos = max_y_dat * (1 + (1. / (1 - 2 * title_height_percent) - 1) / 8)
+            # write to log
+            line_labels = {c_: full_name + ": " + "%.2f" % y_stat[c_]["all"][0] + "±" + "%.2f" % y_stat[c_]["all"][1]
+                           for c_, full_name in cigar_char_dict.items()}
+            echo_statistics = [
+                line_labels[cigar_char] +
+                " (" + ", ".join(["%.2f" % here_mean + "±" + "%.2f" % here_std
+                                  for here_mean, here_std, here_len in y_stat[cigar_char]["subset"]]) + ")"
+                for cigar_char in cigar_chars]
+            if options.customized_error_rate:
+                echo_statistics.append("Customized error rate: " +
+                                       "%.4f" % y_stat["error"]["all"][0] + "±" + "%.4f" % y_stat["error"]["all"][1] +
+                                       " (" +
+                                       ", ".join(["%.4f" % here_mean + "±" + "%.4f" % here_std
+                                                  for here_mean, here_std, here_len in y_stat["error"]["subset"]]) +
+                                       ")")
+            echo_statistics.insert(0, "# mapped pairs: " + str(int(num_paired / 2)))
+            echo_statistics.insert(0, "# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
+            for log_line in echo_statistics:
+                log_handler.info(log_line)
 
-        mapped_str = []
-        if num_paired:
-            mapped_str.append("# mapped pairs: " + str(int(num_paired / 2)))
-        if num_single:
-            mapped_str.append("# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
-        for subtitle_str in [sub_str.strip() for sub_str in options.plot_subtitle.split("    ")] + mapped_str:
-            plt.text(subtitle_x_pos, subtitle_y_pos, subtitle_str, fontsize=12, alpha=0.7,
-                     horizontalalignment='right', verticalalignment='center', multialignment='center')
-            subtitle_y_pos -= max_y_dat / options.figure_height / 4.  # for fontsize==2
-
-        # write to log
-        line_labels = {c_: full_name + ": " + "%.2f" % y_stat[c_]["all"][0] + "±" + "%.2f" % y_stat[c_]["all"][1]
-                       for c_, full_name in cigar_char_dict.items()}
-        echo_statistics = [
-            line_labels[cigar_char] +
-            " (" + ", ".join(["%.2f" % here_mean + "±" + "%.2f" % here_std
-                              for here_mean, here_std, here_len in y_stat[cigar_char]["subset"]]) + ")"
-            for cigar_char in cigar_chars]
-        if options.customized_error_rate:
-            echo_statistics.append("Customized error rate: " +
-                                   "%.4f" % y_stat["error"]["all"][0] + "±" + "%.4f" % y_stat["error"]["all"][1] +
-                                   " (" +
-                                   ", ".join(["%.4f" % here_mean + "±" + "%.4f" % here_std
-                                              for here_mean, here_std, here_len in y_stat["error"]["subset"]]) +
-                                   ")")
-        echo_statistics.insert(0, "# mapped pairs: " + str(int(num_paired / 2)))
-        echo_statistics.insert(0, "# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
-        for log_line in echo_statistics:
-            log_handler.info(log_line)
-
-        # plot txt
-        new_y_pos = adjust_horizontally_in_one_line(max_y_dat, 0, max_y_dat / 20,
-                                                    y_stat["M"]["subset"][-1][0],
-                                                    y_stat["X"]["subset"][-1][0],
-                                                    y_stat["I"]["subset"][-1][0],
-                                                    y_stat["D"]["subset"][-1][0])
-        for go_to, this_char in enumerate(cigar_chars):
-            plt.text(x_data_len + 0.05 * options.plot_x_density, new_y_pos[go_to], line_labels[this_char],
-                     color=color_used[this_char][0], fontsize=12)
-        if max_y_dat / y_stat["M"]["subset"][-1][0] > 2.:
-            middle_pos = (y_stat["M"]["subset"][-1][0] + y_stat["M"]["subset"][-1][1] + max_y_dat) / 2
-        else:
-            middle_pos = (y_stat["M"]["subset"][-1][0] - y_stat["M"]["subset"][-1][1] +
-                          y_stat["X"]["subset"][-1][0] + y_stat["X"]["subset"][-1][1]) / 2
-        middle_set = np.array([middle_pos + max_y_dat/15, middle_pos + max_y_dat/45,
-                               middle_pos - max_y_dat/45, middle_pos - max_y_dat/15])
-        x_y_pos = []
-        this_accumulated_pos = 0
-        for this_mean_cov, this_std_cov, this_len in y_stat["M"]["subset"]:
-            x_y_pos.append([this_accumulated_pos + this_len / 2, deepcopy(middle_set)])
-            this_accumulated_pos += this_len + gap_len
-        width_over_x = (fig_width - extra_width) / x_data_len
-        height_over_y = fig_height / max_y_dat
-        new_x_y_pos = adjust_horizontally_in_different_lines(np.average(middle_set),
-                                                             (fig_height**2 + (fig_width - extra_width)**2)**0.5 / 10,
-                                                             width_over_x, height_over_y,
-                                                             *x_y_pos)
-        label_x_offset = -0.3 / width_over_x
-        for go_to, this_char in enumerate(cigar_chars):
-            accumulated_pos = 0
-            for go_subset, (this_mean_cov, this_std_cov, this_len) in enumerate(y_stat[this_char]["subset"]):
+            # plot txt
+            new_y_pos = adjust_vertically_in_one_line(max_y_dat, 0, max_y_dat / 20,
+                                                      y_stat["M"]["subset"][-1][0],
+                                                      y_stat["X"]["subset"][-1][0],
+                                                      y_stat["I"]["subset"][-1][0],
+                                                      y_stat["D"]["subset"][-1][0])
+            for go_to, this_char in enumerate(cigar_chars):
+                plt.text(x_data_len + 0.05 * options.plot_x_density, new_y_pos[go_to], line_labels[this_char],
+                         color=color_used[this_char][0], fontsize=12)
+            if max_y_dat / y_stat["M"]["subset"][-1][0] > 2.:
+                middle_pos = (y_stat["M"]["subset"][-1][0] + y_stat["M"]["subset"][-1][1] + max_y_dat) / 2
+            else:
+                middle_pos = (y_stat["M"]["subset"][-1][0] - y_stat["M"]["subset"][-1][1] +
+                              y_stat["X"]["subset"][-1][0] + y_stat["X"]["subset"][-1][1]) / 2
+            middle_set = np.array([middle_pos + max_y_dat/15, middle_pos + max_y_dat/45,
+                                   middle_pos - max_y_dat/45, middle_pos - max_y_dat/15])
+            x_y_pos = []
+            this_accumulated_pos = 0
+            for this_mean_cov, this_std_cov, this_len in y_stat["M"]["subset"]:
+                x_y_pos.append([this_accumulated_pos + this_len / 2, deepcopy(middle_set)])
+                this_accumulated_pos += this_len + gap_len
+            width_over_x = (fig_width - extra_width) / x_data_len
+            height_over_y = fig_height / max_y_dat
+            new_x_y_pos = adjust_vertically_in_different_lines(np.average(middle_set),
+                                                               (fig_height**2 + (fig_width - extra_width)**2) ** 0.5 / 10,
+                                                               width_over_x, height_over_y,
+                                                               *x_y_pos)
+            label_x_offset = -0.3 / width_over_x
+            for go_to, this_char in enumerate(cigar_chars):
+                # accumulated_pos = 0
+                for go_subset, (this_mean_cov, this_std_cov, this_len) in enumerate(y_stat[this_char]["subset"]):
+                    this_x, this_y = new_x_y_pos[go_subset]
+                    plt.text(this_x + label_x_offset, this_y[go_to],
+                             "%.2f" % this_mean_cov + "±" + "%.2f" % this_std_cov,
+                             color=color_used[this_char][0], fontsize=9)
+                    # accumulated_pos += this_len + gap_len
+            for go_subset, (this_mean_cov, this_std_cov, this_len) in enumerate(y_stat["M"]["subset"]):
                 this_x, this_y = new_x_y_pos[go_subset]
-                plt.text(this_x + label_x_offset, this_y[go_to],
-                         "%.2f" % this_mean_cov + "±" + "%.2f" % this_std_cov,
-                         color=color_used[this_char][0], fontsize=9)
-                accumulated_pos += this_len + gap_len
+                plt.text(this_x + label_x_offset, this_y[0] + max_y_dat * 2/45,
+                         str(this_len) + " bp",
+                         color="black", fontsize=9)
 
-        # density plot could also be added follow this
-        # a = plt.axes([.65, .6, .2, .2], facecolor='k')
-        # n, bins, patches = plt.hist(s, 400, density=True)
-        # plt.title('Probability')
-        # plt.xticks([])
-        # plt.yticks([])
+            # density plot could also be added follow this
+            # a = plt.axes([.65, .6, .2, .2], facecolor='k')
+            # n, bins, patches = plt.hist(s, 400, density=True)
+            # plt.title('Probability')
+            # plt.xticks([])
+            # plt.yticks([])
 
-        for plot_format in options.plot_format.split(","):
-            plt.savefig(os.path.join(options.output_base, "mapping." + plot_format),
-                        transparent=options.plot_transparent, dpi=300)
+            for plot_format in options.plot_format.split(","):
+                plt.savefig(os.path.join(options.output_base, "mapping." + plot_format),
+                            transparent=options.plot_transparent, dpi=300)
 
-    log_handler = simple_log(log_handler, options.output_base, "")
-    log_handler.info("")
+        log_handler = simple_log(log_handler, options.output_base, "")
+        log_handler.info("")
+    except Exception as e:
+        log_handler.exception(str(e))
+    logging.shutdown()
 
 
 if __name__ == '__main__':

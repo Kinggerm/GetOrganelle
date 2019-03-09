@@ -9,8 +9,10 @@ versions = [
     {"number": "1.5.1c",
      "features": [
          "1. get_organelle_reads.py & disentangle_organelle_assembly.py: --random-seed added with default value 12345",
-         "2. evaluate_assembly_using_mapping.py: customized error rate info added",
-         "3. get_organelle_reads.py: change default & suggested kmers",
+         "2. get_organelle_reads.py: change default & suggested kmers",
+         "3. get_organelle_reads.py: exit after illegal -F",
+         "4. evaluate_assembly_using_mapping.py: customized error rate info added",
+         "5. evaluate_assembly_using_mapping.py: robust to illegitimate usage of duplicated seq names in fasta",
      ]},
     {"number": "1.5.1b",
      "features": [

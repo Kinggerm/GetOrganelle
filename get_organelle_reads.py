@@ -369,6 +369,7 @@ def get_options(descriptions, version):
             sys.stdout.write("\n############################################################################"
                              "\nERROR: \"-F\" MUST be one of 'plant_cp', 'plant_mt', 'plant_nr', "
                              "'animal_mt', 'fungus_mt', 'anonym'!\n\n")
+            exit()
         if "*" in options.seed_file:
             if options.organelle_type == "anonym":
                 sys.stdout.write("\n############################################################################"

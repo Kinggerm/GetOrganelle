@@ -145,7 +145,7 @@ class MapRecords:
         if multiple_hits_mode == "best":
             for query_tuple in self.queries:
                 record_of_a_read = sorted(self.queries[query_tuple], key=lambda x: -x.map_quality)[0]
-                if record_of_a_read.ref_left_by_alignment > 0:
+                if record_of_a_read.ref_left_by_alignment > 0:  # only mapped reads are considered
                     reference = record_of_a_read.ref
                     go_to_base = record_of_a_read.ref_left_by_alignment
                     for op_len, operation in record_of_a_read.cigar:

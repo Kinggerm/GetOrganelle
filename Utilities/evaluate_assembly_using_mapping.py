@@ -198,6 +198,8 @@ def get_lengths_with_seq_names_modified(raw_fasta_file, log_handler=None):
         if record.label in duplicated_name_go:
             duplicated_name_go[record.label] += 1
             record.label = record.label.split(" ")[0] + "--" + str(duplicated_name_go[record.label])
+        else:
+            record.label = record.label.split(" ")[0]
     if log_handler:
         lengths = [len(rc.seq) for rc in fasta_ob]
         log_handler.info("Reference length: " + str(sum(lengths)) + " (" + ", ".join([str(l) for l in lengths]) + ")")
@@ -283,6 +285,7 @@ def main():
                              bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
                              resume=options.resume, threads=options.threads, log_handler=log_handler, debug=options.debug_mode)
         ref_lengths = get_lengths_with_seq_names_modified(options.fasta, log_handler)
+        print(ref_lengths)
         mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
         sequence_statistics = mapping_records.get_customized_mapping_characteristics()
         num_mapped_reads = mapping_records.get_number_of_mapped_reads()

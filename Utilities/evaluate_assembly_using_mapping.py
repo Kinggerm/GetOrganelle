@@ -440,7 +440,7 @@ def main():
             for go_to, this_char in enumerate(cigar_chars):
                 plt.text(x_data_len + 0.05 * options.plot_x_density, new_y_pos[go_to], line_labels[this_char],
                          color=color_used[this_char][0], fontsize=12)
-            if max_y_dat / y_stat["M"]["subset"][-1][0] > 2.:
+            if y_stat["M"]["subset"][-1][0] and max_y_dat / y_stat["M"]["subset"][-1][0] > 2.:
                 middle_pos = (y_stat["M"]["subset"][-1][0] + y_stat["M"]["subset"][-1][1] + max_y_dat) / 2
             else:
                 middle_pos = (y_stat["M"]["subset"][-1][0] - y_stat["M"]["subset"][-1][1] +

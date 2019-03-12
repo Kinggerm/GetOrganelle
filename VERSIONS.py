@@ -13,7 +13,8 @@ versions = [
          "3. get_organelle_reads.py: exit after illegal -F",
          "4. evaluate_assembly_using_mapping.py: customized error rate info added",
          "5. evaluate_assembly_using_mapping.py: robust to illegitimate usage of duplicated seq names in fasta",
-         "6. sam_parser.py: keep redundant cigar chars",
+         "6. evaluate_assembly_using_mapping.py: fix a bug when no aligned bases found",
+         "7. sam_parser.py: keep redundant cigar chars",
      ]},
     {"number": "1.5.1b",
      "features": [

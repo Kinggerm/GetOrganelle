@@ -234,12 +234,12 @@ class MapRecords:
                             else:
                                 mapping_statistics[operation][reference][go_to_base] += op_len
         # remove redundant chars
-        for cigar_char in cigar_char_list:
-            if sum([sum(mapping_statistics[cigar_char][ref]) for ref in mapping_statistics[cigar_char]]) == 0:
-                del mapping_statistics[cigar_char]
-        for cigar_char in list(mapping_statistics):
-            if cigar_char not in cigar_char_list:
-                del mapping_statistics[cigar_char]
+        # for cigar_char in cigar_char_list:
+        #     if sum([sum(mapping_statistics[cigar_char][ref]) for ref in mapping_statistics[cigar_char]]) == 0:
+        #         del mapping_statistics[cigar_char]
+        # for cigar_char in list(mapping_statistics):
+        #     if cigar_char not in cigar_char_list:
+        #         del mapping_statistics[cigar_char]
         # read mismatches from MD
         if "X" in cigar_char_list and "X" not in mapping_statistics:
             mapping_statistics["X"] = {ref: [0 for foo in range(self.references[ref]["index_len"])]

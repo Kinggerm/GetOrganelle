@@ -1,7 +1,7 @@
 # GetOrganelle
 
 
-This pipeline assemblies organelle genome from genomic skimming data.
+This toolkit assemblies organelle genome from genomic skimming data.
 
 <div id="citation"></div>
 
@@ -24,7 +24,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation
 
-This pipeline was written in python 3.5.1, but compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is more efficient under Python 3.*.
+This toolkit was written in python 3.5.1, but compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is more efficient under Python 3.*.
 
 Execute following simple git commands to download the latest version or find older stable versions [here](https://github.com/Kinggerm/GetOrganelle/releases):
 

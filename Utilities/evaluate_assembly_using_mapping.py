@@ -40,6 +40,8 @@ def get_options():
     parser.add_option("-t", dest="threads", type=int, default=2,
                       help="threads.")
     parser.add_option("--continue", dest="resume", default=False, action="store_true")
+    parser.add_option("--seed", dest="random_seed", default=12345, type=int,
+                      help="Seed for random number generator. Default: %default")
     parser.add_option("--draw", dest="draw_plot", default=False, action="store_true",
                       help="Draw density plot using matplotlib, which should be installed.")
     parser.add_option("--plot-format", dest="plot_format", default="pdf,png",
@@ -82,7 +84,7 @@ def get_options():
 
 
 def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, max_lib_len,
-                         resume, threads, log_handler, debug):
+                         resume, threads, random_seed, log_handler, debug):
     if not (os.path.exists(seed_file + '.index.1.bt2l')):
         if debug:
             log_handler.info("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index')
@@ -108,14 +110,14 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
     total_seed_sam = [os.path.join(res_path_name, x + res_base_name + ".sam") for x in ("temp.", "")]
     if not (resume and os.path.exists(total_seed_sam[1])):
         if debug:
-            log_handler.info("bowtie2 --mm -p " + str(threads) + " -X " + str(max_lib_len) +
-                             " --no-discordant --dovetail" + " --sensitive -x " + seed_index_base +
+            log_handler.info("bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " -X " +
+                             str(max_lib_len) + " --no-discordant --dovetail" + " --sensitive -x " + seed_index_base +
                              " -1 " + original_fq_1 + " -2 " + original_fq_2 + " -S " + total_seed_sam[0] +
                              " --no-unal --omit-sec-seq -t")
         make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 --mm -p " + str(threads) + " -X " + str(max_lib_len) + " --no-discordant --dovetail" +
-            " --sensitive -x " + seed_index_base + " -1 " + original_fq_1 + " -2 " + original_fq_2 +
-            " -S " + total_seed_sam[0] + " --no-unal --omit-sec-seq -t",
+            "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " -X " + str(max_lib_len) +
+            " --no-discordant --dovetail  --sensitive -x " + seed_index_base + " -1 " + original_fq_1 +
+            " -2 " + original_fq_2 + " -S " + total_seed_sam[0] + " --no-unal --omit-sec-seq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
         if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
@@ -283,7 +285,8 @@ def main():
             modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
         mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
                              bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
-                             resume=options.resume, threads=options.threads, log_handler=log_handler, debug=options.debug_mode)
+                             resume=options.resume, threads=options.threads, random_seed=options.random_seed,
+                             log_handler=log_handler, debug=options.debug_mode)
         ref_lengths = get_lengths_with_seq_names_modified(options.fasta, log_handler)
         mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
         sequence_statistics = mapping_records.get_customized_mapping_characteristics()

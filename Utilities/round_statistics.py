@@ -26,6 +26,8 @@ def get_options():
                       help="rounds to check. default:automatic stop!")
     parser.add_option("-t", dest="threads", type=int, default=2,
                       help="threads.")
+    parser.add_option('--random-seed', dest="random_seed", type=int, default=12345,
+                      help="seed for random generator for bowtie2. Default: %default")
     parser.add_option("--threshold", dest="threshold", default="0,10",
                       help="sites with coverage above the threshold would be marked as covered. default: %default")
     parser.add_option("--continue", dest="resume", default=False, action="store_true")
@@ -54,7 +56,7 @@ def get_options():
     return options, log
 
 
-def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, log):
+def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, random_seed, log):
     if not (os.path.exists(seed_file + '.index.1.bt2l')):
         # log.info("Making seed bowtie2 index ...")
         build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
@@ -77,8 +79,8 @@ def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threa
     if not (resume and os.path.exists(total_seed_file[1])):
         # log.info("Mapping reads to seed bowtie2 index ...")
         make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 --mm -p " + str(threads) + " --very-fast-local --al " + total_seed_file[
-                0] + " -x " + seed_index_base + " -U " +
+            "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " --very-fast-local "
+            "--al " + total_seed_file[0] + " -x " + seed_index_base + " -U " +
             ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq --omit-sec-seq -t",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
@@ -139,7 +141,8 @@ def main():
             break
         real_fq = real_fq_files[go_to]
         bowtie_base = os.path.join(out_base, fq_pairs[0].replace("_1.fq", ""))
-        mapping_with_bowtie2(options.fasta, real_fq, bowtie_base, options.resume, options.threads, log)
+        mapping_with_bowtie2(options.fasta, real_fq, bowtie_base, options.resume, options.threads,
+                             options.random_seed, log)
         this_result = [fq_pairs[0].replace("_1.fq", "")]
         # this round coverage
         this_coverage = get_coverage_from_sam_fast(bowtie_base + ".sam")

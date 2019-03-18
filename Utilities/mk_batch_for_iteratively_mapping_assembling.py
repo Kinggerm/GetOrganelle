@@ -23,6 +23,8 @@ parser.add_option('-o', dest='output_sh_file',
                   help='Executable output batch file.')
 parser.add_option('--un', dest='unpaired', default=False, action='store_true',
                   help='Try to map and assembly without paired information.')
+parser.add_option('--random-seed', dest="random_seed", type=int, default=12345,
+                  help="seed for random generator for bowtie2. Default: %default")
 options, args = parser.parse_args()
 if not (options.seed_dir and options.fastq_file_1 and options.fastq_file_2 and options.output_sh_file):
     parser.print_help()
@@ -39,21 +41,21 @@ else:
     exit()
 if options.unpaired:
     out_f_h.write('bowtie2-build --large-index ' + options.seed_dir + ' ' + options.seed_dir + '.index\n')
-    out_f_h.write('bowtie2 -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al ' + options.output_sh_file + '.mapped.RUN1/mapped.fq -q -x ' + options.seed_dir + '.index -U ' + options.fastq_file_1 + ',' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam\n')
+    out_f_h.write('bowtie2 --seed ' + str(options.random_seed) + ' -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al ' + options.output_sh_file + '.mapped.RUN1/mapped.fq -q -x ' + options.seed_dir + '.index -U ' + options.fastq_file_1 + ',' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam\n')
     out_f_h.write('spades.py -t ' + str(options.threads) + ' -k ' + options.spades_kmer + ' -s ' + options.output_sh_file + '.mapped.RUN1/mapped.fq -o ' + options.output_sh_file + '.mapped.RUN1/spades\n')
     for i in range(2, options.rounds + 1):
         os.mkdir(options.output_sh_file + '.mapped.RUN' + str(i))
         out_f_h.write('bowtie2-build --large-index ' + options.output_sh_file + '.mapped.RUN' + str(i - 1) + '/spades/assembly_graph.fastg ' + options.output_sh_file + '.mapped.RUN' + str(i - 1) + '/spades/assembly_graph.fastg.index\n')
-        out_f_h.write('bowtie2 -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/mapped.fq -q -x ' + options.seed_dir + '.index -U ' + options.fastq_file_1 + ',' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam\n')
+        out_f_h.write('bowtie2 --seed ' + str(options.random_seed) + ' -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/mapped.fq -q -x ' + options.seed_dir + '.index -U ' + options.fastq_file_1 + ',' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam\n')
         out_f_h.write('spades.py -t ' + str(options.threads) + ' -k ' + options.spades_kmer + ' -s ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/mapped.fq -o ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/spades\n')
 else:
     out_f_h.write('bowtie2-build --large-index ' + options.seed_dir + ' ' + options.seed_dir + '.index\n')
-    out_f_h.write('bowtie2 -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al-conc ' + options.output_sh_file + '.mapped.RUN1/%.mapped.fq -q -x ' + options.seed_dir + '.index -1 ' + options.fastq_file_1 + ' -2 ' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam\n')
+    out_f_h.write('bowtie2 --seed ' + str(options.random_seed) + ' -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al-conc ' + options.output_sh_file + '.mapped.RUN1/%.mapped.fq -q -x ' + options.seed_dir + '.index -1 ' + options.fastq_file_1 + ' -2 ' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN1/bowtie2.bam\n')
     out_f_h.write('spades.py -t ' + str(options.threads) + ' -k ' + options.spades_kmer + ' -1 ' + options.output_sh_file + '.mapped.RUN1/1.mapped.fq -2 ' + options.output_sh_file + '.mapped.RUN1/2.mapped.fq -o ' + options.output_sh_file + '.mapped.RUN1/spades\n')
     for i in range(2, options.rounds+1):
         os.mkdir(options.output_sh_file + '.mapped.RUN' + str(i))
         out_f_h.write('bowtie2-build --large-index ' + options.output_sh_file + '.mapped.RUN' + str(i - 1) + '/spades/assembly_graph.fastg ' + options.output_sh_file + '.mapped.RUN' + str(i - 1) + '/spades/assembly_graph.fastg.index\n')
-        out_f_h.write('bowtie2 -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al-conc ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/%.mapped.fq -q -x ' + options.seed_dir + '.index -1 ' + options.fastq_file_1 + ' -2 ' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam\n')
+        out_f_h.write('bowtie2 --seed ' + str(options.random_seed) + ' -I 0 -X 1000 -p ' + str(options.threads) + ' --very-fast-local --al-conc ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/%.mapped.fq -q -x ' + options.seed_dir + '.index -1 ' + options.fastq_file_1 + ' -2 ' + options.fastq_file_2 + ' -S ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam --no-unal -t && rm ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/bowtie2.bam\n')
         out_f_h.write('spades.py -t ' + str(options.threads) + ' -k ' + options.spades_kmer + ' -1 ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/1.mapped.fq -2 ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/2.mapped.fq -o ' + options.output_sh_file + '.mapped.RUN' + str(i) + '/spades\n')
 out_f_h.close()
 os.system('chmod 777 ' + options.output_sh_file+'.sh')

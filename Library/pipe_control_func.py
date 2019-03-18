@@ -121,7 +121,7 @@ def executable(test_this):
     return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != dead_code else False
 
 
-def mapping_with_bowtie2_for_library(graph_fasta, fq_1, fq_2, out_base, threads, resume, log, verbose_log):
+def mapping_with_bowtie2_for_library(graph_fasta, fq_1, fq_2, out_base, threads, resume, rand_seed, log, verbose_log):
 
     log.info("Making seed - bowtie2 index ...")
     build_seed_index = subprocess.Popen("bowtie2-build --large-index " + graph_fasta + " " + graph_fasta + '.index',
@@ -149,7 +149,8 @@ def mapping_with_bowtie2_for_library(graph_fasta, fq_1, fq_2, out_base, threads,
         log.info("Mapping reads to graph - bowtie2 index ...")
         "-S 800-a.sam -1 800bp_23_1.fq -2 800bp_23_2.fq "
 
-        this_command = "bowtie2 -p " + str(threads) + " --local -a --no-discordant --no-contain -X 1000000 " + \
+        this_command = "bowtie2 --seed " + str(rand_seed) + " -p " + str(threads) + \
+                       " --local -a --no-discordant --no-contain -X 1000000 " + \
                        " -x " + graph_fasta + ".index -1 " + fq_1 + " -2 " + fq_2 + " -S " + mapping_sam[0] + \
                        " --no-unal -t"
         make_seed_bowtie2 = subprocess.Popen(this_command,

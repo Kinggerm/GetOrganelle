@@ -1826,7 +1826,8 @@ def get_heads_from_sam(bowtie_sam_file):
 
 
 def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files, original_fq_beyond_read_limit,
-                         out_base, resume, verbose_log, threads, prefix, keep_temp, bowtie2_other_options, log):
+                         out_base, resume, verbose_log, threads, random_seed, prefix, keep_temp,
+                         bowtie2_other_options, log):
     if os.path.exists(seed_file + '.index.1.bt2l'):
         log.info("Bowtie2 index existed!")
     else:
@@ -1863,7 +1864,8 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
         log.info("Initial seeds existed!")
     else:
         log.info("Mapping reads to seed - bowtie2 index ...")
-        this_command = "bowtie2 --mm -p " + str(threads) + " " + bowtie2_other_options + " --al " + total_seed_fq[0] + \
+        this_command = "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " " \
+                       + bowtie2_other_options + " --al " + total_seed_fq[0] + \
                        " -x " + seed_index_base + " -U " + ",".join(query_fq_files) + " -S " + total_seed_sam[0] + \
                        " --no-unal --no-hd --no-sq --omit-sec-seq"
         make_seed_bowtie2 = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -1912,7 +1914,8 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
             log.info("Anti-seed mapping information existed!")
         else:
             log.info("Mapping reads to anti-seed - bowtie2 index ...")
-            this_command = "bowtie2 --mm -p " + str(threads) + " " + bowtie2_other_options + " -x " + anti_index_base + \
+            this_command = "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " " + \
+                           bowtie2_other_options + " -x " + anti_index_base + \
                            " -U " + ",".join(query_fq_files) + " -S " + anti_seed_sam[0] + \
                            " --no-unal --no-hd --no-sq --omit-sec-seq"
             make_anti_seed_bowtie2 = subprocess.Popen(this_command,
@@ -2548,8 +2551,8 @@ def main():
                 seed_file, anti_lines = mapping_with_bowtie2(seed_file, anti_seed, options.maximum_n_reads,
                                                              original_fq_files,
                                                              original_fq_beyond_read_limit, out_base, resume,
-                                                             verb_log, options.threads, options.prefix,
-                                                             options.keep_temp_files,
+                                                             verb_log, options.threads, options.random_seed,
+                                                             options.prefix, options.keep_temp_files,
                                                              bowtie2_other_options=options.bowtie2_options,
                                                              log=log)
             log.info("Making seed reads finished.\n")

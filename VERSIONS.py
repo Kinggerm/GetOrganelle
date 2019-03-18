@@ -16,6 +16,8 @@ versions = [
          "6. evaluate_assembly_using_mapping.py: fix a bug when no aligned bases found",
          "7. sam_parser.py: keep redundant cigar chars",
          "8. README.md: toolkit",
+         "9. evaluate_assembly_using_mapping.py: re-linearize circular sequence before mapping",
+         "10. plastome_arch_info.py: added",
      ]},
     {"number": "1.5.1b",
      "features": [

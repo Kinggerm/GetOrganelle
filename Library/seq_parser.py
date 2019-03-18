@@ -197,6 +197,562 @@ def write_fasta_with_list(out_dir, matrix, overwrite):
     fasta_file.close()
 
 
+# from https://github.com/Kinggerm/PersonalUtilities
+# Hashing methods.
+# I naively wrote this function by myself and latter found the name and description of this algorithm
+# in Kurtz et al. 2001. REPuter: the manifold applications of repeat analysis on a genomic scale.
+def find_exact_repeats(sequence_string, min_repeat_length, circular,
+                       accepted_char=set(list("ATGCRMYKHBDVatgcrmykhbdv"))):
+    word_size = min(13, min_repeat_length)
+    if len(sequence_string) < min_repeat_length:
+        return []
+    if circular:
+        long_sequence = sequence_string + sequence_string[:word_size - 1]
+        here_seq = long_sequence
+    else:
+        here_seq = sequence_string
+    here_seq_r = complementary_seq(here_seq)
+    here_seq_length = len(here_seq)
+    raw_seq_length = len(sequence_string)
+    """create accepted id set"""
+    if accepted_char:
+        accepted_id = set()
+        count_cal = 0
+        for base_count in range(here_seq_length):
+            if here_seq[base_count] not in accepted_char:
+                count_cal = 0
+            else:
+                count_cal += 1
+                if count_cal >= word_size:
+                    accepted_id.add(base_count - word_size + 1)
+    else:
+        accepted_id = set(list(range(here_seq_length - word_size + 1)))
+    #
+    """initialization"""
+    words_to_index = {}
+    index_to_words = {}
+
+    def add_to_words(add_index, this_forward, this_reverse):
+        if this_forward in words_to_index:
+            words_to_index[this_forward].add((add_index, 1))
+            words_to_index[this_reverse].add((add_index, -1))
+        else:
+            words_to_index[this_forward] = {(add_index, 1)}
+            if this_reverse == this_forward:
+                words_to_index[this_reverse].add((add_index, -1))
+            else:
+                words_to_index[this_reverse] = {(add_index, -1)}
+
+    for i in range(0, here_seq_length):
+        if i in accepted_id:
+            forward_s = here_seq[i:i + word_size]
+            reverse_s = here_seq_r[here_seq_length - i - word_size: here_seq_length - i]
+            add_to_words(i, forward_s, reverse_s)
+            index_to_words[i] = forward_s
+
+    """find repeats"""
+    repeat_indices = set()
+    for repeat_tuples in words_to_index.values():
+        if len(repeat_tuples) >= 2:
+            for repeat_index in repeat_tuples:
+                repeat_indices.add(repeat_index[0])
+    repeat_indices = sorted(list(repeat_indices))
+    repeats = []
+    active_connection_to_repeats = {}
+    last_connection = set()
+    len_indices = len(repeat_indices)
+
+    if circular:
+        if len_indices != raw_seq_length and len(repeat_indices):
+            while (repeat_indices[0] - repeat_indices[-1]) % raw_seq_length == 1:
+                repeat_indices.insert(0, repeat_indices.pop(-1))
+        for i in range(len_indices):
+            this_index = repeat_indices[i]
+            this_word = index_to_words[this_index]
+            this_connection = words_to_index[this_word]
+            """part 1: dealing with old connection"""
+            # Loop 1: find repeats_to_stop
+            # Loop 2: delete the pointers pointing to the stopped repeats
+            # Loop 3: update the pointers
+            # Loop 4: add new pointers if shorter repeats should be continued with less alias
+            # Loop 5: update the repeats according to pointers
+            repeats_to_stop = {}
+            kinds_del_from_active = set()
+            for one_connection in last_connection:
+                here_id, direction_trans = one_connection
+                candidate_new_connect = ((here_id + direction_trans) % raw_seq_length, direction_trans)
+                if candidate_new_connect not in this_connection:
+                    # if one_connection in active_connection_to_repeats:
+                    for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
+                        if repeat_kind in repeats_to_stop:
+                            repeats_to_stop[repeat_kind][repeat_num] = one_connection
+                        else:
+                            repeats_to_stop[repeat_kind] = {repeat_num: one_connection}
+                        kinds_del_from_active.add(repeat_kind)
+            # print(repeats_to_stop)
+            # Loop 2
+            for repeat_kind in kinds_del_from_active:
+                for now_start, now_go_to, n_direction in repeats[repeat_kind]:
+                    connection_del_from_points = ((now_go_to - (word_size - 1) * (n_direction == 1)) % raw_seq_length,
+                                                  n_direction)
+                    if connection_del_from_points in active_connection_to_repeats:
+                        count_this_group = 0
+                        while count_this_group < len(active_connection_to_repeats[connection_del_from_points]):
+                            if active_connection_to_repeats[connection_del_from_points][count_this_group][0]\
+                                    == repeat_kind:
+                                del active_connection_to_repeats[connection_del_from_points][count_this_group]
+                            else:
+                                count_this_group += 1
+                        if not len(active_connection_to_repeats[connection_del_from_points]):
+                            del active_connection_to_repeats[connection_del_from_points]
+            # print("Cleared pointer", active_connection_to_repeats)
+            # Loop 3
+            for one_connection in last_connection:
+                here_id, direction_trans = one_connection
+                candidate_new_connect = ((here_id + direction_trans) % raw_seq_length, direction_trans)
+                if candidate_new_connect in this_connection:
+                    if one_connection in active_connection_to_repeats:
+                        active_connection_to_repeats[candidate_new_connect] = []
+                        for one_repeat_id in active_connection_to_repeats[one_connection]:
+                            active_connection_to_repeats[candidate_new_connect].append(one_repeat_id)
+                        del active_connection_to_repeats[one_connection]
+            # print("Updated pointer", active_connection_to_repeats)
+            # Loop 4
+            for repeat_kind in repeats_to_stop:
+                if len(repeats[repeat_kind]) - len(repeats_to_stop[repeat_kind]) >= 2:
+                    repeat_to_be_continued = False
+                    for repeat_num in range(len(repeats[repeat_kind])):
+                        if repeat_num not in repeats_to_stop[repeat_kind]:
+                            start_id, go_to_id, gt_direction = repeats[repeat_kind][repeat_num]
+                            new_connect = (
+                                (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction) % raw_seq_length,
+                                gt_direction)
+                            if new_connect in this_connection and new_connect not in active_connection_to_repeats:
+                                repeat_to_be_continued = True
+                                break
+                    if repeat_to_be_continued:
+                        repeats.append([])
+                        for inside_repeat_num in range(len(repeats[repeat_kind])):
+                            if inside_repeat_num not in repeats_to_stop[repeat_kind]:
+                                start_id, go_to_id, gt_direction = repeats[repeat_kind][inside_repeat_num]
+                                repeats[-1].append([start_id, go_to_id, gt_direction])
+                                new_connect = (
+                                    (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction) % raw_seq_length,
+                                    gt_direction)
+                                if new_connect in active_connection_to_repeats:
+                                    active_connection_to_repeats[new_connect].append(
+                                        (len(repeats) - 1, len(repeats[-1]) - 1))
+                                else:
+                                    active_connection_to_repeats[new_connect] = [
+                                        (len(repeats) - 1, len(repeats[-1]) - 1)]
+            # print("Post-add pointer", active_connection_to_repeats)
+            # Loop 5
+            for one_connection in active_connection_to_repeats:
+                for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
+                    start_id, previous_id, this_direction = repeats[repeat_kind][repeat_num]
+                    repeats[repeat_kind][repeat_num][1] += this_direction
+                    repeats[repeat_kind][repeat_num][1] %= raw_seq_length
+            # print("Repeats", repeats)
+            """part 2: dealing with new connection"""
+            for one_connection in this_connection:
+                here_id, direction_trans = one_connection
+                candidate_last_connect = ((here_id - direction_trans) % raw_seq_length, direction_trans)
+                if candidate_last_connect not in last_connection:
+                    repeats.append([])
+                    for inside_connection in this_connection:
+                        inside_id, inside_direction = inside_connection
+                        repeats[-1].append([(inside_id + (word_size - 1) * (inside_direction == -1)) % raw_seq_length,
+                                            (inside_id + (word_size - 1) * (inside_direction == 1)) % raw_seq_length,
+                                            inside_direction])
+                        if (inside_id, inside_direction) in active_connection_to_repeats:
+                            active_connection_to_repeats[inside_connection].append(
+                                (len(repeats) - 1, len(repeats[-1]) - 1))
+                        else:
+                            active_connection_to_repeats[inside_connection] = [(len(repeats) - 1, len(repeats[-1]) - 1)]
+                    break
+
+            if i + 1 < len_indices:
+                next_index = repeat_indices[i + 1]
+            else:
+                next_index = None
+            if next_index != (this_index + 1) % raw_seq_length:
+                active_connection_to_repeats = {}
+                last_connection = set()
+            else:
+                last_connection = this_connection
+            # the whole seq is a repeat, problematic?
+            if repeats and (repeats[0][0][1] - repeats[0][0][0] + repeats[0][0][2]) % raw_seq_length == 0:
+                break
+    else:
+        for i in range(len_indices):
+            this_index = repeat_indices[i]
+            this_word = index_to_words[this_index]
+            this_connection = words_to_index[this_word]
+            """part 1: dealing with old connection"""
+            # Loop 1: find repeats_to_stop
+            # Loop 2: delete the pointers pointing to the stopped repeats
+            # Loop 3: update the pointers
+            # Loop 4: add new pointers if shorter repeats should be continued with less alias
+            # Loop 5: update the repeats according to pointers
+            repeats_to_stop = {}
+            kinds_del_from_active = set()
+            for one_connection in last_connection:
+                here_id, direction_trans = one_connection
+                candidate_new_connect = (here_id + direction_trans, direction_trans)
+                if candidate_new_connect not in this_connection:
+                    # if one_connection in active_connection_to_repeats:
+                    for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
+                        if repeat_kind in repeats_to_stop:
+                            repeats_to_stop[repeat_kind][repeat_num] = one_connection
+                        else:
+                            repeats_to_stop[repeat_kind] = {repeat_num: one_connection}
+                        kinds_del_from_active.add(repeat_kind)
+            # print("kinds_del_from_active", kinds_del_from_active)
+            for repeat_kind in kinds_del_from_active:
+                for now_start, now_go_to, n_direction in repeats[repeat_kind]:
+                    connection_del_from_points = (now_go_to - (word_size - 1) * (n_direction == 1),
+                                                  n_direction)
+                    if connection_del_from_points in active_connection_to_repeats:
+                        count_this_group = 0
+                        while count_this_group < len(active_connection_to_repeats[connection_del_from_points]):
+                            if active_connection_to_repeats[connection_del_from_points][count_this_group][0] == repeat_kind:
+                                del active_connection_to_repeats[connection_del_from_points][count_this_group]
+                            else:
+                                count_this_group += 1
+                        if not len(active_connection_to_repeats[connection_del_from_points]):
+                            del active_connection_to_repeats[connection_del_from_points]
+            for one_connection in last_connection:
+                here_id, direction_trans = one_connection
+                candidate_new_connect = (here_id + direction_trans, direction_trans)
+                if candidate_new_connect in this_connection:
+                    if one_connection in active_connection_to_repeats:
+                        active_connection_to_repeats[candidate_new_connect] = []
+                        for one_repeat_id in active_connection_to_repeats[one_connection]:
+                            active_connection_to_repeats[candidate_new_connect].append(one_repeat_id)
+                        del active_connection_to_repeats[one_connection]
+            for repeat_kind in repeats_to_stop:
+                if len(repeats[repeat_kind]) - len(repeats_to_stop[repeat_kind]) >= 2:
+                    repeat_to_be_continued = False
+                    for repeat_num in range(len(repeats[repeat_kind])):
+                        if repeat_num not in repeats_to_stop[repeat_kind]:
+                            start_id, go_to_id, gt_direction = repeats[repeat_kind][repeat_num]
+                            new_connect = (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction,
+                                           gt_direction)
+                            if new_connect in this_connection and new_connect not in active_connection_to_repeats:
+                                repeat_to_be_continued = True
+                                break
+                    if repeat_to_be_continued:
+                        repeats.append([])
+                        for inside_repeat_num in range(len(repeats[repeat_kind])):
+                            if inside_repeat_num not in repeats_to_stop[repeat_kind]:
+                                start_id, go_to_id, gt_direction = repeats[repeat_kind][inside_repeat_num]
+                                repeats[-1].append([start_id, go_to_id, gt_direction])
+                                new_connect = (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction,
+                                               gt_direction)
+                                if new_connect in active_connection_to_repeats:
+                                    active_connection_to_repeats[new_connect].append((len(repeats) - 1, len(repeats[-1]) - 1))
+                                else:
+                                    active_connection_to_repeats[new_connect] = [(len(repeats) - 1, len(repeats[-1]) - 1)]
+            for one_connection in active_connection_to_repeats:
+                for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
+                    start_id, previous_id, this_direction = repeats[repeat_kind][repeat_num]
+                    repeats[repeat_kind][repeat_num][1] += this_direction
+            """part 2: dealing with new connection"""
+            for one_connection in this_connection:
+                here_id, direction_trans = one_connection
+                candidate_last_connect = (here_id - direction_trans, direction_trans)
+                if candidate_last_connect not in last_connection:
+                        repeats.append([])
+                        for inside_connection in this_connection:
+                            inside_id, inside_direction = inside_connection
+                            repeats[-1].append([inside_id + (word_size - 1) * (inside_direction == -1),
+                                                inside_id + (word_size - 1) * (inside_direction == 1),
+                                                inside_direction])
+                            if (inside_id, inside_direction) in active_connection_to_repeats:
+                                active_connection_to_repeats[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
+                            else:
+                                active_connection_to_repeats[inside_connection] = [(len(repeats) - 1, len(repeats[-1]) - 1)]
+                        break
+
+            if i + 1 < len_indices:
+                next_index = repeat_indices[i + 1]
+            else:
+                next_index = None
+            if next_index != this_index + 1:
+                active_connection_to_repeats = {}
+                last_connection = set()
+            else:
+                last_connection = this_connection
+
+    """aftertreatment"""
+    # 1.delete repeated repeats
+    final_repeat = []
+    repeat_dicts = set()
+    for repeat_group in repeats:
+        if tuple(repeat_group[0]) not in repeat_dicts:
+            for single_repeat in repeat_group:
+                here_start, here_end, here_direction = single_repeat
+                repeat_dicts.add((here_start, here_end, here_direction))
+                repeat_dicts.add((here_end, here_start, -here_direction))
+            final_repeat.append(repeat_group)
+        else:
+            continue
+
+    # 2.delete small repeats
+    count_group__ = 0
+    while count_group__ < len(final_repeat):
+        here_start, here_end, here_direction = final_repeat[count_group__][0]
+        if not (here_start == 0 and here_end == raw_seq_length - 1) and \
+                ((here_end - here_start + here_direction)*here_direction) % raw_seq_length < min_repeat_length:
+            del final_repeat[count_group__]
+        else:
+            count_group__ += 1
+
+    # 3.reorder repeats according to occurrence
+    for group_to_sort in range(len(final_repeat)):
+        start, end, direction = final_repeat[group_to_sort][0]
+        if start == end:
+            this_len = 1
+        else:
+            if (end - start) * direction > 0:
+                this_len = (end - start) * direction + 1
+            else:
+                this_len = (start, end)[direction == 1] + raw_seq_length - (start, end)[direction != 1] + 1
+        # transform into dict
+        final_repeat[group_to_sort] = [{"start": start, "end": end, "direction": direction, "length": this_len}
+                                       for start, end, direction in final_repeat[group_to_sort]]
+    # 4.sort according to length: from longest to shortest
+    final_repeat.sort(key=lambda x: -x[0]["length"])
+    return final_repeat
+
+
+def reverse_repeats_info(repeats):
+    new_repeats = []
+    for rep in repeats:
+        new_repeats.append({"start": rep["end"], "end": rep["start"],
+                            "direction": -rep["direction"], "length": rep["length"]})
+    return new_repeats
+
+
+def re_linear_circular_seqs(sequence, minimum_len_for_flip_flop_recombination=2000, log_handler=None):
+    raw_rev = complementary_seq(sequence)
+    len_seq = len(sequence)
+    min_len = minimum_len_for_flip_flop_recombination
+    repeats_set = find_exact_repeats(sequence, min_len, True)
+    if repeats_set:
+        # currently only for plastomes with inverted repeats, us `Arachis` to generalize this function
+        if len(repeats_set) > 1 or len(repeats_set[0]) != 2:
+            if log_handler:
+                log_handler.error("Currently only for plastomes with inverted/directed repeats! "
+                                  "Please inform the author if you want to extend the application.\n"
+                                  "Re-linearizing disabled!")
+            else:
+                sys.stdout.write("Error: Currently only for plastomes with inverted/directed repeats! "
+                                 "Please inform the author if you want to extend the application.\n"
+                                 "Re-linearizing disabled!\n")
+            return sequence
+            # raise NotImplementedError("Currently only for plastomes with inverted/directed repeats! "
+            #                           "Please inform the author if you want to extend the application.")
+        else:
+            longest_repeats = repeats_set[0]
+            # Sorting makes:
+            # direct1==1 and direct2==-1
+            # start1 be the smallest forward start
+            ir_locations_1 = sorted(longest_repeats, key=lambda x: (-x["direction"], x["start"]))
+            ir_locations_2 = sorted(reverse_repeats_info(ir_locations_1), key=lambda x: (-x["direction"], x["start"]))
+            ir_locations = sorted([ir_locations_1, ir_locations_2],
+                                  key=lambda x: (-max([y["direction"] for y in x]), x[0]["start"]))[0]
+            start1, end1, direct1 = ir_locations[0]["start"], ir_locations[0]["end"], ir_locations[0]["direction"]
+            start2, end2, direct2 = ir_locations[1]["start"], ir_locations[1]["end"], ir_locations[1]["direction"]
+            if ir_locations[0]["direction"] == ir_locations[1]["direction"]:
+                # cross the end, meaning site:seq_len in (DR1)
+                if end1 < start1:
+                    if end2 >= start1:
+                        if log_handler:
+                            log_handler.error("Currently only for plastomes with inverted/directed repeats! "
+                                              "Please inform the author if you want to extend the application.\n"
+                                              "Re-linearizing disabled!")
+                        else:
+                            sys.stdout.write("Error: Currently only for plastomes with inverted/directed repeats! "
+                                             "Please inform the author if you want to extend the application.\n"
+                                             "Re-linearizing disabled!\n")
+                        return sequence
+                    else:
+                        forward_seq = sequence[end2 + 1:] + sequence[:end2 + 1]
+                        reverse_seq = raw_rev[len_seq - start1:] + raw_rev[:len_seq - start1]
+                        return sorted([forward_seq, reverse_seq])[0]
+                elif end2 < start2:
+                    if end2 >= start1:
+                        if end1 >= start2:
+                            if log_handler:
+                                log_handler.error("Currently only for plastomes with inverted/directed repeats! "
+                                                  "Please inform the author if you want to extend the application.\n"
+                                                  "Re-linearizing disabled!")
+                            else:
+                                sys.stdout.write("Error: Currently only for plastomes with inverted/directed repeats! "
+                                                 "Please inform the author if you want to extend the application.\n"
+                                                 "Re-linearizing disabled!\n")
+                            return sequence
+                        else:
+                            forward_seq = sequence[end1 + 1:] + sequence[:end1 + 1]
+                            reverse_seq = raw_rev[len_seq - start2:] + raw_rev[:len_seq - start2]
+                            return sorted([forward_seq, reverse_seq])[0]
+                    elif end1 >= start2:
+                        forward_seq = sequence[end2 + 1:] + sequence[:end2 + 1]
+                        reverse_seq = raw_rev[len_seq - start1:] + raw_rev[:len_seq - start1]
+                        return sorted([forward_seq, reverse_seq])[0]
+                    else:
+                        if start1 - end2 - 1 > start2 - end1 - 1:
+                            forward_seq = sequence[end2 + 1:] + sequence[:end2 + 1]
+                            reverse_seq = raw_rev[len_seq - start1:] + raw_rev[:len_seq - start1]
+                            return sorted([forward_seq, reverse_seq])[0]
+                        elif start1 - end2 - 1 < start2 - end1 - 1:
+                            forward_seq = sequence[end1 + 1:] + sequence[:end1 + 1]
+                            reverse_seq = raw_rev[len_seq - start2:] + raw_rev[:len_seq - start2]
+                            return sorted([forward_seq, reverse_seq])[0]
+                        else:
+                            forward_seq_1 = sequence[end2 + 1:] + sequence[:end2 + 1]
+                            reverse_seq_1 = raw_rev[len_seq - start1:] + raw_rev[:len_seq - start1]
+                            forward_seq_2 = sequence[end1 + 1:] + sequence[:end1 + 1]
+                            reverse_seq_2 = raw_rev[len_seq - start2:] + raw_rev[:len_seq - start2]
+                            return sorted([forward_seq_1, reverse_seq_1, forward_seq_2, reverse_seq_2])[0]
+                else:
+                    # if start2 - end1 - 1 > len(sequence) + start1 - end2 - 1:
+                    forward_seq_1 = [sequence[end1 + 1:], sequence[:end1 + 1]]
+                    reverse_seq_1 = [raw_rev[len_seq - start2:], raw_rev[:len_seq - start2]]
+                    # elif start2 - end1 - 1 < len(sequence) + start1 - end2 - 1:
+                    forward_seq_2 = [sequence[end2 + 1:], sequence[:end2 + 1]]
+                    reverse_seq_2 = [raw_rev[len_seq - start1:], raw_rev[:len_seq - start1]]
+                    best_res = sorted([forward_seq_1, forward_seq_2, reverse_seq_1, reverse_seq_2],
+                                      key=lambda x: (-len(x[0]), x))[0]
+                    return "".join(best_res)
+            else:
+                # cross the end, meaning site:seq_len in (IR1)
+                if end1 < start1:
+                    # seq_len >= start2 >= start1
+                    if start2 >= start1:
+                        if log_handler:
+                            log_handler.error("Currently only for plastomes with inverted/directed repeats! "
+                                              "Please inform the author if you want to extend the application.\n"
+                                              "Re-linearizing disabled!")
+                        else:
+                            sys.stdout.write("Error: Currently only for plastomes with inverted/directed repeats! "
+                                             "Please inform the author if you want to extend the application.\n"
+                                             "Re-linearizing disabled!\n")
+                        return sequence
+                    else:
+                        forward_seq = sequence[start2 + 1:] + sequence[:start2 + 1]
+                        reverse_seq = raw_rev[len_seq - start1:] + raw_rev[:len_seq - start1]
+                        return sorted([forward_seq, reverse_seq])[0]
+                elif start2 < end2:
+                    if start2 >= start1:
+                        if end1 >= end2:
+                            if log_handler:
+                                log_handler.error("Currently only for plastomes with inverted/directed repeats! "
+                                                  "Please inform the author if you want to extend the application.\n"
+                                                  "Re-linearizing disabled!")
+                            else:
+                                sys.stdout.write("Error: Currently only for plastomes with inverted/directed repeats! "
+                                                 "Please inform the author if you want to extend the application.\n"
+                                                 "Re-linearizing disabled!\n")
+                            return sequence
+                        else:
+                            forward_seq = sequence[end1 + 1:] + sequence[:end1 + 1]
+                            reverse_seq = raw_rev[len_seq - end2:] + raw_rev[:len_seq - end2]
+                            return sorted([forward_seq, reverse_seq])[0]
+                    else:
+                        # if start1 - start2 - 1 > end2 - end1 - 1:
+                        forward_seq_1 = [sequence[start2 + 1:start1],
+                                         sequence[start1:end1 + 1],
+                                         sequence[end1 + 1:end2],
+                                         sequence[end2:] + sequence[:start2 + 1]]
+                        forward_seq_2 = [sequence[start2 + 1:start1],
+                                         sequence[start1:end1 + 1],
+                                         complementary_seq(sequence[end1 + 1:end2]),
+                                         sequence[end2:] + sequence[:start2 + 1]]
+                        reverse_seq_1 = [raw_rev[len_seq - start1: len_seq - start2 - 1],
+                                         raw_rev[len_seq - start2 - 1:] + raw_rev[:len_seq - end2],
+                                         raw_rev[len_seq - end2: len_seq - end1 - 1],
+                                         raw_rev[len_seq - end1 - 1: len_seq - start1]]
+                        reverse_seq_2 = [raw_rev[len_seq - start1: len_seq - start2 - 1],
+                                         raw_rev[len_seq - start2 - 1:] + raw_rev[:len_seq - end2],
+                                         complementary_seq(raw_rev[len_seq - end2: len_seq - end1 - 1]),
+                                         raw_rev[len_seq - end1 - 1: len_seq - start1]]
+                        # elif start1 - start2 - 1 < end2 - end1 - 1:
+                        forward_seq_3 = [sequence[end1 + 1: end2],
+                                         sequence[end2:] + sequence[:start2 + 1],
+                                         sequence[start2 + 1:start1],
+                                         sequence[start1:end1 + 1]]
+                        forward_seq_4 = [sequence[end1 + 1: end2],
+                                         sequence[end2:] + sequence[:start2 + 1],
+                                         complementary_seq(sequence[start2 + 1:start1]),
+                                         sequence[start1:end1 + 1]]
+                        reverse_seq_3 = [raw_rev[len_seq - end2: len_seq - end1 - 1],
+                                         raw_rev[len_seq - end1 - 1: len_seq - start1],
+                                         raw_rev[len_seq - start1: len_seq - start2 - 1],
+                                         raw_rev[len_seq - start2 - 1:] + raw_rev[:len_seq - end2]]
+                        reverse_seq_4 = [raw_rev[len_seq - end2: len_seq - end1 - 1],
+                                         raw_rev[len_seq - end1 - 1: len_seq - start1],
+                                         complementary_seq(raw_rev[len_seq - start1: len_seq - start2 - 1]),
+                                         raw_rev[len_seq - start2 - 1:] + raw_rev[:len_seq - end2]]
+                        best_res = sorted([forward_seq_1, forward_seq_2, forward_seq_3, forward_seq_4,
+                                           reverse_seq_1, reverse_seq_2, reverse_seq_3, reverse_seq_4],
+                                          key=lambda x: (-len(x[0]), x))[0]
+                        return "".join(best_res)
+                else:
+                    # if len(sequence) + start1 - start2 - 1 > end2 - end1 - 1:
+                    forward_seq_1 = [sequence[start2 + 1:] + sequence[:start1],
+                                     sequence[start1:end1 + 1],
+                                     sequence[end1 + 1:end2],
+                                     sequence[end2:start2 + 1]]
+                    forward_seq_2 = [sequence[start2 + 1:] + sequence[:start1],
+                                     sequence[start1:end1 + 1],
+                                     complementary_seq(sequence[end1 + 1:end2]),
+                                     sequence[end2:start2 + 1]]
+                    reverse_seq_1 = [raw_rev[len_seq - start1:] + raw_rev[:len_seq - start2 - 1],
+                                     raw_rev[len_seq - start2 - 1:len_seq - end2],
+                                     raw_rev[len_seq - end2: len_seq - end1 - 1],
+                                     raw_rev[len_seq - end1 - 1: len_seq - start1]]
+                    reverse_seq_2 = [raw_rev[len_seq - start1:] + raw_rev[:len_seq - start2 - 1],
+                                     raw_rev[len_seq - start2 - 1:len_seq - end2],
+                                     complementary_seq(raw_rev[len_seq - end2: len_seq - end1 - 1]),
+                                     raw_rev[len_seq - end1 - 1: len_seq - start1]]
+                    # elif len(sequence) + start1 - start2 - 1 < end2 - end1 - 1:
+                    forward_seq_3 = [sequence[end1 + 1: end2],
+                                     sequence[end2:start2 + 1],
+                                     sequence[start2 + 1:] + sequence[:start1],
+                                     sequence[start1:end1 + 1]]
+                    forward_seq_4 = [sequence[end1 + 1: end2],
+                                     sequence[end2:start2 + 1],
+                                     complementary_seq(sequence[start2 + 1:] + sequence[:start1]),
+                                     sequence[start1:end1 + 1]]
+                    reverse_seq_3 = [raw_rev[len_seq - end2: len_seq - end1 - 1],
+                                     raw_rev[len_seq - end1 - 1: len_seq - start1],
+                                     raw_rev[len_seq - start1:] + raw_rev[:len_seq - start2 - 1],
+                                     raw_rev[len_seq - start2 - 1:len_seq - end2]]
+                    reverse_seq_4 = [raw_rev[len_seq - end2: len_seq - end1 - 1],
+                                     raw_rev[len_seq - end1 - 1: len_seq - start1],
+                                     complementary_seq(raw_rev[len_seq - start1:] + raw_rev[:len_seq - start2 - 1]),
+                                     raw_rev[len_seq - start2 - 1:len_seq - end2]]
+                    best_res = sorted([forward_seq_1, forward_seq_2, forward_seq_3, forward_seq_4,
+                                       reverse_seq_1, reverse_seq_2, reverse_seq_3, reverse_seq_4],
+                                      key=lambda x: (-len(x[0]), x))[0]
+                    return "".join(best_res)
+    else:
+        extended_template = sequence + sequence[:min_len - 1]
+        extended_temp_rev = raw_rev + raw_rev[:min_len - 1]
+        words = []
+        for go_to_base in range(len_seq):
+            words.append([extended_template[go_to_base: go_to_base + min_len], go_to_base, True])
+            words.append([extended_temp_rev[go_to_base: go_to_base + min_len], go_to_base, False])
+        words.sort()
+        initial_word, initial_base, initial_direction = words[0]
+        if initial_direction:
+            return sequence[initial_base:] + sequence[:initial_base]
+        else:
+            return raw_rev[initial_base:] + raw_rev[:initial_base]
+
+
 def find_string_difference(this_string, this_reference, dynamic_span=2.0):
     this_string = this_string.lower()
     this_reference = this_reference.lower()

@@ -148,6 +148,7 @@ def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
     if is_circular == "yes":
         for record in fasta_ob:
             if len(record.seq):
+                record.seq = re_linear_circular_seqs(record.seq)
                 to_add = record.seq[:max_lib_len]
                 added_len = len(to_add)
                 record.seq += to_add
@@ -164,6 +165,7 @@ def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
     elif is_circular == "auto":
         for record in fasta_ob:
             if len(record.seq) and record.label.endswith("(circular)"):
+                record.seq = re_linear_circular_seqs(record.seq)
                 to_add = record.seq[:max_lib_len]
                 added_len = len(to_add)
                 record.seq += to_add

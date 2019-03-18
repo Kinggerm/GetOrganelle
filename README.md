@@ -78,7 +78,7 @@ It is also very IMPORTANT to keep updated (if you find your version is out of da
 
 You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.
 
-However, to get a complete organelle genome (such as a plastome) rather than organelle reads, other files in GetOrganelle are needed in the original relative path. Also, the following software/libraries are needed to be installed and added to the PATH, since they could be called automatically:
+However, to get a complete organelle genome (such as a plastome) rather than organelle reads, the following software/libraries are needed to be installed and added to the PATH, since they could be called automatically:
 
 * Python libraries numpy, scipy, sympy are used to solve the assembly graph, and could be easily installed by typing in:
     

@@ -233,6 +233,7 @@ class MapRecords:
                                 go_to_base += op_len
                             else:
                                 mapping_statistics[operation][reference][go_to_base] += op_len
+        # PART1
         # remove redundant chars
         # for cigar_char in cigar_char_list:
         #     if sum([sum(mapping_statistics[cigar_char][ref]) for ref in mapping_statistics[cigar_char]]) == 0:
@@ -240,13 +241,32 @@ class MapRecords:
         # for cigar_char in list(mapping_statistics):
         #     if cigar_char not in cigar_char_list:
         #         del mapping_statistics[cigar_char]
+
         # read mismatches from MD
-        if "X" in cigar_char_list and "X" not in mapping_statistics:
-            mapping_statistics["X"] = {ref: [0 for foo in range(self.references[ref]["index_len"])]
-                                       for ref in self.references}
-            if multiple_hits_mode == "best":
-                for query_tuple in self.queries:
-                    record_of_a_read = sorted(self.queries[query_tuple], key=lambda x: -x.map_quality)[0]
+        # activated only when PART1 is activated
+        # if "X" in cigar_char_list and "X" not in mapping_statistics:
+        #     mapping_statistics["X"] = {ref: [0 for foo in range(self.references[ref]["index_len"])]
+        #                                for ref in self.references}
+        if multiple_hits_mode == "best":
+            for query_tuple in self.queries:
+                record_of_a_read = sorted(self.queries[query_tuple], key=lambda x: -x.map_quality)[0]
+                if record_of_a_read.ref_left_by_alignment > 0:
+                    reference = record_of_a_read.ref
+                    go_to_base = record_of_a_read.ref_left_by_alignment
+                    for md_char in record_of_a_read.optional_fields["MD"]:
+                        if md_char.isdigit():
+                            go_to_base += int(md_char)
+                        elif md_char.startswith("^"):
+                            go_to_base += len(md_char) - 1
+                        else:
+                            for add_go in range(len(md_char)):
+                                # list is zero-based
+                                # cigar is one-based
+                                position_1based = go_to_base + add_go
+                                mapping_statistics["X"][reference][position_1based - 1] += 1
+        elif multiple_hits_mode == "all":
+            for query_tuple in self.queries:
+                for record_of_a_read in self.queries[query_tuple]:
                     if record_of_a_read.ref_left_by_alignment > 0:
                         reference = record_of_a_read.ref
                         go_to_base = record_of_a_read.ref_left_by_alignment
@@ -261,23 +281,6 @@ class MapRecords:
                                     # cigar is one-based
                                     position_1based = go_to_base + add_go
                                     mapping_statistics["X"][reference][position_1based - 1] += 1
-            elif multiple_hits_mode == "all":
-                for query_tuple in self.queries:
-                    for record_of_a_read in self.queries[query_tuple]:
-                        if record_of_a_read.ref_left_by_alignment > 0:
-                            reference = record_of_a_read.ref
-                            go_to_base = record_of_a_read.ref_left_by_alignment
-                            for md_char in record_of_a_read.optional_fields["MD"]:
-                                if md_char.isdigit():
-                                    go_to_base += int(md_char)
-                                elif md_char.startswith("^"):
-                                    go_to_base += len(md_char) - 1
-                                else:
-                                    for add_go in range(len(md_char)):
-                                        # list is zero-based
-                                        # cigar is one-based
-                                        position_1based = go_to_base + add_go
-                                        mapping_statistics["X"][reference][position_1based - 1] += 1
         # circularize
         for cigar_char in mapping_statistics:
             for ref in self.references:

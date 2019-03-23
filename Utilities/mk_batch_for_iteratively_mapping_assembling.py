@@ -8,7 +8,7 @@ sys.stdout.write("\nThis is a script for making batch file for "
 sys.stdout.flush()
 
 usage = "\n" + str(os.path.basename(__file__)) + \
-        " -1 original_1.fq -2 original_2.fq -s seed.fasta -R 5 -k 75,85,95 -o output_base"
+        " -1 original_1.fq -2 original_2.fq -s seed.fasta -R 5 -k 21,45,65,85,105 -o output_base"
 parser = Option(usage=usage)
 parser.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
 parser.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
@@ -17,8 +17,8 @@ parser.add_option('-R', dest='rounds', default=3, type=int,
                   help='How many iterations would you like to have? Default=3')
 parser.add_option('-t', dest="threads", default=1, type=int,
                   help="theads used for bowtie2 and SPAdes. Default=1")
-parser.add_option('-k', dest='spades_kmer', default='65,75,85',
-                  help='SPAdes k-mer settings. Use the same format as in SPAdes. Default=65,75,85')
+parser.add_option('-k', dest='spades_kmer', default='21,45,65,85,105',
+                  help='SPAdes k-mer settings. Use the same format as in SPAdes. Default=21,45,65,85,105')
 parser.add_option('-o', dest='output_sh_file',
                   help='Executable output batch file.')
 parser.add_option('--un', dest='unpaired', default=False, action='store_true',

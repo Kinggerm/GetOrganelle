@@ -47,13 +47,13 @@ def get_options(descriptions, version):
     version = version
     usage = "\n###  Plant Plastome, Normal, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_reference.fasta -o plastome_output " \
-            " -R 15 -k 45,65,85,105 -F plant_cp\n" \
+            " -R 15 -k 21,45,65,85,105 -F plant_cp\n" \
             "###  Plant Mitochondria\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_reference.fasta -o mitochondria_output " \
-            " -R 30 -k 45,65,85,105 -F plant_mt\n" \
+            " -R 30 -k 21,45,65,85,105 -F plant_mt\n" \
             "###  Plant Nuclear Ribosomal RNA (18S-ITS1-5.8S-ITS2-26S)\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -o nr_output " \
-            " -R 7 -k 95,115 -P 0 -F plant_nr"
+            " -R 7 -k 35,85,115 -P 0 -F plant_nr"
     parser = OptionParser(usage=usage, version=version, description=descriptions, add_help_option=False)
     # group 1
     group_inout = OptionGroup(parser, "IN-OUT OPTIONS", "Options on inputs and outputs")
@@ -106,7 +106,7 @@ def get_options(descriptions, version):
                                  "from your sample).")
     group_scheme.add_option("--safe", dest="safe_strategy", default=False, action="store_true",
                             help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
-                                 "--max-n-words 4E9 -k 55,65,75,85,95,105,115,125\" "
+                                 "--max-n-words 4E9 -k 21,35,45,55,65,75,85,95,105,115,127\" "
                                  "This option is suggested for lowly-covered or nonhomogeneously-covered data (poor "
                                  "data). You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--safe\" flag. "
@@ -205,7 +205,7 @@ def get_options(descriptions, version):
     # group 4
     group_assembly = OptionGroup(parser, "ASSEMBLY OPTIONS", "These options are about the assembly and "
                                                              "graph disentangling")
-    group_assembly.add_option("-k", dest="spades_kmer", default="45,65,85,105",
+    group_assembly.add_option("-k", dest="spades_kmer", default="21,55,85,115",
                               help="SPAdes kmer settings. Use the same format as in SPAdes. illegal kmer values "
                                    "would be automatically discarded by GetOrganelle. "
                                    "Default: %default")
@@ -325,14 +325,14 @@ def get_options(descriptions, version):
         parser.remove_option("--safe")
         parser.add_option("--safe", dest="safe_strategy",
                           help="=\"-R 200 --max-reads 2E8 -J 1 -M 1 --min-quality-score -5 --max-ignore-percent 0 "
-                               "--max-n-words 4E9 -k 55,65,75,85,95,105,115,125 "
+                               "--max-n-words 4E9 -k 21,35,45,55,65,75,85,95,105,115,127 "
                                "--disentangle-time-limit 3600\"")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
                           help="=\"-R 10 --max-reads 5E6 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
                                "--disentangle-time-limit 180 --no-gradient-k\"")
         parser.remove_option("-k")
-        parser.add_option("-k", dest="spades_kmer", default="45,65,85,105", help="SPAdes kmer settings. Default: %default")
+        parser.add_option("-k", dest="spades_kmer", default="21,55,85,115", help="SPAdes kmer settings. Default: %default")
         parser.remove_option("-t")
         parser.add_option("-t", dest="threads", type=int, default=1, help="Maximum threads to use. Default: %default")
         parser.remove_option("-P")
@@ -476,7 +476,7 @@ def get_options(descriptions, version):
             if "--max-n-words" not in sys.argv:
                 options.maximum_n_words = 4E9
             if "-k" not in sys.argv:
-                options.spades_kmer = "55,65,75,85,95,105,115,125"
+                options.spades_kmer = "21,35,45,55,65,75,85,95,105,115,127"
             if "--disentangle-time-limit" not in sys.argv:
                 options.disentangle_time_limit = 3600
 
@@ -1826,8 +1826,8 @@ def get_heads_from_sam(bowtie_sam_file):
 
 
 def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files, original_fq_beyond_read_limit,
-                         out_base, resume, verbose_log, threads, random_seed, prefix, keep_temp,
-                         bowtie2_other_options, log):
+                         out_base, resume, verbose_log, threads, random_seed,
+                         prefix, keep_temp, bowtie2_other_options, log):
     if os.path.exists(seed_file + '.index.1.bt2l'):
         log.info("Bowtie2 index existed!")
     else:
@@ -2551,8 +2551,8 @@ def main():
                 seed_file, anti_lines = mapping_with_bowtie2(seed_file, anti_seed, options.maximum_n_reads,
                                                              original_fq_files,
                                                              original_fq_beyond_read_limit, out_base, resume,
-                                                             verb_log, options.threads, options.random_seed,
-                                                             options.prefix, options.keep_temp_files,
+                                                             verb_log, options.threads, options.roptions.prefix,
+                                                             options.keep_temp_files,
                                                              bowtie2_other_options=options.bowtie2_options,
                                                              log=log)
             log.info("Making seed reads finished.\n")

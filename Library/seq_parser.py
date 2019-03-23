@@ -199,11 +199,9 @@ def write_fasta_with_list(out_dir, matrix, overwrite):
 
 # from https://github.com/Kinggerm/PersonalUtilities
 # Hashing methods.
-# I naively wrote this function by myself and latter found the name and description of this algorithm
-# in Kurtz et al. 2001. REPuter: the manifold applications of repeat analysis on a genomic scale.
 def find_exact_repeats(sequence_string, min_repeat_length, circular,
                        accepted_char=set(list("ATGCRMYKHBDVatgcrmykhbdv"))):
-    word_size = min(13, min_repeat_length)
+    word_size = min(20, min_repeat_length)
     if len(sequence_string) < min_repeat_length:
         return []
     if circular:
@@ -258,18 +256,20 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
                 repeat_indices.add(repeat_index[0])
     repeat_indices = sorted(list(repeat_indices))
     repeats = []
-    active_connection_to_repeats = {}
-    last_connection = set()
+    # pointer: {active_connection: [(repeat_id_1, sub_repeat_id_1), (repeat_id_2, sub_repeat_id_2)]}
+    pointer = {}
+    last_connections = set()
     len_indices = len(repeat_indices)
 
     if circular:
         if len_indices != raw_seq_length and len(repeat_indices):
+            # shift start id to the break point
             while (repeat_indices[0] - repeat_indices[-1]) % raw_seq_length == 1:
                 repeat_indices.insert(0, repeat_indices.pop(-1))
         for i in range(len_indices):
             this_index = repeat_indices[i]
             this_word = index_to_words[this_index]
-            this_connection = words_to_index[this_word]
+            coming_connections = words_to_index[this_word]
             """part 1: dealing with old connection"""
             # Loop 1: find repeats_to_stop
             # Loop 2: delete the pointers pointing to the stopped repeats
@@ -277,109 +277,94 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
             # Loop 4: add new pointers if shorter repeats should be continued with less alias
             # Loop 5: update the repeats according to pointers
             repeats_to_stop = {}
-            kinds_del_from_active = set()
-            for one_connection in last_connection:
-                here_id, direction_trans = one_connection
+            # Loop 1
+            for last_con in last_connections:
+                here_id, direction_trans = last_con
                 candidate_new_connect = ((here_id + direction_trans) % raw_seq_length, direction_trans)
-                if candidate_new_connect not in this_connection:
-                    # if one_connection in active_connection_to_repeats:
-                    for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
-                        if repeat_kind in repeats_to_stop:
-                            repeats_to_stop[repeat_kind][repeat_num] = one_connection
-                        else:
-                            repeats_to_stop[repeat_kind] = {repeat_num: one_connection}
-                        kinds_del_from_active.add(repeat_kind)
-            # print(repeats_to_stop)
+                if candidate_new_connect not in coming_connections:
+                    for repeat_id, sub_repeat_id in pointer[last_con]:
+                        if repeat_id not in repeats_to_stop:
+                            repeats_to_stop[repeat_id] = set()
+                        repeats_to_stop[repeat_id].add(sub_repeat_id)
+
             # Loop 2
-            for repeat_kind in kinds_del_from_active:
-                for now_start, now_go_to, n_direction in repeats[repeat_kind]:
-                    connection_del_from_points = ((now_go_to - (word_size - 1) * (n_direction == 1)) % raw_seq_length,
-                                                  n_direction)
-                    if connection_del_from_points in active_connection_to_repeats:
-                        count_this_group = 0
-                        while count_this_group < len(active_connection_to_repeats[connection_del_from_points]):
-                            if active_connection_to_repeats[connection_del_from_points][count_this_group][0]\
-                                    == repeat_kind:
-                                del active_connection_to_repeats[connection_del_from_points][count_this_group]
-                            else:
-                                count_this_group += 1
-                        if not len(active_connection_to_repeats[connection_del_from_points]):
-                            del active_connection_to_repeats[connection_del_from_points]
-            # print("Cleared pointer", active_connection_to_repeats)
+            for last_con in list(pointer):
+                count_ids = 0
+                while count_ids < len(pointer[last_con]):
+                    if pointer[last_con][count_ids][0] in repeats_to_stop:
+                        del pointer[last_con][count_ids]
+                    else:
+                        count_ids += 1
+                if not len(pointer[last_con]):
+                    del pointer[last_con]
+
             # Loop 3
-            for one_connection in last_connection:
-                here_id, direction_trans = one_connection
+            new_pointer = {}
+            for last_con in pointer:
+                here_id, direction_trans = last_con
                 candidate_new_connect = ((here_id + direction_trans) % raw_seq_length, direction_trans)
-                if candidate_new_connect in this_connection:
-                    if one_connection in active_connection_to_repeats:
-                        active_connection_to_repeats[candidate_new_connect] = []
-                        for one_repeat_id in active_connection_to_repeats[one_connection]:
-                            active_connection_to_repeats[candidate_new_connect].append(one_repeat_id)
-                        del active_connection_to_repeats[one_connection]
-            # print("Updated pointer", active_connection_to_repeats)
+                if candidate_new_connect in coming_connections:  # and last_con in pointer:
+                    new_pointer[candidate_new_connect] = list(pointer[last_con])
+            pointer = new_pointer
+
             # Loop 4
-            for repeat_kind in repeats_to_stop:
-                if len(repeats[repeat_kind]) - len(repeats_to_stop[repeat_kind]) >= 2:
+            for repeat_id in repeats_to_stop:
+                if len(repeats[repeat_id]) - len(repeats_to_stop[repeat_id]) >= 2:
                     repeat_to_be_continued = False
-                    for repeat_num in range(len(repeats[repeat_kind])):
-                        if repeat_num not in repeats_to_stop[repeat_kind]:
-                            start_id, go_to_id, gt_direction = repeats[repeat_kind][repeat_num]
+                    for sub_repeat_id in range(len(repeats[repeat_id])):
+                        if sub_repeat_id not in repeats_to_stop[repeat_id]:
+                            start_id, go_to_id, gt_direction = repeats[repeat_id][sub_repeat_id]
                             new_connect = (
                                 (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction) % raw_seq_length,
                                 gt_direction)
-                            if new_connect in this_connection and new_connect not in active_connection_to_repeats:
+                            if new_connect in coming_connections and new_connect not in pointer:
                                 repeat_to_be_continued = True
                                 break
                     if repeat_to_be_continued:
                         repeats.append([])
-                        for inside_repeat_num in range(len(repeats[repeat_kind])):
-                            if inside_repeat_num not in repeats_to_stop[repeat_kind]:
-                                start_id, go_to_id, gt_direction = repeats[repeat_kind][inside_repeat_num]
+                        for inside_repeat_num in range(len(repeats[repeat_id])):
+                            if inside_repeat_num not in repeats_to_stop[repeat_id]:
+                                start_id, go_to_id, gt_direction = repeats[repeat_id][inside_repeat_num]
                                 repeats[-1].append([start_id, go_to_id, gt_direction])
                                 new_connect = (
                                     (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction) % raw_seq_length,
                                     gt_direction)
-                                if new_connect in active_connection_to_repeats:
-                                    active_connection_to_repeats[new_connect].append(
-                                        (len(repeats) - 1, len(repeats[-1]) - 1))
-                                else:
-                                    active_connection_to_repeats[new_connect] = [
-                                        (len(repeats) - 1, len(repeats[-1]) - 1)]
-            # print("Post-add pointer", active_connection_to_repeats)
+                                if new_connect not in pointer:
+                                    pointer[new_connect] = []
+                                pointer[new_connect].append((len(repeats) - 1, len(repeats[-1]) - 1))
+
             # Loop 5
-            for one_connection in active_connection_to_repeats:
-                for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
-                    start_id, previous_id, this_direction = repeats[repeat_kind][repeat_num]
-                    repeats[repeat_kind][repeat_num][1] += this_direction
-                    repeats[repeat_kind][repeat_num][1] %= raw_seq_length
-            # print("Repeats", repeats)
+            for last_con in pointer:
+                for repeat_id, sub_repeat_id in pointer[last_con]:
+                    start_id, previous_id, this_direction = repeats[repeat_id][sub_repeat_id]
+                    repeats[repeat_id][sub_repeat_id][1] += this_direction
+                    repeats[repeat_id][sub_repeat_id][1] %= raw_seq_length
+
             """part 2: dealing with new connection"""
-            for one_connection in this_connection:
-                here_id, direction_trans = one_connection
+            for new_con in coming_connections:
+                here_id, direction_trans = new_con
                 candidate_last_connect = ((here_id - direction_trans) % raw_seq_length, direction_trans)
-                if candidate_last_connect not in last_connection:
+                if candidate_last_connect not in last_connections:  # new connection sets
                     repeats.append([])
-                    for inside_connection in this_connection:
+                    for inside_connection in coming_connections:
                         inside_id, inside_direction = inside_connection
                         repeats[-1].append([(inside_id + (word_size - 1) * (inside_direction == -1)) % raw_seq_length,
                                             (inside_id + (word_size - 1) * (inside_direction == 1)) % raw_seq_length,
                                             inside_direction])
-                        if (inside_id, inside_direction) in active_connection_to_repeats:
-                            active_connection_to_repeats[inside_connection].append(
-                                (len(repeats) - 1, len(repeats[-1]) - 1))
-                        else:
-                            active_connection_to_repeats[inside_connection] = [(len(repeats) - 1, len(repeats[-1]) - 1)]
+                        if inside_connection not in pointer:
+                            pointer[inside_connection] = []
+                        pointer[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
                     break
 
             if i + 1 < len_indices:
                 next_index = repeat_indices[i + 1]
             else:
                 next_index = None
-            if next_index != (this_index + 1) % raw_seq_length:
-                active_connection_to_repeats = {}
-                last_connection = set()
+            if next_index != (this_index + 1) % raw_seq_length:  # if not continuous, no pointer to update repeats
+                pointer = {}
+                last_connections = set()
             else:
-                last_connection = this_connection
+                last_connections = coming_connections
             # the whole seq is a repeat, problematic?
             if repeats and (repeats[0][0][1] - repeats[0][0][0] + repeats[0][0][2]) % raw_seq_length == 0:
                 break
@@ -387,7 +372,7 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
         for i in range(len_indices):
             this_index = repeat_indices[i]
             this_word = index_to_words[this_index]
-            this_connection = words_to_index[this_word]
+            coming_connections = words_to_index[this_word]
             """part 1: dealing with old connection"""
             # Loop 1: find repeats_to_stop
             # Loop 2: delete the pointers pointing to the stopped repeats
@@ -395,83 +380,76 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
             # Loop 4: add new pointers if shorter repeats should be continued with less alias
             # Loop 5: update the repeats according to pointers
             repeats_to_stop = {}
-            kinds_del_from_active = set()
-            for one_connection in last_connection:
-                here_id, direction_trans = one_connection
+            # Loop 1
+            for last_con in last_connections:
+                here_id, direction_trans = last_con
                 candidate_new_connect = (here_id + direction_trans, direction_trans)
-                if candidate_new_connect not in this_connection:
-                    # if one_connection in active_connection_to_repeats:
-                    for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
-                        if repeat_kind in repeats_to_stop:
-                            repeats_to_stop[repeat_kind][repeat_num] = one_connection
+                if candidate_new_connect not in coming_connections:
+                    # if last_con in pointer:
+                    for repeat_id, sub_repeat_id in pointer[last_con]:
+                        if repeat_id in repeats_to_stop:
+                            repeats_to_stop[repeat_id][sub_repeat_id] = last_con
                         else:
-                            repeats_to_stop[repeat_kind] = {repeat_num: one_connection}
-                        kinds_del_from_active.add(repeat_kind)
-            # print("kinds_del_from_active", kinds_del_from_active)
-            for repeat_kind in kinds_del_from_active:
-                for now_start, now_go_to, n_direction in repeats[repeat_kind]:
-                    connection_del_from_points = (now_go_to - (word_size - 1) * (n_direction == 1),
-                                                  n_direction)
-                    if connection_del_from_points in active_connection_to_repeats:
-                        count_this_group = 0
-                        while count_this_group < len(active_connection_to_repeats[connection_del_from_points]):
-                            if active_connection_to_repeats[connection_del_from_points][count_this_group][0] == repeat_kind:
-                                del active_connection_to_repeats[connection_del_from_points][count_this_group]
-                            else:
-                                count_this_group += 1
-                        if not len(active_connection_to_repeats[connection_del_from_points]):
-                            del active_connection_to_repeats[connection_del_from_points]
-            for one_connection in last_connection:
-                here_id, direction_trans = one_connection
-                candidate_new_connect = (here_id + direction_trans, direction_trans)
-                if candidate_new_connect in this_connection:
-                    if one_connection in active_connection_to_repeats:
-                        active_connection_to_repeats[candidate_new_connect] = []
-                        for one_repeat_id in active_connection_to_repeats[one_connection]:
-                            active_connection_to_repeats[candidate_new_connect].append(one_repeat_id)
-                        del active_connection_to_repeats[one_connection]
-            for repeat_kind in repeats_to_stop:
-                if len(repeats[repeat_kind]) - len(repeats_to_stop[repeat_kind]) >= 2:
+                            repeats_to_stop[repeat_id] = {sub_repeat_id: last_con}
+            # Loop 2
+            for last_con in list(pointer):
+                count_ids = 0
+                while count_ids < len(pointer[last_con]):
+                    if pointer[last_con][count_ids][0] in repeats_to_stop:
+                        del pointer[last_con][count_ids]
+                    else:
+                        count_ids += 1
+                if not len(pointer[last_con]):
+                    del pointer[last_con]
+            # Loop 3
+            new_pointer = {}
+            for last_con in pointer:
+                here_id, direction_trans = last_con
+                candidate_new_connect = ((here_id + direction_trans) % raw_seq_length, direction_trans)
+                if candidate_new_connect in coming_connections:  # and last_con in pointer:
+                    new_pointer[candidate_new_connect] = list(pointer[last_con])
+            pointer = new_pointer
+            # Loop 4
+            for repeat_id in repeats_to_stop:
+                if len(repeats[repeat_id]) - len(repeats_to_stop[repeat_id]) >= 2:
                     repeat_to_be_continued = False
-                    for repeat_num in range(len(repeats[repeat_kind])):
-                        if repeat_num not in repeats_to_stop[repeat_kind]:
-                            start_id, go_to_id, gt_direction = repeats[repeat_kind][repeat_num]
+                    for sub_repeat_id in range(len(repeats[repeat_id])):
+                        if sub_repeat_id not in repeats_to_stop[repeat_id]:
+                            start_id, go_to_id, gt_direction = repeats[repeat_id][sub_repeat_id]
                             new_connect = (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction,
                                            gt_direction)
-                            if new_connect in this_connection and new_connect not in active_connection_to_repeats:
+                            if new_connect in coming_connections and new_connect not in pointer:
                                 repeat_to_be_continued = True
                                 break
                     if repeat_to_be_continued:
                         repeats.append([])
-                        for inside_repeat_num in range(len(repeats[repeat_kind])):
-                            if inside_repeat_num not in repeats_to_stop[repeat_kind]:
-                                start_id, go_to_id, gt_direction = repeats[repeat_kind][inside_repeat_num]
+                        for inside_repeat_num in range(len(repeats[repeat_id])):
+                            if inside_repeat_num not in repeats_to_stop[repeat_id]:
+                                start_id, go_to_id, gt_direction = repeats[repeat_id][inside_repeat_num]
                                 repeats[-1].append([start_id, go_to_id, gt_direction])
                                 new_connect = (go_to_id - (word_size - 1) * (gt_direction == 1) + gt_direction,
                                                gt_direction)
-                                if new_connect in active_connection_to_repeats:
-                                    active_connection_to_repeats[new_connect].append((len(repeats) - 1, len(repeats[-1]) - 1))
-                                else:
-                                    active_connection_to_repeats[new_connect] = [(len(repeats) - 1, len(repeats[-1]) - 1)]
-            for one_connection in active_connection_to_repeats:
-                for repeat_kind, repeat_num in active_connection_to_repeats[one_connection]:
-                    start_id, previous_id, this_direction = repeats[repeat_kind][repeat_num]
-                    repeats[repeat_kind][repeat_num][1] += this_direction
+                                if new_connect not in pointer:
+                                    pointer[inside_connection] = []
+                                pointer[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
+            for last_con in pointer:
+                for repeat_id, sub_repeat_id in pointer[last_con]:
+                    start_id, previous_id, this_direction = repeats[repeat_id][sub_repeat_id]
+                    repeats[repeat_id][sub_repeat_id][1] += this_direction
             """part 2: dealing with new connection"""
-            for one_connection in this_connection:
-                here_id, direction_trans = one_connection
+            for last_con in coming_connections:
+                here_id, direction_trans = last_con
                 candidate_last_connect = (here_id - direction_trans, direction_trans)
-                if candidate_last_connect not in last_connection:
+                if candidate_last_connect not in last_connections:
                         repeats.append([])
-                        for inside_connection in this_connection:
+                        for inside_connection in coming_connections:
                             inside_id, inside_direction = inside_connection
                             repeats[-1].append([inside_id + (word_size - 1) * (inside_direction == -1),
                                                 inside_id + (word_size - 1) * (inside_direction == 1),
                                                 inside_direction])
-                            if (inside_id, inside_direction) in active_connection_to_repeats:
-                                active_connection_to_repeats[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
-                            else:
-                                active_connection_to_repeats[inside_connection] = [(len(repeats) - 1, len(repeats[-1]) - 1)]
+                            if inside_connection not in pointer:
+                                pointer[inside_connection] = []
+                            pointer[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
                         break
 
             if i + 1 < len_indices:
@@ -479,24 +457,31 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
             else:
                 next_index = None
             if next_index != this_index + 1:
-                active_connection_to_repeats = {}
-                last_connection = set()
+                pointer = {}
+                last_connections = set()
             else:
-                last_connection = this_connection
+                last_connections = coming_connections
 
-    """aftertreatment"""
+    """after-treatment"""
     # 1.delete repeated repeats
     final_repeat = []
     repeat_dicts = set()
+    debug_dict = {}
     for repeat_group in repeats:
         if tuple(repeat_group[0]) not in repeat_dicts:
             for single_repeat in repeat_group:
                 here_start, here_end, here_direction = single_repeat
                 repeat_dicts.add((here_start, here_end, here_direction))
                 repeat_dicts.add((here_end, here_start, -here_direction))
+                if (here_start, here_end, here_direction) in debug_dict:
+                    debug_dict[(here_start, here_end, here_direction)].append(repeat_group)
+                else:
+                    debug_dict[(here_start, here_end, here_direction)] = [repeat_group]
+                if (here_end, here_start, -here_direction) in debug_dict:
+                    debug_dict[(here_end, here_start, -here_direction)].append(repeat_group)
+                else:
+                    debug_dict[(here_end, here_start, -here_direction)] = [repeat_group]
             final_repeat.append(repeat_group)
-        else:
-            continue
 
     # 2.delete small repeats
     count_group__ = 0

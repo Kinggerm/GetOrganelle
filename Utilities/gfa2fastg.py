@@ -48,7 +48,7 @@ def main():
     if len(sys.argv) > 1:
         for i in sys.argv:
             if '-h' in i or 'help' in i:
-                print("Usage: gfa2fastg.py *.fastg")
+                print("Usage: gfa2fastg.py *.gfa")
                 break
         else:
             for gfa_file in sys.argv[1:]:

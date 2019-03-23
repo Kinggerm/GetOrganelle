@@ -2551,8 +2551,8 @@ def main():
                 seed_file, anti_lines = mapping_with_bowtie2(seed_file, anti_seed, options.maximum_n_reads,
                                                              original_fq_files,
                                                              original_fq_beyond_read_limit, out_base, resume,
-                                                             verb_log, options.threads, options.roptions.prefix,
-                                                             options.keep_temp_files,
+                                                             verb_log, options.threads, options.random_seed,
+                                                             options.prefix, options.keep_temp_files,
                                                              bowtie2_other_options=options.bowtie2_options,
                                                              log=log)
             log.info("Making seed reads finished.\n")

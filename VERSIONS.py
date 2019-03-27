@@ -6,6 +6,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.5.2",
+     "features": [
+         "1. get_organelle_reads.py: Bowtie2 index files written to sample output directory rather than inside GetOrganelle/Library/SeqReference",
+     ]},
     {"number": "1.5.1c",
      "features": [
          "1. --random-seed added with default value 12345",

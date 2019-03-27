@@ -1828,41 +1828,45 @@ def get_heads_from_sam(bowtie_sam_file):
 def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files, original_fq_beyond_read_limit,
                          out_base, resume, verbose_log, threads, random_seed,
                          prefix, keep_temp, bowtie2_other_options, log):
-    if os.path.exists(seed_file + '.index.1.bt2l'):
-        log.info("Bowtie2 index existed!")
-    else:
-        log.info("Making seed - bowtie2 index ...")
-        build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
-                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        if verbose_log:
-            log.info("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index')
-        output, err = build_seed_index.communicate()
-        if "unrecognized option" in output.decode("utf8"):
-            build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
-                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            output, err = build_seed_index.communicate()
-        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
-            log.error('\n' + output.decode("utf8"))
-            exit()
-        if verbose_log:
-            log.info("\n" + output.decode("utf8").strip())
-        log.info("Making seed - bowtie2 index finished.")
-    seed_index_base = seed_file + '.index'
-
-    query_fq_files = []
-    for count_fq, ori_fq in enumerate(original_fq_files):
-        if original_fq_beyond_read_limit[count_fq]:
-            query_fq = ori_fq.strip() + ".Reduced"
-            os.system("head -n " + str(int(max_num_reads * 4)) + " " + ori_fq + " > " + query_fq)
-            query_fq_files.append(query_fq)
-        else:
-            query_fq_files.append(ori_fq)
-
     total_seed_fq = [os.path.join(out_base, x + prefix + "Initial.mapped.fq") for x in ("temp.", "")]
     total_seed_sam = [os.path.join(out_base, x + prefix + "seed_bowtie.sam") for x in ("temp.", "")]
+    seed_index_base = os.path.join(out_base, os.path.basename(seed_file)) + '.index'
+    anti_seed = anti_seed if anti_seed else ""
+    anti_index_base = os.path.join(out_base, os.path.basename(anti_seed)) + '.index'
+    query_fq_files = []
+
     if resume and os.path.exists(total_seed_fq[1]):
         log.info("Initial seeds existed!")
     else:
+
+        if os.path.exists(seed_index_base + '.1.bt2l'):
+            log.info("Bowtie2 index existed!")
+        else:
+            log.info("Making seed - bowtie2 index ...")
+            build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_index_base,
+                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            if verbose_log:
+                log.info("bowtie2-build --large-index " + seed_file + " " + seed_index_base)
+            output, err = build_seed_index.communicate()
+            if "unrecognized option" in output.decode("utf8"):
+                build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_index_base,
+                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                output, err = build_seed_index.communicate()
+            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                log.error('\n' + output.decode("utf8"))
+                exit()
+            if verbose_log:
+                log.info("\n" + output.decode("utf8").strip())
+            log.info("Making seed - bowtie2 index finished.")
+
+        for count_fq, ori_fq in enumerate(original_fq_files):
+            if original_fq_beyond_read_limit[count_fq]:
+                query_fq = ori_fq.strip() + ".Reduced"
+                os.system("head -n " + str(int(max_num_reads * 4)) + " " + ori_fq + " > " + query_fq)
+                query_fq_files.append(query_fq)
+            else:
+                query_fq_files.append(ori_fq)
+
         log.info("Mapping reads to seed - bowtie2 index ...")
         this_command = "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " " \
                        + bowtie2_other_options + " --al " + total_seed_fq[0] + \
@@ -1884,35 +1888,45 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
         else:
             log.error("Cannot find bowtie2 result!")
             exit()
-    if anti_seed:
-        if os.path.exists(anti_seed + '.index.1.bt2l'):
-            log.info("anti-seed - bowtie2 index existed!")
-        else:
-            log.info("Making anti-seed - bowtie2 index ...")
-            build_anti_index = subprocess.Popen(
-                "bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index',
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            if verbose_log:
-                log.info("bowtie2-build --large-index " + anti_seed + " " + anti_seed + '.index')
-            output, err = build_anti_index.communicate()
-            if "unrecognized option" in output.decode("utf8"):
-                build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_seed + '.index',
-                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-                if verbose_log:
-                    log.info("bowtie2-build " + anti_seed + " " + anti_seed + '.index')
-                output, err = build_anti_index.communicate()
-            if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
-                log.error('\n' + output.decode("utf8"))
-                exit()
-            if verbose_log:
-                log.info("\n" + output.decode("utf8").strip())
-            log.info("Making anti-seed - bowtie2 index finished.")
-        anti_index_base = anti_seed + '.index'
 
+    if anti_seed:
         anti_seed_sam = [os.path.join(out_base, x + prefix + "anti_seed_bowtie.sam") for x in ("temp.", "")]
         if resume and os.path.exists(anti_seed_sam[1]):
             log.info("Anti-seed mapping information existed!")
         else:
+
+            if os.path.exists(anti_index_base + '.1.bt2l'):
+                log.info("anti-seed - bowtie2 index existed!")
+            else:
+                log.info("Making anti-seed - bowtie2 index ...")
+                build_anti_index = subprocess.Popen(
+                    "bowtie2-build --large-index " + anti_seed + " " + anti_index_base,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                if verbose_log:
+                    log.info("bowtie2-build --large-index " + anti_seed + " " + anti_index_base)
+                output, err = build_anti_index.communicate()
+                if "unrecognized option" in output.decode("utf8"):
+                    build_anti_index = subprocess.Popen("bowtie2-build " + anti_seed + " " + anti_index_base,
+                                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                    if verbose_log:
+                        log.info("bowtie2-build " + anti_seed + " " + anti_index_base)
+                    output, err = build_anti_index.communicate()
+                if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+                    log.error('\n' + output.decode("utf8"))
+                    exit()
+                if verbose_log:
+                    log.info("\n" + output.decode("utf8").strip())
+                log.info("Making anti-seed - bowtie2 index finished.")
+
+            if not query_fq_files:
+                for count_fq, ori_fq in enumerate(original_fq_files):
+                    if original_fq_beyond_read_limit[count_fq]:
+                        query_fq = ori_fq.strip() + ".Reduced"
+                        os.system("head -n " + str(int(max_num_reads * 4)) + " " + ori_fq + " > " + query_fq)
+                        query_fq_files.append(query_fq)
+                    else:
+                        query_fq_files.append(ori_fq)
+
             log.info("Mapping reads to anti-seed - bowtie2 index ...")
             this_command = "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " " + \
                            bowtie2_other_options + " -x " + anti_index_base + \
@@ -1944,6 +1958,10 @@ def mapping_with_bowtie2(seed_file, anti_seed, max_num_reads, original_fq_files,
         for count_fq, query_fq in enumerate(query_fq_files):
             if original_fq_beyond_read_limit[count_fq]:
                 os.remove(query_fq)
+        for seed_index_file in [x for x in os.listdir(out_base) if x.startswith(os.path.basename(seed_index_base))]:
+            os.remove(os.path.join(out_base, seed_index_file))
+        for anti_index_file in [x for x in os.listdir(out_base) if x.startswith(os.path.basename(anti_index_base))]:
+            os.remove(os.path.join(out_base, anti_index_file))
     seed_fq_size = os.path.getsize(total_seed_fq[1])
     if not seed_fq_size:
         if log:

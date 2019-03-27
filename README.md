@@ -64,16 +64,10 @@ and make them writable/executable if they are not:
     
     chmod +x $GetOrganellePATH/GetOrganelle/Utilities/*.py
     
-    chmod +x $GetOrganellePATH/GetOrganelle/Library/*.py
-    
-    chmod +w $GetOrganellePATH/GetOrganelle/Library/*Reference
-    
 It is also very IMPORTANT to keep updated (if you find your version is out of date!):
     
     cd $GetOrganellePATH/GetOrganelle
 
-    rm Library/SeqReference/*index*
-    
     git pull
 
 You could run the main script (get_organelle_reads.py) to get organelle reads (*.fastq) successfully, without any third-party libraries or software.

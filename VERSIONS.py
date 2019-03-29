@@ -12,6 +12,7 @@ versions = [
          " to GetOrganelle/Library/SeqReference",
          "2. get_organelle_reads.py: more descriptive log",
          "3. seq_parser.py: re_linear_circular_seqs: fix a bug for evaluating the assembly result of DR plastomes",
+         "4. evaluate_assembly_using_mapping.py: bowtie2-build --seed",
      ]},
     {"number": "1.5.1c",
      "features": [

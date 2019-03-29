@@ -87,15 +87,19 @@ def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, ma
                          resume, threads, random_seed, log_handler, debug):
     if not (os.path.exists(seed_file + '.index.1.bt2l')):
         if debug:
-            log_handler.info("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index')
-        build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
+            log_handler.info("bowtie2-build --seed " + str(random_seed) + " --large-index " +
+                             seed_file + " " + seed_file + '.index')
+        build_seed_index = subprocess.Popen("bowtie2-build --seed " + str(random_seed) + " --large-index " +
+                                            seed_file + " " + seed_file + '.index',
                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = build_seed_index.communicate()
         if "unrecognized option" in output.decode("utf8"):
             if debug:
                 log_handler.info("Failed. Retry ...")
-                log_handler.info("bowtie2-build " + seed_file + " " + seed_file + '.index')
-            build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
+                log_handler.info("bowtie2-build --seed " + str(random_seed) + " " +
+                                 seed_file + " " + seed_file + '.index')
+            build_seed_index = subprocess.Popen("bowtie2-build --seed " + str(random_seed) + " " +
+                                                seed_file + " " + seed_file + '.index',
                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             output, err = build_seed_index.communicate()
             if debug:

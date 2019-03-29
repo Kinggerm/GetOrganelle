@@ -734,9 +734,9 @@ def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, orig
                     log.error("Please check your raw data or change your reference!")
                 exit()
         base_cov_values = get_cover_range(all_coverages, guessing_percent=0.07)  # top 0.07 from mapped reads
-        log.info("Estimated " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
+        log.info("Estimated seed-hitting base-coverage = " + str(base_cov_values[1]))
         if base_cov_values[0] < 200 and organelle_type in {"animal_mt", "fungus_mt", "anonym"}:
-            log.info("Re-estimating " + organelle_type + " base-coverage using word frequency counting ...")
+            log.info("Re-estimating seed-hitting base-coverage using word frequency counting ...")
             counting_word_size = min(49, 2 * int(mean_read_len * 0.35) - 1)
             smp_percent = min(1., max(0.2, 2E7/all_bases))  # at least 20M raw data should be used
             words_dict = chop_seqs_as_empty_dict(
@@ -756,12 +756,12 @@ def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, orig
             base_cov_values = [round(this_word_cov * mean_read_len / (mean_read_len - counting_word_size + 1)
                                      / smp_percent, 2)
                                for this_word_cov in word_cov_values]
-            log.info("Estimated " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
+            log.info("Estimated seed-hitting base-coverage = " + str(base_cov_values[1]))
     else:
         organelle_base_percent = 0.05
         guessing_base_cov = organelle_base_percent * all_bases / target_genome_size
         base_cov_values = [guessing_base_cov * 0.8, guessing_base_cov, guessing_base_cov * 1.2]
-        log.info("Guessing " + organelle_type + " base-coverage = " + str(base_cov_values[1]))
+        log.info("Guessing seed-hitting base-coverage = " + str(base_cov_values[1]) + " without mapping.")
     if word_size is None:
         if larger_auto_ws:
             min_word_size, word_size, max_word_size = estimate_word_size(

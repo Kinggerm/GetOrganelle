@@ -1831,11 +1831,11 @@ class Assembly:
                     if log_handler:
                         log_handler.warning("Multiple repeat patterns appeared in your data, "
                                             "a more balanced pattern (always the repeat_pattern1) would be suggested "
-                                            "for plastomes with inverted repeats!")
+                                            "for plastomes with the canonical IR!")
                     else:
                         sys.stdout.write("Warning: Multiple repeat patterns appeared in your data, "
                                          "a more balanced pattern (always the repeat_pattern1) would be suggested "
-                                         "for plastomes with inverted repeats!\n")
+                                         "for plastomes with the canonical IR!\n")
                     sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
                                     for this_path, acc_distance in sorted_paths]
                 else:
@@ -2029,28 +2029,28 @@ class Assembly:
                 if len(sorted_paths) > 2 and \
                         not (100000 < sum([len(self.export_path(part_p).seq) for part_p in sorted_paths[0][0]]) < 200000):
                     if log_handler:
-                        log_handler.warning("Multiple genome structures with abnormal plastome length produced!")
+                        log_handler.warning("Multiple structures (gene order) with abnormal plastome length produced!")
                         log_handler.warning("Please check the assembly graph and selected graph to confirm.")
                     else:
                         sys.stdout.write(
-                            "Warning: Multiple genome structures with abnormal plastome length produced!\n")
+                            "Warning: Multiple structures (gene order) with abnormal plastome length produced!\n")
                         sys.stdout.write("Please check the assembly graph and selected graph to confirm.\n")
                 elif len(sorted_paths) > 2:
                     if log_handler:
-                        log_handler.warning("Multiple genome structures produced!")
+                        log_handler.warning("Multiple structures (gene order) produced!")
                         log_handler.warning("Please check the existence of those isomers "
                                             "by using reads mapping (library information) or longer reads.")
                     else:
-                        sys.stdout.write("Warning: Multiple genome structures produced!\n")
+                        sys.stdout.write("Warning: Multiple structures (gene order) produced!\n")
                         sys.stdout.write("Please check the existence of those isomers by "
                                          "using reads mapping (library information) or longer reads.\n")
                 elif len(sorted_paths) > 1:
                     if log_handler:
-                        log_handler.warning("More than one genome structure produced ...")
+                        log_handler.warning("More than one structure (gene order) produced ...")
                         log_handler.warning("Please check the final result to confirm whether they are "
                                             "simply flip-flop configurations!")
                     else:
-                        sys.stdout.write("More than one genome structure produced ...\n")
+                        sys.stdout.write("More than one structure (gene order) produced ...\n")
                         sys.stdout.write("Please check the final result to confirm whether they are "
                                          "simply flip-flop configurations!\n")
             return sorted_paths

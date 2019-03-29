@@ -8,7 +8,10 @@ def get_versions():
 versions = [
     {"number": "1.5.2",
      "features": [
-         "1. get_organelle_reads.py: Bowtie2 index files written to sample output directory rather than inside GetOrganelle/Library/SeqReference",
+         "1. get_organelle_reads.py: Bowtie2 index files written to sample output directory rather than "
+         " to GetOrganelle/Library/SeqReference",
+         "2. get_organelle_reads.py: more descriptive log",
+         "3. seq_parser.py: re_linear_circular_seqs: fix a bug for evaluating the assembly result of DR plastomes",
      ]},
     {"number": "1.5.1c",
      "features": [

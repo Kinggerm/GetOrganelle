@@ -603,11 +603,23 @@ def re_linear_circular_seqs(sequence, minimum_len_for_flip_flop_recombination=20
                             return sorted([forward_seq_1, reverse_seq_1, forward_seq_2, reverse_seq_2])[0]
                 else:
                     # if start2 - end1 - 1 > len(sequence) + start1 - end2 - 1:
-                    forward_seq_1 = [sequence[end1 + 1:], sequence[:end1 + 1]]
-                    reverse_seq_1 = [raw_rev[len_seq - start2:], raw_rev[:len_seq - start2]]
+                    forward_seq_1 = [sequence[end1 + 1: start2],
+                                     sequence[start2: end2 + 1],
+                                     sequence[end2 + 1:] + sequence[:start1],
+                                     sequence[start1: end1 + 1]]
+                    reverse_seq_1 = [raw_rev[len_seq - start2: len_seq - end1 - 1],
+                                     raw_rev[len_seq - end1 - 1: len_seq - start1],
+                                     raw_rev[len_seq - start1:] + raw_rev[:len_seq - end2 - 1],
+                                     raw_rev[len_seq - end2 - 1:len_seq - start2]]
                     # elif start2 - end1 - 1 < len(sequence) + start1 - end2 - 1:
-                    forward_seq_2 = [sequence[end2 + 1:], sequence[:end2 + 1]]
-                    reverse_seq_2 = [raw_rev[len_seq - start1:], raw_rev[:len_seq - start1]]
+                    forward_seq_2 = [sequence[end2 + 1:] + sequence[:start1],
+                                     sequence[start1: end1 + 1],
+                                     sequence[end1 + 1: start2],
+                                     sequence[start2: end2 + 1]]
+                    reverse_seq_2 = [raw_rev[len_seq - start1:] + raw_rev[:len_seq - end2 - 1],
+                                     raw_rev[len_seq - end2 - 1:len_seq - start2],
+                                     raw_rev[len_seq - start2: len_seq - end1 - 1],
+                                     raw_rev[len_seq - end1 - 1: len_seq - start1]]
                     best_res = sorted([forward_seq_1, forward_seq_2, reverse_seq_1, reverse_seq_2],
                                       key=lambda x: (-len(x[0]), x))[0]
                     return "".join(best_res)

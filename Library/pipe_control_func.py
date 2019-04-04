@@ -180,7 +180,7 @@ class LogInfo:
     def __init__(self, sample_out_dir, prefix=""):
         self.header = ["sample", "fastq_format", "mean_error_rate", "trim_percent", "trim_int", "trim_chars",
                        "mean_read_len", "max_read_len", "num_reads", "estimated_base_coverage",
-                       "w", "k", "pre_w", "mem_dup", "mem_used", "n_candidates", "n_reads", "n_bases", "dup_used",
+                       "w", "k", "pre_w", "mem_dup", "mem_used", "n_unique_reads", "n_reads", "n_bases", "dup_used",
                        "mem_group", "rounds", "accepted_lines", "accepted_words", "mem_extending", "circular",
                        "degenerate_base_used", "library_size", "library_deviation", "library_left", "library_right",
                        "res_kmer", "res_kmer_cov", "res_base_cov", "res_path_count",
@@ -236,7 +236,7 @@ class LogInfo:
                         if " - INFO: " in line and line[:4].isdigit():
                             time_point, detail_record = line.strip().split(" - INFO:")
                             detail_record = detail_record.strip()
-                            if "candidates in all" in detail_record:
+                            if "unique reads in all" in detail_record:
                                 if "Mem" in detail_record:
                                     mem_part, data_part = detail_record.split(", ")
                                     mem = mem_part.split("Mem ")[-1]
@@ -245,7 +245,7 @@ class LogInfo:
                                     data_part_list = data_part.split(" ")
                                 else:
                                     data_part_list = detail_record.split(" ")
-                                this_record["n_candidates"] = data_part_list[0]
+                                this_record["n_unique_reads"] = data_part_list[0]
                                 this_record["n_reads"] = data_part_list[4]
                                 if "mean_read_len" in this_record:
                                     this_record["n_bases"] = str(int(float(this_record["mean_read_len"]) *

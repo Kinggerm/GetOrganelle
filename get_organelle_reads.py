@@ -807,24 +807,30 @@ def check_parameters(word_size, out_base, utilize_mapping, maximum_n_reads, orig
 def check_kmers(kmer_str, auto_gradient_k, word_s, max_r_len, log):
     if kmer_str:
         # delete illegal kmer
-        kmer_values = [int(kmer_v) for kmer_v in kmer_str.split(",")]
+        try:
+            kmer_values = [int(kmer_v) for kmer_v in kmer_str.split(",")]
+        except ValueError:
+            raise ValueError("Invalid kmer value string: " + kmer_str)
+        else:
+            for kmer_v_out in kmer_values:
+                if kmer_v_out % 2 == 0:
+                    raise ValueError("Invalid kmer value: " + str(kmer_v_out) + "! kmer values must be odd numbers!")
+            if auto_gradient_k:
+                # add kmer around estimated word_size
+                k_tens_digits = [int(kmer_v / 10) for kmer_v in kmer_values]
+                w_tens_digit = int(word_s / 10)
+                if w_tens_digit not in k_tens_digits:
+                    # kmer_values.append(int(w_tens_digit * 10 + 5))
+                    avail_tens_digits = k_tens_digits + [w_tens_digit]
+                    for add_tens_digit in range(min(avail_tens_digits), max(avail_tens_digits)):
+                        if add_tens_digit not in k_tens_digits:
+                            kmer_values.append(int(add_tens_digit * 10 + 5))
+            # delete illegal kmer
+            kmer_values = [kmer_v for kmer_v in kmer_values if 21 <= kmer_v <= min(max_r_len, 127)]
 
-        if auto_gradient_k:
-            # add kmer around estimated word_size
-            k_tens_digits = [int(kmer_v / 10) for kmer_v in kmer_values]
-            w_tens_digit = int(word_s / 10)
-            if w_tens_digit not in k_tens_digits:
-                # kmer_values.append(int(w_tens_digit * 10 + 5))
-                avail_tens_digits = k_tens_digits + [w_tens_digit]
-                for add_tens_digit in range(min(avail_tens_digits), max(avail_tens_digits)):
-                    if add_tens_digit not in k_tens_digits:
-                        kmer_values.append(int(add_tens_digit * 10 + 5))
-        # delete illegal kmer
-        kmer_values = [kmer_v for kmer_v in kmer_values if 21 <= kmer_v <= min(max_r_len, 127)]
-
-        spades_kmer = ",".join([str(kmer_v) for kmer_v in sorted(kmer_values)])
-        log.info("Setting '-k " + spades_kmer + "'")
-        return spades_kmer
+            spades_kmer = ",".join([str(kmer_v) for kmer_v in sorted(kmer_values)])
+            log.info("Setting '-k " + spades_kmer + "'")
+            return spades_kmer
     else:
         return None
 
@@ -939,7 +945,7 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
             else:
                 memory_usage = ''
             if rm_duplicates:
-                log.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
+                log.info(memory_usage + str(len_indices) + " unique reads in all " + str(line_count // 4) + " reads")
             else:
                 log.info(memory_usage + str(len_indices) + " reads")
         else:
@@ -2177,6 +2183,8 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log):
         return False
     elif not os.path.exists(os.path.join(out_base, prefix + "filtered_2_paired.fq")):
         log.warning("Separating filtered fastq file failed with unknown error: " + run_command)
+        if verbose_log:
+            log.warning(output.decode("utf8"))
         return False
     else:
         if verbose_log:

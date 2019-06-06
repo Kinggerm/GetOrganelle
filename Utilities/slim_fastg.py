@@ -118,7 +118,7 @@ def get_options(print_title):
     parser.add_option("--verbose", dest="verbose_log", default=False, action="store_true",
                       help="For debug usage.")
     parser.add_option('--continue', dest='resume', default=False, action='store_true',
-                      help='Specified for calling from get_organelle_reads.py')
+                      help='Specified for calling from get_organelle_from_reads.py')
     parser.add_option("--no-overwrite", dest="overwrite", default=True, action="store_false",
                       help="Overwrite existing output result.")
     parser.add_option("--which-blast", dest="which_blast", default="",

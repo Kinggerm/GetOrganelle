@@ -9,7 +9,7 @@ parser = OptionParser(usage=usage)
 parser.add_option('-o', dest='output_base',
                   help='output base name for each sample')
 parser.add_option('-p', dest='other_arguments',
-                  help='Other arguments that get_organelle_reads.py would take.'
+                  help='Other arguments that get_organelle_from_reads.py would take.'
                        'Use double quotation marks to include all the arguments'
                        'Example: "-s plastome.fasta -a mitochondrial.fasta -F embplant_pt -w 105"')
 parser.add_option('--all', dest='skip_done', default=True, action='store_false',
@@ -56,13 +56,13 @@ for dire in dirs:
             continue
     if options.skip_done and os.path.isdir(os.path.join(dire, options.output_base)):
         if options.ano_skip:
-            lines.append('# get_organelle_reads.py -1 '+these_files[0]+' -2 '+these_files[1]+' -o ' +
+            lines.append('# get_organelle_from_reads.py -1 '+these_files[0]+' -2 '+these_files[1]+' -o ' +
                          os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')
             print('Warning: ' + os.path.join(dire, options.output_base) + ' already exists. Annotated!')
         else:
             print('Warning: ' + os.path.join(dire, options.output_base) + ' already exists. Skipped!')
     else:
-        lines.append('get_organelle_reads.py -1 ' + these_files[0] + ' -2 ' + these_files[1] + ' -o ' +
+        lines.append('get_organelle_from_reads.py -1 ' + these_files[0] + ' -2 ' + these_files[1] + ' -o ' +
                      os.path.join(dire, options.output_base) + ' ' + options.other_arguments + '\n')
 
 out_file = './get_organelle_'+options.output_base

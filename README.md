@@ -121,7 +121,7 @@ Python libraries (numpy, scipy, sympy) is covered in the installation part.
 
 <a href='http://rrwick.github.io/Bandage/'>Bandage</a> is a fantastic tool to view the assembly graph (`*.fastg`/`*.gfa`). If you have Bandage correctly configured and add the binary folder of Bandage (which is `Bandage.app/Contents/MacOS` for MacOS) to the $PATH, get_organelle_from_*.py would automatically generate the a png formatted image of the assembly graph. 
 
-If you installed python library psutil (pip install psutil), the memory cost of get_organelle_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
+If you installed python library psutil (pip install psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
 
 
 ## How To
@@ -150,39 +150,39 @@ Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produc
 
 To assembly Embryophyta plant plastome (e.g. using 2G raw data of 150 bp paired reads), typically I use:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output -R 15 -k 21,45,65,85,105 -F embplant_pt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output -R 15 -k 21,45,65,85,105 -F embplant_pt
 
 or in a draft way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output --fast -k 21,65,105 -w 0.68 -F embplant_pt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output --fast -k 21,65,105 -w 0.68 -F embplant_pt
 
 or in a slow and memory-economic way:
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_seed.fasta -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save  -a mitochondria.fasta
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_seed.fasta -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save  -a mitochondria.fasta
 
 To assembly Embryophyta plant mitochondria (usually you need more than 5G raw data):
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_seed.fasta -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt 
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_seed.fasta -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt 
     
 To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 5 -k 35,85,115 -F embplant_nr
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 5 -k 35,85,115 -F embplant_nr
 
 To assembly fungus mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_seed.fasta --genes fungus_mt_genes.fasta -R 7 -k 21,45,65,85,105 -F fungus_mt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_seed.fasta --genes fungus_mt_genes.fasta -R 7 -k 21,45,65,85,105 -F fungus_mt
 
 To assembly animal mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
 
-    get_organelle_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_seed.fasta --genes animal_mt_genes.fasta -R 5 -k 21,45,65,85,105 -F animal_mt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_seed.fasta --genes animal_mt_genes.fasta -R 5 -k 21,45,65,85,105 -F animal_mt
 
 See a brief illustrations of those arguments by typing in:
 
-    get_organelle_reads.py -h
+    get_organelle_from_reads.py -h
     
 or see the detailed illustrations:
     
-    get_organelle_reads.py --help
+    get_organelle_from_reads.py --help
 
 Also see [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) for a benchmark test of `GetOrganelle` and `NOVOPlasty` using 50 online samples.
 

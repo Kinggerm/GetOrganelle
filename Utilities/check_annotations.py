@@ -8,7 +8,7 @@ import sys
 from optparse import OptionParser, OptionGroup
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.seq_parser import *
+from GetOrganelleLib.seq_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 # Local version 3.4
@@ -170,7 +170,7 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
 
 
 def read_gb(gb_dir):
-    gb_file = [x.strip('\n') for x in open(gb_dir, 'rU').readlines()]
+    gb_file = [x.strip('\n').strip("\r") for x in open(gb_dir, 'r').readlines()]
     i = 0
     gb_structure = {}
     while i < len(gb_file):

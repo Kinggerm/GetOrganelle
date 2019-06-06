@@ -6,13 +6,25 @@ import os
 import sys
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.pipe_control_func import *
-from Library.seq_parser import *
-from Library.sam_parser import *
-from Library.statistical_func import *
+import GetOrganelleLib
+from GetOrganelleLib.pipe_control_func import *
+from GetOrganelleLib.seq_parser import *
+from GetOrganelleLib.sam_parser import *
+from GetOrganelleLib.statistical_func import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 from sympy import Interval
 import sys
+import platform
+SYSTEM_NAME = ""
+if platform.system() == "Linux":
+    SYSTEM_NAME = "linux"
+elif platform.system() == "Darwin":
+    SYSTEM_NAME = "macOS"
+else:
+    sys.stdout.write("Error: currently GetOrganelle is not supported for " + platform.system() + "! ")
+    exit()
+GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
+GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
 
 try:
     # python2 UnicodeDecodeError ±
@@ -28,6 +40,9 @@ def get_options():
                       help="input assembly fasta file.")
     parser.add_option("-1", dest="original_fq_1")
     parser.add_option("-2", dest="original_fq_2")
+    parser.add_option("-u", dest="unpaired_fq_files", default="",
+                      help="Input file(s) with unpaired (single-end) reads to be added to the pool. "
+                           "files could be comma-separated lists such as 'seq1,seq2'.")
     parser.add_option("--max-lib-len", dest="max_lib_len", type=int, default=1200,
                       help="default: %default.")
     parser.add_option("-c", dest="is_circular", default="auto",
@@ -64,10 +79,15 @@ def get_options():
     #                   help="Default: %default")
     parser.add_option("--disable-customized-error-rate", dest="customized_error_rate", default=True,
                       action="store_true")
+    parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
+                      help="Assign the path to Bowtie2 binary files if not added to the path. "
+                      "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/bowtie2 first, then $PATH")
     parser.add_option("--debug", dest="debug_mode", default=False, action="store_true",
                       help="Turn on debug mode.")
     options, argv = parser.parse_args()
-    if not (options.fasta and options.original_fq_1 and options.original_fq_2 and options.output_base):
+    if not (options.fasta and
+            ((options.original_fq_1 and options.original_fq_2) or options.unpaired_fq_files)
+            and options.output_base):
         sys.stderr.write("Insufficient arguments!\n")
         sys.exit()
     if not os.path.isdir(options.output_base):
@@ -76,64 +96,24 @@ def get_options():
         log_level = "DEBUG"
     else:
         log_level = "INFO"
-    log = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
-    log.info("")
-    log.info(' '.join(sys.argv) + '\n')
-    log = timed_log(log, options.output_base, "", log_level=log_level)
-    return options, log
-
-
-def mapping_with_bowtie2(seed_file, original_fq_1, original_fq_2, bowtie_out, max_lib_len,
-                         resume, threads, random_seed, log_handler, debug):
-    if not (os.path.exists(seed_file + '.index.1.bt2l')):
-        if debug:
-            log_handler.info("bowtie2-build --seed " + str(random_seed) + " --large-index " +
-                             seed_file + " " + seed_file + '.index')
-        build_seed_index = subprocess.Popen("bowtie2-build --seed " + str(random_seed) + " --large-index " +
-                                            seed_file + " " + seed_file + '.index',
-                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = build_seed_index.communicate()
-        if "unrecognized option" in output.decode("utf8"):
-            if debug:
-                log_handler.info("Failed. Retry ...")
-                log_handler.info("bowtie2-build --seed " + str(random_seed) + " " +
-                                 seed_file + " " + seed_file + '.index')
-            build_seed_index = subprocess.Popen("bowtie2-build --seed " + str(random_seed) + " " +
-                                                seed_file + " " + seed_file + '.index',
-                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            output, err = build_seed_index.communicate()
-            if debug:
-                log_handler.info('\n' + output.decode("utf8"))
-        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8") or "error" in output.decode("utf8"):
-            log_handler.error('\n' + output.decode("utf8"))
-            exit()
-        elif debug:
-            log_handler.info('\n' + output.decode("utf8"))
-    seed_index_base = seed_file + '.index'
-    res_path_name, res_base_name = os.path.split(bowtie_out)
-    total_seed_sam = [os.path.join(res_path_name, x + res_base_name + ".sam") for x in ("temp.", "")]
-    if not (resume and os.path.exists(total_seed_sam[1])):
-        if debug:
-            log_handler.info("bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " -X " +
-                             str(max_lib_len) + " --no-discordant --dovetail" + " --sensitive -x " + seed_index_base +
-                             " -1 " + original_fq_1 + " -2 " + original_fq_2 + " -S " + total_seed_sam[0] +
-                             " --no-unal --omit-sec-seq -t")
-        make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " -X " + str(max_lib_len) +
-            " --no-discordant --dovetail  --sensitive -x " + seed_index_base + " -1 " + original_fq_1 +
-            " -2 " + original_fq_2 + " -S " + total_seed_sam[0] + " --no-unal --omit-sec-seq -t",
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = make_seed_bowtie2.communicate()
-        if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
-            log_handler.error('\n' + output.decode("utf8"))
-            exit()
-        elif debug:
-            log_handler.info('\n' + output.decode("utf8"))
-        if os.path.exists(total_seed_sam[0]):
-            os.rename(total_seed_sam[0], total_seed_sam[1])
-        else:
-            log_handler.error("Cannot find bowtie2 result!")
-            exit()
+    log_handler = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
+    log_handler.info("")
+    log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
+    if not options.which_bowtie2:
+        try_this_bin = os.path.join(GO_DEP_PATH, "bowtie2", "bowtie2")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            options.which_bowtie2 = os.path.split(try_this_bin)[0]
+    if not executable(os.path.join(options.which_bowtie2, "bowtie2")):
+        log_handler.error(os.path.join(options.which_bowtie2, "bowtie2") + " not accessible!")
+        exit()
+    if not executable(os.path.join(options.which_bowtie2, "bowtie2-build") + " --large-index"):
+        log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build") + " not accessible!")
+        exit()
+    # if not executable(os.path.join(options.which_bowtie2, "bowtie2-build-l")):
+    #     log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build-l") + " not accessible!")
+    #     exit()
+    log_handler = timed_log(log_handler, options.output_base, "", log_level=log_level)
+    return options, log_handler
 
 
 def modify_fasta(original_fasta, new_fasta, is_circular, max_lib_len):
@@ -289,12 +269,21 @@ def main():
         new_fasta = os.path.join(options.output_base, "modified.fasta")
         if not (options.resume and os.path.exists(new_fasta)):
             modify_fasta(options.fasta, new_fasta, options.is_circular, max_lib_len=options.max_lib_len)
-        mapping_with_bowtie2(seed_file=new_fasta, original_fq_1=options.original_fq_1, original_fq_2=options.original_fq_2,
-                             bowtie_out=os.path.join(options.output_base, "check"), max_lib_len=options.max_lib_len,
-                             resume=options.resume, threads=options.threads, random_seed=options.random_seed,
-                             log_handler=log_handler, debug=options.debug_mode)
+        unpaired_fq_files = []
+        if options.unpaired_fq_files:
+            unpaired_fq_files = options.unpaired_fq_files.split(",")
+        other_bowtie2_options = " -X " + str(options.max_lib_len) + " --no-discordant --dovetail "
+        bowtie2_mode = " --sensitive "
+        map_with_bowtie2(seed_file=new_fasta,
+                         original_fq_files=unpaired_fq_files,
+                         bowtie_out=os.path.join(options.output_base, "check"),
+                         resume=options.resume, threads=options.threads, random_seed=options.random_seed,
+                         silent=False or options.debug_mode, log_handler=log_handler, verbose_log=options.debug_mode,
+                         which_bowtie2=options.which_bowtie2, bowtie2_other_options=other_bowtie2_options,
+                         fq_1=options.original_fq_1, fq_2=options.original_fq_2, bowtie2_mode=bowtie2_mode)
         ref_lengths = get_lengths_with_seq_names_modified(options.fasta, log_handler)
-        mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"), ref_real_len_dict=ref_lengths)
+        mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"),
+                                     ref_real_len_dict=ref_lengths)
         sequence_statistics = mapping_records.get_customized_mapping_characteristics()
         num_mapped_reads = mapping_records.get_number_of_mapped_reads()
         num_paired, num_single = num_mapped_reads["paired"], num_mapped_reads["single"]
@@ -303,94 +292,98 @@ def main():
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            # make data and default settings
-            gap_len = options.gap_len
-            extra_width = 3.  # options.extra_width
-            sliding_w_size = 1   # options.sliding_window_size
-            x_data_len = gap_len * (len(mapping_records.references) - 1) \
-                         + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
-            fig_width = extra_width + x_data_len / options.plot_x_density
-            fig_height = options.figure_height
-            extra_percent = extra_width / fig_width
-            title_height_percent = 0.09
-            add_extra_to_left = 0.27   # for extra_width==3
-            plot_area_l, plot_area_r = extra_percent * add_extra_to_left, 1 - extra_percent * (1 - add_extra_to_left)
-            plot_area_b, plot_area_t = title_height_percent, 1 - title_height_percent
-            cigar_chars = ["M", "X", "I", "D"]
-            cigar_char_dict = {"M": "Aligned", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
-            color_used = {"M": [(0.133, 0.616, 0.361), 0.5],
-                          "X": [(0.145, 0.651, 0.961), 0.3],
-                          "I": [(0.996, 0.804, 0.322), 0.8],
-                          "D": [(0.831, 0.310, 0.275), 0.5]}
+        else:
+            plt = None
 
-            x_data = np.array(range(x_data_len))
-            y_data = {}
-            # log mean and std
-            y_stat = dict()
-            max_y_dat = 0
-            # start @20190304: add extra error rate @20190304
-            err_all_cover = np.array([])
-            err_subset_cover = [np.array([]) for foo in range(len(sequence_statistics["M"]))]
-            # end @20190304
-            for cigar_char in cigar_chars:
-                y_stat[cigar_char] = {"subset": [], "all": []}
-                this_cover = []
-                this_cover_for_stat = []
-                ref_list = sorted(list(sequence_statistics[cigar_char]))
-                go_to_subset = 0
-                while ref_list:
-                    ref = ref_list.pop(0)
-                    smoothed_cover_per_site = sequence_statistics[cigar_char][ref]
-                    this_mean, this_std = float(np.average(smoothed_cover_per_site)), float(np.std(smoothed_cover_per_site))
+        # make data and default settings
+        gap_len = options.gap_len
+        extra_width = 3.  # options.extra_width
+        sliding_w_size = 1   # options.sliding_window_size
+        x_data_len = gap_len * (len(mapping_records.references) - 1) \
+                     + sum([mapping_records.references[ref]["real_len"] for ref in mapping_records.references])
+        fig_width = extra_width + x_data_len / options.plot_x_density
+        fig_height = options.figure_height
+        extra_percent = extra_width / fig_width
+        title_height_percent = 0.09
+        add_extra_to_left = 0.27   # for extra_width==3
+        plot_area_l, plot_area_r = extra_percent * add_extra_to_left, 1 - extra_percent * (1 - add_extra_to_left)
+        plot_area_b, plot_area_t = title_height_percent, 1 - title_height_percent
+        cigar_chars = ["M", "X", "I", "D"]
+        cigar_char_dict = {"M": "Aligned", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
+        color_used = {"M": [(0.133, 0.616, 0.361), 0.5],
+                      "X": [(0.145, 0.651, 0.961), 0.3],
+                      "I": [(0.996, 0.804, 0.322), 0.8],
+                      "D": [(0.831, 0.310, 0.275), 0.5]}
 
-                    y_stat[cigar_char]["subset"].append((this_mean, this_std, len(smoothed_cover_per_site)))
-                    this_cover_for_stat.extend(smoothed_cover_per_site)
-                    # start @20190304
-                    if options.customized_error_rate:
-                        if cigar_char in {"X", "I", "D"}:
-                            if len(err_subset_cover[go_to_subset]):
-                                err_subset_cover[go_to_subset] += np.array(smoothed_cover_per_site)
-                            else:
-                                err_subset_cover[go_to_subset] = np.array(smoothed_cover_per_site)
-                    # end @20190304
-                    if sliding_w_size != 1:
-                        new_averaged_cover = []
-                        for j in range(len(smoothed_cover_per_site)):
-                            if j % sliding_w_size:
-                                new_averaged_cover.append(0)
-                            else:
-                                new_averaged_cover.append(np.average(smoothed_cover_per_site[j: j + sliding_w_size]))
-                        smoothed_cover_per_site = np.array(new_averaged_cover)
-                    this_cover.extend(smoothed_cover_per_site)
-                    max_y_dat = max(max(smoothed_cover_per_site), max_y_dat)
-                    if ref_list:
-                        this_cover.extend([0] * gap_len)
-                    go_to_subset += 1
-                y_data[cigar_char] = np.ma.masked_where(np.array(this_cover) <= 0, this_cover)
-                y_stat[cigar_char]["all"] = float(np.average(this_cover_for_stat)), float(np.std(this_cover_for_stat))
+        x_data = np.array(range(x_data_len))
+        y_data = {}
+        # log mean and std
+        y_stat = dict()
+        max_y_dat = 0
+        # start @20190304: add extra error rate @20190304
+        err_all_cover = np.array([])
+        err_subset_cover = [np.array([]) for foo in range(len(sequence_statistics["M"]))]
+        # end @20190304
+        for cigar_char in cigar_chars:
+            y_stat[cigar_char] = {"subset": [], "all": []}
+            this_cover = []
+            this_cover_for_stat = []
+            ref_list = sorted(list(sequence_statistics[cigar_char]))
+            go_to_subset = 0
+            while ref_list:
+                ref = ref_list.pop(0)
+                smoothed_cover_per_site = sequence_statistics[cigar_char][ref]
+                this_mean, this_std = float(np.average(smoothed_cover_per_site)), float(np.std(smoothed_cover_per_site))
+
+                y_stat[cigar_char]["subset"].append((this_mean, this_std, len(smoothed_cover_per_site)))
+                this_cover_for_stat.extend(smoothed_cover_per_site)
                 # start @20190304
                 if options.customized_error_rate:
                     if cigar_char in {"X", "I", "D"}:
-                        if len(err_all_cover):
-                            err_all_cover += np.array(this_cover_for_stat)
+                        if len(err_subset_cover[go_to_subset]):
+                            err_subset_cover[go_to_subset] += np.array(smoothed_cover_per_site)
                         else:
-                            err_all_cover = np.array(this_cover_for_stat)
+                            err_subset_cover[go_to_subset] = np.array(smoothed_cover_per_site)
                 # end @20190304
-
-            if not max_y_dat:
-                raise ValueError("No mapped reads found!")
-
+                if sliding_w_size != 1:
+                    new_averaged_cover = []
+                    for j in range(len(smoothed_cover_per_site)):
+                        if j % sliding_w_size:
+                            new_averaged_cover.append(0)
+                        else:
+                            new_averaged_cover.append(np.average(smoothed_cover_per_site[j: j + sliding_w_size]))
+                    smoothed_cover_per_site = np.array(new_averaged_cover)
+                this_cover.extend(smoothed_cover_per_site)
+                max_y_dat = max(max(smoothed_cover_per_site), max_y_dat)
+                if ref_list:
+                    this_cover.extend([0] * gap_len)
+                go_to_subset += 1
+            y_data[cigar_char] = np.ma.masked_where(np.array(this_cover) <= 0, this_cover)
+            y_stat[cigar_char]["all"] = float(np.average(this_cover_for_stat)), float(np.std(this_cover_for_stat))
             # start @20190304
             if options.customized_error_rate:
-                y_stat["error"] = {"all": [np.average(err_all_cover) / y_stat["M"]["all"][0],
-                                           np.std(err_all_cover) / y_stat["M"]["all"][0]],
-                                   "subset": [[np.average(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
-                                               np.std(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
-                                               y_stat["M"]["subset"][go_to_sb][2]]
-                                              for go_to_sb in range(len(sequence_statistics["M"]))]}
+                if cigar_char in {"X", "I", "D"}:
+                    if len(err_all_cover):
+                        err_all_cover += np.array(this_cover_for_stat)
+                    else:
+                        err_all_cover = np.array(this_cover_for_stat)
             # end @20190304
 
-            # create figure
+        if not max_y_dat:
+            raise ValueError("No mapped reads found!")
+
+        # start @20190304
+        if options.customized_error_rate:
+            y_stat["error"] = {"all": [np.average(err_all_cover) / y_stat["M"]["all"][0],
+                                       np.std(err_all_cover) / y_stat["M"]["all"][0]],
+                               "subset": [[np.average(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
+                                           np.std(err_subset_cover[go_to_sb]) / y_stat["M"]["subset"][go_to_sb][0],
+                                           y_stat["M"]["subset"][go_to_sb][2]]
+                                          for go_to_sb in range(len(sequence_statistics["M"]))]}
+        # end @20190304
+
+        # create figure
+        if options.draw_plot:
             fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
             ax.spines['top'].set_visible(False)
             # ax.spines['bottom'].set_visible(False)
@@ -420,27 +413,28 @@ def main():
                          horizontalalignment='right', verticalalignment='center', multialignment='center')
                 subtitle_y_pos -= max_y_dat / options.figure_height / 4.  # for fontsize==2
 
-            # write to log
-            line_labels = {c_: full_name + ": " + "%.2f" % y_stat[c_]["all"][0] + "±" + "%.2f" % y_stat[c_]["all"][1]
-                           for c_, full_name in cigar_char_dict.items()}
-            echo_statistics = [
-                line_labels[cigar_char] +
-                " (" + ", ".join(["%.2f" % here_mean + "±" + "%.2f" % here_std
-                                  for here_mean, here_std, here_len in y_stat[cigar_char]["subset"]]) + ")"
-                for cigar_char in cigar_chars]
-            if options.customized_error_rate:
-                echo_statistics.append("Customized error rate: " +
-                                       "%.4f" % y_stat["error"]["all"][0] + "±" + "%.4f" % y_stat["error"]["all"][1] +
-                                       " (" +
-                                       ", ".join(["%.4f" % here_mean + "±" + "%.4f" % here_std
-                                                  for here_mean, here_std, here_len in y_stat["error"]["subset"]]) +
-                                       ")")
-            echo_statistics.insert(0, "# mapped pairs: " + str(int(num_paired / 2)))
-            echo_statistics.insert(0, "# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
-            for log_line in echo_statistics:
-                log_handler.info(log_line)
+        # write to log
+        line_labels = {c_: full_name + ": " + "%.2f" % y_stat[c_]["all"][0] + "±" + "%.2f" % y_stat[c_]["all"][1]
+                       for c_, full_name in cigar_char_dict.items()}
+        echo_statistics = [
+            line_labels[cigar_char] +
+            " (" + ", ".join(["%.2f" % here_mean + "±" + "%.2f" % here_std
+                              for here_mean, here_std, here_len in y_stat[cigar_char]["subset"]]) + ")"
+            for cigar_char in cigar_chars]
+        if options.customized_error_rate:
+            echo_statistics.append("Customized error rate: " +
+                                   "%.4f" % y_stat["error"]["all"][0] + "±" + "%.4f" % y_stat["error"]["all"][1] +
+                                   " (" +
+                                   ", ".join(["%.4f" % here_mean + "±" + "%.4f" % here_std
+                                              for here_mean, here_std, here_len in y_stat["error"]["subset"]]) +
+                                   ")")
+        echo_statistics.insert(0, "# mapped pairs: " + str(int(num_paired / 2)))
+        echo_statistics.insert(0, "# mapped reads: " + str(int(num_paired / 2)) + "×2+" + str(num_single))
+        for log_line in echo_statistics:
+            log_handler.info(log_line)
 
-            # plot txt
+        # plot txt
+        if options.draw_plot:
             new_y_pos = adjust_vertically_in_one_line(max_y_dat, 0, max_y_dat / 20,
                                                       y_stat["M"]["subset"][-1][0],
                                                       y_stat["X"]["subset"][-1][0],

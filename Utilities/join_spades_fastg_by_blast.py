@@ -10,12 +10,24 @@ try:
     import commands
 except:
     pass
-from optparse import OptionParser, OptionGroup
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.seq_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-
+from optparse import OptionParser
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(PATH_OF_THIS_SCRIPT, ".."))
+import GetOrganelleLib
+from GetOrganelleLib.seq_parser import *
+from GetOrganelleLib.pipe_control_func import executable, make_blast_db, execute_blast
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+import platform
+SYSTEM_NAME = ""
+if platform.system() == "Linux":
+    SYSTEM_NAME = "linux"
+elif platform.system() == "Darwin":
+    SYSTEM_NAME = "macOS"
+else:
+    sys.stdout.write("Error: currently GetOrganelle is not supported for " + platform.system() + "! ")
+    exit()
+GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
+GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
 
 # V1_4
 
@@ -28,24 +40,6 @@ short_candidates = {}
 
 def require_commands():
     global options
-    try:
-        # python3
-        blast_in_path = subprocess.getstatusoutput('blastn')
-    except AttributeError:
-        # python2
-        blast_in_path = commands.getstatusoutput('blastn')
-    if blast_in_path[0] == 32512:
-        sys.stdout.write('\nError: blastn not in the path!')
-        exit()
-    try:
-        # python3
-        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
-    except AttributeError:
-        # python2
-        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
-    if makeblastdb_in_path[0] == 32512:
-        sys.stdout.write('\nError: makeblastdb not in the path!')
-        exit()
     usage = 'python '+str(os.path.basename(__file__))+' -g input.fastg -f refernce.fasta'
     parser = OptionParser(usage=usage)
     parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
@@ -55,41 +49,39 @@ def require_commands():
     parser.add_option('--max-gap', dest='max_gap_to_add', default=1500, help='Default: 1500', type=int)
     parser.add_option('--con-all', dest='connect_inner_contig', default=False, action='store_true', help='Choose to activate connecting all possible contigs. Default: False')
     parser.add_option('--depth', dest='depth_to_connect', default=1.0, help='Default: 1.0', type=float)
+    parser.add_option("--which-blast", dest="which_blast", default="",
+                      help="Assign the path to BLAST binary files if not added to the path. "
+                           "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/ncbi-blast first, then $PATH")
     # parser.add_option('--merge-overlaps', default=False, action='store_true', help='Choose to activate automatically merging overlapping contigs')
     # parser.add_option('--min-os', dest='min_overlap_similarity', default=0.9, help='The similarity threshold to merge overlapping contigs. Default: 0.9', type=float)
     # parser.add_option('--min-ol', dest='min_overlap_length', default=15, help='The length threshold to merge overlapping contigs. Default: 15', type=int)
     try:
-        (options, args) = parser.parse_args()
+        options, args = parser.parse_args()
     except Exception as e:
         sys.stdout.write('\n######################################'+str(e))
         sys.stdout.write('\n"-h" for more usage')
         exit()
+    else:
+        if not (options.in_fastg_file and options.reference_fa_base):
+            sys.stdout.write("\n######################################\nInsufficient arguments!")
+            sys.stdout.write("\n\"-h\" for more usage")
+            exit()
 
 
-def check_db():
+def check_db(which_blast=""):
     global options
+    in_index = options.reference_fa_base + '.index'
     if options.reference_fa_base:
         time0 = time.time()
         ref_fasta = read_fasta(options.reference_fa_base)
         if len(ref_fasta[0]) > 1:
             options.reference_fa_base += '.1st.fasta'
-            write_fasta(out_dir=options.reference_fa_base, matrix=[[ref_fasta[0][0]], [ref_fasta[1][0]], ref_fasta[2]], overwrite=True)
+            write_fasta(out_file=options.reference_fa_base, matrix=[[ref_fasta[0][0]], [ref_fasta[1][0]], ref_fasta[2]], overwrite=True)
             sys.stdout.write('\nWarning: multi-seqs in reference file, only use the 1st sequence.')
         elif len(ref_fasta[0]) == 0:
             sys.stdout.write('\nError: illegal reference file!')
             exit()
-        try:
-            # python2
-            makedb_result = subprocess.getstatusoutput('makeblastdb -dbtype nucl -in '+options.reference_fa_base+' -out '+options.reference_fa_base+'.index')
-        except AttributeError:
-            # python3
-            makedb_result = commands.getstatusoutput('makeblastdb -dbtype nucl -in ' + options.reference_fa_base + ' -out ' + options.reference_fa_base + '.index')
-        if 'Error' in str(makedb_result[1]) or 'error' in str(makedb_result[1]) or '不是内部或外部命令' in str(makedb_result[1]):
-            os.system('makeblastdb -dbtype nucl -in '+options.reference_fa_base+' -out '+options.reference_fa_base+'.index')
-            if not os.path.exists(options.reference_fa_base+'.index.nhr'):
-                sys.stdout.write('Blast terminated with following info:\n'+str(makedb_result[1]))
-                exit()
-        in_index = options.reference_fa_base+'.index'
+        make_blast_db(input_file=options.reference_fa_base, output_base=in_index, which_blast=which_blast)
         sys.stdout.write('\nMaking BLAST db cost '+str(time.time()-time0))
     else:
         sys.stdout.write('\nError: No reference input!')
@@ -97,23 +89,13 @@ def check_db():
     return in_index
 
 
-def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
+def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db, which_blast=""):
     global options
     time0 = time.time()
     sys.stdout.write('\nMaking BLAST ...')
     fasta_file += '.Temp'
-    try:
-        blast_result = subprocess.getstatusoutput(
-        'blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6')
-    except AttributeError:
-        blast_result = commands.getstatusoutput(
-            'blastn -num_threads 4 -query ' + fasta_file + ' -db ' + index_files + ' -out ' + out_file + ' -outfmt 6')
-    if 'Error' in str(blast_result[1]) or 'error' in str(blast_result[1]) or '不是内部或外部命令' in str(blast_result[1]):
-        sys.stdout.write('\nBlast terminated with following info:\n'+str(blast_result[1]))
-        exit()
-    # windows
-    if not os.path.exists(out_file):
-        os.system('blastn -num_threads 4 -query '+fasta_file+' -db '+index_files+' -out '+out_file+' -outfmt 6')
+    execute_blast(query=fasta_file, blast_db=index_files, output=out_file, outfmt=6, threads=4, e_value="1e-20",
+                  which_blast=which_blast)
     time1 = time.time()
     sys.stdout.write('\nBLAST to '+index_files.split(this_dir_split)[-1]+' cost '+str(time1-time0))
     # ----------------------------------------
@@ -208,9 +190,9 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db):
             edge_connections[(edge, direction)] = get_jointed_edges_within_distance(hits_candidates, edge, direction, options.max_gap_to_add+k_mer, set(), k_mer)
 
     # compare candidates with blast results
-    blast_out_lines = open(out_file, 'rU')
+    blast_out_lines = open(out_file, 'r')
     for line in blast_out_lines:
-        line_split = line.split('\t')
+        line_split = line.strip().split('\t')
         query = '_'.join(line_split[0].split('_')[1:]).split('_length')[0]
         q_start, q_end = int(line_split[6]), int(line_split[7])
         r_start, r_end = int(line_split[8]), int(line_split[9])
@@ -370,7 +352,7 @@ def del_complementary(fastg_file):
             del temp_matrix[1][i]
         else:
             i += 1
-    write_fasta(out_dir=fastg_file + '.Temp', matrix=temp_matrix, overwrite=True)
+    write_fasta(out_file=fastg_file + '.Temp', matrix=temp_matrix, overwrite=True)
     sys.stdout.write('\nDel complementary cost'+str(time.time()-time0))
 
 
@@ -403,16 +385,26 @@ def main():
         "\nDon't be surprised if you find any other bugs.\n")
     require_commands()
     global options
+    if not options.which_blast:
+        try_this_bin = os.path.join(GO_DEP_PATH, "ncbi-blast", "blastn")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            options.which_blast = os.path.split(try_this_bin)[0]
+    if not executable(os.path.join(options.which_blast, "blastn")):
+        sys.stdout.write(os.path.join(options.which_blast, "blastn") + " not accessible!")
+        exit()
+    if not executable(os.path.join(options.which_blast, "makeblastdb")):
+        sys.stdout.write(os.path.join(options.which_blast, "makeblastdb") + " not accessible!")
+        exit()
     # fastg to fasta
     fasta_file = options.in_fastg_file
     del_complementary(fasta_file)
     # make blast database if not made
-    include_index = check_db()
+    include_index = check_db(which_blast=options.which_blast)
     len_db = len(read_fasta(options.reference_fa_base)[1][0])
     # make blast
-    new_fasta_matrix = blast_and_call_new_matrix(fasta_file=fasta_file, index_files=include_index, out_file=fasta_file + '.blast_in', len_db=len_db)
+    new_fasta_matrix = blast_and_call_new_matrix(fasta_file=fasta_file, index_files=include_index, out_file=fasta_file + '.blast_in', len_db=len_db, which_blast=options.which_blast)
     # write out fastg
-    write_fasta(out_dir=fasta_file+'.Ncontigs_added.'+fasta_file.split('.')[-1], matrix=new_fasta_matrix, overwrite=False)
+    write_fasta(out_file=fasta_file + '.Ncontigs_added.' + fasta_file.split('.')[-1], matrix=new_fasta_matrix, overwrite=False)
     remove_temp_files(fasta_file)
     sys.stdout.write('\n\nTotal cost: '+str(time.time()-time0)+'\n\n')
 

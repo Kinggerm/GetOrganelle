@@ -2,12 +2,12 @@
 # coding: utf8
 import os
 import sys
-# import string
+import string
 # import math
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.seq_parser import *
+from GetOrganelleLib.seq_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
@@ -18,7 +18,9 @@ def require_commands():
     parser.add_option('-s', dest='similarity', help='similarity threshold above which took as overlap. Default: 0.8', default=0.8, type=float)
     options, args = parser.parse_args()
     if not args:
-        raise FileNotFoundError("No input fasta file found!")
+        sys.stdout.write("\n######################################\nInsufficient arguments!")
+        sys.stdout.write("\n\"-h\" for more usage")
+        exit()
     else:
         return options, args
 

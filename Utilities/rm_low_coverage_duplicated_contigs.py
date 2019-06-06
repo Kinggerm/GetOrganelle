@@ -9,22 +9,30 @@ except:
 import os
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.seq_parser import *
+import GetOrganelleLib
+from GetOrganelleLib.seq_parser import *
+from GetOrganelleLib.pipe_control_func import executable, make_blast_db, execute_blast
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+import platform
+SYSTEM_NAME = ""
+if platform.system() == "Linux":
+    SYSTEM_NAME = "linux"
+elif platform.system() == "Darwin":
+    SYSTEM_NAME = "macOS"
+else:
+    sys.stdout.write("Error: currently GetOrganelle is not supported for " + platform.system() + "! ")
+    exit()
+GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
+GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
 
 
-def check_db(reference_fa_base):
+def check_db(reference_fa_base, which_blast=""):
     in_index = reference_fa_base + '.index'
     if min([os.path.exists(in_index+postfix) for postfix in ('.nhr', '.nin', '.nsq')]):
         pass
     elif reference_fa_base:
         print('Making BLAST db ... ')
-        makedb_result = subprocess.Popen('makeblastdb -dbtype nucl -in '+reference_fa_base+' -out '+in_index,
-                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, error = makedb_result.communicate()
-        if 'Error' in str(output) or 'error' in str(output):
-            print('ERROR: Blast terminated with following info:\n'+output.decode('utf-8'))
-            exit()
+        make_blast_db(input_file=reference_fa_base, output_base=in_index, which_blast=which_blast)
         print('Making BLAST db finished.')
     else:
         print('ERROR: No reference input!')
@@ -32,37 +40,7 @@ def check_db(reference_fa_base):
     return in_index
 
 
-def execute_blast(query, blast_db, output, outfmt, threads):
-    print("Executing BLAST ...")
-    make_blast = subprocess.Popen(
-        'blastn -evalue 1E-30 -num_threads '+str(threads)+' -word_size 10 -query ' + query + ' -db ' + blast_db + ' -out ' + output + ' -outfmt '+str(outfmt),
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    output, err = make_blast.communicate()
-    if "(ERR)" in str(output) or "Error:" in str(output) or 'error' in str(output):
-        print('\nERROR:\n', output.decode('utf-8'))
-        exit()
-    print("Executing BLAST finished.")
-
-
 def require_options():
-    try:
-        # python3
-        blast_in_path = subprocess.getstatusoutput('blastn')
-    except AttributeError:
-        # python2
-        blast_in_path = commands.getstatusoutput('blastn')
-    if blast_in_path[0] == 32512:
-        sys.stdout.write('\nError: blastn not in the path!')
-        exit()
-    try:
-        # python3
-        makeblastdb_in_path = subprocess.getstatusoutput('makeblastdb')
-    except AttributeError:
-        # python2
-        makeblastdb_in_path = commands.getstatusoutput('makeblastdb')
-    if makeblastdb_in_path[0] == 32512:
-        sys.stdout.write('\nError: makeblastdb not in the path!')
-        exit()
     usage = "Usage: rm_low_coverage_duplicated_contigs.py *.fastg"
     parser = OptionParser(usage=usage)
     parser.add_option('--cov-t', dest='coverage_threshold', default=0.12,
@@ -75,8 +53,10 @@ def require_options():
                       help='Replace hit low-coverage bases with N.')
     parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
                       help='Keep temp blast files.')
-    parser.add_option('-o', dest='output',
-                      help='Output file. Default: *.purified.fastg')
+    parser.add_option("--which-blast", dest="which_blast", default="",
+                      help="Assign the path to BLAST binary files if not added to the path.")
+    parser.add_option('-o', dest='output_dir',
+                      help='Output directory. Default: along with the original file')
     parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
                       help="Threads of blastn.")
     options, args = parser.parse_args()
@@ -84,13 +64,28 @@ def require_options():
         parser.print_help()
         sys.stdout.write('\n######################################\nERROR: Insufficient REQUIRED arguments!\n\n')
         exit()
+    if not options.which_blast:
+        try_this_bin = os.path.join(GO_DEP_PATH, "ncbi-blast", "blastn")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            options.which_blast = os.path.split(try_this_bin)[0]
+    if not executable(os.path.join(options.which_blast, "blastn")):
+        sys.stdout.write(os.path.join(options.which_blast, "blastn") + " not accessible!")
+        exit()
+    if not executable(os.path.join(options.which_blast, "makeblastdb")):
+        sys.stdout.write(os.path.join(options.which_blast, "makeblastdb") + " not accessible!")
+        exit()
+    if options.treat_no_hits not in ["ex_no_con", "ex_no_hit", "keep_all"]:
+        sys.stdout.write('\n\nOption Error: you should choose assign one of "ex_no_con", "ex_no_hit"'
+                         ' and "keep_all" to variable treat_no_hits\n')
+        exit()
     return options, args
 
 
-def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, output, threads):
-    index_base = check_db(fastg_file)
-    execute_blast(fastg_file, index_base, fastg_file + '.blast', 7, threads)
-    blast_result = open(fastg_file + '.blast', 'rU')
+def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, output, threads, which_blast):
+    index_base = check_db(fastg_file, which_blast=which_blast)
+    execute_blast(fastg_file, index_base, fastg_file + '.blast', threads=threads, outfmt=6,
+                  e_value="1E-30", word_size=10, which_blast=which_blast)
+    blast_result = open(fastg_file + '.blast', 'r')
     suspicious_nodes = {}
     for line in blast_result:
         if not line.startswith("#") and line.strip():
@@ -121,9 +116,10 @@ def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, outp
                     fastg_matrix[1][i][base_to_blur-1] = 'N'
         i += 1
     if output:
-        write_fasta_with_list(output, fastg_matrix, True)
+        output_f = os.path.join(output, os.path.basename(fastg_file+'.purified.fastg'))
     else:
-        write_fasta_with_list(fastg_file+'.purified.fastg', fastg_matrix, True)
+        output_f = fastg_file + '.purified.fastg'
+    write_fasta_with_list(output_f, fastg_matrix, True)
     blast_result.close()
     if not keep_temp:
         os.remove(fastg_file + '.blast')
@@ -135,7 +131,7 @@ def main():
     options, args = require_options()
     for fastg_file in args:
         purify_fastg(fastg_file, options.coverage_threshold, options.length_threshold,
-                     options.blur_bases, options.keep_temp, options.output, options.threads)
+                     options.blur_bases, options.keep_temp, options.output, options.threads, options.which_blast)
 
 
 if __name__ == '__main__':

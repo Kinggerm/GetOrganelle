@@ -6,10 +6,22 @@ import sys
 from math import ceil
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from Library.pipe_control_func import *
-from Library.seq_parser import *
-from Library.sam_parser import *
+import GetOrganelleLib
+from GetOrganelleLib.pipe_control_func import *
+from GetOrganelleLib.seq_parser import *
+from GetOrganelleLib.sam_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+import platform
+SYSTEM_NAME = ""
+if platform.system() == "Linux":
+    SYSTEM_NAME = "linux"
+elif platform.system() == "Darwin":
+    SYSTEM_NAME = "macOS"
+else:
+    sys.stdout.write("Error: currently GetOrganelle is not supported for " + platform.system() + "! ")
+    exit()
+GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
+GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
 
 
 def get_options():
@@ -26,6 +38,9 @@ def get_options():
                       help="rounds to check. default:automatic stop!")
     parser.add_option("-t", dest="threads", type=int, default=2,
                       help="threads.")
+    parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
+                      help="Assign the path to Bowtie2 binary files if not added to the path. "
+                           "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/bowtie2 first, then $PATH")
     parser.add_option('--random-seed', dest="random_seed", type=int, default=12345,
                       help="seed for random generator for bowtie2. Default: %default")
     parser.add_option("--threshold", dest="threshold", default="0,10",
@@ -49,53 +64,24 @@ def get_options():
         log_level = "DEBUG"
     else:
         log_level = "INFO"
-    log = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
-    log.info("")
-    log.info(' '.join(sys.argv) + '\n')
-    log = timed_log(log, options.output_base, "", log_level=log_level)
-    return options, log
-
-
-def mapping_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, random_seed, log):
-    if not (os.path.exists(seed_file + '.index.1.bt2l')):
-        # log.info("Making seed bowtie2 index ...")
-        build_seed_index = subprocess.Popen("bowtie2-build --large-index " + seed_file + " " + seed_file + '.index',
-                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = build_seed_index.communicate()
-        if "unrecognized option" in str(output):
-            build_seed_index = subprocess.Popen("bowtie2-build " + seed_file + " " + seed_file + '.index',
-                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            output, err = build_seed_index.communicate()
-        if "(ERR)" in str(output) or "Error:" in str(output):
-            log.error('\n' + str(output))
-            exit()
-        # if verbose_log:
-        #     log.info("\n" + str(output).strip())
-        # log.info("Making seed bowtie2 index finished.")
-    seed_index_base = seed_file + '.index'
-    res_path_name, res_base_name = os.path.split(bowtie_out)
-    total_seed_file = [os.path.join(res_path_name, x + res_base_name + ".fq") for x in ("temp.", "")]
-    total_seed_sam = [os.path.join(res_path_name, x + res_base_name + ".sam") for x in ("temp.", "")]
-    if not (resume and os.path.exists(total_seed_file[1])):
-        # log.info("Mapping reads to seed bowtie2 index ...")
-        make_seed_bowtie2 = subprocess.Popen(
-            "bowtie2 --seed " + str(random_seed) + " --mm -p " + str(threads) + " --very-fast-local "
-            "--al " + total_seed_file[0] + " -x " + seed_index_base + " -U " +
-            ",".join(original_fq_files) + " -S " + total_seed_sam[0] + " --no-unal --no-hd --no-sq --omit-sec-seq -t",
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, err = make_seed_bowtie2.communicate()
-        if "(ERR)" in str(output) or "Error:" in str(output):
-            log.error('\n' + str(output))
-            exit()
-        # if verbose_log:
-        #     log.info("\n" + str(output).strip())
-        if os.path.exists(total_seed_sam[0]):
-            os.rename(total_seed_sam[0], total_seed_sam[1])
-            os.rename(total_seed_file[0], total_seed_file[1])
-            # log.info("Mapping finished.")
-        else:
-            log.error("Cannot find bowtie2 result!")
-            exit()
+    log_handler = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
+    log_handler.info("")
+    log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
+    if not options.which_bowtie2:
+        try_this_bin = os.path.join(GO_DEP_PATH, "bowtie2", "bowtie2")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            options.which_bowtie2 = os.path.split(try_this_bin)[0]
+    if not executable(os.path.join(options.which_bowtie2, "bowtie2")):
+        log_handler.error(os.path.join(options.which_bowtie2, "bowtie2") + " not accessible!")
+        exit()
+    if not executable(os.path.join(options.which_bowtie2, "bowtie2-build") + " --large-index"):
+        log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build") + " not accessible!")
+        exit()
+    # if not executable(os.path.join(options.which_bowtie2, "bowtie2-build-l")):
+    #     log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build-l") + " not accessible!")
+    #     exit()
+    log_handler = timed_log(log_handler, options.output_base, "", log_level=log_level)
+    return options, log_handler
 
 
 def count_fq_reads(fq_files):
@@ -109,7 +95,7 @@ def count_fq_reads(fq_files):
 
 
 def main():
-    options, log = get_options()
+    options, log_handler = get_options()
     out_base = options.output_base
     all_fq_files = []
     for fq_f in os.listdir(options.output_per_round_dir):
@@ -120,12 +106,12 @@ def main():
     len_ref_seq = len(read_fasta(options.fasta)[1][0])
     all_coverages = {}
     if options.round:
-        log.info(str(len(all_fq_files)) + " paired fastq files found. " + str(options.round) + " rounds required.")
+        log_handler.info(str(len(all_fq_files)) + " paired fastq files found. " + str(options.round) + " rounds required.")
     else:
-        log.info(str(len(all_fq_files)) + " paired fastq files found.")
+        log_handler.info(str(len(all_fq_files)) + " paired fastq files found.")
     thresholds = [int(thr) for thr in options.threshold.split(",")]
     if all_fq_files:
-        log.info("\t".join(
+        log_handler.info("\t".join(
             ["#Round"] +
             ["Round_Covered_T" + str(x) for x in thresholds] +
             ["Cumulative_Covered_T" + str(x) for x in thresholds] +
@@ -137,49 +123,42 @@ def main():
     real_fq_files = [(options.initial_mapped, )] + real_fq_files
     for go_to, fq_pairs in enumerate(all_fq_files):
         if options.round and go_to > options.round:
-            log.info("Hit required rounds! Exiting ..")
+            log_handler.info("Hit required rounds! Exiting ..")
             break
         real_fq = real_fq_files[go_to]
         bowtie_base = os.path.join(out_base, fq_pairs[0].replace("_1.fq", ""))
-        mapping_with_bowtie2(options.fasta, real_fq, bowtie_base, options.resume, options.threads,
-                             options.random_seed, log)
+        map_with_bowtie2(seed_file=options.fasta, original_fq_files=real_fq, bowtie_out=bowtie_base,
+                         resume=options.resume, threads=options.threads, random_seed=options.random_seed,
+                         which_bowtie2=options.which_bowtie2,
+                         silent=True, log_handler=log_handler, generate_fq=True, bowtie2_mode="--very-fast-local")
         this_result = [fq_pairs[0].replace("_1.fq", "")]
         # this round coverage
-        this_coverage = get_coverage_from_sam_fast(bowtie_base + ".sam")
-        if this_coverage:
-            if not this_coverage and not options.round:
-                log.info("No more target found! Exiting ..")
-                if not options.keep_temp:
-                    os.remove(bowtie_base + ".fq")
-                    os.remove(bowtie_base + ".sam")
-                break
-            ref_bowtie = sorted(this_coverage.keys())[0]
+        this_records = MapRecords(bowtie_base + ".sam")
+        this_records.update_coverages()
+        this_coverages = this_records.coverages
+        if this_coverages:
+            ref_bowtie = sorted(this_coverages.keys())[0]
             for threshold in thresholds:
-                count_site = 0
-                for site in range(1, len_ref_seq + 1):
-                    if site in this_coverage[ref_bowtie] and this_coverage[ref_bowtie][site] > threshold:
-                        count_site += 1
+                count_site = len([site_cov for site_cov in this_coverages[ref_bowtie] if site_cov > threshold])
                 this_result.append(float(count_site) / len_ref_seq)
-            results_to_draw.append(this_coverage)
+            results_to_draw.append(this_coverages)
             # merge
-            for ref in this_coverage:
+            for ref in this_coverages:
                 if ref not in all_coverages:
-                    all_coverages[ref] = {}
-                    for site in this_coverage[ref]:
-                        all_coverages[ref][site] = this_coverage[ref][site]
+                    all_coverages[ref] = list(this_coverages[ref])
                 else:
-                    for site in this_coverage[ref]:
-                        if site in all_coverages[ref]:
-                            all_coverages[ref][site] += this_coverage[ref][site]
-                        else:
-                            all_coverages[ref][site] = this_coverage[ref][site]
+                    for go_s, site_cov in this_coverages[ref]:
+                        all_coverages[ref][go_s] += site_cov
             ref_bowtie = sorted(all_coverages.keys())[0]
             for threshold in thresholds:
-                count_site = 0
-                for site in range(1, len_ref_seq + 1):
-                    if site in all_coverages[ref_bowtie] and all_coverages[ref_bowtie][site] > threshold:
-                        count_site += 1
+                count_site = len([site_cov for site_cov in all_coverages[ref_bowtie] if site_cov > threshold])
                 this_result.append(float(count_site) / len_ref_seq)
+        elif not this_coverages and not options.round:
+            log_handler.info("No more target found! Exiting ..")
+            if not options.keep_temp:
+                os.remove(bowtie_base + ".fq")
+                os.remove(bowtie_base + ".sam")
+            break
         else:
             for threshold in thresholds:
                 this_result.append("-")
@@ -196,7 +175,7 @@ def main():
         if not options.keep_temp:
             os.remove(bowtie_base + ".fq")
             os.remove(bowtie_base + ".sam")
-        log.info("\t".join([str(val) for val in this_result]))
+        log_handler.info("\t".join([str(val) for val in this_result]))
     # draw
     if options.draw_plot:
         import matplotlib

@@ -40,9 +40,10 @@ Execute following curl commands to download suitable version (see more versions 
     
 install [pip](https://pip.pypa.io/en/stable/installing/) and then install downloaded GetOrganelle with pip.
 
-    # install pip, not neccessary if pip was already available
+    # install pip, NOT neccessary if pip was already available
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     python get-pip.py
+    
     # install GetOrganelle
     cd GetOrganelle
     pip install --user .

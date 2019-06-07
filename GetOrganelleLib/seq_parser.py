@@ -1167,9 +1167,15 @@ def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2
     # len_parts = len(common_parts)
     split_by_dot = False
     split_by_slash = False
+    simple_digit_head = False
     if file_h_1 and file_h_1[0]:
         if file_h_1[0][-3] == "/" and file_h_1[0][-2].isdigit():
             split_by_slash = True
+        elif file_h_1[0][1:-1].isdigit():
+            simple_digit_head = True
+            for i in range(0, len(file_h_1), 4):
+                this_n = file_h_1[i][1:-1]
+                names[this_n] = i
         else:
             first_n = file_h_1[0].split()[0].split('#')[0].split(".")
             split_by_dot = len(first_n) > 2
@@ -1191,6 +1197,8 @@ def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2
             this_name = this_line.split("/")[0]
         elif split_by_dot:
             this_name = ".".join(this_line.split()[0].split('#')[0].split(".")[:2])
+        elif simple_digit_head:
+            this_name = this_line[1:-1]
         else:
             this_name = this_line.split()[0].split('#')[0]
         if this_name in names:

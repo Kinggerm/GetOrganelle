@@ -1382,15 +1382,20 @@ def make_read_index(original_fq_files, direction_according_to_user_input, maximu
                                     this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
                                 elif line[-3] == "/" and line[-2].isdigit():  # 2019-04-22 added
                                     this_name, direction = line[1:-3], int(line[-2])
+                                elif line[1:].strip().isdigit():
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
                                 else:
                                     log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
-                                    log_handler.info("Using user-defined directions. ")
+                                    log_handler.info("Using user-defined read directions. ")
                                     use_user_direction = True
                                     this_name = line[1:].strip()
                                     direction = direction_according_to_user_input[id_file]
                             except (ValueError, IndexError):
                                 log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
-                                log_handler.info("Using user-defined directions. ")
+                                log_handler.info("Using user-defined read directions. ")
                                 use_user_direction = True
                                 this_name = line[1:].strip()
                                 direction = direction_according_to_user_input[id_file]
@@ -2654,7 +2659,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                     ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                     [kmer, spades_out_command]).strip()
             else:
-                log_handler.warning("No paired reads found for the target!?")
+                # log_handler.warning("No paired reads found for the target!?")
                 spades_command = ' '.join(
                     [os.path.join(which_spades, "spades.py"), '-t', str(threads), parameters] +
                     ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +

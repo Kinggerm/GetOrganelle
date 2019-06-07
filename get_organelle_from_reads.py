@@ -568,7 +568,7 @@ def get_options(description, version):
                 stderr=subprocess.STDOUT, shell=True).communicate()
             this_lines = output.decode("utf8").split("\n")[:2]
             dep_versions_info.append("Blast " + this_lines[1].strip().split()[2].replace(",", "").strip())
-        if executable(os.path.join(options.which_bandage, "Bandage")):
+        if executable(os.path.join(options.which_bandage, "Bandage -v")):
             output, err = subprocess.Popen(
                 os.path.join(options.which_bandage, "Bandage") + " -v", stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, shell=True).communicate()

@@ -48,7 +48,7 @@ install [pip](https://pip.pypa.io/en/stable/installing/) and then install downlo
     cd GetOrganelle
     pip install --user .
     
-Alternatively but not recommended, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `python setup.py install --user`. 
+Alternatively, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `python setup.py install --user`. 
     
 For some fresh linux systems, after above commands you still cannot execute `get_organelle_from_reads.py` in a new terminal directly, meaning `~/.local/bin` was not added to the $PATH, you have to manually add `~/.local/bin` by executing `echo "PATH=~/.local/bin:\$PATH" >> ~/.bashrc`. For fresh MacOS environment with similar situation, for example, if you installed GetOrganelle with `Python 3.6` and find scripts not in the $PATH, please execute `echo "PATH=/Library/Frameworks/Python.framework/Versions/3.6/bin:\$PATH" >> ~/.bash_profile`.
     

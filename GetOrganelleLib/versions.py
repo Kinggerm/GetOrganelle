@@ -11,7 +11,7 @@ versions = [
          "2. GetOrganelleDep added for easier dependencies installation",
          "3. get_organelle_reads.py -> get_organelle_from_reads.py;"
          " --max-extending-len, --ex-genes, --which-blast, --which-bowtie2, --which-spades added; "
-         "multi-organelle mode supported; "
+         "multi-organelle mode supported; fq head @digits; "
          "--safe,-r,--auto-wss,--soft-max-n-words etc removed"
          "4. get_organelle_from_assembly.py (basically slim + disentangle) added",
          "5. Library/SeqReference -> GetOrganelleLib/SeedDatabase",

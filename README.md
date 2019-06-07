@@ -34,7 +34,7 @@ There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is
 
 Execute following curl commands to download suitable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into a specified directory.
 
-    # To dowload GetOrganelle using curl and decompress it. Supposing your system is linux, otherwise change the 'linux' into 'macOS'; Supposing you download GetOrganelle to ~/Downloads and want to install for current user (remove the option "--user" to install for all users)
+    # To dowload GetOrganelle using curl and decompress it. Supposing your system is linux, otherwise change the 'linux' into 'macOS'; Supposing you download GetOrganelle to ~/Downloads
     cd ~/Downloads
     curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.0/v1.6.0-linux.tar.gz | tar zx
     
@@ -44,11 +44,11 @@ install [pip](https://pip.pypa.io/en/stable/installing/) and then install downlo
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     python get-pip.py
     
-    # install GetOrganelle
+    # install GetOrganelle; add the option "--user" after "install" to install for current user
     cd GetOrganelle
-    pip install --user .
+    pip install .
     
-Alternatively, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `python setup.py install --user`. 
+Alternatively, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `python setup.py install`. 
     
 For some fresh linux systems, after above commands you still cannot execute `get_organelle_from_reads.py` in a new terminal directly, meaning `~/.local/bin` was not added to the $PATH, you have to manually add `~/.local/bin` by executing `echo "PATH=~/.local/bin:\$PATH" >> ~/.bashrc`. For fresh MacOS environment with similar situation, for example, if you installed GetOrganelle with `Python 3.6` and find scripts not in the $PATH, please execute `echo "PATH=/Library/Frameworks/Python.framework/Versions/3.6/bin:\$PATH" >> ~/.bash_profile`.
     
@@ -83,7 +83,7 @@ add GetOrganelle to the $PATH.
     
 At last, install python libraries numpy, scipy, and sympy using [pip](https://pip.pypa.io/en/stable/installing/). Alternatively you could install package/environment management systems such as [conda](https://conda.io/en/latest/), which already have those python packages installed. [Pyenv](https://github.com/pyenv/pyenv) is highly suggested to control python versions/environments.
     
-    pip install --user numpy scipy sympy
+    pip install numpy scipy sympy
 
 #### Updating GetOrganelle
 
@@ -99,9 +99,9 @@ You are always recommended to use the latest GetOrganelle, although you could fi
         # if you previously used curl or the manual way to download GetOrganelle, then re-download them
         cd ~/Downloads
         curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.0/v1.6.0-linux.tar.gz | tar zx
-        pip install --user .
+        pip install .
     
-    alternatively if you used git to clone the repository and had not removed it, it would be easier to keep updated with `cd ~/Downloads/GetOrganelle && git pull && pip install --user .`
+    alternatively if you used git to clone the repository and had not removed it, it would be easier to keep updated with `cd ~/Downloads/GetOrganelle && git pull && pip install .`
 
 2. If you follow the way of `In situ configuration` with git, go to the directory where you cloned GetOrganelle:
     

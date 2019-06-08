@@ -18,7 +18,7 @@ versions = [
          "6. Library/NotationReference -> GetOrganelleLib/LabelDatabase",
          "7. plant_mt -> embplant_mt; plant_nr -> embplant_nr; plant_pt -> embplant_pt; other_pt added;",
          "8. assembly_parser.py: keep terminal contigs if --linear; fix a bug when --acyclic-allowed; "
-         "optimized for self-circle contigs",
+         "optimized for self-loop contigs",
          "9. evaluate_assembly_using_mapping.py: log statistics without --draw",
          "10. disentangle_organelle_assembly.py: --acyclic-allowed -> --linear",
      ]},

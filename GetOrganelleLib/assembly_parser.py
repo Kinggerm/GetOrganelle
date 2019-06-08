@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-import random
-from copy import deepcopy
 from itertools import combinations, product
 try:
     from sympy import Symbol, solve, lambdify
@@ -19,6 +17,8 @@ except ImportError:
             pass
         def minimize(self, fun=None, x0=None, jac=None, method=None, bounds=None, constraints=None, options=None):
             raise ImportError("No module named scipy")
+import random
+from copy import deepcopy
 
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
@@ -35,6 +35,7 @@ elif major_version == 3 and minor_version >= 5:
 else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
+ECHO_DIRECTION = ["_tail", "_head"]
 
 
 class Vertex(object):
@@ -828,25 +829,31 @@ class Assembly(object):
                         for n_v, n_e in connection_set:
                             # if n_v in vertices_set:
                             recorded_ends.add((n_v, n_e))
-                            direct = ["_tail", "_head"]
                             try:
                                 this_formula -= get_formula(n_v, n_e, vertex_name, this_end)
                                 if verbose:
                                     if log_handler:
-                                        log_handler.info("formulating for: " + n_v + direct[n_e] + "->" +
-                                                         vertex_name + direct[this_end] + ": " + str(this_formula))
+                                        log_handler.info("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                                         vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula))
                                     else:
-                                        sys.stdout.write("formulating for: " + n_v + direct[n_e] + "->" +
-                                                         vertex_name + direct[this_end] + ": " + str(this_formula)+"\n")
+                                        sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                                         vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula)+"\n")
                             except RecursionError:
 
                                 if log_handler:
-                                    log_handler.warning("formulating for: " + n_v + direct[n_e] + "->" +
-                                                        vertex_name + direct[this_end] + " failed!")
+                                    log_handler.warning("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                                        vertex_name + ECHO_DIRECTION[this_end] + " failed!")
                                 else:
-                                    sys.stdout.write("formulating for: " + n_v + direct[n_e] + "->" +
-                                                     vertex_name + direct[this_end] + " failed!\n")
+                                    sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                                     vertex_name + ECHO_DIRECTION[this_end] + " failed!\n")
                                 raise ProcessingGraphFailed("RecursionError!")
+                        if verbose:
+                            if log_handler:
+                                log_handler.info(
+                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula))
+                            else:
+                                sys.stdout.write(
+                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula)+"\n")
                         formulae.append(this_formula)
                     elif broken_graph_allowed:
                         # Extra limitation to force terminal vertex to have only one copy, to avoid over-estimation
@@ -854,6 +861,25 @@ class Assembly(object):
                         # because the True-multiple-copy vertex would simply have no other connections,
                         # or failed in the following estimation if it does
                         formulae.append(vertex_to_symbols[vertex_name] - 1)
+
+        # add self-loop formulae
+        for vertex_name in vertices_list:
+            if self.vertex_info[vertex_name].is_self_loop():
+                if log_handler:
+                    log_handler.warning("Self-loop contig detected: Vertex_" + vertex_name)
+                pseudo_self_loop_str = "P" + vertex_name
+                if pseudo_self_loop_str not in extra_str_to_symbol:
+                    extra_str_to_symbol[pseudo_self_loop_str] = Symbol(pseudo_self_loop_str, integer=True)
+                    extra_symbol_to_str[extra_str_to_symbol[pseudo_self_loop_str]] = pseudo_self_loop_str
+                this_formula = vertex_to_symbols[vertex_name] - (extra_str_to_symbol[pseudo_self_loop_str] - 1)
+                formulae.append(this_formula)
+                if verbose:
+                    if log_handler:
+                        log_handler.info(
+                            "formulating for: " + vertex_name + ECHO_DIRECTION[True] + ": " + str(this_formula))
+                    else:
+                        sys.stdout.write(
+                            "formulating for: " + vertex_name + ECHO_DIRECTION[True] + ": " + str(this_formula) + "\n")
 
         # add following extra limitation
         # set cov_sequential_repeat = x*near_by_cov, x is an integer
@@ -867,21 +893,27 @@ class Assembly(object):
                     new_str = "E" + str(len(extra_str_to_symbol))
                     extra_str_to_symbol[new_str] = Symbol(new_str, integer=True)
                     extra_symbol_to_str[extra_str_to_symbol[new_str]] = new_str
-                    formulae.append(vertex_to_symbols[vertex_name] -
-                                    vertex_to_symbols[from_v] * extra_str_to_symbol[new_str])
+                    this_formula = vertex_to_symbols[vertex_name] - \
+                                   vertex_to_symbols[from_v] * extra_str_to_symbol[new_str]
+                    formulae.append(this_formula)
+                    if verbose:
+                        if log_handler:
+                            log_handler.info("formulating for: " + vertex_name + ": " + str(this_formula))
+                        else:
+                            sys.stdout.write("formulating for: " + vertex_name + ": " + str(this_formula) + "\n")
+
+        all_v_symbols = list(symbols_to_vertex)
+        all_symbols = all_v_symbols + list(extra_symbol_to_str)
         if verbose or debug:
             if log_handler:
                 log_handler.info("formulae: " + str(formulae))
             else:
                 sys.stdout.write("formulae: " + str(formulae) + "\n")
-
         # solve the equations
-        all_v_symbols = list(symbols_to_vertex)
-        all_symbols = all_v_symbols + list(extra_symbol_to_str)
         copy_solution = solve(formulae, all_v_symbols)
 
         copy_solution = copy_solution if copy_solution else {}
-        if type(copy_solution) == list:  # delete 0 containing set
+        if type(copy_solution) == list:  # delete 0 containing set, even for self-loop vertex
             go_solution = 0
             while go_solution < len(copy_solution):
                 if 0 in set(copy_solution[go_solution].values()):
@@ -903,9 +935,11 @@ class Assembly(object):
                 copy_solution[symbol_used] = symbol_used
         if verbose:
             if log_handler:
-                log_handler.info("Copy equations: " + str(copy_solution))
+                log_handler.info("copy equations: " + str(copy_solution))
+                log_handler.info("free variables: " + str(free_copy_variables))
             else:
-                sys.stdout.write("Copy equations: " + str(copy_solution) + "\n")
+                sys.stdout.write("copy equations: " + str(copy_solution) + "\n")
+                sys.stdout.write("free variables: " + str(free_copy_variables) + "\n")
 
         # """ minimizing equation-based copy values and their deviations from coverage-based copy values """
         """ minimizing equation-based copy's deviations from coverage-based copy values """
@@ -960,13 +994,19 @@ class Assembly(object):
                     log_handler.info("Best function value: " + str(best_fun))
                 else:
                     sys.stdout.write("Best function value: " + str(best_fun) + "\n")
+        if verbose or debug:
+            if log_handler:
+                log_handler.info("Copy results: " + str(copy_results))
+            else:
+                sys.stdout.write("Copy results: " + str(copy_results) + "\n")
         if len(copy_results) == 1:
             copy_results = list(copy_results)
         elif len(copy_results) > 1:
-            # sort results
+            # draftly sort results by freedom vertices
             copy_results = sorted(copy_results, key=lambda
-                x: sum([(x[go_sym] - self.vertex_to_float_copy[symbols_to_vertex[symbol_used]]) ** 2
-                        for go_sym, symbol_used in enumerate(all_v_symbols)]))
+                x: sum([(x[go_sym] - self.vertex_to_float_copy[symbols_to_vertex[symb_used]]) ** 2
+                        for go_sym, symb_used in enumerate(free_copy_variables)
+                        if symb_used in symbols_to_vertex]))
         else:
             raise ProcessingGraphFailed("Incomplete/Complicated " + target_name_for_log +" graph (3)!")
 

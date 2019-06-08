@@ -1174,49 +1174,55 @@ def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2
         elif file_h_1[0][1:-1].isdigit():
             simple_digit_head = True
             for i in range(0, len(file_h_1), 4):
-                this_n = file_h_1[i][1:-1]
-                names[this_n] = i
+                if file_h_1[i].startswith("@"):
+                    this_n = file_h_1[i][1:-1]
+                    names[this_n] = i
         else:
             first_n = file_h_1[0].split()[0].split('#')[0].split(".")
             split_by_dot = len(first_n) > 2
             if split_by_dot:
                 for i in range(0, len(file_h_1), 4):
-                    this_n = ".".join(file_h_1[i].split()[0].split('#')[0].split(".")[:2])
-                    names[this_n] = i
+                    if file_h_1[i].startswith("@"):
+                        this_n = ".".join(file_h_1[i].split()[0].split('#')[0].split(".")[:2])
+                        names[this_n] = i
             else:
                 for i in range(0, len(file_h_1), 4):
-                    this_n = file_h_1[i].split()[0].split('#')[0]
-                    names[this_n] = i
+                    if file_h_1[i].startswith("@"):
+                        this_n = file_h_1[i].split()[0].split('#')[0]
+                        names[this_n] = i
     out_paired_h_1 = open(output_p_1 + '.temp', 'w')
     out_paired_h_2 = open(output_p_2 + '.temp', 'w')
     out_unpaired_h_1 = open(output_u_1 + '.temp', 'w')
     out_unpaired_h_2 = open(output_u_2 + '.temp', 'w')
     this_line = file_h_2.readline()
     while this_line:
-        if split_by_slash:
-            this_name = this_line.split("/")[0]
-        elif split_by_dot:
-            this_name = ".".join(this_line.split()[0].split('#')[0].split(".")[:2])
-        elif simple_digit_head:
-            this_name = this_line[1:-1]
+        if this_line.startswith("@"):
+            if split_by_slash:
+                this_name = this_line.split("/")[0]
+            elif split_by_dot:
+                this_name = ".".join(this_line.split()[0].split('#')[0].split(".")[:2])
+            elif simple_digit_head:
+                this_name = this_line[1:-1]
+            else:
+                this_name = this_line.split()[0].split('#')[0]
+            if this_name in names:
+                here_id = names[this_name]
+                out_paired_h_1.writelines(file_h_1[here_id:here_id + 4])
+                out_paired_h_2.write(this_line)
+                for k in range(3):
+                    out_paired_h_2.write(file_h_2.readline())
+                this_line = file_h_2.readline()
+                del names[this_name]
+            else:
+                out_unpaired_h_2.write(this_line)
+                for k in range(3):
+                    out_unpaired_h_2.write(file_h_2.readline())
+                this_line = file_h_2.readline()
         else:
-            this_name = this_line.split()[0].split('#')[0]
-        if this_name in names:
-            here_id = names[this_name]
-            out_paired_h_1.writelines(file_h_1[here_id:here_id + 4])
-            out_paired_h_2.write(this_line)
-            for k in range(3):
-                out_paired_h_2.write(file_h_2.readline())
             this_line = file_h_2.readline()
-            del names[this_name]
-        else:
-            out_unpaired_h_2.write(this_line)
-            for k in range(3):
-                out_unpaired_h_2.write(file_h_2.readline())
-            this_line = file_h_2.readline()
+    left_ids = set(names.values())
     for i in range(0, len(file_h_1), 4):
-        this_name = file_h_1[i].split()[0]
-        if this_name in names:
+        if i in left_ids:
             out_unpaired_h_1.writelines(file_h_1[i:i + 4])
     out_paired_h_1.close()
     out_paired_h_2.close()

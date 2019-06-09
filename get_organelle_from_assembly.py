@@ -630,8 +630,10 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                              time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag)
         # currently time is not limited for exporting contigs
-    except ImportError:
+    except (ImportError, AttributeError) as e:
         log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
+        if verbose:
+            log_handler.error(str(e))
         return False
     except RuntimeError:
         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
@@ -660,6 +662,9 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  min_sigma_factor=options.min_sigma_factor,
                                  here_only_max_c=options.only_keep_max_cov, here_acyclic_allowed=True,
                                  time_limit=3600, timeout_flag_str=timeout_flag)
+        except (ImportError, AttributeError) as e:
+            if verbose:
+                log_handler.error(str(e))
         except RuntimeError:
             log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
         except ProcessingGraphFailed as e:
@@ -695,7 +700,7 @@ def main():
     time0 = time.time()
     title = "GetOrganelle v" + str(get_versions()) + \
             "\n" \
-            "\nget_organelle_from_assembly.py: isolates organelle genomes from assembly graph." \
+            "\nget_organelle_from_assembly.py isolates organelle genomes from assembly graph." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
     options, log_handler = get_options(description=title, version=get_versions())

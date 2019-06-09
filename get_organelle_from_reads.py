@@ -164,7 +164,7 @@ def get_options(description, version):
     #                                 "Default: %default")
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
-                                    "Default: 4E8 (-F embplant_pt), 8E7 (-F embplant_nr/fungus_mt/animal_mt), "
+                                    "Default: 4E8 (-F embplant_pt), 2E8 (-F embplant_nr/fungus_mt/animal_mt), "
                                     "2E9 (-F embplant_mt/other_pt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=3,
                                help="The length of step for checking words in reads during extending process "
@@ -647,9 +647,9 @@ def get_options(description, version):
             if "embplant_mt" in options.organelle_type or "anonym" in options.organelle_type:
                 options.maximum_n_words *= 5
             elif "embplant_nr" in options.organelle_type or "fungus_mt" in options.organelle_type:
-                options.maximum_n_words /= 5
+                options.maximum_n_words /= 2
             elif "animal_mt" in options.organelle_type:
-                options.maximum_n_words /= 5
+                options.maximum_n_words /= 2
         if "--genes" not in sys.argv:
             options.genes_fasta = []  #  None] * organelle_type_len
         else:
@@ -2814,20 +2814,11 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output,
         run_command = os.path.join(which_slim, "slim_fastg.py") + " --verbose " * int(bool(verbose_log)) + \
                       " --no-merge --log -t " + str(threads) + \
                       which_bl_str + " " + graph_file + run_command  # \
-        # + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
         slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         if verbose_log:
             log_handler.info(run_command)
         output, err = slim_spades.communicate()
-        output_file_list = [os.path.join(spades_output, x) for x in os.listdir(spades_output) if x.count(".fastg") == 2]
-        # if "not recognized" in output.decode("utf8") or "command not found" in output.decode("utf8") \
-        #         or "no such file" in output.decode("utf8"):
-        #     if log_handler:
-        #         if verbose_log:
-        #             log_handler.warning(os.path.join(which_slim, "slim_fastg.py") + " not accessible!")
-        #             log_handler.warning(output.decode("utf8"))
-        #         log_handler.warning("Slimming " + graph_file + " failed.")
-        #     slim_stat_list.append((1, None))
+        output_file_list = [os.path.join(kmer_dir, x) for x in os.listdir(kmer_dir) if x.count(".fastg") == 2]
         if "failed" in output.decode("utf8") or "error" in output.decode("utf8") or "Error" in output.decode("utf8"):
             if log_handler:
                 if verbose_log:
@@ -2838,12 +2829,14 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output,
             if log_handler:
                 log_handler.warning("Slimming " + graph_file + " finished with no target organelle contigs found!")
             slim_stat_list.append((2, None))
-        else:
+        elif output_file_list:
             if log_handler:
                 if verbose_log:
                     log_handler.info(output.decode("utf8"))
                 log_handler.info("Slimming " + graph_file + " finished!")
             slim_stat_list.append((0, this_fastg_file_out))
+        else:
+            slim_stat_list.append((1, None))
     return slim_stat_list
 
 
@@ -3026,7 +3019,7 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
     export_succeeded = False
     for go_k, kmer_dir in enumerate(kmer_dirs):
         out_fastg = slim_out_fg[go_k]
-        if out_fastg:
+        if out_fastg and os.path.getsize(out_fastg):
             try:
                 """disentangle"""
 
@@ -3049,8 +3042,10 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
                                      here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                                      time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag)
                 # currently time is not limited for exporting contigs
-            except ImportError:
+            except (ImportError, AttributeError) as e:
                 log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
+                if verbose:
+                    log_handler.error(str(e))
                 return False
             except RuntimeError:
                 log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
@@ -3067,7 +3062,7 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
         if kmer_dirs and largest_k_graph_f_exist:
             for go_k, kmer_dir in enumerate(kmer_dirs):
                 out_fastg = slim_out_fg[go_k]
-                if out_fastg:
+                if out_fastg and os.path.getsize(out_fastg):
                     try:
                         """disentangle the graph as contig(s)"""
                         out_fastg_list = sorted([os.path.join(kmer_dir, x)
@@ -3089,7 +3084,9 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
                                                  expected_min_size=expected_minimum_size,
                                                  here_only_max_c=True, here_acyclic_allowed=True,
                                                  time_limit=3600, timeout_flag_str=timeout_flag)
-                    except ImportError:
+                    except (ImportError, AttributeError) as e:
+                        if verbose:
+                            log_handler.error(str(e))
                         break
                     except RuntimeError:
                         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
@@ -3139,7 +3136,7 @@ def main():
     time0 = time.time()
     title = "GetOrganelle v" + str(get_versions()) + \
             "\n" \
-            "\nget_organelle_from_reads.py: assembles organelle genomes from genome skimming data." \
+            "\nget_organelle_from_reads.py assembles organelle genomes from genome skimming data." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
     options, log_handler, previous_attributes = get_options(description=title, version=get_versions())

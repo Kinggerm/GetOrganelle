@@ -30,7 +30,7 @@ This toolkit was written in python 3.5.1, but compatible with versions higher th
 
 There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is the way with GetOrganelleLib installed in the $PYTHONPATH ; 2) `In situ configuration` is the classic and heavy way, but easier to keep updated.
 
-#### Using the setup.py
+### Using the setup.py
 
 Execute following curl commands to download suitable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into a specified directory.
 
@@ -52,7 +52,7 @@ Alternatively, if you have Python library setuptools installed (`sudo apt instal
     
 For some fresh linux systems, after above commands you still cannot execute `get_organelle_from_reads.py` in a new terminal directly, meaning `~/.local/bin` was not added to the $PATH, you have to manually add `~/.local/bin` by executing `echo "PATH=~/.local/bin:\$PATH" >> ~/.bashrc`. For fresh MacOS environment with similar situation, for example, if you installed GetOrganelle with `Python 3.6` and find scripts not in the $PATH, please execute `echo "PATH=/Library/Frameworks/Python.framework/Versions/3.6/bin:\$PATH" >> ~/.bash_profile`.
     
-#### In situ configuration
+### In situ configuration
 
 You could use curl as explained above, however [git](https://www.atlassian.com/git/tutorials/install-git) would be more suggested for update and version control.
 
@@ -85,7 +85,7 @@ At last, install python libraries numpy, scipy, and sympy using [pip](https://pi
     
     pip install numpy scipy sympy
 
-#### Updating GetOrganelle
+### Updating GetOrganelle
 
 You are always recommended to use the latest GetOrganelle, although you could find many old versions of GetOrganelle [here](https://github.com/Kinggerm/GetOrganelle/releases).
 
@@ -110,7 +110,7 @@ You are always recommended to use the latest GetOrganelle, although you could fi
         git stash
         git pull
 
-#### Required Dependencies
+### Required Dependencies
 
 Since v1.6, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `python setup.py install`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.0/v1.6.0-light.tar.gz) upon installing GetOrganelle. 
 

@@ -235,9 +235,11 @@ def build_bowtie2_db(seed_file, seed_index_base, which_bowtie2, target_echo_name
                                (".1.bt2l", ".2.bt2l", ".3.bt2l", ".4.bt2l", ".rev.1.bt2l", ".rev.2.bt2l")]) == 6):
         if not silent:
             if log_handler:
-                log_handler.info((target_echo_name + " ") * int(bool(target_echo_name)) + "bowtie2 index existed!")
+                log_handler.info((target_echo_name + " ").capitalize() * int(bool(target_echo_name)) +
+                                 "bowtie2 index existed!")
             else:
-                sys.stdout.write((target_echo_name + " ") * int(bool(target_echo_name)) + "bowtie2 index existed!\n")
+                sys.stdout.write((target_echo_name + " ").capitalize() * int(bool(target_echo_name)) +
+                                 "bowtie2 index existed!\n")
     else:
         if not silent:
             if log_handler:

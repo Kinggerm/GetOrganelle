@@ -109,6 +109,7 @@ You are always recommended to use the latest GetOrganelle, although you could fi
         cd ~/Applications/bin/GetOrganelle
         git stash
         git pull
+        python setup.py --in-situ
 
 ### Required Dependencies
 

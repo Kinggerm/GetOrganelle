@@ -2440,14 +2440,16 @@ def weighted_mean_and_std_np_free(values, weights):
     return mean, std
 
 
-def get_graph_coverages_range_simple(fasta_matrix, drop_low_percent=0.10, drop_high_percent=0.40):
+def get_graph_coverages_range_simple(fasta_matrix, drop_low_percent=0.10, drop_high_percent=0.40, drop_ssr=True):
     coverages = []
     lengths = []
-    for fastg_name in fasta_matrix[0]:
-        this_coverage = float(fastg_name.split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0])
-        this_length = int(fastg_name.split('length_')[1].split('_cov_')[0])
-        coverages.append(this_coverage)
-        lengths.append(this_length)
+    for go_seq, fastg_name in enumerate(fasta_matrix[0]):
+        # remove sequences like "ATATATATATAT", "AGAGAGAGAGAGAG"
+        if not (drop_ssr and len(set(fasta_matrix[1][go_seq])) < 3):
+            this_coverage = float(fastg_name.split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0])
+            this_length = int(fastg_name.split('length_')[1].split('_cov_')[0])
+            coverages.append(this_coverage)
+            lengths.append(this_length)
     weights = [inside_cov * lengths[go_v] for go_v, inside_cov in enumerate(coverages)]
     sum_weights = sum(weights)
     assert drop_low_percent + drop_high_percent < 1

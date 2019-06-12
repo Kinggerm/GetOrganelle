@@ -5,14 +5,19 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.1",
+     "features": [
+         "1. GetOrganelleLib/SeedDatabase: updated with repeats removed. "
+         " save computational time and generate better target-hitting base coverage estimation.",
+     ]},
     {"number": "1.6.0",
      "features": [
          "1. setup.py added with new installation way.",
          "2. GetOrganelleDep added for easier dependencies installation",
          "3. get_organelle_reads.py -> get_organelle_from_reads.py;"
-         " --max-extending-len, --ex-genes, --which-blast, --which-bowtie2, --which-spades added; "
+         " --max-extending-len, --ex-genes, --which-blast, --which-bowtie2, --which-spades, --zip-files added; "
          "multi-organelle mode supported; add support for fq head @digits; "
-         "--safe,-r,--auto-wss,--soft-max-n-words etc removed"
+         "--safe,-r,--auto-wss,--soft-max-n-words etc removed; --flush-step modified (background mode); "
          "4. get_organelle_from_assembly.py (basically slim + disentangle) added",
          "5. Library/SeqReference -> GetOrganelleLib/SeedDatabase",
          "6. Library/NotationReference -> GetOrganelleLib/LabelDatabase",

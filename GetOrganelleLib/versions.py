@@ -5,6 +5,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.1a",
+     "features": [
+         "1. GetOrganelleLib/SeedDatabase: embplant_pt updated. ",
+     ]},
     {"number": "1.6.1",
      "features": [
          "1. GetOrganelleLib/SeedDatabase: updated with repeats removed. "
@@ -24,8 +28,9 @@ versions = [
          "7. plant_mt -> embplant_mt; plant_nr -> embplant_nr; plant_pt -> embplant_pt; other_pt added;",
          "8. assembly_parser.py: keep terminal contigs if --linear; fix a bug when --acyclic-allowed; "
          "optimized for self-loop contigs",
-         "9. evaluate_assembly_using_mapping.py: log statistics without --draw",
-         "10. disentangle_organelle_assembly.py: --acyclic-allowed -> --linear",
+         "9. Utilities/evaluate_assembly_using_mapping.py: log statistics without --draw",
+         "10. Utilities/disentangle_organelle_assembly.py: --acyclic-allowed -> --linear",
+         "11. Utilities/slim_fastg.py: --no-merge added",
      ]},
     {"number": "1.5.2a",
      "features": [

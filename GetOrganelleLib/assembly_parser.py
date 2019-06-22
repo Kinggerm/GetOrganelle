@@ -17,14 +17,14 @@ except ImportError:
             pass
         def minimize(self, fun=None, x0=None, jac=None, method=None, bounds=None, constraints=None, options=None):
             raise ImportError("No module named scipy")
-import random
-from copy import deepcopy
 
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.statistical_func import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+import random
+from copy import deepcopy
 
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
@@ -86,6 +86,9 @@ class Vertex(object):
         self.fastg_form_name = \
             "EDGE_" + str(self.name) + "_length_" + str(self.len) + "_cov_" + str(round(self.cov, 5))
 
+    def is_terminal(self):
+        return not (self.connections[True] and self.connections[False])
+
     def is_self_loop(self):
         return (self.name, False) in self.connections[True]
 
@@ -100,6 +103,7 @@ class VertexInfo(dict):
     def __setitem__(self, key, val):
         if not isinstance(val, Vertex):
             raise ValueError("Value must be a Vertex type! Current: " + str(type(val)))
+        val.name = key
         dict.__setitem__(self, key, val)
 
 
@@ -267,6 +271,7 @@ class Assembly(object):
         for old_name in those_vertices:
             new_name = name_trans[old_name]
             this_v_info = deepcopy(self.vertex_info[old_name])
+            this_v_info.name = new_name
             this_v_info.connections = {True: set(), False: set()}
             for this_end in self.vertex_info[old_name].connections:
                 for next_name, next_end in self.vertex_info[old_name].connections[this_end]:
@@ -375,6 +380,18 @@ class Assembly(object):
     def kmer(self):
         return int(self.__kmer)
 
+    def update_orf_total_len(self, limited_vertices=None):
+        if not limited_vertices:
+            limited_vertices = sorted(self.vertex_info)
+        else:
+            limited_vertices = sorted(limited_vertices)
+        for vertex_name in limited_vertices:
+            self.vertex_info[vertex_name].other_attr["orf"] = {}
+            for direction in (True, False):
+                this_orf_lens = get_orf_lengths(self.vertex_info[vertex_name].seq[direction])
+                self.vertex_info[vertex_name].other_attr["orf"][direction] = {"lengths": this_orf_lens,
+                                                                              "sum_len": sum(this_orf_lens)}
+
     def update_vertex_clusters(self):
         self.vertex_clusters = []
         vertices = set(self.vertex_info)
@@ -425,8 +442,8 @@ class Assembly(object):
             limiting = True
             limited_vertices = sorted(limited_vertices)
         all_both_ends = {}
-        for limited_vertex in limited_vertices:
-            this_cons = self.vertex_info[limited_vertex].connections
+        for vertex_name in limited_vertices:
+            this_cons = self.vertex_info[vertex_name].connections
             connect_1 = this_cons[True]
             connect_2 = this_cons[False]
             if connect_1 and connect_2:
@@ -436,7 +453,7 @@ class Assembly(object):
                 this_ends = tuple(this_ends)
                 if this_ends not in all_both_ends:
                     all_both_ends[this_ends] = set()
-                all_both_ends[this_ends].add((limited_vertex, direction_remained))
+                all_both_ends[this_ends].add((vertex_name, direction_remained))
         if limiting:
             limited_vertex_set = set(limited_vertices)
             for each_vertex in self.vertex_info:
@@ -551,6 +568,7 @@ class Assembly(object):
                         limited_vertices.append(new_vertex)
                         # initialization
                         self.vertex_info[new_vertex] = deepcopy(self.vertex_info[this_vertex])
+                        self.vertex_info[new_vertex].name = new_vertex
                         self.vertex_info[new_vertex].fastg_form_name = None
                         # if "long" in self.vertex_info[new_vertex]:
                         #     del self.vertex_info[new_vertex]["long"]
@@ -581,7 +599,8 @@ class Assembly(object):
                         if copy_tags:
                             if "tags" in self.vertex_info[next_vertex].other_attr:
                                 if "tags" not in self.vertex_info[new_vertex].other_attr:
-                                    self.vertex_info[new_vertex].other_attr["tags"] = deepcopy(self.vertex_info[next_vertex].other_attr["tags"])
+                                    self.vertex_info[new_vertex].other_attr["tags"] = \
+                                        deepcopy(self.vertex_info[next_vertex].other_attr["tags"])
                                 else:
                                     for mode in self.vertex_info[next_vertex].other_attr["tags"]:
                                         if mode not in self.vertex_info[new_vertex].other_attr["tags"]:
@@ -707,21 +726,22 @@ class Assembly(object):
                                           return_new_graphs=True, verbose=True, log_handler=None, debug=False,
                                           target_name_for_log="target"):
 
-        def get_formula(from_vertex, from_end, back_to_vertex, back_to_end):
+        def get_formula(from_vertex, from_end, back_to_vertex, back_to_end, here_record_ends):
             result_form = vertex_to_symbols[from_vertex]
-            # if itself (from_vertex == back_to_vertex) form a loop, skipped
+            here_record_ends.add((from_vertex, from_end))
+            # if back_to_vertex ~ from_vertex (from_vertex == back_to_vertex) form a loop, skipped
             if from_vertex != back_to_vertex:
                 for next_v, next_e in self.vertex_info[from_vertex].connections[from_end]:
-                    # if itself (next_v == from_vertex) form a loop, add a pseudo vertex
+                    # if next_v ~ from_vertex (next_v == from_vertex) form a loop, add a pseudo vertex
                     if (next_v, next_e) == (from_vertex, not from_end):
                         pseudo_self_circle_str = "P" + from_vertex
                         if pseudo_self_circle_str not in extra_str_to_symbol:
                             extra_str_to_symbol[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
                             extra_symbol_to_str[extra_str_to_symbol[pseudo_self_circle_str]] = pseudo_self_circle_str
                         result_form -= (extra_str_to_symbol[pseudo_self_circle_str] - 1)
-                    elif (next_v, next_e) != (back_to_vertex, back_to_end):
-                        recorded_ends.add((next_v, next_e))
-                        result_form -= get_formula(next_v, next_e, from_vertex, from_end)
+                    # elif (next_v, next_e) != (back_to_vertex, back_to_end):
+                    elif (next_v, next_e) not in here_record_ends:
+                        result_form -= get_formula(next_v, next_e, from_vertex, from_end, here_record_ends)
             return result_form
 
         # for compatibility between scipy and sympy
@@ -811,6 +831,15 @@ class Assembly(object):
                     sys.stdout.write("Average " + target_name_for_log +" kmer-coverage = " + str(round(cov_, 2)) + "\n")
                 return
 
+        # reduce maximum_copy_num to reduce computational burden
+        all_coverages = [self.vertex_info[v_name].cov for v_name in vertices_list]
+        maximum_copy_num = min(maximum_copy_num, 2 * math.ceil(max(all_coverages) / min(all_coverages)))
+        if verbose:
+            if log_handler:
+                log_handler.info("Maximum multiplicity: " + str(maximum_copy_num))
+            else:
+                sys.stdout.write("Maximum multiplicity: " + str(maximum_copy_num) + "\n")
+
         """ create constraints by creating multivariate equations """
         vertex_to_symbols = {vertex_name: Symbol("V"+vertex_name, integer=True)  # positive=True)
                              for vertex_name in vertices_list}
@@ -826,35 +855,42 @@ class Assembly(object):
                     connection_set = self.vertex_info[vertex_name].connections[this_end]
                     if connection_set:  # len([n_v for n_v, n_e in connection_set if n_v in vertices_set]):
                         this_formula = vertex_to_symbols[vertex_name]
+                        formulized = False
                         for n_v, n_e in connection_set:
-                            # if n_v in vertices_set:
-                            recorded_ends.add((n_v, n_e))
-                            try:
-                                this_formula -= get_formula(n_v, n_e, vertex_name, this_end)
-                                if verbose:
+                            if (n_v, n_e ) not in recorded_ends:
+                                # if n_v in vertices_set:
+                                # recorded_ends.add((n_v, n_e))
+                                try:
+                                    this_formula -= get_formula(n_v, n_e, vertex_name, this_end, recorded_ends)
+                                    formulized = True
+                                    # if verbose:
+                                    #     if log_handler:
+                                    #         log_handler.info("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                    #                          vertex_name + ECHO_DIRECTION[this_end] + ": " +
+                                    #                          str(this_formula))
+                                    #     else:
+                                    #         sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                    #                          vertex_name + ECHO_DIRECTION[this_end] + ": " +
+                                    #                          str(this_formula)+"\n")
+                                except RecursionError:
                                     if log_handler:
-                                        log_handler.info("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                                         vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula))
+                                        log_handler.warning("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+                                                            vertex_name + ECHO_DIRECTION[this_end] + " failed!")
                                     else:
                                         sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                                         vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula)+"\n")
-                            except RecursionError:
-
-                                if log_handler:
-                                    log_handler.warning("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                                        vertex_name + ECHO_DIRECTION[this_end] + " failed!")
-                                else:
-                                    sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                                     vertex_name + ECHO_DIRECTION[this_end] + " failed!\n")
-                                raise ProcessingGraphFailed("RecursionError!")
+                                                         vertex_name + ECHO_DIRECTION[this_end] + " failed!\n")
+                                    raise ProcessingGraphFailed("RecursionError!")
                         if verbose:
                             if log_handler:
                                 log_handler.info(
-                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula))
+                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
+                                    str(this_formula))
                             else:
                                 sys.stdout.write(
-                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " + str(this_formula)+"\n")
-                        formulae.append(this_formula)
+                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
+                                    str(this_formula)+"\n")
+                        if formulized:
+                            formulae.append(this_formula)
                     elif broken_graph_allowed:
                         # Extra limitation to force terminal vertex to have only one copy, to avoid over-estimation
                         # Under-estimation would not be a problem here,
@@ -921,7 +957,7 @@ class Assembly(object):
                 else:
                     go_solution += 1
         if not copy_solution:
-            raise ProcessingGraphFailed("Incomplete/Complicated " + target_name_for_log + " graph (1)!")
+            raise ProcessingGraphFailed("Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (1)!")
         elif type(copy_solution) == list:
             if len(copy_solution) > 2:
                 raise ProcessingGraphFailed("Incomplete/Complicated " + target_name_for_log + " graph (2)!")
@@ -968,10 +1004,10 @@ class Assembly(object):
             copy_results = set()
             best_fun = inf
             opt = {'disp': verbose, "maxiter": 100}
-            for initial_copy in range(maximum_copy_num*2 + 1):
+            for initial_copy in range(maximum_copy_num * 2 + 1):
                 if initial_copy < maximum_copy_num:
                     initials = np.array([initial_copy + 1] * len(free_copy_variables))
-                elif initial_copy < maximum_copy_num*2:
+                elif initial_copy < maximum_copy_num * 2:
                     initials = np.array([random.randint(1, maximum_copy_num)] * len(free_copy_variables))
                 else:
                     initials = np.array([self.vertex_to_copy.get(symbols_to_vertex.get(symb, False), 2)
@@ -1008,7 +1044,7 @@ class Assembly(object):
                         for go_sym, symb_used in enumerate(free_copy_variables)
                         if symb_used in symbols_to_vertex]))
         else:
-            raise ProcessingGraphFailed("Incomplete/Complicated " + target_name_for_log +" graph (3)!")
+            raise ProcessingGraphFailed("Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (3)!")
 
         if return_new_graphs:
             """ produce all possible vertex copy combinations """
@@ -1215,14 +1251,20 @@ class Assembly(object):
             raise Exception("No available " + mode + " information found in " + tab_file)
 
     def filter_by_coverage(self, drop_num=1, mode="embplant_pt", log_hard_cov_threshold=10.,
-                           weight_factor=100., min_sigma_factor=0.1, min_cluster=1,
+                           weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
                            verbose=False, log_handler=None, debug=False):
         changed = False
         log_hard_cov_threshold = abs(log(log_hard_cov_threshold))
         vertices = sorted(self.vertex_info)
-        v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1)
-                       for this_v in vertices}
-        max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[mode]])
+        v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1) for this_v in vertices}
+        try:
+            max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[mode]])
+        except ValueError as e:
+            if log_handler:
+                log_handler.info("tagged vertices: " + str(self.tagged_vertices))
+            else:
+                sys.stdout.write("tagged vertices: " + str(self.tagged_vertices) + "\n")
+            raise e
         # removing coverage with 10 times lower/greater than tagged_cov
         removing_low_cov = [candidate_v
                             for candidate_v in vertices
@@ -1242,9 +1284,29 @@ class Assembly(object):
                        for this_v in vertices}
 
         coverages = np.array([v_coverages[this_v] for this_v in vertices])
-        cover_weights = np.array([(self.vertex_info[this_v].len - self.__kmer) * self.vertex_to_copy.get(this_v, 1)
+        cover_weights = np.array([(self.vertex_info[this_v].len - self.__kmer)
+                                  # multiply by copy number
+                                  * self.vertex_to_copy.get(this_v, 1)
+                                  # extra weight to short non-target
+                                  * (terminal_extra_weight if self.vertex_info[this_v].is_terminal() else 1)
                                   for this_v in vertices])
-        set_cluster = {v_coverages[tagged_v]: 0 for tagged_v in self.tagged_vertices[mode]}
+        tag_kinds = [tag_kind for tag_kind in self.tagged_vertices if self.tagged_vertices[tag_kind]]
+        tag_kinds.sort(key=lambda x: x != mode)
+        set_cluster = {}
+        for v_id, vertex_name in enumerate(vertices):
+            for go_tag, this_tag in enumerate(tag_kinds):
+                if vertex_name in self.tagged_vertices[this_tag]:
+                    if v_id not in set_cluster:
+                        set_cluster[v_id] = set()
+                    set_cluster[v_id].add(go_tag)
+        min_tag_kind = {0}
+        for v_id in set_cluster:
+            if 0 not in set_cluster[v_id]:
+                min_tag_kind |= set_cluster[v_id]
+        min_cluster = max(min_cluster, len(min_tag_kind))
+
+        # old way:
+        # set_cluster = {v_coverages[tagged_v]: 0 for tagged_v in self.tagged_vertices[mode]}
 
         # gmm_scheme = gmm_with_em_aic(coverages, maximum_cluster=6, cluster_limited=set_cluster,
         #                              min_sigma_factor=min_sigma_factor)
@@ -1256,7 +1318,8 @@ class Assembly(object):
             sys.stdout.write("Coverages: " + str([float("%.1f" % cov_x) for cov_x in coverages]) + "\n")
         gmm_scheme = weighted_gmm_with_em_aic(coverages, data_weights=cover_weights,
                                               minimum_cluster=min_cluster, maximum_cluster=6,
-                                              cluster_limited=set_cluster, min_sigma_factor=min_sigma_factor)
+                                              cluster_limited=set_cluster, min_sigma_factor=min_sigma_factor,
+                                              log_handler=log_handler, verbose_log=verbose)
         cluster_num = gmm_scheme["cluster_num"]
         parameters = gmm_scheme["parameters"]
         # for debug
@@ -1367,6 +1430,7 @@ class Assembly(object):
         if len(vertices) > 1:
             new_vertex = "(" + "|".join(vertices) + ")"
             self.vertex_info[new_vertex] = deepcopy(self.vertex_info[vertices[0]])
+            self.vertex_info[new_vertex].name = new_vertex
             self.vertex_info[new_vertex].cov = sum([self.vertex_info[v].cov for v in vertices])
             self.vertex_info[new_vertex].fastg_form_name = None
             # if "long" in self.vertex_info[new_vertex]:
@@ -1379,6 +1443,11 @@ class Assembly(object):
             consensus_s = generate_consensus(*[self.vertex_info[v].seq[directions[go]] for go, v in enumerate(vertices)])
             self.vertex_info[new_vertex].seq[directions[0]] = consensus_s
             self.vertex_info[new_vertex].seq[not directions[0]] = complementary_seq(consensus_s)
+            if copy_tags:
+                for mode in self.tagged_vertices:
+                    if vertices[0] in self.tagged_vertices[mode]:
+                        self.tagged_vertices[mode].add(new_vertex)
+                        self.tagged_vertices[mode].remove(vertices[0])
 
             # tags
             if copy_tags:
@@ -1442,7 +1511,11 @@ class Assembly(object):
         for prl_vertices in parallel_vertices_list:
             this_contamination_or_polymorphic = False
             this_using_only_max = False
-            prl_vertices = sorted(prl_vertices, key=lambda x: -self.vertex_info[x[0]].cov)
+            # sort by weight, then coverage
+            prl_vertices = sorted(
+                prl_vertices,
+                key=lambda x: (-self.vertex_info[x[0]].other_attr.get("weight", {mode: 0.}).get(mode, 0.),
+                               -self.vertex_info[x[0]].cov))
             max_cov_vertex, direction_remained = prl_vertices.pop(0)
             max_cov_seq = self.vertex_info[max_cov_vertex].seq[direction_remained]
             max_cov = self.vertex_info[max_cov_vertex].cov
@@ -1455,7 +1528,8 @@ class Assembly(object):
                     if abs(len(this_seq) - len(max_cov_seq)) / float(len(this_seq)) <= contamination_dif:
                         # too long to calculate, too long to be polymorphic
                         if max(len(max_cov_seq), len(this_seq)) > 1E5:
-                            removing_irrelevant_v.add(this_v)
+                            # removing_irrelevant_v.add(this_v)
+                            pass
                         else:
                             seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
                             seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
@@ -1521,6 +1595,9 @@ class Assembly(object):
             contaminating_cov = np.array([self.vertex_info[con_v].cov for con_v in removing_contaminating_v])
             contaminating_weight = np.array([len(self.vertex_info[con_v].seq[True]) - self.__kmer
                                              for con_v in removing_contaminating_v])
+            for candidate_rm_v in removing_contaminating_v:
+                if candidate_rm_v in self.tagged_vertices[mode]:
+                    removing_contaminating_v.remove(candidate_rm_v)
             self.remove_vertex(removing_contaminating_v)
             cont_mean, cont_std = weighted_mean_and_std(contaminating_cov, contaminating_weight)
             cut_off_min, cut_off_max = cont_mean - cont_std, cont_mean + cont_std
@@ -1540,6 +1617,9 @@ class Assembly(object):
                     sys.stdout.write("removing contaminating vertices: " + " ".join(list(removing_contaminating_v)) + "\n")
                     sys.stdout.write("removing contaminating-like vertices: " + " ".join(list(removing_below_cut_off)) + "\n")
         if removing_irrelevant_v:
+            for candidate_rm_v in removing_irrelevant_v:
+                if candidate_rm_v in self.tagged_vertices[mode]:
+                    removing_irrelevant_v.remove(candidate_rm_v)
             self.remove_vertex(removing_irrelevant_v)
             if verbose or debug:
                 if log_handler:
@@ -1562,9 +1642,36 @@ class Assembly(object):
                           max_copy=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
                           log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
+                          min_single_copy_percent=50,
                           broken_graph_allowed=False, temp_graph=None, verbose=True,
                           read_len_for_log=None, kmer_for_log=None,
                           log_handler=None, debug=False):
+        """
+        :param tab_file:
+        :param mode:
+        :param type_factor:
+        :param weight_factor:
+        :param max_copy:
+        :param min_sigma_factor:
+        :param expected_max_size:
+        :param expected_min_size:
+        :param log_hard_cov_threshold:
+        :param contamination_depth:
+        :param contamination_similarity:
+        :param degenerate:
+        :param degenerate_depth:
+        :param degenerate_similarity:
+        :param only_keep_max_cov:
+        :param min_single_copy_percent: [0-100]
+        :param broken_graph_allowed:
+        :param temp_graph:
+        :param verbose:
+        :param read_len_for_log:
+        :param kmer_for_log:
+        :param log_handler:
+        :param debug:
+        :return:
+        """
 
         def log_target_res(final_res_combinations_inside):
             echo_graph_id = int(bool(len(final_res_combinations_inside) - 1))
@@ -1608,6 +1715,17 @@ class Assembly(object):
         if broken_graph_allowed:
             weight_factor = 10000.
 
+        if temp_graph:
+            if temp_graph.endswith(".gfa"):
+                temp_csv = temp_graph[:-3] + "csv"
+            elif temp_graph.endswith(".fastg"):
+                temp_csv = temp_graph[:-5] + "csv"
+            elif temp_graph.endswith(".fasta"):
+                temp_csv = temp_graph[:-5] + "csv"
+            else:
+                temp_csv = temp_graph + ".csv"
+        else:
+            temp_csv = None
         self.parse_tab_file(tab_file, mode=mode, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
         is_reasonable_res = False
@@ -1615,32 +1733,42 @@ class Assembly(object):
         try:
             while not is_reasonable_res:
                 is_reasonable_res = True
-                # if verbose or debug:
-                #     if log_handler:
-                #         log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
-                #         log_handler.info("tagged coverage: " +
-                #                          str(["%.1f"%new_assembly.vertex_info[log_v].cov
-                #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]))
-                #     else:
-                #         sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
-                #         log_handler.info("tagged coverage: " +
-                #                          str(["%.1f"%new_assembly.vertex_info[log_v].cov
-                #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
+                if verbose or debug:
+                    if log_handler:
+                        log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
+                        log_handler.info("tagged coverage: " +
+                                         str(["%.1f" % new_assembly.vertex_info[log_v].cov
+                                              for log_v in sorted(new_assembly.tagged_vertices[mode])]))
+                    else:
+                        sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
+                        sys.stdout.write("tagged coverage: " +
+                                         str(["%.1f" % new_assembly.vertex_info[log_v].cov
+                                              for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
                 new_assembly.merge_all_possible_vertices()
                 new_assembly.tag_in_between(mode=mode)
-                new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
-                                                     contamination_similarity=contamination_similarity,
-                                                     degenerate=False, verbose=verbose, debug=debug,
-                                                     log_handler=log_handler)
+                # new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
+                #                                      contamination_similarity=contamination_similarity,
+                #                                      degenerate=False, verbose=verbose, debug=debug,
+                #                                      log_handler=log_handler)
+                if temp_graph:
+                    if verbose:
+                        if log_handler:
+                            log_handler.info("Writing out temp graph (1): " + temp_graph)
+                        else:
+                            sys.stdout.write("Writing out temp graph (1): " + temp_graph + "\n")
+                    new_assembly.write_to_gfa(temp_graph)
+                    new_assembly.write_out_tags([mode], temp_csv)
                 changed = True
                 count_large_round = 0
                 while changed:
                     count_large_round += 1
                     if verbose or debug:
                         if log_handler:
-                            log_handler.info("===================== " + str(count_large_round) + " =====================")
+                            log_handler.info(
+                                "===================== " + str(count_large_round) + " =====================")
                         else:
-                            sys.stdout.write("===================== " + str(count_large_round) + " =====================\n")
+                            sys.stdout.write(
+                                "===================== " + str(count_large_round) + " =====================\n")
                     changed = False
                     cluster_trimmed = True
                     while cluster_trimmed:
@@ -1660,6 +1788,10 @@ class Assembly(object):
                                                                     min_cluster=2, log_handler=log_handler,
                                                                     verbose=verbose, debug=debug)
                                 data_contains_outlier = False
+                                if not this_del:
+                                    raise ProcessingGraphFailed(
+                                        "Unable to generate result with single copy vertex percentage < {}%"
+                                            .format(min_single_copy_percent))
                             else:
                                 this_del, parameters = \
                                     new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
@@ -1667,17 +1799,17 @@ class Assembly(object):
                                                                     min_sigma_factor=min_sigma_factor,
                                                                     log_handler=log_handler, verbose=verbose,
                                                                     debug=debug)
-                            # if verbose or debug:
-                            #     if log_handler:
-                            #         log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
-                            #         log_handler.info("tagged coverage: " +
-                            #                          str(["%.1f"%new_assembly.vertex_info[log_v].cov
-                            #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]))
-                            #     else:
-                            #         sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
-                            #         log_handler.info("tagged coverage: " +
-                            #                          str(["%.1f"%new_assembly.vertex_info[log_v].cov
-                            #                               for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
+                            if verbose or debug:
+                                if log_handler:
+                                    log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
+                                    log_handler.info("tagged coverage: " +
+                                                     str(["%.1f" % new_assembly.vertex_info[log_v].cov
+                                                          for log_v in sorted(new_assembly.tagged_vertices[mode])]))
+                                else:
+                                    sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
+                                    log_handler.info("tagged coverage: " +
+                                                     str(["%.1f" % new_assembly.vertex_info[log_v].cov
+                                                          for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
                             new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
                                                                         log_handler=log_handler, verbose=verbose, mode=mode)
                             first_round = False
@@ -1719,8 +1851,13 @@ class Assembly(object):
                                 second = max(temp_cluster_weights)
                                 if best < second * weight_factor:
                                     if temp_graph:
+                                        if verbose:
+                                            if log_handler:
+                                                log_handler.info("Writing out temp graph (2): " + temp_graph)
+                                            else:
+                                                sys.stdout.write("Writing out temp graph (2): " + temp_graph + "\n")
                                         new_assembly.write_to_gfa(temp_graph)
-                                        new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                        new_assembly.write_out_tags([mode], temp_csv)
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
                                                                 "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
@@ -1734,8 +1871,15 @@ class Assembly(object):
                                                 for mu, sigma in parameters:
                                                     if abs(new_cov - mu) < sigma:
                                                         if temp_graph:
+                                                            if verbose:
+                                                                if log_handler:
+                                                                    log_handler.info(
+                                                                        "Writing out temp graph (3): " + temp_graph)
+                                                                else:
+                                                                    sys.stdout.write(
+                                                                        "Writing out temp graph (3): " + temp_graph + "\n")
                                                             new_assembly.write_to_gfa(temp_graph)
-                                                            new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                                            new_assembly.write_out_tags([mode], temp_csv)
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
                                                             "# tags: " +
@@ -1775,8 +1919,13 @@ class Assembly(object):
                                         for cn in new_assembly.vertex_info[vertex_name].connections.values()]) != 2:
                                     if vertex_name in new_assembly.tagged_vertices[mode]:
                                         if temp_graph:
+                                            if verbose:
+                                                if log_handler:
+                                                    log_handler.info("Writing out temp graph (4): " + temp_graph)
+                                                else:
+                                                    sys.stdout.write("Writing out temp graph (4): " + temp_graph + "\n")
                                             new_assembly.write_to_gfa(temp_graph)
-                                            new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                                            new_assembly.write_out_tags([mode], temp_csv)
                                         raise ProcessingGraphFailed(
                                             "Incomplete/Complicated graph: please check around EDGE_"+vertex_name + "!")
                                     else:
@@ -1806,10 +1955,23 @@ class Assembly(object):
                                                          degenerate_similarity=degenerate_similarity,
                                                          verbose=verbose, debug=debug, log_handler=log_handler)
                     new_assembly.tag_in_between(mode=mode)
+                    if temp_graph:
+                        if verbose:
+                            if log_handler:
+                                log_handler.info("Writing out temp graph (5): " + temp_graph)
+                            else:
+                                sys.stdout.write("Writing out temp graph (5): " + temp_graph + "\n")
+                        new_assembly.write_to_gfa(temp_graph)
+                        new_assembly.write_out_tags([mode], temp_csv)
 
                 if temp_graph:
+                    if verbose:
+                        if log_handler:
+                            log_handler.info("Writing out temp graph (6): " + temp_graph)
+                        else:
+                            sys.stdout.write("Writing out temp graph (6): " + temp_graph + "\n")
                     new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                    new_assembly.write_out_tags([mode], temp_csv)
                 new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
                                                      contamination_similarity=contamination_similarity,
                                                      degenerate=degenerate, degenerate_depth=degenerate_depth,
@@ -1818,8 +1980,13 @@ class Assembly(object):
                                                      verbose=verbose, debug=debug, log_handler=log_handler)
                 new_assembly.merge_all_possible_vertices()
                 if temp_graph:
+                    if verbose:
+                        if log_handler:
+                            log_handler.info("Writing out temp graph (7): " + temp_graph)
+                        else:
+                            sys.stdout.write("Writing out temp graph (7): " + temp_graph + "\n")
                     new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                    new_assembly.write_out_tags([mode], temp_csv)
 
                 # create idealized vertices and edges
                 try:
@@ -1996,26 +2163,33 @@ class Assembly(object):
                         if outer_continue:
                             continue
                     elif temp_graph:
+                        if verbose:
+                            if log_handler:
+                                log_handler.info("Writing out temp graph (8): " + temp_graph)
+                            else:
+                                sys.stdout.write("Writing out temp graph (8): " + temp_graph + "\n")
                         new_assembly.write_to_gfa(temp_graph)
-                        new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                        new_assembly.write_out_tags([mode], temp_csv)
                         raise ProcessingGraphFailed("Complicated " + mode + " graph! Detecting path(s) failed!")
                     else:
                         raise e
                 else:
                     test_first_g = final_res_combinations[0]["graph"]
-                    if 1 in test_first_g.copy_to_vertex:
+                    if 1 in test_first_g.copy_to_vertex or min_single_copy_percent == 0:
                         single_copy_percent = sum([test_first_g.vertex_info[s_v].len
                                                    for s_v in test_first_g.copy_to_vertex[1]]) \
                                               / float(sum([test_first_g.vertex_info[a_v].len
                                                            for a_v in test_first_g.vertex_info]))
-                        if single_copy_percent < 0.5:
+                        if single_copy_percent < min_single_copy_percent / 100.:
                             if verbose:
                                 if log_handler:
-                                    log_handler.warning("Result with single copy vertex percentage < 50% is "
-                                                        "unacceptable, continue dropping suspicious vertices ...")
+                                    log_handler.warning("Result with single copy vertex percentage < {}% is "
+                                                        "unacceptable, continue dropping suspicious vertices ..."
+                                                        .format(min_single_copy_percent))
                                 else:
-                                    sys.stdout.write("Warning: Result with single copy vertex percentage < 50% is "
-                                                     "unacceptable, continue dropping suspicious vertices ...")
+                                    sys.stdout.write("Warning: Result with single copy vertex percentage < {}% is "
+                                                     "unacceptable, continue dropping suspicious vertices ..."
+                                                     .format(min_single_copy_percent))
                             data_contains_outlier = True
                             is_reasonable_res = False
                             continue
@@ -2025,18 +2199,25 @@ class Assembly(object):
                     else:
                         if verbose:
                             if log_handler:
-                                log_handler.warning("Result with single copy vertex percentage < 50% is "
-                                                    "unacceptable, continue dropping suspicious vertices ...")
+                                log_handler.warning("Result with single copy vertex percentage < {}% is "
+                                                    "unacceptable, continue dropping suspicious vertices ..."
+                                                    .format(min_single_copy_percent))
                             else:
-                                sys.stdout.write("Warning: Result with single copy vertex percentage < 50% is "
-                                                 "unacceptable, continue dropping suspicious vertices ...")
+                                sys.stdout.write("Warning: Result with single copy vertex percentage < {}% is "
+                                                 "unacceptable, continue dropping suspicious vertices ..."
+                                                 .format(min_single_copy_percent))
                         data_contains_outlier = True
                         is_reasonable_res = False
                         continue
         except KeyboardInterrupt as e:
             if temp_graph:
+                if verbose:
+                    if log_handler:
+                        log_handler.info("Writing out temp graph (9): " + temp_graph)
+                    else:
+                        sys.stdout.write("Writing out temp graph (9): " + temp_graph + "\n")
                 new_assembly.write_to_gfa(temp_graph)
-                new_assembly.write_out_tags([mode], temp_graph[:-5] + "csv")
+                new_assembly.write_out_tags([mode], temp_csv)
             raise KeyboardInterrupt
 
     def get_all_circular_paths(self, mode="embplant_pt", library_info=None, log_handler=None):
@@ -2071,7 +2252,7 @@ class Assembly(object):
                         del new_left[next_vertex]
                     new_connections = self.vertex_info[next_vertex].connections[not next_end]
                     if not new_left:
-                        if (start_vertex, False) in new_connections:
+                        if (start_vertex, not start_direction) in new_connections:
                             if check_all_kinds:
                                 rev_path = [(this_v, not this_e) for this_v, this_e in new_path[::-1]]
                                 this_path_derived = [new_path, rev_path]
@@ -2092,16 +2273,32 @@ class Assembly(object):
 
         # print(self.copy_to_vertex)
 
+        self.update_orf_total_len()
         if 1 not in self.copy_to_vertex:
             do_check_all_start_kinds = True
-            start_vertex = sorted(self.vertex_info, key=lambda x: -self.vertex_info[x].len)[0]
+            start_vertex = sorted(self.vertex_info,
+                                  key=lambda x: (-self.vertex_info[x].len,
+                                                 -max(self.vertex_info[x].other_attr["orf"][True]["sum_len"],
+                                                      self.vertex_info[x].other_attr["orf"][False]["sum_len"]),
+                                                 x))[0]
+            start_direction = True
         else:
             # start from a single copy vertex, no need to check all kinds of start vertex
             do_check_all_start_kinds = False
-            start_vertex = sorted(self.copy_to_vertex[1], key=lambda x: -self.vertex_info[x].len)[0]
+            start_vertex = sorted(self.copy_to_vertex[1],
+                                  key=lambda x: (-self.vertex_info[x].len,
+                                                 -max(self.vertex_info[x].other_attr["orf"][True]["sum_len"],
+                                                      self.vertex_info[x].other_attr["orf"][False]["sum_len"]),
+                                                 x))[0]
+            if mode == "embplant_pt":
+                # more orfs found in the reverse direction of LSC of a typical plastome
+                start_direction = self.vertex_info[start_vertex].other_attr["orf"][True]["sum_len"] \
+                                  >= self.vertex_info[start_vertex].other_attr["orf"][False]["sum_len"]
+            else:
+                start_direction = True
         # each contig stored format:
-        first_path = [(start_vertex, True)]
-        first_connections = self.vertex_info[start_vertex].connections[True]
+        first_path = [(start_vertex, start_direction)]
+        first_connections = self.vertex_info[start_vertex].connections[start_direction]
         vertex_to_copy = deepcopy(self.vertex_to_copy)
         vertex_to_copy[start_vertex] -= 1
         if vertex_to_copy[start_vertex] <= 0:
@@ -2130,7 +2327,8 @@ class Assembly(object):
             if record_pattern:
                 sorted_paths.sort(key=lambda x: -x[1])
                 pattern_dict = {acc_distance: ad_id + 1
-                                for ad_id, acc_distance in enumerate(sorted(set([x[1] for x in sorted_paths]), reverse=True))}
+                                for ad_id, acc_distance in enumerate(sorted(set([x[1] for x in sorted_paths]),
+                                                                            reverse=True))}
                 if len(pattern_dict) > 1:
                     if log_handler:
                         log_handler.warning("Multiple repeat patterns appeared in your data, "
@@ -2479,7 +2677,10 @@ def get_graph_coverages_range_simple(fasta_matrix, drop_low_percent=0.10, drop_h
         else:
             del coverages[check_v]
             del lengths[check_v]
-    cov_mean, cov_std = weighted_mean_and_std_np_free(coverages, lengths)
+    try:
+        cov_mean, cov_std = weighted_mean_and_std_np_free(coverages, lengths)
+    except ZeroDivisionError:
+        cov_mean, cov_std = 0., 0.
     return max(cov_mean - cov_std, min(coverages)), cov_mean, min(cov_mean + cov_std, max(coverages))
 
 

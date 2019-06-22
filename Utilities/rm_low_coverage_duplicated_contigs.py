@@ -67,7 +67,13 @@ def require_options():
     if not options.which_blast:
         try_this_bin = os.path.join(GO_DEP_PATH, "ncbi-blast", "blastn")
         if os.path.isfile(try_this_bin) and executable(try_this_bin):
-            options.which_blast = os.path.split(try_this_bin)[0]
+            output, err = subprocess.Popen(
+                try_this_bin + " -version", stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, shell=True).communicate()
+            if "not found" in output.decode("utf8"):
+                sys.stdout.write(output.decode("utf8") + "\n")
+            else:
+                options.which_blast = os.path.split(try_this_bin)[0]
     if not executable(os.path.join(options.which_blast, "blastn")):
         sys.stdout.write(os.path.join(options.which_blast, "blastn") + " not accessible!")
         exit()

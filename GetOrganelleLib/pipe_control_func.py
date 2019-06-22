@@ -291,14 +291,20 @@ def map_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, 
     total_seed_sam = [os.path.join(res_path_name, x + res_base_name + ".sam") for x in ("temp.", "")]
     if resume and (os.path.exists(total_seed_fq[1]) or not generate_fq) and os.path.exists(total_seed_sam[1]):
         if not silent:
-            log_handler.info((target_echo_name + " ") * int(bool(target_echo_name)) + "reads existed!")
+            if log_handler:
+                log_handler.info((target_echo_name + " ") * int(bool(target_echo_name)) + "reads existed!")
+            else:
+                sys.stdout.write((target_echo_name + " ") * int(bool(target_echo_name)) + "reads existed!\n")
     else:
         seed_index_base = remove_db_postfix(seed_file) + '.index'
         build_bowtie2_db(seed_file=seed_file, seed_index_base=seed_index_base, which_bowtie2=which_bowtie2,
                          target_echo_name=target_echo_name, overwrite=False, random_seed=random_seed,
                          log_handler=log_handler, silent=silent)
         if not silent:
-            log_handler.info("Mapping reads to " + target_echo_name + " bowtie2 index ...")
+            if log_handler:
+                log_handler.info("Mapping reads to " + target_echo_name + " bowtie2 index ...")
+            else:
+                sys.stdout.write("Mapping reads to " + target_echo_name + " bowtie2 index ...\n")
         this_input_fq_data = " "
         if fq_1 and fq_2:
             this_input_fq_data += " -1 " + fq_1 + " -2 " + fq_2
@@ -316,25 +322,35 @@ def map_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, 
         output, err = make_seed_bowtie2.communicate()
         if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
             if not silent:
-                log_handler.error("\n" + output.decode("utf8"))
-            exit()
+                if log_handler:
+                    log_handler.error("\n" + output.decode("utf8"))
+                else:
+                    sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
+            raise Exception("")
         elif "No such file" in output.decode("utf8") or "not found" in output.decode("utf8"):
             if not silent:
-                log_handler.error("\n" + output.decode("utf8"))
+                if log_handler:
+                    log_handler.error("\n" + output.decode("utf8"))
+                else:
+                    sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
                 if "perl" in output.decode("utf8"):
-                    log_handler.error("perl is required for the wrapper of bowtie2!")
-            exit()
+                    raise Exception("perl is required for the wrapper of bowtie2!")
         if not silent and verbose_log:
-            log_handler.info("\n" + output.decode("utf8").strip())
+            if log_handler:
+                log_handler.info("\n" + output.decode("utf8").strip())
+            else:
+                sys.stdout.write("\n" + output.decode("utf8").strip() + "\n")
         if os.path.exists(total_seed_sam[0]):
             os.rename(total_seed_sam[0], total_seed_sam[1])
             if generate_fq:
                 os.rename(total_seed_fq[0], total_seed_fq[1])
             if not silent:
-                log_handler.info("Mapping finished.")
+                if log_handler:
+                    log_handler.info("Mapping finished.")
+                else:
+                    sys.stdout.write("Mapping finished.\n")
         else:
-            log_handler.error("Cannot find bowtie2 result!")
-            exit()
+            raise Exception("Cannot find bowtie2 result!")
 
 
 def mapping_with_bowtie2_for_library(graph_fasta, fq_1, fq_2, out_base, threads, resume, rand_seed,
@@ -403,9 +419,9 @@ class LogInfo:
     def __init__(self, sample_out_dir, prefix=""):
         self.header = ["sample", "organelle_type", "fastq_format", "mean_error_rate",
                        "trim_percent", "trim_int", "trim_chars",
-                       "mean_read_len", "max_read_len", "num_reads", "estimated_base_coverage",
-                       "closest_seed", "unmapped_percentage", "unmapped_lengths",
-                       "w", "k", "max_extending_len", "pre_w",
+                       "mean_read_len", "max_read_len", "num_reads_1", "seed_read_filesize",
+                       "estimated_base_coverage", "closest_seed", "unmapped_percentage", "unmapped_lengths",
+                       "num_reads_2", "w", "k", "max_extending_len", "pre_w",
                        "mem_dup", "mem_used", "n_unique_reads", "n_reads", "n_bases", "dup_used",
                        "mem_group", "rounds", "accepted_lines", "accepted_words", "mem_extending", "circular",
                        "degenerate_base_used", "library_size", "library_deviation", "library_left", "library_right",
@@ -444,12 +460,23 @@ class LogInfo:
                                 this_record["mean_read_len"] = detail_record.split(" = ")[1].split(" bp")[0]
                                 this_record["max_read_len"] = detail_record.split(" = ")[-1].split(" bp")[0]
                             elif detail_record.startswith("Reads used = "):
-                                this_record["num_reads"] = detail_record.split(" = ")[-1]
-                        if " - WARNING: " in line and line[:4].isdigit():
-                            time_point, detail_record = line.strip().split(" - WARNING:")
-                            detail_record = detail_record.strip()
-                            if detail_record.startswith("Number of reads exceeded "):
+                                this_record["num_reads_1"] = detail_record.split(" = ")[-1]
+                            # if " - WARNING: " in line and line[:4].isdigit():
+                            #     time_point, detail_record = line.strip().split(" - WARNING:")
+                            #     detail_record = detail_record.strip()
+                            elif detail_record.endswith("are used in downstream analysis."):
                                 this_record["record_fq_beyond_limit"] = True
+                elif "Making seed reads .." in log_part:
+                    for line in log_part.split("\n"):
+                        if " - INFO: " in line and line[:4].isdigit():
+                            time_point, detail_record = line.strip().split(" - INFO:")
+                            detail_record = detail_record.strip()
+                            if detail_record.startswith("Seed reads made: "):
+                                seed_read_filesize = detail_record.split("(")[-1].split(" ")[0]
+                                if "seed_read_filesize" in this_record:
+                                    this_record["seed_read_filesize"] += " & " + seed_read_filesize
+                                else:
+                                    this_record["seed_read_filesize"] = seed_read_filesize
                 elif "Checking seed reads and parameters" in log_part:
                     for line in log_part.split("\n"):
                         if " - INFO: " in line and line[:4].isdigit():
@@ -478,6 +505,8 @@ class LogInfo:
                                     this_record["unmapped_lengths"] += " & " + unmapped_lens
                                 else:
                                     this_record["unmapped_lengths"] = unmapped_lens
+                            elif detail_record.startswith("Reads reduced to = "):
+                                this_record["num_reads_2"] = detail_record.split(" = ")[-1]
                             elif detail_record.startswith("Setting '-w "):
                                 this_record["w"] = detail_record.split("-w ")[-1][:-1]
                             elif detail_record.startswith("Setting '-k "):
@@ -692,7 +721,7 @@ def unzip(source, target, line_limit=1000000000000000, verbose_log=False, log_ha
     if "tar." not in source:
         try_commands = try_commands[1], try_commands[0]
     if log_handler:
-        log_handler.info("Unzipping reads file: " + source)
+        log_handler.info("Unzipping reads file: " + source + " (" + str(os.path.getsize(source)) + " bytes)")
     success = False
     output = b""
     for run_command in try_commands:

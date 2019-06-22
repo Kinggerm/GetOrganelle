@@ -38,93 +38,118 @@ SEQ_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "SeedDatabase"))
 
 
 def get_options(print_title):
-    usage = 'python '+str(os.path.basename(__file__)+' your_fastg_files -F embplant_pt')
+    usage = "python "+str(os.path.basename(__file__)+" your_fastg_files -F embplant_pt -E embplant_mt")
     parser = OptionParser(usage=usage)
-    # parser.add_option('-o', dest='out_fastg_file', help='Output file')
+    # parser.add_option("-o", dest="out_fastg_file", help="Output file")
     # filters
-    parser.add_option('-F', dest='organelle_types',
-                      help='followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt '
-                           '(which means embryophyta plastome, non-embryophyta plastome, '
-                           'plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion separately), '
-                           'or a combination of above split by comma(s) '
-                           '(corresponding to certain arguments as following listed). '
-                           '\t'
-                           ' ------------------------------------------------------ '
-                           '\nembplant_pt \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'embplant_pt.fasta') + ' --exclude ' + os.path.join(NOT_DB_PATH, 'embplant_mt.fasta') + '"'
-                           ' ------------------------------------------------------ '
-                           '\nother_pt \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'other_pt.fasta') + '"'
-                           ' ------------------------------------------------------ '                                                                                                                                        
-                           '\nembplant_mt \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'embplant_mt.fasta') + ' --exclude ' + os.path.join(NOT_DB_PATH, 'embplant_pt.fasta') + '"'
-                           ' ------------------------------------------------------ '
-                           '\nembplant_nr \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'embplant_nr.fasta') + '"'
-                           ' ------------------------------------------------------ '
-                           '\nanimal_mt \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'animal_mt.fasta') + '"'
-                           ' ------------------------------------------------------ '
-                           '\nfungus_mt \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'fungus_mt.fasta') + '"'
-                           ' ------------------------------------------------------ '
-                           '\nother_pt,embplant_mt,fungus_mt \t " --include-priority ' + os.path.join(NOT_DB_PATH, 'other_pt.fasta') + ',' + os.path.join(NOT_DB_PATH, 'embplant_mt.fasta') + ',' + os.path.join(NOT_DB_PATH, 'fungus_mt.fasta') +
-                           ' ------------------------------------------------------ '
+    parser.add_option("-F", dest="organelle_types",
+                      help="followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt "
+                           "(which means embryophyta plastome, non-embryophyta plastome, "
+                           "plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion separately), "
+                           "or a combination of above split by comma(s) "
+                           "(corresponds to certain arguments as following listed). "
+                           "\t"
+                           " ------------------------------------------------------ "
+                           "\nembplant_pt \t \" --include-priority " + os.path.join(NOT_DB_PATH, "embplant_pt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nother_pt \t \" --include-priority " + os.path.join(NOT_DB_PATH, "other_pt.fasta") + "\""
+                           " ------------------------------------------------------ "                                                                                                                                        
+                           "\nembplant_mt \t \" --include-priority " + os.path.join(NOT_DB_PATH, "embplant_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nembplant_nr \t \" --include-priority " + os.path.join(NOT_DB_PATH, "embplant_nr.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nanimal_mt \t \" --include-priority " + os.path.join(NOT_DB_PATH, "animal_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nfungus_mt \t \" --include-priority " + os.path.join(NOT_DB_PATH, "fungus_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nother_pt,embplant_mt,fungus_mt \t \" --include-priority " + os.path.join(NOT_DB_PATH, "other_pt.fasta") + "," + os.path.join(NOT_DB_PATH, "embplant_mt.fasta") + "," + os.path.join(NOT_DB_PATH, "fungus_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
                            "For easy usage and compatibility of old versions, following redirection "
                            "would be automatically fulfilled without warning:\t"
                            "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
                            "\nplant_mt->embplant_mt; plant_nr->embplant_nr"
                       )
-    parser.add_option('--no-hits', dest='treat_no_hits', default='ex_no_con',
-                      help='Provide treatment for non-hitting contigs.\t'
-                           ' ------------------------------------------------------ '
-                           '\nex_no_con \t keep those connect with hitting-include contigs. (Default)'
-                           ' ------------------------------------------------------ '
-                           '\nex_no_hit \t exclude all.'
-                           ' ------------------------------------------------------ '
-                           '\nkeep_all \t keep all'
-                           ' ------------------------------------------------------ ')
-    parser.add_option('--significant', dest='significant', default=3.0, type=float,
-                      help='Within a contig, if the query-score of hitting A is more than given times (Default: 3.0) '
-                           'of the query-score of hitting B, this contig would be treated as only A related, '
-                           'rather than both.')
-    parser.add_option('--remove-low-dup', dest='remove_low_duplicated', default=False, action='store_true',
-                      help='Remove redundant low-coverage contigs that largely overlap some high-coverage contigs.')
-    parser.add_option('--depth-cutoff', dest='depth_cutoff', default=10000.0, type=float,
-                      help='After detection for target coverage, those beyond certain times (depth cutoff) of the'
-                           ' detected coverage would be excluded. Default: 10000.0')
-    parser.add_option('--min-depth', dest='min_depth', default=0., type=float,
-                      help='Input a float or integer number. Filter fastg file by a minimum depth. Default: %default.')
-    parser.add_option('--max-depth', dest='max_depth', default=inf, type=float,
-                      help='Input a float or integer number. filter fastg file by a maximum depth. Default: %default.')
-    parser.add_option('--no-merge', dest='merge_contigs', default=True, action="store_false",
+    parser.add_option("-E", dest="exclude_organelle_types",
+                      help="followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt "
+                           "(which means embryophyta plastome, non-embryophyta plastome, "
+                           "plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion separately), "
+                           "or a combination of above split by comma(s) "
+                           "(be similar to -F and corresponds to certain arguments as following listed). "
+                           "\t"
+                           " ------------------------------------------------------ "
+                           "\nembplant_pt \t \" --exclude " + os.path.join(NOT_DB_PATH, "embplant_pt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nembplant_mt \t \" --exclude " + os.path.join(NOT_DB_PATH, "embplant_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nembplant_nr \t \" --exclude " + os.path.join(NOT_DB_PATH, "embplant_nr.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nanimal_mt \t \" --exclude " + os.path.join(NOT_DB_PATH, "animal_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nfungus_mt \t \" --exclude " + os.path.join(NOT_DB_PATH, "fungus_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nembplant_mt,embplant_nr \t \" --exclude " + os.path.join(NOT_DB_PATH, "embplant_mt.fasta") + "," + os.path.join(NOT_DB_PATH, "embplant_nr.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "For easy usage and compatibility of old versions, following redirection "
+                           "would be automatically fulfilled without warning:\t"
+                           "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
+                           "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
+    # parser.add_option("-N", dest="neutral")
+    parser.add_option("--no-hits", dest="treat_no_hits", default="ex_no_con",
+                      help="Provide treatment for non-hitting contigs.\t"
+                           " ------------------------------------------------------ "
+                           "\nex_no_con \t keep those connect with hitting-include contigs. (Default)"
+                           " ------------------------------------------------------ "
+                           "\nex_no_hit \t exclude all."
+                           " ------------------------------------------------------ "
+                           "\nkeep_all \t keep all"
+                           " ------------------------------------------------------ ")
+    parser.add_option("--significant", dest="significant", default=3.0, type=float,
+                      help="Within a contig, if the query-score of hitting A is more than given times (Default: 3.0) "
+                           "of the query-score of hitting B, this contig would be treated as only A related, "
+                           "rather than both.")
+    parser.add_option("--remove-low-dup", dest="remove_low_duplicated", default=False, action="store_true",
+                      help="Remove redundant low-coverage contigs that largely overlap some high-coverage contigs.")
+    parser.add_option("--depth-cutoff", dest="depth_cutoff", default=10000.0, type=float,
+                      help="After detection for target coverage, those beyond certain times (depth cutoff) of the"
+                           " detected coverage would be excluded. Default: 10000.0")
+    parser.add_option("--min-depth", dest="min_depth", default=0., type=float,
+                      help="Input a float or integer number. Filter fastg file by a minimum depth. Default: %default.")
+    parser.add_option("--max-depth", dest="max_depth", default=inf, type=float,
+                      help="Input a float or integer number. filter fastg file by a maximum depth. Default: %default.")
+    parser.add_option("--merge", dest="merge_contigs", default=False, action="store_true",
                       help="Merge all possible contigs. ")
-    parser.add_option('--include', dest='include',
-                      help='followed by Blastn database(s)')
-    parser.add_option('--include-priority', dest='include_priority',
-                      help='followed by Blastn database(s).')
-    parser.add_option('--exclude', dest='exclude',
-                      help='followed by Blastn database(s).')
-    parser.add_option('--exclude-priority', dest='exclude_priority',
-                      help='followed by Blastn database(s)')
-    parser.add_option('--no-hits-labeled-tab', dest='no_tab', default=False, action='store_true',
-                      help='Choose to disable producing tab file')
-    parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
-                      help='Choose to disable deleting temp files produced by blast and this script')
-    parser.add_option('-o', '--out-dir', dest="out_dir",
+    parser.add_option("--include", dest="include",
+                      help="followed by Blastn database(s)")
+    parser.add_option("--include-priority", dest="include_priority",
+                      help="followed by Blastn database(s).")
+    parser.add_option("--exclude", dest="exclude",
+                      help="followed by Blastn database(s).")
+    parser.add_option("--exclude-priority", dest="exclude_priority",
+                      help="followed by Blastn database(s)")
+    parser.add_option("--no-hits-labeled-tab", dest="no_tab", default=False, action="store_true",
+                      help="Choose to disable producing tab file")
+    parser.add_option("--keep-temp", dest="keep_temp", default=False, action="store_true",
+                      help="Choose to disable deleting temp files produced by blast and this script")
+    parser.add_option("-o", "--out-dir", dest="out_dir",
                       help="By default the output would be along with the input fastg file. "
                            "But you could assign a new directory with this option.")
     parser.add_option("--prefix", dest="prefix", default="",
-                      help="Add prefix to the output basename. Conflict with '--out-base'.")
+                      help="Add prefix to the output basename. Conflict with \"--out-base\".")
     parser.add_option("--out-base", dest="out_base", default="",
                       help="By default the output basename would be modified based on the input fastg file. "
-                           "But you could assign a new basename with this option. Conflict with '--prefix'.")
+                           "But you could assign a new basename with this option. Conflict with \"--prefix\".")
     parser.add_option("--log", dest="generate_log", default=False, action="store_true",
                       help="Generate log file.")
     parser.add_option("--verbose", dest="verbose_log", default=False, action="store_true",
                       help="For debug usage.")
-    parser.add_option('--continue', dest='resume', default=False, action='store_true',
-                      help='Specified for calling from get_organelle_from_reads.py')
+    parser.add_option("--continue", dest="resume", default=False, action="store_true",
+                      help="Specified for calling from get_organelle_from_reads.py")
     parser.add_option("--no-overwrite", dest="overwrite", default=True, action="store_false",
                       help="Overwrite existing output result.")
     parser.add_option("--which-blast", dest="which_blast", default="",
                       help="Assign the path to BLAST binary files if not added to the path. "
                            "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/ncbi-blast first, then $PATH")
-    parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
+    parser.add_option("-t", "--threads", dest="threads", default=4, type=int,
                       help="Threads for blastn.")
 
     # redirect organelle types before parsing arguments
@@ -133,16 +158,17 @@ def get_options(print_title):
                                 "plant_mt": "embplant_mt",
                                 "plant_nr": "embplant_nr"}
     for go_arg, candidate_arg in enumerate(sys.argv):
-        if candidate_arg in redirect_organelle_types:
-            sys.argv[go_arg] = redirect_organelle_types[candidate_arg]
-        elif "," in candidate_arg:
-            new_arg = []
-            for sub_arg in candidate_arg.split(","):
-                if sub_arg in redirect_organelle_types:
-                    new_arg.append(redirect_organelle_types[sub_arg])
-                else:
-                    new_arg.append(sub_arg)
-            sys.argv[go_arg] = ",".join(new_arg)
+        if go_arg > 1 and sys.argv[go_arg - 1] in {"-F", "-E"}:
+            if candidate_arg in redirect_organelle_types:
+                sys.argv[go_arg] = redirect_organelle_types[candidate_arg]
+            elif "," in candidate_arg:
+                new_arg = []
+                for sub_arg in candidate_arg.split(","):
+                    if sub_arg in redirect_organelle_types:
+                        new_arg.append(redirect_organelle_types[sub_arg])
+                    else:
+                        new_arg.append(sub_arg)
+                sys.argv[go_arg] = ",".join(new_arg)
     #
     try:
         options, args = parser.parse_args()
@@ -154,7 +180,13 @@ def get_options(print_title):
         if not options.which_blast:
             try_this_bin = os.path.join(GO_DEP_PATH, "ncbi-blast", "blastn")
             if os.path.isfile(try_this_bin) and executable(try_this_bin):
-                options.which_blast = os.path.split(try_this_bin)[0]
+                output, err = subprocess.Popen(
+                    try_this_bin + " -version", stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, shell=True).communicate()
+                if "not found" in output.decode("utf8"):
+                    sys.stdout.write(output.decode("utf8") + "\n")
+                else:
+                    options.which_blast = os.path.split(try_this_bin)[0]
         if not executable(os.path.join(options.which_blast, "blastn")):
             sys.stdout.write(os.path.join(options.which_blast, "blastn") + " not accessible!")
             exit()
@@ -231,18 +263,12 @@ def get_options(print_title):
                         options.exclude.append(sub_e)
             else:
                 options.exclude = []
-        elif options.organelle_types == 'embplant_pt':
-            options.include_priority = [os.path.join(NOT_DB_PATH, 'embplant_pt.fasta')]
-            options.exclude = [os.path.join(NOT_DB_PATH, 'embplant_mt.fasta')]
-        elif options.organelle_types == 'embplant_mt':
-            options.include_priority = [os.path.join(NOT_DB_PATH, 'embplant_mt.fasta')]
-            options.exclude = [os.path.join(NOT_DB_PATH, 'embplant_pt.fasta')]
-        # elif options.organelle_types == 'embplant_nr':
-        #     options.include_priority = [os.path.join(NOT_DB_PATH, 'embplant_nr')]
-        # elif options.organelle_types == 'animal_mt':
-        #     options.include_priority = [os.path.join(NOT_DB_PATH, 'animal_mt')]
-        # elif options.organelle_types == 'fungus_mt':
-        #     options.include_priority = [os.path.join(NOT_DB_PATH, 'fungus_mt')]
+        # elif options.organelle_types == 'embplant_pt':
+        #     options.include_priority = [os.path.join(NOT_DB_PATH, 'embplant_pt.fasta')]
+        #     options.exclude = [os.path.join(NOT_DB_PATH, 'embplant_mt.fasta')]
+        # elif options.organelle_types == 'embplant_mt':
+        #     options.include_priority = [os.path.join(NOT_DB_PATH, 'embplant_mt.fasta')]
+        #     options.exclude = [os.path.join(NOT_DB_PATH, 'embplant_pt.fasta')]
         else:
             if options.organelle_types:
                 options.include_priority = []
@@ -256,10 +282,22 @@ def get_options(print_title):
                         exit()
                     else:
                         options.include_priority.append(os.path.join(NOT_DB_PATH, sub_organelle_t + ".fasta"))
+            if options.exclude_organelle_types:
+                options.exclude = []
+                options.exclude_organelle_types = options.exclude_organelle_types.split(",")
+                for sub_organelle_t in options.exclude_organelle_types:
+                    if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt", "fungus_mt"}:
+                        sys.stdout.write(
+                            "\n############################################################################"
+                            "\nERROR: \"-E\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', 'embplant_nr', "
+                            "'animal_mt', 'fungus_mt', or a combination of above split by comma(s)!\n\n")
+                        exit()
+                    else:
+                        options.exclude.append(os.path.join(NOT_DB_PATH, sub_organelle_t + ".fasta"))
         if not len(args):
             sys.stdout.write('\n\nInput Error: you must choose one input fasta or fastg file!\n')
             exit()
-        output_dir = options.out_dir if options.out_dir else os.path.split(args[0])[0]
+        output_dir = options.out_dir if options.out_dir else os.path.realpath(os.path.split(args[0])[0])
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
         if options.out_base:

@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 
-import shutil
-from copy import deepcopy
-from itertools import combinations
-from math import log
-import numpy as np
 import sympy
 import scipy
 try:
@@ -21,6 +16,7 @@ import random
 import subprocess
 import sys
 import os
+from shutil import copyfile
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
 SYSTEM_NAME = ""
@@ -79,15 +75,13 @@ def get_options(description, version):
                            "contingent on the organelle types chosen (-F). "
                            "The default value no longer holds when '--genes' or '--ex-genes' is used.")
     parser.add_option("--ex-genes", dest="exclude_genes",
-                      help="Followed with a customized database (a fasta file or the base name of a "
+                      help="This is optional and Not suggested, since non-target contigs could contribute "
+                           "information for better downstream coverage-based clustering. "
+                           "Followed with a customized database (a fasta file or the base name of a "
                            "blast database) containing or made of protein coding genes "
                            "and ribosomal RNAs extracted from reference genome(s) that you want to exclude. "
-                           "This is optional in all cases. "
                            "Could be a list of databases split by comma(s) but "
                            "NOT required to have the same list length to organelle_type (followed by '-F'). "
-                           "By default, "
-                           "embplant_mt would be excluded for a single organelle mode '-F embplant_pt', "
-                           "embplant_pt would be excluded for a single organelle mode '-F embplant_mt'. "
                            "The default value no longer holds when '--genes' or '--ex-genes' is used.")
     parser.add_option("--no-slim", dest="no_slim", default=False, action="store_true",
                       help="Disable slimming process and directly disentangle the original assembly graph. "
@@ -118,9 +112,9 @@ def get_options(description, version):
                       help="Expected maximum target genome size(s) for disentangling. "
                            "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
                            "with the same list length to organelle_type (followed by '-F'). "
-                           "Default: 200000 (-F embplant_pt), 100000 (-F fungus_mt), "
-                           "25000 (-F embplant_nr/animal_mt), 600000 (-F embplant_mt/other_pt),"
-                           "600000,600000,100000 (-F other_pt,embplant_mt,fungus_mt)")
+                           "Default: 250000 (-F embplant_pt/fungus_mt), 25000 (-F embplant_nr/animal_mt), "
+                           "1000000 (-F embplant_mt/other_pt), "
+                           "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
     parser.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
                       help="Expected minimum target genome size(s) for disentangling. "
                            "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
@@ -182,8 +176,9 @@ def get_options(description, version):
         parser.remove_option("--max-depth")
         parser.add_option("--max-depth", dest="max_depth", default=inf, type=float,
                           help="Maximum depth threshold of contigs. Default: %default.")
-        parser.remove_option("--no-slim", dest="no_slim",
-                             help="Disable the slimming process and directly disentangle the assembly graph.")
+        parser.remove_option("--no-slim")
+        parser.add_option("--no-slim", dest="no_slim",
+                          help="Disable the slimming process and directly disentangle the assembly graph.")
         parser.remove_option("-t")
         parser.add_option("-t", dest="threads", type=int, default=1, help="Maximum threads to use. Default: %default.")
         parser.remove_option("--continue")
@@ -201,16 +196,17 @@ def get_options(description, version):
                                 "plant_mt": "embplant_mt",
                                 "plant_nr": "embplant_nr"}
     for go_arg, candidate_arg in enumerate(sys.argv):
-        if candidate_arg in redirect_organelle_types:
-            sys.argv[go_arg] = redirect_organelle_types[candidate_arg]
-        elif "," in candidate_arg:
-            new_arg = []
-            for sub_arg in candidate_arg.split(","):
-                if sub_arg in redirect_organelle_types:
-                    new_arg.append(redirect_organelle_types[sub_arg])
-                else:
-                    new_arg.append(sub_arg)
-            sys.argv[go_arg] = ",".join(new_arg)
+        if go_arg > 1 and sys.argv[go_arg - 1] in {"-F", "-E"}:
+            if candidate_arg in redirect_organelle_types:
+                sys.argv[go_arg] = redirect_organelle_types[candidate_arg]
+            elif "," in candidate_arg:
+                new_arg = []
+                for sub_arg in candidate_arg.split(","):
+                    if sub_arg in redirect_organelle_types:
+                        new_arg.append(redirect_organelle_types[sub_arg])
+                    else:
+                        new_arg.append(sub_arg)
+                sys.argv[go_arg] = ",".join(new_arg)
     #
     try:
         (options, args) = parser.parse_args()
@@ -271,7 +267,13 @@ def get_options(description, version):
             if not options.which_blast:
                 try_this_bin = os.path.join(GO_DEP_PATH, "ncbi-blast", "blastn")
                 if os.path.isfile(try_this_bin) and executable(try_this_bin):
-                    options.which_blast = os.path.split(try_this_bin)[0]
+                    output, err = subprocess.Popen(
+                        try_this_bin + " -version", stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT, shell=True).communicate()
+                    if "not found" in output.decode("utf8"):
+                        log_handler.warning(output.decode("utf8"))
+                    else:
+                        options.which_blast = os.path.split(try_this_bin)[0]
             if executable(os.path.join(options.which_blast, "blastn")):
                 output, err = subprocess.Popen(
                     os.path.join(options.which_blast, "blastn") + " -version", stdout=subprocess.PIPE,
@@ -342,11 +344,11 @@ def get_options(description, version):
                 if sub_organelle_t == "embplant_pt":
                     options.expected_max_size.append(raw_default_value)
                 elif sub_organelle_t == "embplant_mt":
-                    options.expected_max_size.append(int(raw_default_value * 3))
+                    options.expected_max_size.append(int(raw_default_value * 4))
                 elif sub_organelle_t == "fungus_mt":
-                    options.expected_max_size.append(int(raw_default_value / 2))
+                    options.expected_max_size.append(raw_default_value)
                 elif sub_organelle_t in ("embplant_nr", "animal_mt"):
-                    options.expected_max_size.append(int(raw_default_value / 8))
+                    options.expected_max_size.append(int(raw_default_value / 10))
                 elif sub_organelle_t == "anonym":
                     ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
                     options.expected_max_size.append(10 * sum([len(this_seq) for this_seq in ref_seqs]))
@@ -383,7 +385,7 @@ def get_options(description, version):
         # check slim options
         if options.slim_options.strip():
             slim_op_parts = options.slim_options.split()
-            ban_argv = {"-F": 2, "--min-depth": 2, "--max-depth": 2, "--no-merge": 1,
+            ban_argv = {"-F": 2, "-E": 2, "--min-depth": 2, "--max-depth": 2, "--merge": 1,
                         "--include": 2, "--include-priority": 2, "--exclude": 2, "--exclude-priority": 2,
                         "--no-hits-labeled-tab": 1, "-o": 2, "--prefix": 2, "--out-base": 2, "--log": 1,
                         "--verbose": 1, "--continue": 1, "--no-overwrite": 1, "--which-blast": 2, "-t": 2,
@@ -406,7 +408,8 @@ def get_options(description, version):
 
 
 def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_out_base,
-                       verbose_log, log_handler, threads, which_slim, which_blast="", other_options="", resume=False):
+                       verbose_log, log_handler, threads, which_slim, which_blast="", other_options="",
+                       resume=False, keep_temp=False):
     include_priority_db = []
     exclude_db = []
     if in_custom or ex_custom:
@@ -414,11 +417,14 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_ou
         exclude_db = ex_custom
     else:
         if organelle_types == ["embplant_pt"]:
-            include_priority_db = [os.path.join(NOT_DB_PATH, "embplant_pt.fasta")]
-            exclude_db = [os.path.join(NOT_DB_PATH, "embplant_mt.fasta")]
+            include_priority_db = [os.path.join(NOT_DB_PATH, "embplant_pt.fasta"),
+                                   os.path.join(NOT_DB_PATH, "embplant_mt.fasta")]
         elif organelle_types == ["embplant_mt"]:
-            include_priority_db = [os.path.join(NOT_DB_PATH, "embplant_mt.fasta")]
-            exclude_db = [os.path.join(NOT_DB_PATH, "embplant_pt.fasta")]
+            include_priority_db = [os.path.join(NOT_DB_PATH, "embplant_mt.fasta"),
+                                   os.path.join(NOT_DB_PATH, "embplant_pt.fasta")]
+        # elif organelle_types == ["embplant_mt"]:
+        #     include_priority_db = [os.path.join(NOT_DB_PATH, "embplant_mt.fasta")]
+        #     exclude_db = [os.path.join(NOT_DB_PATH, "embplant_pt.fasta")]
         else:
             include_priority_db = [os.path.join(NOT_DB_PATH, sub_organelle_t + ".fasta")
                                    for sub_organelle_t in organelle_types]
@@ -433,9 +439,10 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_ou
     if exclude_db:
         run_command += " --exclude " + ",".join(exclude_db)
     which_bl_str = " --which-blast " + which_blast if which_blast else ""
-    run_command = os.path.join(which_slim, "slim_fastg.py") + " --no-merge -t " + str(threads) + which_bl_str + \
+    run_command = os.path.join(which_slim, "slim_fastg.py") + " -t " + str(threads) + which_bl_str + \
                   " " + graph_in + " --out-base " + graph_out_base + " " + run_command + " --log " + \
-                  "--verbose " * int(bool(verbose_log)) + "--continue " * int(bool(resume)) + other_options
+                  "--verbose " * int(bool(verbose_log)) + "--continue " * int(bool(resume)) + other_options + \
+                  " --keep-temp" * int(bool(keep_temp))
     # + ' -o ' + out_base + (' --prefix ' + prefix if prefix else "")
     slim_spades = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     if verbose_log:
@@ -465,11 +472,11 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              degenerate_depth=1.5, degenerate_similarity=0.98,
                              expected_max_size=inf, expected_min_size=0, hard_cov_threshold=10.,
                              min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
-                             here_verbose=False, timeout_flag_str="'--disentangle-time-limit'"):
+                             here_verbose=False, timeout_flag_str="'--disentangle-time-limit'", temp_graph=None):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
         def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt", c_d=3., c_s=0.95,
                                deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
-                               max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False):
+                               max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
             if acyclic_allowed_in:
                 log_in.info("Disentangling " + fastg_f + " as contig(s) ... ")
             else:
@@ -494,7 +501,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                                                min_sigma_factor=min_s_f,
                                                                weight_factor=w_f,
                                                                broken_graph_allowed=acyclic_allowed_in,
-                                                               log_handler=log_in, verbose=verbose_in)
+                                                               log_handler=log_in, verbose=verbose_in,
+                                                               temp_graph=in_temp_graph)
             if len(target_results) > 1:
                 log_in.warning(str(len(target_results)) + " sets of graph detected!")
             # log_in.info("Slimming and disentangling graph finished!")
@@ -603,11 +611,13 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
                            hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
                            max_s=expected_max_size, min_s=expected_min_size,
-                           acyclic_allowed_in=here_acyclic_allowed, verbose_in=here_verbose)
+                           acyclic_allowed_in=here_acyclic_allowed, verbose_in=here_verbose, in_temp_graph=temp_graph)
 
     # start
     timeout_flag = "'--disentangle-time-limit'"
     export_succeeded = False
+    path_prefix = os.path.join(out_base, organelle_prefix)
+    graph_temp_file = path_prefix + ".temp.gfa" if options.keep_temp_files else None
     try:
         """disentangle"""
         # if it is the first round (the largest kmer), copy the slimmed result to the main spades output
@@ -615,7 +625,6 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         #     main_spades_folder = os.path.split(kmer_dir)[0]
         #     os.system("cp " + out_fastg + " " + main_spades_folder)
         #     os.system("cp " + out_csv + " " + main_spades_folder)
-        path_prefix = os.path.join(out_base, organelle_prefix)
         disentangle_assembly(fastg_file=slim_out_fg, mode=organelle_type, tab_file=slim_out_csv, output=path_prefix,
                              weight_factor=100, type_factor=options.type_factor, 
                              hard_cov_threshold=options.depth_factor,
@@ -628,13 +637,17 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              here_only_max_c=options.only_keep_max_cov,
                              min_sigma_factor=options.min_sigma_factor,
                              here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
-                             time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag)
+                             time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
+                             temp_graph=graph_temp_file)
         # currently time is not limited for exporting contigs
-    except (ImportError, AttributeError) as e:
+    except ImportError as e:
         log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
         if verbose:
             log_handler.error(str(e))
         return False
+    except AttributeError as e:
+        if verbose:
+            raise e
     except RuntimeError:
         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
     except ProcessingGraphFailed as e:
@@ -647,7 +660,6 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     if not export_succeeded:
         try:
             """disentangle the graph as contig(s)"""
-            path_prefix = os.path.join(out_base, organelle_prefix)
             disentangle_assembly(fastg_file=slim_out_fg, mode=organelle_type, tab_file=slim_out_csv,
                                  output=path_prefix, weight_factor=100, type_factor=options.type_factor, 
                                  here_verbose=verbose, log_dis=log_handler,
@@ -661,7 +673,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  expected_min_size=expected_minimum_size,
                                  min_sigma_factor=options.min_sigma_factor,
                                  here_only_max_c=options.only_keep_max_cov, here_acyclic_allowed=True,
-                                 time_limit=3600, timeout_flag_str=timeout_flag)
+                                 time_limit=3600, timeout_flag_str=timeout_flag,
+                                 temp_graph=graph_temp_file)
         except (ImportError, AttributeError) as e:
             if verbose:
                 log_handler.error(str(e))
@@ -717,12 +730,15 @@ def main():
         if os.path.getsize(options.input_graph) == 0:
             raise Exception("No vertices found in " + options.input_graph + "!")
         processed_graph_file = os.path.join(options.output_base, options.prefix + "initial_assembly_graph.fastg")
-        this_graph = Assembly(options.input_graph, max_cov=options.max_depth, min_cov=options.min_depth)
-        this_graph.write_to_fastg(
-            out_file=processed_graph_file, check_postfix=False, rename_if_needed=True,
-            out_renaming_table=os.path.join(
-                options.output_base, options.prefix + "initial_assembly_graph.vertex_trans.tab"),
-            echo_rename_warning=True, log_handler=log_handler)
+        if options.max_depth != inf or options.min_depth != 0. or options.input_graph.endswith(".gfa"):
+            this_graph = Assembly(options.input_graph, max_cov=options.max_depth, min_cov=options.min_depth)
+            this_graph.write_to_fastg(
+                out_file=processed_graph_file, check_postfix=False, rename_if_needed=True,
+                out_renaming_table=os.path.join(
+                    options.output_base, options.prefix + "initial_assembly_graph.vertex_trans.tab"),
+                echo_rename_warning=True, log_handler=log_handler)
+        else:
+            copyfile(options.input_graph, processed_graph_file)
         log_handler.info("Processing assembly graph finished.\n")
         if os.path.getsize(processed_graph_file) == 0:
             raise Exception("No vertices left in " + processed_graph_file + "! Please adjust the depth range!")
@@ -740,7 +756,7 @@ def main():
                                           log_handler=log_handler, threads=options.threads,
                                           which_blast=options.which_blast,
                                           which_slim=which_slim, other_options=options.slim_options,
-                                          resume=options.script_resume)
+                                          resume=options.script_resume, keep_temp=options.keep_temp_files)
             if run_stat:
                 log_handler.error(run_stat + "\n")
                 exit()

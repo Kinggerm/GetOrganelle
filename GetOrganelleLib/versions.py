@@ -5,6 +5,21 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.2",
+     "features": [
+         "1. get_organelle_from_reads.py: --reduce-reads-for-cov/estimate_maximum_n_reads_using_mapping() added; "
+         "   problem with pre_assembly_mapped_reads_for_base_cov() fixed; "
+         "   better target-hitting base coverage estimation",
+         "2. get_organelle_from_assembly.py: fix a bug on parsing gfa file with long seq head names; "
+         "   --keep-temp fixed; fix a bug with '-h'; ",
+         "3. Utilities/slim_fastg.py: --no-merge -> --merge; disable merge by default",
+         "4. GetOrganelleLib/assembly_parser.py: fix a bug with generating new vertices, "
+         "   as well as merge_all_possible_contigs; export plastome-LSC direction according to convention based on "
+         "   accumulated orf lengths (the conventional reverse direction has more accumulated orf lengths), which "
+         "   makes users easier to use; remove processing_polymorphism() before filter_by_coverage() to better "
+         "   cluster organelle contigs by coverages?",
+         "5. blastn GLIBC_2.14 not found problem fixed",
+     ]},
     {"number": "1.6.1a",
      "features": [
          "1. GetOrganelleLib/SeedDatabase: embplant_pt updated. ",

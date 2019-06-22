@@ -68,6 +68,11 @@ if "--in-situ" in sys.argv:
     sys.argv.remove("--in-situ")
 else:
     in_situ = False
+if "--keep-index" in sys.argv:
+    keep_index = True
+    sys.argv.remove("--keep-index")
+else:
+    keep_index = False
 
 
 def get_recursive_files(target_dir, start_from="", exclude_files=None):
@@ -82,17 +87,18 @@ def get_recursive_files(target_dir, start_from="", exclude_files=None):
 
 
 EXCLUDE_SHARE_SPADES_PATHS = set()
-if os.path.exists(DEP_DIR):
-    if MAJOR_VERSION == 2:
-        for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/joblib3"), DEP_DIR):
-            EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-        for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/pyyaml3"), DEP_DIR):
-            EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-    elif MAJOR_VERSION == 3:
-        for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/joblib2"), DEP_DIR):
-            EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-        for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/pyyaml2"), DEP_DIR):
-            EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
+# do not exclude other version in case some users install it at root with python2 but use it with python3 ...
+# if os.path.exists(DEP_DIR):
+#     if MAJOR_VERSION == 2:
+#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/joblib3"), DEP_DIR):
+#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
+#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/pyyaml3"), DEP_DIR):
+#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
+#     elif MAJOR_VERSION == 3:
+#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/joblib2"), DEP_DIR):
+#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
+#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/pyyaml2"), DEP_DIR):
+#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
 
 
 scripts_to_install = ["get_organelle_from_reads.py",
@@ -257,8 +263,11 @@ if not in_situ:
         install_requires=install_dependencies,
         zip_safe=False
         )
-    os.system("rm -vrf GetOrganelleLib/SeedDatabase/*.index.*.bt2l GetOrganelleLib/LabelDatabase/*.n* "
-              "./build ./dist ./*.pyc ./*.tgz ./*.egg-info")
+    if keep_index:
+        os.system("rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info")
+    else:
+        os.system("rm -vrf GetOrganelleLib/SeedDatabase/*.index.*.bt2l GetOrganelleLib/LabelDatabase/*.n* "
+                  "./build ./dist ./*.pyc ./*.tgz ./*.egg-info")
 else:
     for script_chmod in scripts_to_install:
         os.chmod(script_chmod, 0o755)

@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import re
+import random
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
     python_version = "2.7+"
@@ -32,6 +33,10 @@ else:
 
 def complementary_seqs(input_seq_iter):
     return tuple([complementary_seq(seq) for seq in input_seq_iter])
+
+
+CLASSIC_START_CODONS = {"ATG", "ATC", "ATA", "ATT", "GTG", "TTG"}
+CLASSIC_STOP_CODONS = {"TAA", "TAG", "TGA"}
 
 
 class Sequence(object):
@@ -1041,42 +1046,195 @@ def check_fasta_seq_names(original_fas, new_seed_file, log_handler=None):
             return True
 
 
-def simulate_fq(from_fasta_file, out_base, out_name=None, is_circular=False, sim_read_len=100, sim_read_jump_size=3):
-    if out_name:
-        to_fq_file = os.path.join(out_base, out_name)
+def get_orf_lengths(sequence_string, threshold=200, which_frame=None,
+                    here_stop_codons=None, here_start_codons=None):
+    """
+    :param sequence_string:
+    :param threshold: default: 200
+    :param which_frame: 1, 2, 3, or None
+    :param here_stop_codons: default: CLASSIC_STOP_CODONS
+    :param here_start_codons: default: CLASSIC_START_CODONS
+    :return: [len_orf1, len_orf2, len_orf3 ...] # longest accumulated orfs among all frame choices
+    """
+    assert which_frame in {0, 1, 2, None}
+    if which_frame is None:
+        test_frames = [0, 1, 2]
     else:
-        to_fq_file = os.path.join(out_base, os.path.basename(from_fasta_file[:-5] + "fq"))
-    if not os.path.exists(to_fq_file):
+        test_frames = [which_frame]
+    if here_start_codons is None:
+        here_start_codons = CLASSIC_START_CODONS
+    if here_stop_codons is None:
+        here_stop_codons = CLASSIC_STOP_CODONS
+    orf_lengths = {}
+    for try_frame in test_frames:
+        orf_lengths[try_frame] = []
+        this_start = False
+        for go in range(try_frame, len(sequence_string), 3):
+            if this_start:
+                if sequence_string[go:go + 3] not in here_stop_codons:
+                    orf_lengths[try_frame][-1] += 3
+                else:
+                    if orf_lengths[try_frame][-1] < threshold:
+                        del orf_lengths[try_frame][-1]
+                    this_start = False
+            else:
+                if sequence_string[go:go + 3] in here_start_codons:
+                    orf_lengths[try_frame].append(3)
+                    this_start = True
+                else:
+                    pass
+    return sorted(orf_lengths.values(), key=lambda x: -sum(x))[0]
+
+
+def simulate_fq_simple(
+        from_fasta_file, out_dir, out_name=None, is_circular=False, sim_read_len=100, sim_read_jump_size=None,
+        generate_paired=False, paired_insert_size=300, generate_spot_num=None, generate_depth=None,
+        resume=True):
+    """
+    :param from_fasta_file:
+    :param out_dir:
+    :param out_name:
+    :param is_circular:
+    :param sim_read_len:
+    :param sim_read_jump_size: int; mutually exclusive with generate_spot_num, generate_depth; randomly off
+    :param generate_paired:
+    :param paired_insert_size:
+    :param randomly:
+    :param generate_spot_num: int; mutually exclusive with sim_read_jump_size, generate_depth; randomly on
+    :param generate_depth: int; mutually exclusive with sim_read_jump_size, generate_spot_num; randomly on
+    :param resume: continue
+    :return:
+    """
+    if bool(sim_read_jump_size) + bool(generate_spot_num) + bool(generate_depth) == 0:
+        raise Exception("One of sim_read_jump_size, generate_spot_num, generate_depth must be given!")
+    elif bool(sim_read_jump_size) + bool(generate_spot_num) + bool(generate_depth) > 1:
+        raise Exception("Parameters sim_read_jump_size, generate_spot_num, generate_depth are mutually exclusive!")
+    if out_name:
+        if generate_paired:
+            to_fq_files = [os.path.join(out_dir, out_name + "_1.fq"), os.path.join(out_dir, out_name + "_2.fq")]
+        else:
+            to_fq_files = [os.path.join(out_dir, out_name)]
+    else:
+        if generate_paired:
+            to_fq_files = [os.path.join(out_dir, os.path.basename(from_fasta_file[:-6] + "_1.fq")),
+                           os.path.join(out_dir, os.path.basename(from_fasta_file[:-6] + "_2.fq"))]
+        else:
+            to_fq_files = [os.path.join(out_dir, os.path.basename(from_fasta_file[:-5] + "fq"))]
+    if not (resume and os.path.exists(to_fq_files[-1])):
         count_read = 1
-        with open(to_fq_file + ".Temp", "w") as output_handler:
-            for from_record in SequenceList(from_fasta_file).sequences:
-                from_sequence = from_record.seq
-                if is_circular:
-                    from_sequence += from_sequence[:sim_read_len - 1]
-                for go_base in range(0, len(from_sequence) - sim_read_len + 1, sim_read_jump_size):
-                    output_handler.write("".join(["@", str(count_read), "\n",
-                                                  from_sequence[go_base: go_base + sim_read_len], "\n",
-                                                  "+", str(count_read), "\n",
-                                                  "G" * sim_read_len, "\n"]))
-                    count_read += 1
-        os.rename(to_fq_file + ".Temp", to_fq_file)
+        if generate_paired:
+            if sim_read_jump_size:
+                with open(to_fq_files[0] + ".Temp", "w") as output_handler_1:
+                    with open(to_fq_files[1] + ".Temp", "w") as output_handler_2:
+                        for from_record in SequenceList(from_fasta_file):
+                            from_sequence = from_record.seq
+                            if is_circular:
+                                from_sequence += from_sequence[:paired_insert_size - 1]
+                            from_complement = complementary_seq(from_sequence)
+                            len_seq = len(from_sequence)
+                            for go_base in range(0, len(from_sequence) - paired_insert_size + 1, sim_read_jump_size):
+                                output_handler_1.write("".join(["@", str(count_read), "\n",
+                                                                from_sequence[go_base: go_base + sim_read_len], "\n",
+                                                                "+", str(count_read), "\n",
+                                                                "G" * sim_read_len, "\n"]))
+                                go_base = len_seq - (go_base + paired_insert_size)
+                                output_handler_2.write("".join(["@", str(count_read), "\n",
+                                                                from_complement[go_base: go_base + sim_read_len], "\n",
+                                                                "+", str(count_read), "\n",
+                                                                "G" * sim_read_len, "\n"]))
+                                count_read += 1
+            elif generate_spot_num or generate_depth:
+                records = SequenceList(from_fasta_file)
+                total_len = sum([len(this_r.seq) for this_r in records])
+                if generate_depth:
+                    generate_spot_num = math.ceil(generate_depth * total_len / (sim_read_len * 2))
+                start_ids = []
+                cat_all_seqs = []
+                accumulated_len = 0
+                for from_record in records:
+                    from_sequence = from_record.seq
+                    if is_circular:
+                        from_sequence += from_sequence[:paired_insert_size - 1]
+                    start_ids.extend(
+                        list(range(accumulated_len, accumulated_len + len(from_sequence) - paired_insert_size + 1)))
+                    accumulated_len += len(from_sequence)
+                    cat_all_seqs.append(from_sequence)
+                cat_all_seqs = "".join(cat_all_seqs)
+                cat_all_seqs_rev = complementary_seq(cat_all_seqs)
+                chosen_start_ids = [random.choice(start_ids) for foo in range(generate_spot_num)]
+                with open(to_fq_files[0] + ".Temp", "w") as output_handler_1:
+                    with open(to_fq_files[1] + ".Temp", "w") as output_handler_2:
+                        for go_base in chosen_start_ids:
+                            output_handler_1.write("".join(["@", str(count_read), "\n",
+                                                            cat_all_seqs[go_base: go_base + sim_read_len], "\n",
+                                                            "+", str(count_read), "\n",
+                                                            "G" * sim_read_len, "\n"]))
+                            go_base = accumulated_len - (go_base + paired_insert_size)
+                            output_handler_2.write("".join(["@", str(count_read), "\n",
+                                                            cat_all_seqs_rev[go_base: go_base + sim_read_len], "\n",
+                                                            "+", str(count_read), "\n",
+                                                            "G" * sim_read_len, "\n"]))
+                            count_read += 1
+
+        else:
+            if sim_read_jump_size:
+                with open(to_fq_files[0] + ".Temp", "w") as output_handler:
+                    for from_record in SequenceList(from_fasta_file):
+                        from_sequence = from_record.seq
+                        if is_circular:
+                            from_sequence += from_sequence[:sim_read_len - 1]
+                        for go_base in range(0, len(from_sequence) - sim_read_len + 1, sim_read_jump_size):
+                            output_handler.write("".join(["@", str(count_read), "\n",
+                                                          from_sequence[go_base: go_base + sim_read_len], "\n",
+                                                          "+", str(count_read), "\n",
+                                                          "G" * sim_read_len, "\n"]))
+                            count_read += 1
+            elif generate_spot_num or generate_depth:
+                records = SequenceList(from_fasta_file)
+                total_len = sum([len(this_r.seq) for this_r in records])
+                if generate_depth:
+                    generate_spot_num = math.ceil(generate_depth * total_len/(sim_read_len * 2))
+                start_ids = []
+                cat_all_seqs = []
+                accumulated_len = 0
+                for from_record in records:
+                    from_sequence = from_record.seq
+                    if is_circular:
+                        from_sequence += from_sequence[:sim_read_len - 1]
+                    start_ids.extend(
+                        list(range(accumulated_len, accumulated_len + len(from_sequence) - sim_read_len + 1)))
+                    accumulated_len += len(from_sequence)
+                    cat_all_seqs.append(from_sequence)
+                cat_all_seqs = "".join(cat_all_seqs)
+                chosen_start_ids = [random.choice(start_ids) for foo in range(generate_spot_num)]
+                with open(to_fq_files[0] + ".Temp", "w") as output_handler:
+                    for go_base in chosen_start_ids:
+                        output_handler.write("".join(["@", str(count_read), "\n",
+                                                      cat_all_seqs[go_base: go_base + sim_read_len], "\n",
+                                                      "+", str(count_read), "\n",
+                                                      "G" * sim_read_len, "\n"]))
+                        count_read += 1
+        for to_fq_f in to_fq_files:
+            os.rename(to_fq_f + ".Temp", to_fq_f)
 
 
-def get_read_len_mean_max_count(fq_files, maximum_n_reads, sampling_percent=1.):
+def get_read_len_mean_max_count(fq_or_fq_files, maximum_n_reads, sampling_percent=1.):
+    if type(fq_or_fq_files) is str:
+        fq_or_fq_files = [fq_or_fq_files]
     read_lengths = []
-    all_count = 0
+    all_counts = []
     if sampling_percent == 1:
-        for fq_f in fq_files:
+        for fq_f in fq_or_fq_files:
             count_r = 0
             for seq in fq_simple_generator(fq_f):
                 count_r += 1
                 read_lengths.append(len(seq.strip("N")))
                 if count_r >= maximum_n_reads:
                     break
-            all_count += count_r
+            all_counts.append(count_r)
     else:
         sampling_percent = int(1 / sampling_percent)
-        for fq_f in fq_files:
+        for fq_f in fq_or_fq_files:
             count_r = 0
             for seq in fq_simple_generator(fq_f):
                 count_r += 1
@@ -1084,23 +1242,35 @@ def get_read_len_mean_max_count(fq_files, maximum_n_reads, sampling_percent=1.):
                     read_lengths.append(len(seq.strip("N")))
                 if count_r >= maximum_n_reads:
                     break
-            all_count += count_r
-    return sum(read_lengths)/len(read_lengths), max(read_lengths), all_count
+            all_counts.append(count_r)
+    return sum(read_lengths)/len(read_lengths), max(read_lengths), all_counts
 
 
 def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_handler,
-                          maximum_ignore_percent=0.05, sampling_percent=0.1):
-    sampling_percent = int(1 / sampling_percent)
-    all_quality_chars_list = []
-    for fq_f in fq_files:
-        count_r = 0
-        this_fq_generator = fq_simple_generator(fq_f, go_to_line=3)
-        for quality_str in this_fq_generator:
-            if count_r % sampling_percent == 0:
+                          maximum_ignore_percent=0.05, sampling_percent=1.):
+    if sampling_percent < 1.:
+        sampling_percent = int(1 / sampling_percent)
+        all_quality_chars_list = []
+        for fq_f in fq_files:
+            count_r = 0
+            this_fq_generator = fq_simple_generator(fq_f, go_to_line=3)
+            for quality_str in this_fq_generator:
+                if count_r % sampling_percent == 0:
+                    all_quality_chars_list.append(quality_str)
+                count_r += 1
+                if count_r >= maximum_n_reads:
+                    break
+    else:
+        #  sampling_top_n_reads
+        all_quality_chars_list = []
+        for fq_f in fq_files:
+            count_r = 0
+            this_fq_generator = fq_simple_generator(fq_f, go_to_line=3)
+            for quality_str in this_fq_generator:
                 all_quality_chars_list.append(quality_str)
-            count_r += 1
-            if count_r >= maximum_n_reads:
-                break
+                count_r += 1
+                if count_r >= maximum_n_reads:
+                    break
     all_quality_chars = "".join(all_quality_chars_list)
     len_quality_chars_total = float(len(all_quality_chars))
     max_quality = max(all_quality_chars)
@@ -1120,7 +1290,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_hand
     if max_quality > the_c_max:
         log_handler.warning("Max quality score " + repr(chr(max_quality)) +
                             "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
-                            ") in your fastq file exceeds the usual boundary " + str((the_c_min, the_c_max)))
+                            ") in your fastq file exceeds the usual range " + str((the_c_min, the_c_max)))
     if min_quality < the_c_min:
         log_handler.warning("Min quality score " + repr(chr(min_quality)) +
                             "(" + str(min_quality) + ":" + str(min_quality - the_c_min + the_s_min) +

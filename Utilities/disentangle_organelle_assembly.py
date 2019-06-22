@@ -77,7 +77,14 @@ def get_options(print_title):
     options, argv = parser.parse_args()
     if (options.fastg_file is None) or (options.tab_file is None) or (options.output_directory is None) \
             or (options.mode is None):
-        parser.print_help()
+        if options.fastg_file is None:
+            sys.stdout.write("Missing option \"-g\"!\n")
+        if options.tab_file is None:
+            sys.stdout.write("Missing option \"-t\"!\n")
+        if options.output_directory is None:
+            sys.stdout.write("Missing option \"-o\"!\n")
+        if options.mode is None:
+            sys.stdout.write("Missing option \"-F\"!\n")
         sys.stdout.write("Insufficient arguments!\n")
         sys.exit()
     else:
@@ -231,6 +238,8 @@ def main():
         log_handler = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
 
         log_handler.info('\nTotal cost: ' + str(round(time.time() - time0, 4)) + 's\n')
+    except FileNotFoundError as e:
+        raise e
     except Exception as e:
         if options.debug:
             log_handler.exception("")

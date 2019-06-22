@@ -34,9 +34,11 @@ There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is
 
 Execute following curl commands to download suitable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into a specified directory.
 
-    # To dowload GetOrganelle using curl and decompress it. Supposing your system is linux, otherwise change the 'linux' into 'macOS'; Supposing you download GetOrganelle to ~/Downloads
+    # To dowload GetOrganelle using curl and decompress it. 
+    # Supposing your system is linux, otherwise change the 'linux' into 'macOS'; 
+    # Supposing you download GetOrganelle to ~/Downloads
     cd ~/Downloads
-    curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.0/v1.6.0-linux.tar.gz | tar zx
+    curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2/v1.6.2-linux.tar.gz | tar zx
     
 install [pip](https://pip.pypa.io/en/stable/installing/) and then install downloaded GetOrganelle with pip.
 
@@ -45,10 +47,9 @@ install [pip](https://pip.pypa.io/en/stable/installing/) and then install downlo
     python get-pip.py
     
     # install GetOrganelle; add the option "--user" after "install" to install for current user
-    cd GetOrganelle
-    pip install .
+    pip install ./GetOrganelle
     
-Alternatively, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `python setup.py install`. 
+Alternatively, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `cd GetOrganelle && python setup.py install`. 
     
 For some fresh linux systems, after above commands you still cannot execute `get_organelle_from_reads.py` in a new terminal directly, meaning `~/.local/bin` was not added to the $PATH, you have to manually add `~/.local/bin` by executing `echo "PATH=~/.local/bin:\$PATH" >> ~/.bashrc`. For fresh MacOS environment with similar situation, for example, if you installed GetOrganelle with `Python 3.6` and find scripts not in the $PATH, please execute `echo "PATH=/Library/Frameworks/Python.framework/Versions/3.6/bin:\$PATH" >> ~/.bash_profile`.
     
@@ -89,19 +90,7 @@ At last, install python libraries numpy, scipy, and sympy using [pip](https://pi
 
 You are always recommended to use the latest GetOrganelle, although you could find many old versions of GetOrganelle [here](https://github.com/Kinggerm/GetOrganelle/releases).
 
-1. If you follow the way of `Using the setup.py`, you could uninstall previous version by:
-
-        pip uninstall GetOrganelle
-    
-    you could alternatively use `cd ~/Downloads/GetOrganelle && python setup.py install --record install.txt && cat install.txt | xargs rm -rf` without pip.
-    To install the latest version according the way of `Using the setup.py`:
-        
-        # if you previously used curl or the manual way to download GetOrganelle, then re-download them
-        cd ~/Downloads
-        curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.0/v1.6.0-linux.tar.gz | tar zx
-        pip install .
-    
-    alternatively if you used git to clone the repository and had not removed it, it would be easier to keep updated with `cd ~/Downloads/GetOrganelle && git pull && pip install .`
+1. If you follow the way of `Using the setup.py`, to update, just do the same thing as the installation process.
 
 2. If you follow the way of `In situ configuration` with git, go to the directory where you cloned GetOrganelle:
     
@@ -113,7 +102,7 @@ You are always recommended to use the latest GetOrganelle, although you could fi
 
 ### Required Dependencies
 
-Since v1.6, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `python setup.py install`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.0/v1.6.0-light.tar.gz) upon installing GetOrganelle. 
+Since v1.6*, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `pip install ./GetOrganelle`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2/v1.6.2-light.tar.gz) upon installing GetOrganelle. 
 
 Besides, no worries about interference from GetOrganelle's dependencies. Because during the installing process mentioned above, GetOrganelle would add those dependencies (SPAdes, Bowtie2, BLAST+) to the GetOrganelle-*.egg rather than to the $PATH, thereby not influence your own usage. For example, if you already installed SPAdes v3.6.2, after installing GetOrganelle, the spades version for your system would still be v3.6.2, while only GetOrganelle uses the [version in GetOrganelleDep](https://github.com/Kinggerm/GetOrganelle/blob/master/GetOrganelleDep/linux/SPAdes/share/spades/VERSION). 
 
@@ -132,7 +121,7 @@ If you installed python library psutil (pip install psutil), the memory cost of 
 
 <b>Preparing Data</b>
 
-Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz). 1G per end is enough for plastome for most normal angiosperm samples, and 5G per end is enough for mitochondria data. You could simply assign a maximum number of reads (number of seqs, not number of bases) for GetOrganelle to use with flag `--max-reads` or manually cut raw data into certain size before running GetOrganelle using the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`). 
+Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz). 1G per end is enough for plastome for most normal angiosperm samples, and 5G per end is enough for mitochondria data. You could simply assign a maximum number of reads (number of seqs, not number of bases) for GetOrganelle to use with flag `--max-reads` (Default value: 1.5E7 for "-F embplant_pt/embplant_nr/fungus_mt"; 7.5E7 for "-F embplant_mt/animal_mt/other_pt/anonym"; 3E8 for "-F animal_mt") or manually cut raw data into certain size before running GetOrganelle using the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`). 
 
 <b>Filtering and Assembly</b>
 
@@ -140,11 +129,11 @@ Take your input seed (fasta; the default is `GetOrganelleLib/SeedDatabase/*.fast
 
 <b>Producing Result</b>
 
-By default, SPAdes is automatically called to produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-del_embplant_mt.fastg` if -F embplant_pt been used) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-del_embplant_mt.csv`). 
+By default, SPAdes is automatically called to produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` if "-F embplant_pt" been used by get_organelle_from_reads.py) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`). 
 
-The `assembly_graph.fastg.extend_embplant_pt-del_embplant_mt.fastg` file along with the `assembly_graph.fastg.extend_embplant_pt-del_embplant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. 
+The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. 
 
-Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend_embplant_pt-del_embplant_mt.fastg` and load the `assembly_graph.fastg.extend_embplant_pt-del_embplant_mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. 
+Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` and load the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` in Bandage, choose the best path(s) as the <b>final result</b>. You could execute `slim_fastg.py -F embplant_pt -E embplant_mt assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` to further remove mitogenome contigs for this easier visualization and manual completion.
 [Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to manually extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
 
 
@@ -160,23 +149,23 @@ or in a draft way:
 
 or in a slow and memory-economic way:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s cp_seed.fasta -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save  -a mitochondria.fasta
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save
 
 To assembly Embryophyta plant mitochondria (usually you need more than 5G raw data):
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s mt_seed.fasta -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt 
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt
     
 To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 5 -k 35,85,115 -F embplant_nr
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 7 -k 35,85,115 -F embplant_nr
 
-To assembly fungus mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
+To assembly fungus mitochondria:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_seed.fasta --genes fungus_mt_genes.fasta -R 7 -k 21,45,65,85,105 -F fungus_mt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_seed.fasta --genes fungus_mt_genes.fasta -R 10 -k 21,45,65,85,105 -F fungus_mt
 
-To assembly animal mitochondria (currently only tested on limited samples, suggested parameters might not be the best)
+To assembly animal mitochondria:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_seed.fasta --genes animal_mt_genes.fasta -R 5 -k 21,45,65,85,105 -F animal_mt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_seed.fasta --genes animal_mt_genes.fasta -R 10 -k 21,45,65,85,105 -F animal_mt
 
 See a brief illustrations of those arguments by typing in:
 

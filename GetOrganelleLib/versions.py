@@ -17,8 +17,9 @@ versions = [
          "   as well as merge_all_possible_contigs; export plastome-LSC direction according to convention based on "
          "   accumulated orf lengths (the conventional reverse direction has more accumulated orf lengths), which "
          "   makes users easier to use; remove processing_polymorphism() before filter_by_coverage() to better "
-         "   cluster organelle contigs by coverages?",
+         "   cluster organelle contigs by coverages",
          "5. blastn GLIBC_2.14 not found problem fixed",
+         "6. '-F embplant_pt' does not remove embplant_mt-hitting contigs, which makes more accurate clustering",
      ]},
     {"number": "1.6.1a",
      "features": [

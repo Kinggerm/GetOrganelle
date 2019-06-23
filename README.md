@@ -35,7 +35,7 @@ There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is
 Execute following curl commands to download suitable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into a specified directory.
 
     # To dowload GetOrganelle using curl and decompress it. 
-    # Supposing your system is linux, otherwise change the 'linux' into 'macOS'; 
+    # Supposing your system is linux, otherwise change the 'linux' into 'macOS'; If you do not need the attached dependency, change 'linux' into 'light';
     # Supposing you download GetOrganelle to ~/Downloads
     cd ~/Downloads
     curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2/v1.6.2-linux.tar.gz | tar zx

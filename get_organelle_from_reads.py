@@ -257,6 +257,9 @@ def get_options(description, version):
     group_assembly.add_option("--gradient-k", dest="auto_gradient_k", action="store_true", default=False,
                               help="Automatically adding an extra set of kmer values according to word size. "
                                    "Default: %default")
+    group_assembly.add_option("--ignore-k", dest="ignore_kmer_res", default=40, type=int,
+                              help="A kmer threshold below which, no slimming/disentangling would be executed"
+                                   " on the result. Default: %default")
     group_assembly.add_option("--genes", dest="genes_fasta",
                               help="Followed with a customized database (a fasta file or the base name of a "
                                    "blast database) containing or made of ONE set of protein coding genes "
@@ -372,7 +375,7 @@ def get_options(description, version):
                                "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
                                "-J", "-M", "--bowtie2-options",
                                "--larger-auto-ws", "--target-genome-size", "--spades-options", "--no-spades",
-                               "--gradient-k", "--genes", "--ex-genes", "--disentangle-df",
+                               "--gradient-k", "--ignore-k", "--genes", "--ex-genes", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
                                "--expected-max-size", "--expected-min-size",
@@ -3034,7 +3037,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         return True
 
 
-def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output,
+def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ignore_kmer_res,
                        verbose_log, log_handler, threads, which_blast="", resume=False, keep_temp=False):
     if executable(os.path.join(UTILITY_PATH, "slim_fastg.py")):
         which_slim = UTILITY_PATH
@@ -3081,7 +3084,8 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output,
                           and kmer_d.startswith("K")
                           and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
                          reverse=True)
-    kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_values]
+    kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val))
+                 for kmer_val in kmer_values if kmer_val > ignore_kmer_res]
     in_ex_info = generate_in_ex_info_name(include_indices=include_priority_db, exclude_indices=exclude_db)
     for kmer_dir in kmer_dirs:
         graph_file = os.path.join(kmer_dir, "assembly_graph.fastg")
@@ -3144,8 +3148,9 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
     return True
 
 
-def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_prefix, organelle_type, read_len_for_log,
-                             verbose, log_handler, basic_prefix, expected_maximum_size, expected_minimum_size, options):
+def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_fg, organelle_prefix,
+                             organelle_type, read_len_for_log, verbose, log_handler, basic_prefix,
+                             expected_maximum_size, expected_minimum_size, options):
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
                              mode="embplant_pt", contamination_depth=3., contamination_similarity=0.95, degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=0.98,
@@ -3296,13 +3301,14 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
                            acyclic_allowed_in=here_acyclic_allowed, verbose_in=here_verbose, in_temp_graph=temp_graph)
 
     # start
-    kmer_vals = sorted([int(kmer_d[1:])
+    kmer_values = sorted([int(kmer_d[1:])
                         for kmer_d in os.listdir(spades_output)
                         if os.path.isdir(os.path.join(spades_output, kmer_d))
                         and kmer_d.startswith("K")
                         and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
                        reverse=True)
-    kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_vals]
+    kmer_values = [kmer_val for kmer_val in kmer_values if kmer_val > ignore_kmer_res]
+    kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_values]
     timeout_flag = "'--disentangle-time-limit'"
     export_succeeded = False
     path_prefix = os.path.join(out_base, organelle_prefix)
@@ -3389,9 +3395,9 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
                         out_csv = out_fastg[:-5] + "csv"
                         log_handler.info("Please ...")
                         log_handler.info("load the graph file '" + os.path.basename(out_fastg) +
-                                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_values]))
                         log_handler.info("load the CSV file '" + os.path.basename(out_csv) +
-                                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                                         "' in " + ",".join(["K" + str(k_val) for k_val in kmer_values]))
                         log_handler.info("visualize and confirm the incomplete result in Bandage.")
                         # log.info("-------------------------------------------------------")
                         log_handler.info("If the result is nearly complete, ")
@@ -3406,9 +3412,9 @@ def extract_organelle_genome(out_base, spades_output, slim_out_fg, organelle_pre
                 out_csv = out_fastg[:-5] + "csv"
                 log_handler.info("Please ...")
                 log_handler.info("load the graph file '" + os.path.basename(out_fastg) + ",assembly_graph.fastg" +
-                                 "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                                 "' in " + ",".join(["K" + str(k_val) for k_val in kmer_values]))
                 log_handler.info("load the CSV file '" + os.path.basename(out_csv) +
-                                 "' in " + ",".join(["K" + str(k_val) for k_val in kmer_vals]))
+                                 "' in " + ",".join(["K" + str(k_val) for k_val in kmer_values]))
                 log_handler.info("visualize and export your result in Bandage.")
                 log_handler.info("If you have questions for us, please provide us with the get_org.log.txt file "
                                  "and the graph in the format you like!")
@@ -3750,7 +3756,7 @@ def main():
             log_handler.info("Slimming assembly graphs ...")
             slim_stat_list = slim_spades_result(organelle_types=options.organelle_type,
                                                 in_custom=options.genes_fasta, ex_custom=options.exclude_genes,
-                                                spades_output=spades_output,
+                                                spades_output=spades_output, ignore_kmer_res=options.ignore_kmer_res,
                                                 verbose_log=options.verbose_log, log_handler=log_handler,
                                                 threads=options.threads, which_blast=options.which_blast,
                                                 resume=options.script_resume, keep_temp=options.keep_temp_files)
@@ -3784,6 +3790,7 @@ def main():
                         # log_handler.info("Parsing assembly graph and outputting ...")
                         log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ...")
                         ext_res = extract_organelle_genome(out_base=out_base, spades_output=spades_output,
+                                                           ignore_kmer_res=options.ignore_kmer_res,
                                                            slim_out_fg=slim_fastg_file, organelle_prefix=og_prefix,
                                                            organelle_type=sub_organelle_type,
                                                            read_len_for_log=mean_read_len,

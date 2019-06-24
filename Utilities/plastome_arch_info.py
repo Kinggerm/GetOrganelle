@@ -26,7 +26,7 @@ def get_options():
     else:
         for f in argv:
             if not os.path.isfile(f):
-                raise FileNotFoundError(f + " not found/valid!")
+                raise IOError(f + " not found/valid!")
         options.valid_bases = set(list(options.valid_bases))
         return options, argv
 

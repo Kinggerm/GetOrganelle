@@ -3349,6 +3349,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 log_handler.info("Disentangling failed: " + str(e).strip())
             except Exception as e:
                 log_handler.exception("")
+                sys.exit()
             else:
                 export_succeeded = True
                 break

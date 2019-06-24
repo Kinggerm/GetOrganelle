@@ -60,9 +60,9 @@ GUESSING_FQ_SEQ_INFLATE_TO_FILE = 3.22
 SUPPORTED_ORGANELLE_TYPES = ["embplant_pt", "embplant_mt", "embplant_nr", "other_pt", "animal_mt", "fungus_mt"]
 ORGANELLE_EXPECTED_GRAPH_SIZES = {"embplant_pt": 130000,
                                   "embplant_mt": 390000,
-                                  "embplant_nr":13000,
-                                  "other_pt":39000,
-                                  "animal_mt":13000,
+                                  "embplant_nr": 13000,
+                                  "other_pt": 39000,
+                                  "animal_mt": 13000,
                                   "fungus_mt": 65000}
 
 
@@ -211,7 +211,7 @@ def get_options(description, version):
                                     "produce a relative larger W, which would speed up the matching in extending, "
                                     "reduce the memory cost in extending, but increase the risk of broken final "
                                     "graph. Suggested when the data is good with high and homogenous coverage.")
-    mixed_organelles = ("embplant_nr", "embplant_mt", "fungus_mt")
+    mixed_organelles = ("other_pt", "embplant_mt", "fungus_mt")
     group_extending.add_option("--target-genome-size", dest="target_genome_size", default='130000', type=str,
                                help="Hypothetical value(s) of target genome size. This is only used for estimating "
                                     "word size when no '-w word_size' is given. "
@@ -756,7 +756,7 @@ def get_options(description, version):
             for got_t, sub_organelle_t in enumerate(options.organelle_type):
                 if sub_organelle_t == "embplant_pt":
                     options.expected_max_size.append(raw_default_value)
-                elif sub_organelle_t == "embplant_mt":
+                elif sub_organelle_t in ("embplant_mt", "other_pt"):
                     options.expected_max_size.append(int(raw_default_value * 4))
                 elif sub_organelle_t == "fungus_mt":
                     options.expected_max_size.append(raw_default_value)

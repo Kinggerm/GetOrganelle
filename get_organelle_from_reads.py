@@ -3348,7 +3348,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
             except ProcessingGraphFailed as e:
                 log_handler.info("Disentangling failed: " + str(e).strip())
             except Exception as e:
-                raise e
+                log_handler.exception("")
             else:
                 export_succeeded = True
                 break
@@ -3807,6 +3807,8 @@ def main():
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
         log_handler.info("Thank you!")
+    # except SystemExit:
+    #     pass
     except:
         log_handler.exception("")
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")

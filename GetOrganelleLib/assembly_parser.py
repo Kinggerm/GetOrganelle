@@ -833,7 +833,7 @@ class Assembly(object):
 
         # reduce maximum_copy_num to reduce computational burden
         all_coverages = [self.vertex_info[v_name].cov for v_name in vertices_list]
-        maximum_copy_num = min(maximum_copy_num, 2 * math.ceil(max(all_coverages) / min(all_coverages)))
+        maximum_copy_num = min(maximum_copy_num, int(2 * math.ceil(max(all_coverages) / min(all_coverages))))
         if verbose:
             if log_handler:
                 log_handler.info("Maximum multiplicity: " + str(maximum_copy_num))

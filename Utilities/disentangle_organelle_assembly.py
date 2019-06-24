@@ -238,14 +238,23 @@ def main():
         log_handler = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
 
         log_handler.info('\nTotal cost: ' + str(round(time.time() - time0, 4)) + 's\n')
-    except FileNotFoundError as e:
+    except IOError as e:
         raise e
-    except Exception as e:
-        if options.debug:
-            log_handler.exception("")
+    except KeyError as e:
+        if str(e).strip("'") == options.mode:
+            log_handler.error(options.mode + " not found in " + str(options.tab_file) + "!")
+            log_handler.error("Disentangling failed!")
         else:
             log_handler.exception(str(e))
-        log_handler.exception("Disentangling failed!")
+            log_handler.error("Disentangling failed!")
+            if not options.acyclic_allowed:
+                log_handler.info("You might try again with '--linear' to export contig(s) instead of circular genome.")
+            log_handler = simple_log(log_handler, options.output_directory, options.prefix + ".disentangle.")
+            log_handler.info("\nTotal cost " + str(time.time() - time0))
+            log_handler.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")
+    except Exception as e:
+        log_handler.exception(str(e))
+        log_handler.error("Disentangling failed!")
         if not options.acyclic_allowed:
             log_handler.info("You might try again with '--linear' to export contig(s) instead of circular genome.")
         log_handler = simple_log(log_handler, options.output_directory, options.prefix + ".disentangle.")

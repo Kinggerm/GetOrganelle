@@ -1331,6 +1331,8 @@ class Assembly(object):
             log_handler.info("Labels: " + str(labels))
         elif verbose or debug:
             sys.stdout.write("Labels: " + str(labels) + "\n")
+
+        # 1
         selected_label_type = list(
             set([lb for go, lb in enumerate(labels) if vertices[go] in self.tagged_vertices[mode]]))
         if len(selected_label_type) > 1:
@@ -1370,6 +1372,29 @@ class Assembly(object):
                 sys.stdout.write("\t".join(["Mu" + str(go) + ":" + str(parameters[lab_tp]["mu"]) +
                                             " Sigma" + str(go) + ":" + str(parameters[lab_tp]["sigma"])
                                             for go, lab_tp in enumerate(remained_label_type)]) + "\n")
+
+        # 2
+        # exclude_label_type = set()
+        # if len(tag_kinds) > 1:
+        #     for go_l, this_label in enumerate(labels):
+        #         for this_tag in tag_kinds[1:]:
+        #             if vertices[go_l] in self.tagged_vertices[this_tag]:
+        #                 exclude_label_type.add(this_label)
+        #                 break
+        # exclude_label_type = sorted(exclude_label_type)
+        # if exclude_label_type:
+        #     check_ex = 0
+        #     while check_ex < len(exclude_label_type):
+        #         if exclude_label_type[check_ex] in remained_label_type:
+        #             if debug or verbose:
+        #                 if log_handler:
+        #                     log_handler.info("label " + str(exclude_label_type[check_ex]) + " kept")
+        #                 else:
+        #                     sys.stdout.write("label " + str(exclude_label_type[check_ex]) + " kept\n")
+        #             del exclude_label_type[check_ex]
+        #         else:
+        #             check_ex += 1
+
         candidate_dropping_label_type = {l_t: inf for l_t in set(range(cluster_num)) - remained_label_type}
         for lab_tp in candidate_dropping_label_type:
             check_mu = parameters[lab_tp]["mu"]
@@ -1380,18 +1405,19 @@ class Assembly(object):
                 this_dist = abs(rem_mu - check_mu) - 2 * (check_sigma + rem_sigma)
                 candidate_dropping_label_type[lab_tp] = min(candidate_dropping_label_type[lab_tp], this_dist)
         dropping_type = sorted(candidate_dropping_label_type, key=lambda x: -candidate_dropping_label_type[x])
+        drop_num = max(len(tag_kinds) - 1, 1)
         dropping_type = dropping_type[:drop_num]
         if debug or verbose:
             if log_handler:
                 for lab_tp in dropping_type:
                     if candidate_dropping_label_type[lab_tp] < 0:
-                        log_handler.warning("Distinguishable vertices "
+                        log_handler.warning("Indistinguishable vertices "
                                             + str([vertices[go] for go in np.where(labels == lab_tp)[0]])
                                             + " removed!")
             else:
                 for lab_tp in dropping_type:
                     if candidate_dropping_label_type[lab_tp] < 0:
-                        sys.stdout.write("Warning: distinguishable vertices "
+                        sys.stdout.write("Warning: indistinguishable vertices "
                                          + str([vertices[go] for go in np.where(labels == lab_tp)[0]])
                                          + " removed!\n")
         vertices_to_del = {vertices[go] for go, lb in enumerate(labels) if lb in set(dropping_type)}
@@ -1404,6 +1430,20 @@ class Assembly(object):
                     sys.stdout.write("removing outlying coverage contigs: " + str(vertices_to_del) + "\n")
             self.remove_vertex(vertices_to_del)
         return changed, [(parameters[lab_tp]["mu"], parameters[lab_tp]["sigma"]) for lab_tp in remained_label_type]
+
+    def exclude_other_hits(self, mode):
+        vertices_to_exclude = []
+        for vertex_name in self.vertex_info:
+            if "tags" in self.vertex_info[vertex_name].other_attr:
+                if mode in self.vertex_info[vertex_name].other_attr["tags"]:
+                    pass
+                elif self.vertex_info[vertex_name].other_attr["tags"]:
+                    vertices_to_exclude.append(vertex_name)
+        if vertices_to_exclude:
+            self.remove_vertex(vertices_to_exclude)
+            return True
+        else:
+            return False
 
     def generate_consensus_vertex(self, vertices, directions, copy_tags=True, check_parallel_vertices=True,
                                   log_handler=None):
@@ -1810,9 +1850,13 @@ class Assembly(object):
                                     log_handler.info("tagged coverage: " +
                                                      str(["%.1f" % new_assembly.vertex_info[log_v].cov
                                                           for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
-                            new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
-                                                                        log_handler=log_handler, verbose=verbose, mode=mode)
+                            new_assembly.estimate_copy_and_depth_by_cov(
+                                new_assembly.tagged_vertices[mode], debug=debug, log_handler=log_handler,
+                                verbose=verbose, mode=mode)
                             first_round = False
+
+                        if new_assembly.exclude_other_hits(mode=mode):
+                            changed = True
 
                         cluster_trimmed = False
 

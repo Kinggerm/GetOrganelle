@@ -192,7 +192,7 @@ def main():
         y_values_list = []
         for i in range(len_round):
             ref_bowtie = sorted(results_to_draw[i].keys())[0]
-            y_values_list.append([results_to_draw[i][ref_bowtie].get(site_here, 0) for site_here in x_values])
+            y_values_list.append([results_to_draw[i][ref_bowtie][site_here-1] for site_here in x_values])
             y_values_list[-1] = [sum(y_values_list[-1][n:n + width]) / float(len(y_values_list[-1][n:n + width]))
                                  for n in range(0, len(y_values_list[-1]), width)]
         if options.max_cov_tick:

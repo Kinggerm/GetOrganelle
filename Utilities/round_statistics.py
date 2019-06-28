@@ -4,6 +4,7 @@ from optparse import OptionParser
 import os
 import sys
 from math import ceil
+from shutil import copyfile
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 import GetOrganelleLib
@@ -127,6 +128,8 @@ def main():
             break
         real_fq = real_fq_files[go_to]
         bowtie_base = os.path.join(out_base, fq_pairs[0].replace("_1.fq", ""))
+        seed_file = os.path.join(out_base, os.path.basename(options.fasta))
+        copyfile(options.fasta, seed_file)
         map_with_bowtie2(seed_file=options.fasta, original_fq_files=real_fq, bowtie_out=bowtie_base,
                          resume=options.resume, threads=options.threads, random_seed=options.random_seed,
                          which_bowtie2=options.which_bowtie2,
@@ -147,7 +150,7 @@ def main():
                 if ref not in all_coverages:
                     all_coverages[ref] = list(this_coverages[ref])
                 else:
-                    for go_s, site_cov in this_coverages[ref]:
+                    for go_s, site_cov in enumerate(this_coverages[ref]):
                         all_coverages[ref][go_s] += site_cov
             ref_bowtie = sorted(all_coverages.keys())[0]
             for threshold in thresholds:

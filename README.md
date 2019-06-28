@@ -7,7 +7,7 @@ This toolkit assemblies organelle genome from genomic skimming data.
 
 Please denote the versions of GetOrganelle as well as the dependencies in your manuscript for reproducible science.
 
-<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: an easy and fast toolkit for de novo assembly of accurate organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/14/256479)
+<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/14/256479)
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -26,13 +26,13 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation
 
-This toolkit was written in python 3.5.1, but compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is generally more efficient under Python 3.*.
+This toolkit was currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is generally more efficient under Python 3.*.
 
 There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is the way with GetOrganelleLib installed in the $PYTHONPATH ; 2) `In situ configuration` is the classic and heavy way, but easier to keep updated.
 
 ### Using the setup.py
 
-Execute following curl commands to download suitable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into a specified directory.
+Execute following curl commands to download suitable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into the installation directory.
 
     # To dowload GetOrganelle using curl and decompress it. 
     # Supposing your system is linux, otherwise change the 'linux' into 'macOS'; If you do not need the attached dependency, change 'linux' into 'light';
@@ -68,7 +68,7 @@ use following commands to make GetOrganelle scripts executable; and make blast-d
     cd GetOrganelle
     python setup.py --in-situ
 
-add GetOrganelle to the $PATH.
+add GetOrganelle and GetOrganelle/Utilities to the $PATH.
     
     # for Linux
     echo "PATH=$GetOrganellePATH/GetOrganelle:\$PATH" >> ~/.bashrc

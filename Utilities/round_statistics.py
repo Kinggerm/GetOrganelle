@@ -130,7 +130,7 @@ def main():
         bowtie_base = os.path.join(out_base, fq_pairs[0].replace("_1.fq", ""))
         seed_file = os.path.join(out_base, os.path.basename(options.fasta))
         copyfile(options.fasta, seed_file)
-        map_with_bowtie2(seed_file=options.fasta, original_fq_files=real_fq, bowtie_out=bowtie_base,
+        map_with_bowtie2(seed_file=seed_file, original_fq_files=real_fq, bowtie_out=bowtie_base,
                          resume=options.resume, threads=options.threads, random_seed=options.random_seed,
                          which_bowtie2=options.which_bowtie2,
                          silent=True, log_handler=log_handler, generate_fq=True, bowtie2_mode="--very-fast-local")

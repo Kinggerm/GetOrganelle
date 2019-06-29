@@ -904,8 +904,9 @@ def estimate_maximum_n_reads_using_mapping(
     original_fq_sizes = [os.path.getsize(raw_fq) * GUESSING_FQ_GZIP_COMPRESSING_RATIO
                          if raw_fq.endswith(".gz") else os.path.getsize(raw_fq)
                          for raw_fq in original_fq_list]
-    # make paired equal size
-    if reads_paired and abs(log(original_fq_sizes[0]/original_fq_sizes[1])) < log(1.3):
+    # make paired equal size estimation if compressed
+    if reads_paired and original_fq_list[0].endswith(".gz") and original_fq_list[1].endswith(".gz") and \
+            abs(log(float(original_fq_sizes[0])/original_fq_sizes[1])) < log(1.3):
         original_fq_sizes[0] = original_fq_sizes[1] = (original_fq_sizes[0] + original_fq_sizes[1]) /2.
     # if the original data sizes is too small, no need to reduce
     max_organelle_base_percent = 0.2
@@ -3766,7 +3767,7 @@ def main():
             if set(slim_stat_codes) == {2}:
                 log_handler.warning("No target organelle contigs found!")
                 log_handler.warning("This might due to unreasonable seed/parameter choices or a bug.")
-                log_handler.info("Please email phylojin@163.com or jinjianjun@mail.kib.ac.cn "
+                log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com "
                                  "with the get_org.log.txt file.\n")
             elif 0 in slim_stat_codes:
                 log_handler.info("Slimming assembly graphs finished\n")
@@ -3814,7 +3815,7 @@ def main():
         log_handler.exception("")
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("Please email phylojin@163.com or jinjianjun@mail.kib.ac.cn if you find bugs!")
+        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com if you find bugs!")
         log_handler.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()
 

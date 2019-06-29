@@ -942,7 +942,7 @@ def estimate_maximum_n_reads_using_mapping(
                 check_percents.append(1)
                 estimated_maximum_n_reads_list[f_id] = int(len(open(check_fq).readlines()) / 4)
             else:
-                check_percents.append(min(check_f_size / original_fq_sizes[f_id], 1))
+                check_percents.append(min(float(check_f_size) / original_fq_sizes[f_id], 1))
                 estimated_maximum_n_reads_list[f_id] = int(check_num_line / check_percents[-1])
             check_fq_files.append(check_fq)
         count_round += 1

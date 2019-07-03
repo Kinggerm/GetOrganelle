@@ -141,7 +141,8 @@ def main():
                 sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
             temp_graph = prefix + ".temp.fastg" if keep_temp else None
 
-            copy_results = input_graph.find_target_graph(tab_file, mode=mode, type_factor=type_factor,
+            copy_results = input_graph.find_target_graph(tab_file, database_name=mode, mode=mode,
+                                                         type_factor=type_factor,
                                                          weight_factor=weight_factor,
                                                          log_hard_cov_threshold=log_hard_cov_threshold,
                                                          contamination_depth=contamination_depth,

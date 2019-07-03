@@ -465,16 +465,18 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_ou
         return 0
 
 
-def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_prefix, organelle_type,
+def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_prefix, organelle_type, blast_db,
                              verbose, log_handler, expected_maximum_size, expected_minimum_size, no_slim, options):
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
-                             mode="embplant_pt", contamination_depth=3., contamination_similarity=0.95, degenerate=True,
+                             mode="embplant_pt", blast_db_base="embplant_pt", contamination_depth=3.,
+                             contamination_similarity=0.95, degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=0.98,
                              expected_max_size=inf, expected_min_size=0, hard_cov_threshold=10.,
                              min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'", temp_graph=None):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
-        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt", c_d=3., c_s=0.95,
+        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt",
+                               in_db_n="embplant_pt", c_d=3., c_s=0.95,
                                deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
                                max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
             if acyclic_allowed_in:
@@ -490,7 +492,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                     log_handler=log_in)
             else:
                 target_results = input_graph.find_target_graph(tab_f,
-                                                               mode=mode_in, type_factor=type_f,
+                                                               mode=mode_in, database_name=in_db_n, type_factor=type_f,
                                                                log_hard_cov_threshold=hard_c_t,
                                                                contamination_depth=c_d,
                                                                contamination_similarity=c_s,
@@ -607,7 +609,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             log_in.info("Writing output finished.")
 
         disentangle_inside(fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
-                           type_f=type_factor, mode_in=mode, c_d=contamination_depth, c_s=contamination_similarity,
+                           type_f=type_factor, mode_in=mode, in_db_n=blast_db_base,
+                           c_d=contamination_depth, c_s=contamination_similarity,
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
                            hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
                            max_s=expected_max_size, min_s=expected_min_size,
@@ -625,7 +628,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         #     main_spades_folder = os.path.split(kmer_dir)[0]
         #     os.system("cp " + out_fastg + " " + main_spades_folder)
         #     os.system("cp " + out_csv + " " + main_spades_folder)
-        disentangle_assembly(fastg_file=slim_out_fg, mode=organelle_type, tab_file=slim_out_csv, output=path_prefix,
+        disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
+                             tab_file=slim_out_csv, output=path_prefix,
                              weight_factor=100, type_factor=options.type_factor, 
                              hard_cov_threshold=options.depth_factor,
                              contamination_depth=options.contamination_depth,
@@ -660,8 +664,9 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     if not export_succeeded:
         try:
             """disentangle the graph as contig(s)"""
-            disentangle_assembly(fastg_file=slim_out_fg, mode=organelle_type, tab_file=slim_out_csv,
-                                 output=path_prefix, weight_factor=100, type_factor=options.type_factor, 
+            disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
+                                 tab_file=slim_out_csv, output=path_prefix,
+                                 weight_factor=100, type_factor=options.type_factor,
                                  here_verbose=verbose, log_dis=log_handler,
                                  hard_cov_threshold=options.depth_factor * 0.8,
                                  contamination_depth=options.contamination_depth,
@@ -785,9 +790,15 @@ def main():
             else:
                 # log_handler.info("Parsing assembly graph and outputting ...")
                 log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ...")
+                if options.genes_fasta:
+                    db_base_name = remove_db_postfix(os.path.basename(options.genes_fasta[go_t]))
+                else:
+                    db_base_name = sub_organelle_type
                 ext_res = extract_organelle_genome(out_base=options.output_base,
                                                    slim_out_fg=slimmed_fastg_file, slim_out_csv=slimmed_csv_file,
-                                                   organelle_prefix=og_prefix, organelle_type=sub_organelle_type,
+                                                   organelle_prefix=og_prefix,
+                                                   organelle_type=sub_organelle_type,
+                                                   blast_db=db_base_name,
                                                    verbose=options.verbose_log, log_handler=log_handler,
                                                    expected_minimum_size=options.expected_min_size[go_t],
                                                    expected_maximum_size=options.expected_max_size[go_t],
@@ -803,7 +814,7 @@ def main():
         log_handler.exception("")
         log_handler = simple_log(log_handler, options.output_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("Please email phylojin@163.com or jinjianjun@mail.kib.ac.cn if you find bugs!")
+        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com if you find bugs!")
         log_handler.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()
 

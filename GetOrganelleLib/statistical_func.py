@@ -184,26 +184,33 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
         count_iterations = 0
         best_loglike = prev_loglike
         best_parameter = norm_parameters
-        while loglike_shift > epsilon:
-            count_iterations += 1
-            # expectation
-            labels = assign_cluster_labels(data_array, data_weights, norm_parameters, cluster_limited)
-            # maximization
-            updated_parameters = updating_parameter(data_array, data_weights, labels, deepcopy(norm_parameters))
-            # loglike shift
-            this_loglike = model_loglike(data_array, data_weights, labels, updated_parameters)
-            loglike_shift = abs(this_loglike - prev_loglike)
-            # update
-            prev_loglike = this_loglike
-            norm_parameters = updated_parameters
-            if this_loglike > best_loglike:
-                best_parameter = updated_parameters
-                best_loglike = this_loglike
-        labels = assign_cluster_labels(data_array, data_weights, best_parameter, None)
-        results.append({"loglike": best_loglike, "iterates": count_iterations, "cluster_num": total_cluster_num,
-                        "parameters": best_parameter, "labels": labels,
-                        "aic": aic(prev_loglike, 2 * total_cluster_num),
-                        "bic": bic(prev_loglike, 2 * total_cluster_num, data_len)})
+        try:
+            while loglike_shift > epsilon:
+                count_iterations += 1
+                # expectation
+                labels = assign_cluster_labels(data_array, data_weights, norm_parameters, cluster_limited)
+                # maximization
+                updated_parameters = updating_parameter(data_array, data_weights, labels, deepcopy(norm_parameters))
+                # loglike shift
+                this_loglike = model_loglike(data_array, data_weights, labels, updated_parameters)
+                loglike_shift = abs(this_loglike - prev_loglike)
+                # update
+                prev_loglike = this_loglike
+                norm_parameters = updated_parameters
+                if this_loglike > best_loglike:
+                    best_parameter = updated_parameters
+                    best_loglike = this_loglike
+            labels = assign_cluster_labels(data_array, data_weights, best_parameter, None)
+            results.append({"loglike": best_loglike, "iterates": count_iterations, "cluster_num": total_cluster_num,
+                            "parameters": best_parameter, "labels": labels,
+                            "aic": aic(prev_loglike, 2 * total_cluster_num),
+                            "bic": bic(prev_loglike, 2 * total_cluster_num, data_len)})
+        except TypeError as e:
+            if log_handler:
+                log_handler.error("This error might be caused by outdated version of scipy!")
+            else:
+                sys.stdout.write("This error might be caused by outdated version of scipy!\n")
+            raise e
     if verbose_log:
         if log_handler:
             log_handler.info(str(results))

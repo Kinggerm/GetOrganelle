@@ -5,6 +5,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.2a",
+     "features": [
+         "1. the bug with option \"--genes\" fixed",
+         "2. the bug with \"Mixing iteration and read methods\" introduced by 1.6.2 fixed",
+     ]},
     {"number": "1.6.2",
      "features": [
          "1. get_organelle_from_reads.py: --reduce-reads-for-cov/estimate_maximum_n_reads_using_mapping() added; "

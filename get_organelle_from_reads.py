@@ -1123,7 +1123,8 @@ def extend_with_constant_words(baits_pool, raw_fq_files, word_size, output, jump
     output_handler = open(output + ".Temp", "w")
     for fq_f in raw_fq_files:
         with open(fq_f) as fq_f_input_handler:
-            for head_line in fq_f_input_handler:
+            head_line = fq_f_input_handler.readline()
+            while head_line:
                 seq_line = fq_f_input_handler.readline()
                 seq_len = len(seq_line.strip())
                 accepted = False
@@ -1139,6 +1140,7 @@ def extend_with_constant_words(baits_pool, raw_fq_files, word_size, output, jump
                 else:
                     fq_f_input_handler.readline()
                     fq_f_input_handler.readline()
+                head_line = fq_f_input_handler.readline()
     output_handler.close()
     os.rename(output + ".Temp", output)
 
@@ -2080,7 +2082,7 @@ def extending_no_lim(word_size, seed_file, original_fq_files, len_indices, pre_g
         round_dir = os.path.join(output_base, "intermediate_reads")
         if not os.path.exists(round_dir):
             os.mkdir(round_dir)
-    if this_process and verbose:
+    if not this_process and verbose:
         log_handler.warning("Package psutil is not installed, so that memory usage will not be logged\n"
                             "Don't worry. This will not affect the result.")
     try:
@@ -3150,16 +3152,18 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
 
 
 def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_fg, organelle_prefix,
-                             organelle_type, read_len_for_log, verbose, log_handler, basic_prefix,
+                             organelle_type, blast_db, read_len_for_log, verbose, log_handler, basic_prefix,
                              expected_maximum_size, expected_minimum_size, options):
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
-                             mode="embplant_pt", contamination_depth=3., contamination_similarity=0.95, degenerate=True,
+                             mode="embplant_pt", blast_db_base="embplant_pt", contamination_depth=3.,
+                             contamination_similarity=0.95, degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=0.98,
                              expected_max_size=inf, expected_min_size=0, hard_cov_threshold=10.,
                              min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'", temp_graph=None):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
-        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt", c_d=3., c_s=0.95,
+        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt",
+                               in_db_n="embplant_pt", c_d=3., c_s=0.95,
                                deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
                                max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
             from GetOrganelleLib.assembly_parser import Assembly
@@ -3172,7 +3176,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 log_in.info("Disentangling " + fastg_f + " as a circular genome ... ")
             input_graph = Assembly(fastg_f)
             target_results = input_graph.find_target_graph(tab_f,
-                                                           mode=mode_in, type_factor=type_f,
+                                                           mode=mode_in, database_name=in_db_n, type_factor=type_f,
                                                            log_hard_cov_threshold=hard_c_t,
                                                            contamination_depth=c_d,
                                                            contamination_similarity=c_s,
@@ -3295,7 +3299,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
             log_in.info("Writing output finished.")
 
         disentangle_inside(fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
-                           type_f=type_factor, mode_in=mode, c_d=contamination_depth, c_s=contamination_similarity,
+                           type_f=type_factor, mode_in=mode, in_db_n=blast_db_base,
+                           c_d=contamination_depth, c_s=contamination_similarity,
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
                            hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
                            max_s=expected_max_size, min_s=expected_min_size,
@@ -3326,7 +3331,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 #     main_spades_folder = os.path.split(kmer_dir)[0]
                 #     os.system("cp " + out_fastg + " " + main_spades_folder)
                 #     os.system("cp " + out_csv + " " + main_spades_folder)
-                disentangle_assembly(fastg_file=out_fastg, mode=organelle_type, tab_file=out_csv, output=path_prefix,
+                disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
+                                     mode=organelle_type, tab_file=out_csv, output=path_prefix,
                                      weight_factor=100, hard_cov_threshold=options.disentangle_depth_factor,
                                      contamination_depth=options.contamination_depth,
                                      contamination_similarity=options.contamination_similarity,
@@ -3368,7 +3374,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         if out_fastg_list:
                             out_fastg = out_fastg_list[0]
                             out_csv = out_fastg[:-5] + "csv"
-                            disentangle_assembly(fastg_file=out_fastg, mode=organelle_type, tab_file=out_csv,
+                            disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
+                                                 mode=organelle_type, tab_file=out_csv,
                                                  output=path_prefix, weight_factor=100, here_verbose=verbose,
                                                  log_dis=log_handler,
                                                  hard_cov_threshold=options.disentangle_depth_factor * 0.8,
@@ -3791,10 +3798,15 @@ def main():
                     else:
                         # log_handler.info("Parsing assembly graph and outputting ...")
                         log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ...")
+                        if options.genes_fasta:
+                            db_base_name = remove_db_postfix(os.path.basename(options.genes_fasta[go_t]))
+                        else:
+                            db_base_name = sub_organelle_type
                         ext_res = extract_organelle_genome(out_base=out_base, spades_output=spades_output,
                                                            ignore_kmer_res=options.ignore_kmer_res,
                                                            slim_out_fg=slim_fastg_file, organelle_prefix=og_prefix,
                                                            organelle_type=sub_organelle_type,
+                                                           blast_db=db_base_name,
                                                            read_len_for_log=mean_read_len,
                                                            verbose=options.verbose_log, log_handler=log_handler,
                                                            basic_prefix=options.prefix,

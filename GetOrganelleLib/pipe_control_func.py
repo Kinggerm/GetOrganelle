@@ -317,6 +317,11 @@ def map_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, 
                        (" --al " + total_seed_fq[0]) * int(bool(generate_fq)) + " -x " + seed_index_base + \
                        this_input_fq_data + " -S " + total_seed_sam[0] + \
                        " --no-unal --omit-sec-seq"
+        if not silent and verbose_log:
+            if log_handler:
+                log_handler.info(this_command)
+            else:
+                sys.stdout.write(this_command + "\n")
         make_seed_bowtie2 = subprocess.Popen(this_command,
                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()

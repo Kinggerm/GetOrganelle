@@ -189,7 +189,7 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast")):
 # TODO set overwrite=True
 if executable(os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast", "makeblastdb")):
     initialize_notation_database(which_blast=os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast"), overwrite=not RESUME)
-elif executable("blastn"):
+elif executable("makeblastdb"):
     initialize_notation_database(which_blast="", overwrite=not RESUME)
 else:
     raise EnvironmentError("makeblastdb not found in the $PATH nor in " +

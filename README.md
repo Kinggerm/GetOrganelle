@@ -11,7 +11,7 @@ Please denote the versions of GetOrganelle as well as the dependencies in your m
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
-<b>Bug&Usage contact:</b> [phylojin@163.com](mailto:phylojin@163.com); [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
+<b>Bug&Usage contact:</b> [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn) or [phylojin@163.com](mailto:phylojin@163.com); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
 
 Please also cite the dependencies if used:
 

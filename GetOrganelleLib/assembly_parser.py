@@ -355,10 +355,10 @@ class Assembly(object):
                             str(self.__kmer) + "M"
                         ]) + "\n")
 
-    def write_out_tags(self, modes, out_file):
+    def write_out_tags(self, db_names, out_file):
         tagged_vertices = set()
-        for mode in modes:
-            tagged_vertices |= self.tagged_vertices[mode]
+        for db_n in db_names:
+            tagged_vertices |= self.tagged_vertices[db_n]
         tagged_vertices = sorted(tagged_vertices)
         lines = [["EDGE", "database", "database_weight", "loci"]]
         for this_vertex in tagged_vertices:
@@ -371,7 +371,7 @@ class Assembly(object):
                               ";".join([tag_n + "(" + str(all_weights[tag_n]) + ")" for tag_n in all_tag_list]),
                               ";".join([",".join(sorted(all_tags[tag_n])) for tag_n in all_tag_list])])
             else:
-                here_tags = {tag_n for tag_n in modes if this_vertex in self.tagged_vertices[tag_n]}
+                here_tags = {tag_n for tag_n in db_names if this_vertex in self.tagged_vertices[tag_n]}
                 lines.append([this_vertex,
                               ";".join(sorted(here_tags)),
                               "", ""])
@@ -394,7 +394,7 @@ class Assembly(object):
 
     def update_vertex_clusters(self):
         self.vertex_clusters = []
-        vertices = set(self.vertex_info)
+        vertices = sorted(self.vertex_info)
         for this_vertex in vertices:
             connecting_those = set()
             for connected_set in self.vertex_info[this_vertex].connections.values():
@@ -602,32 +602,32 @@ class Assembly(object):
                                     self.vertex_info[new_vertex].other_attr["tags"] = \
                                         deepcopy(self.vertex_info[next_vertex].other_attr["tags"])
                                 else:
-                                    for mode in self.vertex_info[next_vertex].other_attr["tags"]:
-                                        if mode not in self.vertex_info[new_vertex].other_attr["tags"]:
-                                            self.vertex_info[new_vertex].other_attr["tags"][mode] \
-                                                = deepcopy(self.vertex_info[next_vertex].other_attr["tags"][mode])
+                                    for db_n in self.vertex_info[next_vertex].other_attr["tags"]:
+                                        if db_n not in self.vertex_info[new_vertex].other_attr["tags"]:
+                                            self.vertex_info[new_vertex].other_attr["tags"][db_n] \
+                                                = deepcopy(self.vertex_info[next_vertex].other_attr["tags"][db_n])
                                         else:
-                                            self.vertex_info[new_vertex].other_attr["tags"][mode] \
-                                                |= self.vertex_info[next_vertex].other_attr["tags"][mode]
+                                            self.vertex_info[new_vertex].other_attr["tags"][db_n] \
+                                                |= self.vertex_info[next_vertex].other_attr["tags"][db_n]
                             if "weight" in self.vertex_info[next_vertex].other_attr:
                                 if "weight" not in self.vertex_info[new_vertex].other_attr:
                                     self.vertex_info[new_vertex].other_attr["weight"] \
                                         = deepcopy(self.vertex_info[next_vertex].other_attr["weight"])
                                 else:
-                                    for mode in self.vertex_info[next_vertex].other_attr["weight"]:
-                                        if mode not in self.vertex_info[new_vertex].other_attr["weight"]:
-                                            self.vertex_info[new_vertex].other_attr["weight"][mode] \
-                                                = self.vertex_info[next_vertex].other_attr["weight"][mode]
+                                    for db_n in self.vertex_info[next_vertex].other_attr["weight"]:
+                                        if db_n not in self.vertex_info[new_vertex].other_attr["weight"]:
+                                            self.vertex_info[new_vertex].other_attr["weight"][db_n] \
+                                                = self.vertex_info[next_vertex].other_attr["weight"][db_n]
                                         else:
-                                            self.vertex_info[new_vertex].other_attr["weight"][mode] \
-                                                += self.vertex_info[next_vertex].other_attr["weight"][mode]
-                            for mode in self.tagged_vertices:
-                                if this_vertex in self.tagged_vertices[mode]:
-                                    self.tagged_vertices[mode].add(new_vertex)
-                                    self.tagged_vertices[mode].remove(this_vertex)
-                                if next_vertex in self.tagged_vertices[mode]:
-                                    self.tagged_vertices[mode].add(new_vertex)
-                                    self.tagged_vertices[mode].remove(next_vertex)
+                                            self.vertex_info[new_vertex].other_attr["weight"][db_n] \
+                                                += self.vertex_info[next_vertex].other_attr["weight"][db_n]
+                            for db_n in self.tagged_vertices:
+                                if this_vertex in self.tagged_vertices[db_n]:
+                                    self.tagged_vertices[db_n].add(new_vertex)
+                                    self.tagged_vertices[db_n].remove(this_vertex)
+                                if next_vertex in self.tagged_vertices[db_n]:
+                                    self.tagged_vertices[db_n].add(new_vertex)
+                                    self.tagged_vertices[db_n].remove(next_vertex)
                         self.remove_vertex([this_vertex, next_vertex], update_cluster=False)
                         break
         self.update_vertex_clusters()
@@ -1120,7 +1120,7 @@ class Assembly(object):
                 else:
                     sys.stdout.write("Average " + target_name_for_log +" kmer-coverage = " + str(round(new_val, 2)) + "\n")
 
-    def tag_in_between(self, mode):
+    def tag_in_between(self, database_n):
         # add those in between the tagged vertices to tagged_vertices, which offered the only connection
         updated = True
         candidate_vertices = list(self.vertex_info)
@@ -1129,7 +1129,7 @@ class Assembly(object):
             go_to_v = 0
             while go_to_v < len(candidate_vertices):
                 can_v = candidate_vertices[go_to_v]
-                if can_v in self.tagged_vertices[mode]:
+                if can_v in self.tagged_vertices[database_n]:
                     del candidate_vertices[go_to_v]
                     continue
                 else:
@@ -1140,19 +1140,19 @@ class Assembly(object):
                     for can_end, can_connect in self.vertex_info[can_v].connections.items():
                         for next_v, next_e in can_connect:
                             # candidate_v is the only output vertex to next_v
-                            if next_v in self.tagged_vertices[mode] and \
+                            if next_v in self.tagged_vertices[database_n] and \
                                     len(self.vertex_info[next_v].connections[next_e]) == 1:
                                 count_nearby_tagged.append((next_v, next_e))
                                 break
                     if len(count_nearby_tagged) == 2:
                         del candidate_vertices[go_to_v]
                         # add in between
-                        self.tagged_vertices[mode].add(can_v)
+                        self.tagged_vertices[database_n].add(can_v)
                         if "weight" not in self.vertex_info[can_v].other_attr:
                             self.vertex_info[can_v].other_attr["weight"] = {}
-                        if mode not in self.vertex_info[can_v].other_attr["weight"]:
-                            self.vertex_info[can_v].other_attr["weight"][mode] = 0
-                        self.vertex_info[can_v].other_attr["weight"][mode] += 1 * self.vertex_info[can_v].cov
+                        if database_n not in self.vertex_info[can_v].other_attr["weight"]:
+                            self.vertex_info[can_v].other_attr["weight"][database_n] = 0
+                        self.vertex_info[can_v].other_attr["weight"][database_n] += 1 * self.vertex_info[can_v].cov
                         # add extra circle
                         near_by_pairs = self.is_sequential_repeat(can_v, return_pair_in_the_trunk_path=False)
                         if near_by_pairs:
@@ -1171,21 +1171,21 @@ class Assembly(object):
                                           self.vertex_info[near_v].cov, 0))
                             if max(coverage_folds) >= 2:
                                 for extra_v_to_add in set(checking_new):
-                                    self.tagged_vertices[mode].add(extra_v_to_add)
+                                    self.tagged_vertices[database_n].add(extra_v_to_add)
                                     try:
                                         candidate_vertices.remove(extra_v_to_add)
                                     except ValueError:
                                         pass
                                     if "weight" not in self.vertex_info[extra_v_to_add].other_attr:
-                                        self.vertex_info[extra_v_to_add].other_attr["weight"] = {mode: 0}
-                                    self.vertex_info[extra_v_to_add].other_attr["weight"][mode] \
+                                        self.vertex_info[extra_v_to_add].other_attr["weight"] = {database_n: 0}
+                                    self.vertex_info[extra_v_to_add].other_attr["weight"][database_n] \
                                         += 1 * self.vertex_info[extra_v_to_add].cov
                         updated = True
                         break
                     else:
                         go_to_v += 1
 
-    def parse_tab_file(self, tab_file, mode, type_factor, log_handler=None):
+    def parse_tab_file(self, tab_file, database_name, type_factor, log_handler=None):
         # parse_csv, every locus only occur in one vertex (removing locations with smaller weight)
         tag_loci = {}
         tab_matrix = [line.strip("\n").split("\t") for line in open(tab_file)][1:]
@@ -1247,10 +1247,10 @@ class Assembly(object):
                         if next_w * type_factor < best_w:
                             self.tagged_vertices[next_t].remove(vertex_name)
 
-        if len(self.tagged_vertices[mode]) == 0:
-            raise Exception("No available " + mode + " information found in " + tab_file)
+        if database_name not in self.tagged_vertices or len(self.tagged_vertices[database_name]) == 0:
+            raise Exception("No available " + database_name + " information found in " + tab_file)
 
-    def filter_by_coverage(self, drop_num=1, mode="embplant_pt", log_hard_cov_threshold=10.,
+    def filter_by_coverage(self, drop_num=1, database_n="embplant_pt", log_hard_cov_threshold=10.,
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
                            verbose=False, log_handler=None, debug=False):
         changed = False
@@ -1258,7 +1258,7 @@ class Assembly(object):
         vertices = sorted(self.vertex_info)
         v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1) for this_v in vertices}
         try:
-            max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[mode]])
+            max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[database_n]])
         except ValueError as e:
             if log_handler:
                 log_handler.info("tagged vertices: " + str(self.tagged_vertices))
@@ -1291,7 +1291,7 @@ class Assembly(object):
                                   * (terminal_extra_weight if self.vertex_info[this_v].is_terminal() else 1)
                                   for this_v in vertices])
         tag_kinds = [tag_kind for tag_kind in self.tagged_vertices if self.tagged_vertices[tag_kind]]
-        tag_kinds.sort(key=lambda x: x != mode)
+        tag_kinds.sort(key=lambda x: x != database_n)
         set_cluster = {}
         for v_id, vertex_name in enumerate(vertices):
             for go_tag, this_tag in enumerate(tag_kinds):
@@ -1334,7 +1334,7 @@ class Assembly(object):
 
         # 1
         selected_label_type = list(
-            set([lb for go, lb in enumerate(labels) if vertices[go] in self.tagged_vertices[mode]]))
+            set([lb for go, lb in enumerate(labels) if vertices[go] in self.tagged_vertices[database_n]]))
         if len(selected_label_type) > 1:
             label_weights = {}
             # for lb in selected_label_type:
@@ -1342,7 +1342,7 @@ class Assembly(object):
             #     for go in np.where(labels == lb)[0]:
             #         this_add_up += self.vertex_info[vertices[go]].get("weight", {}).get(mode, 0)
             #     label_weights[lb] = this_add_up
-            label_weights = {lb: sum([self.vertex_info[vertices[go]].other_attr.get("weight", {}).get(mode, 0)
+            label_weights = {lb: sum([self.vertex_info[vertices[go]].other_attr.get("weight", {}).get(database_n, 0)
                                       for go in np.where(labels == lb)[0]])
                              for lb in selected_label_type}
             selected_label_type.sort(key=lambda x: -label_weights[x])
@@ -1405,7 +1405,7 @@ class Assembly(object):
                 this_dist = abs(rem_mu - check_mu) - 2 * (check_sigma + rem_sigma)
                 candidate_dropping_label_type[lab_tp] = min(candidate_dropping_label_type[lab_tp], this_dist)
         dropping_type = sorted(candidate_dropping_label_type, key=lambda x: -candidate_dropping_label_type[x])
-        drop_num = max(len(tag_kinds) - 1, 1)
+        drop_num = max(len(tag_kinds) - 1, drop_num)
         dropping_type = dropping_type[:drop_num]
         if debug or verbose:
             if log_handler:
@@ -1431,11 +1431,11 @@ class Assembly(object):
             self.remove_vertex(vertices_to_del)
         return changed, [(parameters[lab_tp]["mu"], parameters[lab_tp]["sigma"]) for lab_tp in remained_label_type]
 
-    def exclude_other_hits(self, mode):
+    def exclude_other_hits(self, database_n):
         vertices_to_exclude = []
         for vertex_name in self.vertex_info:
             if "tags" in self.vertex_info[vertex_name].other_attr:
-                if mode in self.vertex_info[vertex_name].other_attr["tags"]:
+                if database_n in self.vertex_info[vertex_name].other_attr["tags"]:
                     pass
                 elif self.vertex_info[vertex_name].other_attr["tags"]:
                     vertices_to_exclude.append(vertex_name)
@@ -1484,10 +1484,10 @@ class Assembly(object):
             self.vertex_info[new_vertex].seq[directions[0]] = consensus_s
             self.vertex_info[new_vertex].seq[not directions[0]] = complementary_seq(consensus_s)
             if copy_tags:
-                for mode in self.tagged_vertices:
-                    if vertices[0] in self.tagged_vertices[mode]:
-                        self.tagged_vertices[mode].add(new_vertex)
-                        self.tagged_vertices[mode].remove(vertices[0])
+                for db_n in self.tagged_vertices:
+                    if vertices[0] in self.tagged_vertices[db_n]:
+                        self.tagged_vertices[db_n].add(new_vertex)
+                        self.tagged_vertices[db_n].remove(vertices[0])
 
             # tags
             if copy_tags:
@@ -1497,36 +1497,36 @@ class Assembly(object):
                             self.vertex_info[new_vertex].other_attr["tags"] = \
                                 deepcopy(self.vertex_info[other_vertex].other_attr["tags"])
                         else:
-                            for mode in self.vertex_info[other_vertex].other_attr["tags"]:
-                                if mode not in self.vertex_info[new_vertex].other_attr["tags"]:
-                                    self.vertex_info[new_vertex].other_attr["tags"][mode] \
-                                        = deepcopy(self.vertex_info[other_vertex].other_attr["tags"][mode])
+                            for db_n in self.vertex_info[other_vertex].other_attr["tags"]:
+                                if db_n not in self.vertex_info[new_vertex].other_attr["tags"]:
+                                    self.vertex_info[new_vertex].other_attr["tags"][db_n] \
+                                        = deepcopy(self.vertex_info[other_vertex].other_attr["tags"][db_n])
                                 else:
-                                    self.vertex_info[new_vertex].other_attr["tags"][mode] \
-                                        |= self.vertex_info[other_vertex].other_attr["tags"][mode]
+                                    self.vertex_info[new_vertex].other_attr["tags"][db_n] \
+                                        |= self.vertex_info[other_vertex].other_attr["tags"][db_n]
                     if "weight" in self.vertex_info[other_vertex].other_attr:
                         if "weight" not in self.vertex_info[new_vertex].other_attr:
                             self.vertex_info[new_vertex].other_attr["weight"] \
                                 = deepcopy(self.vertex_info[other_vertex].other_attr["weight"])
                         else:
-                            for mode in self.vertex_info[other_vertex].other_attr["weight"]:
-                                if mode not in self.vertex_info[new_vertex].other_attr["weight"]:
-                                    self.vertex_info[new_vertex].other_attr["weight"][mode] \
-                                        = self.vertex_info[other_vertex].other_attr["weight"][mode]
+                            for db_n in self.vertex_info[other_vertex].other_attr["weight"]:
+                                if db_n not in self.vertex_info[new_vertex].other_attr["weight"]:
+                                    self.vertex_info[new_vertex].other_attr["weight"][db_n] \
+                                        = self.vertex_info[other_vertex].other_attr["weight"][db_n]
                                 else:
-                                    self.vertex_info[new_vertex].other_attr["weight"][mode] \
-                                        += self.vertex_info[other_vertex].other_attr["weight"][mode]
-                    for mode in self.tagged_vertices:
-                        if other_vertex in self.tagged_vertices[mode]:
-                            self.tagged_vertices[mode].add(new_vertex)
-                            self.tagged_vertices[mode].remove(other_vertex)
+                                    self.vertex_info[new_vertex].other_attr["weight"][db_n] \
+                                        += self.vertex_info[other_vertex].other_attr["weight"][db_n]
+                    for db_n in self.tagged_vertices:
+                        if other_vertex in self.tagged_vertices[db_n]:
+                            self.tagged_vertices[db_n].add(new_vertex)
+                            self.tagged_vertices[db_n].remove(other_vertex)
             self.remove_vertex(vertices)
             if log_handler:
                 log_handler.info("Consensus made: " + new_vertex)
             else:
                 log_handler.info("Consensus made: " + new_vertex + "\n")
 
-    def processing_polymorphism(self, mode, limited_vertices=None,
+    def processing_polymorphism(self, database_name, limited_vertices=None,
                                 contamination_depth=3., contamination_similarity=0.95,
                                 degenerate=False, degenerate_depth=1.5, degenerate_similarity=0.98, warning_count=4,
                                 only_keep_max_cov=False, verbose=False, debug=False, log_handler=None):
@@ -1554,7 +1554,7 @@ class Assembly(object):
             # sort by weight, then coverage
             prl_vertices = sorted(
                 prl_vertices,
-                key=lambda x: (-self.vertex_info[x[0]].other_attr.get("weight", {mode: 0.}).get(mode, 0.),
+                key=lambda x: (-self.vertex_info[x[0]].other_attr.get("weight", {database_name: 0.}).get(database_name, 0.),
                                -self.vertex_info[x[0]].cov))
             max_cov_vertex, direction_remained = prl_vertices.pop(0)
             max_cov_seq = self.vertex_info[max_cov_vertex].seq[direction_remained]
@@ -1636,7 +1636,7 @@ class Assembly(object):
             contaminating_weight = np.array([len(self.vertex_info[con_v].seq[True]) - self.__kmer
                                              for con_v in removing_contaminating_v])
             for candidate_rm_v in removing_contaminating_v:
-                if candidate_rm_v in self.tagged_vertices[mode]:
+                if candidate_rm_v in self.tagged_vertices[database_name]:
                     removing_contaminating_v.remove(candidate_rm_v)
             self.remove_vertex(removing_contaminating_v)
             cont_mean, cont_std = weighted_mean_and_std(contaminating_cov, contaminating_weight)
@@ -1646,7 +1646,7 @@ class Assembly(object):
             for del_v in self.vertex_info:
                 if cut_off_min < self.vertex_info[del_v].cov < cut_off_max:
                     if sum([bool(cnn) for cnn in self.vertex_info[del_v].connections.values()]) < 2 \
-                            and del_v not in self.tagged_vertices[mode]:
+                            and del_v not in self.tagged_vertices[database_name]:
                         removing_below_cut_off.append(del_v)
             self.remove_vertex(removing_below_cut_off)
             if verbose or debug:
@@ -1658,7 +1658,7 @@ class Assembly(object):
                     sys.stdout.write("removing contaminating-like vertices: " + " ".join(list(removing_below_cut_off)) + "\n")
         if removing_irrelevant_v:
             for candidate_rm_v in removing_irrelevant_v:
-                if candidate_rm_v in self.tagged_vertices[mode]:
+                if candidate_rm_v in self.tagged_vertices[database_name]:
                     removing_irrelevant_v.remove(candidate_rm_v)
             self.remove_vertex(removing_irrelevant_v)
             if verbose or debug:
@@ -1678,7 +1678,7 @@ class Assembly(object):
                     sys.stdout.write("Warning: Only the contig with the max cov was kept for each of those " +
                                      str(count_using_only_max) + " polymorphic loci.\n")
 
-    def find_target_graph(self, tab_file, mode="embplant_pt", type_factor=3, weight_factor=100.0,
+    def find_target_graph(self, tab_file, database_name, mode="embplant_pt", type_factor=3, weight_factor=100.0,
                           max_copy=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
                           log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
@@ -1688,6 +1688,7 @@ class Assembly(object):
                           log_handler=None, debug=False):
         """
         :param tab_file:
+        :param database_name:
         :param mode:
         :param type_factor:
         :param weight_factor:
@@ -1766,7 +1767,7 @@ class Assembly(object):
                 temp_csv = temp_graph + ".csv"
         else:
             temp_csv = None
-        self.parse_tab_file(tab_file, mode=mode, type_factor=type_factor, log_handler=log_handler)
+        self.parse_tab_file(tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
         is_reasonable_res = False
         data_contains_outlier = False
@@ -1775,17 +1776,18 @@ class Assembly(object):
                 is_reasonable_res = True
                 if verbose or debug:
                     if log_handler:
-                        log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
+                        log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[database_name])))
                         log_handler.info("tagged coverage: " +
                                          str(["%.1f" % new_assembly.vertex_info[log_v].cov
-                                              for log_v in sorted(new_assembly.tagged_vertices[mode])]))
+                                              for log_v in sorted(new_assembly.tagged_vertices[database_name])]))
                     else:
-                        sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
+                        sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[database_name]))
+                                         + "\n")
                         sys.stdout.write("tagged coverage: " +
                                          str(["%.1f" % new_assembly.vertex_info[log_v].cov
-                                              for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
+                                              for log_v in sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
                 new_assembly.merge_all_possible_vertices()
-                new_assembly.tag_in_between(mode=mode)
+                new_assembly.tag_in_between(database_n=database_name)
                 # new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
                 #                                      contamination_similarity=contamination_similarity,
                 #                                      degenerate=False, verbose=verbose, debug=debug,
@@ -1797,7 +1799,7 @@ class Assembly(object):
                         else:
                             sys.stdout.write("Writing out temp graph (1): " + temp_graph + "\n")
                     new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([mode], temp_csv)
+                    new_assembly.write_out_tags([database_name], temp_csv)
                 changed = True
                 count_large_round = 0
                 while changed:
@@ -1817,12 +1819,14 @@ class Assembly(object):
                         delete_those_vertices = set()
                         parameters = []
                         this_del = False
-                        new_assembly.estimate_copy_and_depth_by_cov(new_assembly.tagged_vertices[mode], debug=debug,
-                                                                    log_handler=log_handler, verbose=verbose, mode=mode)
+                        new_assembly.estimate_copy_and_depth_by_cov(
+                            new_assembly.tagged_vertices[database_name], debug=debug, log_handler=log_handler,
+                            verbose=verbose, mode=mode)
                         while first_round or delete_those_vertices or this_del:
                             if data_contains_outlier:
                                 this_del, parameters =\
-                                    new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
+                                    new_assembly.filter_by_coverage(database_n=database_name,
+                                                                    weight_factor=weight_factor,
                                                                     log_hard_cov_threshold=log_hard_cov_threshold,
                                                                     min_sigma_factor=min_sigma_factor,
                                                                     min_cluster=2, log_handler=log_handler,
@@ -1834,28 +1838,33 @@ class Assembly(object):
                                             .format(min_single_copy_percent))
                             else:
                                 this_del, parameters = \
-                                    new_assembly.filter_by_coverage(mode=mode, weight_factor=weight_factor,
+                                    new_assembly.filter_by_coverage(database_n=database_name,
+                                                                    weight_factor=weight_factor,
                                                                     log_hard_cov_threshold=log_hard_cov_threshold,
                                                                     min_sigma_factor=min_sigma_factor,
                                                                     log_handler=log_handler, verbose=verbose,
                                                                     debug=debug)
                             if verbose or debug:
                                 if log_handler:
-                                    log_handler.info("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])))
+                                    log_handler.info("tagged vertices: " +
+                                                     str(sorted(new_assembly.tagged_vertices[database_name])))
                                     log_handler.info("tagged coverage: " +
                                                      str(["%.1f" % new_assembly.vertex_info[log_v].cov
-                                                          for log_v in sorted(new_assembly.tagged_vertices[mode])]))
+                                                          for log_v
+                                                          in sorted(new_assembly.tagged_vertices[database_name])]))
                                 else:
-                                    sys.stdout.write("tagged vertices: " + str(sorted(new_assembly.tagged_vertices[mode])) + "\n")
+                                    sys.stdout.write("tagged vertices: " +
+                                                     str(sorted(new_assembly.tagged_vertices[database_name])) + "\n")
                                     log_handler.info("tagged coverage: " +
                                                      str(["%.1f" % new_assembly.vertex_info[log_v].cov
-                                                          for log_v in sorted(new_assembly.tagged_vertices[mode])]) + "\n")
+                                                          for log_v
+                                                          in sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
                             new_assembly.estimate_copy_and_depth_by_cov(
-                                new_assembly.tagged_vertices[mode], debug=debug, log_handler=log_handler,
+                                new_assembly.tagged_vertices[database_name], debug=debug, log_handler=log_handler,
                                 verbose=verbose, mode=mode)
                             first_round = False
 
-                        if new_assembly.exclude_other_hits(mode=mode):
+                        if new_assembly.exclude_other_hits(database_n=database_name):
                             changed = True
 
                         cluster_trimmed = False
@@ -1865,10 +1874,12 @@ class Assembly(object):
                         elif len(new_assembly.vertex_clusters) == 1:
                             pass
                         else:
-                            cluster_weights = [sum([new_assembly.vertex_info[x_v].other_attr["weight"][mode]
+                            cluster_weights = [sum([new_assembly.vertex_info[x_v].other_attr["weight"][database_name]
                                                     for x_v in x
-                                                    if "weight" in new_assembly.vertex_info[x_v].other_attr
-                                                    and mode in new_assembly.vertex_info[x_v].other_attr["weight"]])
+                                                    if
+                                                    "weight" in new_assembly.vertex_info[x_v].other_attr
+                                                    and
+                                                    database_name in new_assembly.vertex_info[x_v].other_attr["weight"]])
                                                for x in new_assembly.vertex_clusters]
                             best = max(cluster_weights)
                             best_id = cluster_weights.index(best)
@@ -1879,7 +1890,7 @@ class Assembly(object):
                                         id_remained.add(j)
                                     else:
                                         for del_v in new_assembly.vertex_clusters[j]:
-                                            if del_v in new_assembly.tagged_vertices[mode]:
+                                            if del_v in new_assembly.tagged_vertices[database_name]:
                                                 new_cov = new_assembly.vertex_info[del_v].cov
                                                 for mu, sigma in parameters:
                                                     if abs(new_cov - mu) < sigma:
@@ -1901,13 +1912,13 @@ class Assembly(object):
                                             else:
                                                 sys.stdout.write("Writing out temp graph (2): " + temp_graph + "\n")
                                         new_assembly.write_to_gfa(temp_graph)
-                                        new_assembly.write_out_tags([mode], temp_csv)
+                                        new_assembly.write_out_tags([database_name], temp_csv)
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
                                                                 "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
                                     if w == second:
                                         for del_v in new_assembly.vertex_clusters[j]:
-                                            if del_v in new_assembly.tagged_vertices[mode]:
+                                            if del_v in new_assembly.tagged_vertices[database_name]:
                                                 new_cov = new_assembly.vertex_info[del_v].cov
                                                 # for debug
                                                 # print(new_cov)
@@ -1923,11 +1934,11 @@ class Assembly(object):
                                                                     sys.stdout.write(
                                                                         "Writing out temp graph (3): " + temp_graph + "\n")
                                                             new_assembly.write_to_gfa(temp_graph)
-                                                            new_assembly.write_out_tags([mode], temp_csv)
+                                                            new_assembly.write_out_tags([database_name], temp_csv)
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
                                                             "# tags: " +
-                                                            str(new_assembly.vertex_info[del_v].other_attr["tags"][mode]))
+                                                            str(new_assembly.vertex_info[del_v].other_attr["tags"][database_name]))
 
                             # remove other clusters
                             vertices_to_del = set()
@@ -1946,7 +1957,7 @@ class Assembly(object):
 
                     # merge vertices
                     new_assembly.merge_all_possible_vertices()
-                    new_assembly.tag_in_between(mode=mode)
+                    new_assembly.tag_in_between(database_n=database_name)
 
                     # no tip contigs allowed
                     if broken_graph_allowed:
@@ -1961,7 +1972,7 @@ class Assembly(object):
                                 # both ends must have edge(s)
                                 if sum([bool(len(cn))
                                         for cn in new_assembly.vertex_info[vertex_name].connections.values()]) != 2:
-                                    if vertex_name in new_assembly.tagged_vertices[mode]:
+                                    if vertex_name in new_assembly.tagged_vertices[database_name]:
                                         if temp_graph:
                                             if verbose:
                                                 if log_handler:
@@ -1969,7 +1980,7 @@ class Assembly(object):
                                                 else:
                                                     sys.stdout.write("Writing out temp graph (4): " + temp_graph + "\n")
                                             new_assembly.write_to_gfa(temp_graph)
-                                            new_assembly.write_out_tags([mode], temp_csv)
+                                            new_assembly.write_out_tags([database_name], temp_csv)
                                         raise ProcessingGraphFailed(
                                             "Incomplete/Complicated graph: please check around EDGE_"+vertex_name + "!")
                                     else:
@@ -1993,12 +2004,13 @@ class Assembly(object):
 
                     # merge vertices
                     new_assembly.merge_all_possible_vertices()
-                    new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
+                    new_assembly.processing_polymorphism(database_name=database_name,
+                                                         contamination_depth=contamination_depth,
                                                          contamination_similarity=contamination_similarity,
                                                          degenerate=False, degenerate_depth=degenerate_depth,
                                                          degenerate_similarity=degenerate_similarity,
                                                          verbose=verbose, debug=debug, log_handler=log_handler)
-                    new_assembly.tag_in_between(mode=mode)
+                    new_assembly.tag_in_between(database_n=database_name)
                     if temp_graph:
                         if verbose:
                             if log_handler:
@@ -2006,7 +2018,7 @@ class Assembly(object):
                             else:
                                 sys.stdout.write("Writing out temp graph (5): " + temp_graph + "\n")
                         new_assembly.write_to_gfa(temp_graph)
-                        new_assembly.write_out_tags([mode], temp_csv)
+                        new_assembly.write_out_tags([database_name], temp_csv)
 
                 if temp_graph:
                     if verbose:
@@ -2015,8 +2027,9 @@ class Assembly(object):
                         else:
                             sys.stdout.write("Writing out temp graph (6): " + temp_graph + "\n")
                     new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([mode], temp_csv)
-                new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
+                    new_assembly.write_out_tags([database_name], temp_csv)
+                new_assembly.processing_polymorphism(database_name=database_name,
+                                                     contamination_depth=contamination_depth,
                                                      contamination_similarity=contamination_similarity,
                                                      degenerate=degenerate, degenerate_depth=degenerate_depth,
                                                      degenerate_similarity=degenerate_similarity,
@@ -2030,7 +2043,7 @@ class Assembly(object):
                         else:
                             sys.stdout.write("Writing out temp graph (7): " + temp_graph + "\n")
                     new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([mode], temp_csv)
+                    new_assembly.write_out_tags([database_name], temp_csv)
 
                 # create idealized vertices and edges
                 try:
@@ -2131,7 +2144,7 @@ class Assembly(object):
                 except (RecursionError, Exception) as e:
                     if broken_graph_allowed:
                         unlabelled_contigs = [check_v for check_v in list(new_assembly.vertex_info)
-                                              if check_v not in new_assembly.tagged_vertices[mode]]
+                                              if check_v not in new_assembly.tagged_vertices[database_name]]
                         if unlabelled_contigs:
                             if verbose or debug:
                                 if log_handler:
@@ -2213,7 +2226,7 @@ class Assembly(object):
                             else:
                                 sys.stdout.write("Writing out temp graph (8): " + temp_graph + "\n")
                         new_assembly.write_to_gfa(temp_graph)
-                        new_assembly.write_out_tags([mode], temp_csv)
+                        new_assembly.write_out_tags([database_name], temp_csv)
                         raise ProcessingGraphFailed("Complicated " + mode + " graph! Detecting path(s) failed!")
                     else:
                         raise e
@@ -2261,7 +2274,7 @@ class Assembly(object):
                     else:
                         sys.stdout.write("Writing out temp graph (9): " + temp_graph + "\n")
                 new_assembly.write_to_gfa(temp_graph)
-                new_assembly.write_out_tags([mode], temp_csv)
+                new_assembly.write_out_tags([database_name], temp_csv)
             raise KeyboardInterrupt
 
     def get_all_circular_paths(self, mode="embplant_pt", library_info=None, log_handler=None):
@@ -2374,14 +2387,15 @@ class Assembly(object):
                                 for ad_id, acc_distance in enumerate(sorted(set([x[1] for x in sorted_paths]),
                                                                             reverse=True))}
                 if len(pattern_dict) > 1:
-                    if log_handler:
-                        log_handler.warning("Multiple repeat patterns appeared in your data, "
-                                            "a more balanced pattern (always the repeat_pattern1) would be suggested "
-                                            "for plastomes with the canonical IR!")
-                    else:
-                        sys.stdout.write("Warning: Multiple repeat patterns appeared in your data, "
-                                         "a more balanced pattern (always the repeat_pattern1) would be suggested "
-                                         "for plastomes with the canonical IR!\n")
+                    if mode == "embplant_pt":
+                        if log_handler:
+                            log_handler.warning("Multiple repeat patterns appeared in your data, "
+                                                "a more balanced pattern (always the repeat_pattern1) "
+                                                "would be suggested for plastomes with the canonical IR!")
+                        else:
+                            sys.stdout.write("Warning: Multiple repeat patterns appeared in your data, "
+                                             "a more balanced pattern (always the repeat_pattern1) would be suggested "
+                                             "for plastomes with the canonical IR!\n")
                     sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
                                     for this_path, acc_distance in sorted_paths]
                 else:

@@ -190,7 +190,7 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db, which_b
             edge_connections[(edge, direction)] = get_jointed_edges_within_distance(hits_candidates, edge, direction, options.max_gap_to_add+k_mer, set(), k_mer)
 
     # compare candidates with blast results
-    blast_out_lines = open(out_file, 'r')
+    blast_out_lines = open(out_file)
     for line in blast_out_lines:
         line_split = line.strip().split('\t')
         query = '_'.join(line_split[0].split('_')[1:]).split('_length')[0]

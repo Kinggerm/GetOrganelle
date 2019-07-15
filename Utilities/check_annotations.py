@@ -170,7 +170,7 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
 
 
 def read_gb(gb_dir):
-    gb_file = [x.strip('\n').strip("\r") for x in open(gb_dir, 'r').readlines()]
+    gb_file = [x.strip('\n').strip("\r") for x in open(gb_dir).readlines()]
     i = 0
     gb_structure = {}
     while i < len(gb_file):

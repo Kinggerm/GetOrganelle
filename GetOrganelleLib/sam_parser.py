@@ -312,7 +312,7 @@ def split_cigar_str(cigar_str):
 def get_heads_from_sam_fast(*bowtie_sam_files):
     hit_heads = set()
     for bt_s_f in bowtie_sam_files:
-        for line in open(bt_s_f, 'r'):
+        for line in open(bt_s_f):
             if line.strip() and not line.startswith('@'):
                 line_split = line.strip().split('\t')
                 this_name = line_split[0]

@@ -14,7 +14,7 @@ direction = {'+': True, '-': False}
 def read_gfa_as_fastg(gfa_file):
     edges = {}
     count_edge = 0
-    for line in open(gfa_file, 'r'):
+    for line in open(gfa_file):
         line_split = line.rstrip().split('\t')
         if line_split[0] == 'S':
             count_edge += 1

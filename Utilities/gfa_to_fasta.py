@@ -10,7 +10,7 @@ path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 def read_gfa_as_fasta(gfa_file):
     fasta_matrix = [[], [], 70]
-    for line in open(gfa_file, 'r'):
+    for line in open(gfa_file):
         line_split = line.rstrip().split('\t')
         if line_split[0] == 'S':
             seq_len = int(line_split[3].split(':')[-1])

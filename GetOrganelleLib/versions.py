@@ -9,6 +9,7 @@ versions = [
      "features": [
          "1. fix a minor bug when raising ProcessingGraphFailed with # tags",
          "2. setup.py install modified",
+         "3. open() modified",
      ]},
     {"number": "1.6.2a",
      "features": [

@@ -91,7 +91,7 @@ def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, outp
     index_base = check_db(fastg_file, which_blast=which_blast)
     execute_blast(fastg_file, index_base, fastg_file + '.blast', threads=threads, outfmt=6,
                   e_value="1E-30", word_size=10, which_blast=which_blast)
-    blast_result = open(fastg_file + '.blast', 'r')
+    blast_result = open(fastg_file + '.blast')
     suspicious_nodes = {}
     for line in blast_result:
         if not line.startswith("#") and line.strip():

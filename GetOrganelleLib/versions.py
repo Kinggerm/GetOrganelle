@@ -5,6 +5,11 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.2b",
+     "features": [
+         "1. fix a minor bug when raising ProcessingGraphFailed with # tags",
+         "2. setup.py install modified",
+     ]},
     {"number": "1.6.2a",
      "features": [
          "1. the bug with option \"--genes\" fixed",

@@ -1938,7 +1938,8 @@ class Assembly(object):
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
                                                             "# tags: " +
-                                                            str(new_assembly.vertex_info[del_v].other_attr["tags"][database_name]))
+                                                            str(new_assembly.vertex_info[del_v].other_attr.
+                                                                get("tags", {database_name: ""})[database_name]))
 
                             # remove other clusters
                             vertices_to_del = set()

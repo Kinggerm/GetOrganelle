@@ -1,3 +1,4 @@
+import setuptools
 from setuptools import setup
 from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.pipe_control_func \
@@ -25,6 +26,10 @@ elif MAJOR_VERSION == 3 and MINOR_VERSION >= 5:
 else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
+
+sys.stdout.write("Python " + str(sys.version).replace("\n", " ") + "\n")
+sys.stdout.write("Using setuptools " + str(setuptools.__version__) + "\n")
+
 # python libs
 install_dependencies = []
 try:
@@ -34,6 +39,8 @@ except ImportError:
         install_dependencies.append("numpy>=1.16.4")
     else:
         install_dependencies.append("numpy==1.16.4")
+else:
+    sys.stdout.write("Existed module numpy " + str(numpy.__version__) + "\n")
 try:
     import scipy
 except ImportError:
@@ -42,6 +49,8 @@ except ImportError:
     else:
         # higher version not compatible with python2
         install_dependencies.append("scipy==1.2.1")
+else:
+    sys.stdout.write("Existed module numpy " + str(scipy.__version__) + "\n")
 try:
     import sympy
 except ImportError:
@@ -49,6 +58,9 @@ except ImportError:
         install_dependencies.append("sympy>=1.4")
     else:
         install_dependencies.append("sympy==1.4")
+else:
+    sys.stdout.write("Existed module sympy " + str(sympy.__version__) + "\n")
+
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 LIB_NAME = "GetOrganelleLib"
 LIB_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME)
@@ -80,7 +92,7 @@ def get_recursive_files(target_dir, start_from="", exclude_files=None):
         exclude_files = set()
     assert target_dir.startswith(start_from), "target_dir should be starting with start_from!"
     omit_len = len(start_from.rstrip("/") + "/") if start_from else 0
-    for f_dir, p_dir, files in os.walk(target_dir):
+    for f_dir, sub_dirs, files in os.walk(target_dir):
         for i_file in files:
             if not i_file.startswith(".") and os.path.join(f_dir, i_file)[omit_len:] not in exclude_files:
                 yield os.path.join(f_dir, i_file)[omit_len:]
@@ -247,7 +259,7 @@ if not in_situ:
     setup(
         name="GetOrganelle",
         version=get_versions(),
-        description="gets organelle reads and genomes from genome skimming data by extending.",
+        description="a fast and versatile toolkit for accurate de novo assembly of organelle genomes.",
         author="Jian-Jun Jin",
         author_email="jinjianjun@mail.kib.ac.cn",
         url="http://github.org/Kinggerm/GetOrganelle",
@@ -255,7 +267,10 @@ if not in_situ:
         packages=[LIB_NAME, DEP_NAME],
         platforms="linux/MacOS",
         scripts=scripts_to_install,
-        package_data={LIB_NAME: [NOT_DIR + "/*.n*", SEQ_DIR + "/*.bt2l", SEQ_DIR + "/*.fasta"],
+        # relative path to each package
+        package_data={LIB_NAME: [os.path.join(NOT_NAME, "*.n*"),
+                                 os.path.join(SEQ_NAME, "*.bt2l"),
+                                 os.path.join(SEQ_NAME, "*.fasta")],
                       DEP_NAME: [this_file
                                  for this_file in
                                  get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
@@ -264,10 +279,12 @@ if not in_situ:
         zip_safe=False
         )
     if keep_index:
-        os.system("rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info")
+        for temp_dir_or_files in ("build", "dist", "*.pyc", "*.tgz", "*.egg-info"):
+            os.system("rm -vrf " + str(os.path.join(PATH_OF_THIS_SCRIPT, temp_dir_or_files)))
     else:
-        os.system("rm -vrf GetOrganelleLib/SeedDatabase/*.index.*.bt2l GetOrganelleLib/LabelDatabase/*.n* "
-                  "./build ./dist ./*.pyc ./*.tgz ./*.egg-info")
+        for temp_dir_or_files in ("build", "dist", "*.pyc", "*.tgz", "*.egg-info",
+                                  os.path.join(LIB_NAME, NOT_NAME, "*.n*"), os.path.join(LIB_NAME, SEQ_NAME, "*.bt2l")):
+            os.system("rm -vrf " + str(os.path.join(PATH_OF_THIS_SCRIPT, temp_dir_or_files)))
 else:
     for script_chmod in scripts_to_install:
         os.chmod(script_chmod, 0o755)

@@ -50,6 +50,13 @@ def get_options(print_title):
                            "25000 (-F embplant_nr/animal_mt/fungus_mt), 600000 (-F embplant_mt/other_pt)")
     parser.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
                       help="Expected mininum target genome size. Default: %default")
+    parser.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
+                      help="For '-F embplant_pt' with complete circular result, "
+                           "by default, the direction of the starting contig (usually "
+                           "the LSC contig) is determined as the direction with less ORFs. Choose this option "
+                           "to reverse the direction of the starting contig when result is circular. "
+                           "Actually, both directions are biologically equivalent to each other. The "
+                           "reordering of the direction is only for easier downstream analysis.")
     parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
                       help="By default, this script would pick the contig with highest coverage among all parallel "
                            "(polymorphic) contigs when degenerating was not applicable. "
@@ -203,7 +210,8 @@ def main():
                     # should add making one-step-inversion pairs for paths,
                     # which would be used to identify existence of a certain isomer using mapping information
                     count_path = 0
-                    for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode, log_handler=log_handler):
+                    for this_path, other_tag in idealized_graph.get_all_circular_paths(
+                            mode=mode, log_handler=log_handler, reverse_start_direction_for_pt=options.reverse_lsc):
                         count_path += 1
                         this_seq_obj = idealized_graph.export_path(this_path)
                         if DEGENERATE_BASES & set(this_seq_obj.seq):

@@ -120,6 +120,13 @@ def get_options(description, version):
                            "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
                            "with the same list length to organelle_type (followed by '-F'). "
                            "Default: %default for all.")
+    parser.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
+                      help="For '-F embplant_pt' with complete circular result, "
+                           "by default, the direction of the starting contig (usually "
+                           "the LSC contig) is determined as the direction with less ORFs. Choose this option "
+                           "to reverse the direction of the starting contig when result is circular. "
+                           "Actually, both directions are biologically equivalent to each other. The "
+                           "reordering of the direction is only for easier downstream analysis.")
     parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
                       help="By default, this script would pick the contig with highest coverage among all parallel "
                            "(polymorphic) contigs when degenerating was not applicable. "
@@ -157,7 +164,8 @@ def get_options(description, version):
         for not_often_used in ("--genes", "--ex-genes", "--slim-options", "--depth-factor", "--type-f",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--expected-max-size", "--expected-min-size", "--keep-all-polymorphic", "--min-sigma",
+                               "--expected-max-size", "--expected-min-size", "--reverse-lsc",
+                               "--keep-all-polymorphic", "--min-sigma",
                                "--prefix", "--which-blast", "--which-bandage",
                                "--keep-temp", "--random-seed", "--verbose"):
             parser.remove_option(not_often_used)
@@ -577,8 +585,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                     go_res += 1
                     idealized_graph = res["graph"]
                     count_path = 0
-                    for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode_in,
-                                                                                       log_handler=log_in):
+                    for this_path, other_tag in idealized_graph.get_all_circular_paths(
+                            mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc):
                         count_path += 1
                         out_n = o_p + ".complete.graph" + str(go_res) + "." + str(
                             count_path) + other_tag + ".path_sequence.fasta"

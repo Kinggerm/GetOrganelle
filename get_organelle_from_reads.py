@@ -311,6 +311,13 @@ def get_options(description, version):
                                    "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
                                    "with the same list length to organelle_type (followed by '-F'). "
                                    "Default: %default for all.")
+    group_assembly.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
+                              help="For '-F embplant_pt' with complete circular result, "
+                                   "by default, the direction of the starting contig (usually "
+                                   "the LSC contig) is determined as the direction with less ORFs. Choose this option "
+                                   "to reverse the direction of the starting contig when result is circular. "
+                                   "Actually, both directions are biologically equivalent to each other. The "
+                                   "reordering of the direction is only for easier downstream analysis.")
     # group 5
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "")
     group_computational.add_option("-t", dest="threads", type=int, default=1,
@@ -378,7 +385,7 @@ def get_options(description, version):
                                "--gradient-k", "--ignore-k", "--genes", "--ex-genes", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--expected-max-size", "--expected-min-size",
+                               "--expected-max-size", "--expected-min-size", "--reverse-lsc",
                                "--which-blast", "--which-bowtie2", "--which-spades", "--which-bandage",
                                "--continue", "--index-in-memory",
                                "--remove-duplicates", "--flush-step", "--verbose"):
@@ -3263,8 +3270,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     go_res += 1
                     idealized_graph = res["graph"]
                     count_path = 0
-                    for this_path, other_tag in idealized_graph.get_all_circular_paths(mode=mode_in,
-                                                                                       log_handler=log_in):
+                    for this_path, other_tag in idealized_graph.get_all_circular_paths(
+                            mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc):
                         count_path += 1
                         out_n = o_p + ".complete.graph" + str(go_res) + "." + str(
                             count_path) + other_tag + ".path_sequence.fasta"

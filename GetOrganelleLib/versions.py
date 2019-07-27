@@ -5,6 +5,12 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.2c",
+     "features": [
+         "1. GetOrganelleLib/assembly_parser.py: SSC direction set according to orf",
+         "2. disentangle: --reverse-lsc option added; fix a bug for disentangling contigs with no overlaps",
+         "3. Utilities/plastome_arch_info.py: GC content added",
+     ]},
     {"number": "1.6.2b",
      "features": [
          "1. fix a minor bug when raising ProcessingGraphFailed with # tags",

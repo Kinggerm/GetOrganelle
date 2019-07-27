@@ -168,7 +168,9 @@ class Assembly(object):
                     kmer_values.add(kmer_val)
                     self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
                     self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
-            if len(kmer_values) != 1:
+            if len(kmer_values) == 0:
+                self.__kmer = None
+            elif len(kmer_values) > 1:
                 raise ProcessingGraphFailed("Multiple overlap values: " + ",".join(sorted(kmer_values)))
             else:
                 self.__kmer = int(kmer_values.pop()[:-1])
@@ -2278,7 +2280,8 @@ class Assembly(object):
                 new_assembly.write_out_tags([database_name], temp_csv)
             raise KeyboardInterrupt
 
-    def get_all_circular_paths(self, mode="embplant_pt", library_info=None, log_handler=None):
+    def get_all_circular_paths(self, mode="embplant_pt",
+                               library_info=None, log_handler=None, reverse_start_direction_for_pt=False):
 
         def circular_directed_graph_solver(ongoing_path, next_connections, vertices_left, check_all_kinds):
             # print("-----------------------------")
@@ -2294,9 +2297,14 @@ class Assembly(object):
                         this_path_derived.append(new_path[change_start:] + new_path[:change_start])
                         this_path_derived.append(rev_path[change_start:] + rev_path[:change_start])
                     standardized_path = tuple(sorted(this_path_derived)[0])
-                    paths.add(tuple(standardized_path))
+                    if standardized_path not in paths_set:
+                        paths_set.add(standardized_path)
+                        paths.append(standardized_path)
                 else:
-                    paths.add(tuple(new_path))
+                    new_path = tuple(new_path)
+                    if new_path not in paths_set:
+                        paths_set.add(new_path)
+                        paths.append(new_path)
                 return
 
             for next_vertex, next_end in next_connections:
@@ -2318,16 +2326,26 @@ class Assembly(object):
                                     this_path_derived.append(new_path[change_start:] + new_path[:change_start])
                                     this_path_derived.append(rev_path[change_start:] + rev_path[:change_start])
                                 standardized_path = tuple(sorted(this_path_derived)[0])
-                                paths.add(tuple(standardized_path))
+                                if standardized_path not in paths_set:
+                                    paths_set.add(standardized_path)
+                                    paths.append(standardized_path)
                             else:
-                                paths.add(tuple(new_path))
+                                new_path = tuple(new_path)
+                                if new_path not in paths_set:
+                                    paths_set.add(new_path)
+                                    paths.append(new_path)
                             return
                         else:
                             return
                     else:
+                        new_connections = sorted(new_connections)
+                        # if next_connections is SSC, reorder
+                        if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == new_connections[1][0]:
+                            new_connections.sort(key=lambda x: -self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
                         circular_directed_graph_solver(new_path, new_connections, new_left, check_all_kinds)
 
-        paths = set()
+        paths = []
+        paths_set = set()
 
         # print(self.copy_to_vertex)
 
@@ -2351,12 +2369,14 @@ class Assembly(object):
             if mode == "embplant_pt":
                 # more orfs found in the reverse direction of LSC of a typical plastome
                 start_direction = self.vertex_info[start_vertex].other_attr["orf"][True]["sum_len"] \
-                                  >= self.vertex_info[start_vertex].other_attr["orf"][False]["sum_len"]
+                                  < self.vertex_info[start_vertex].other_attr["orf"][False]["sum_len"]
+                if reverse_start_direction_for_pt:
+                    start_direction = not start_direction
             else:
                 start_direction = True
         # each contig stored format:
         first_path = [(start_vertex, start_direction)]
-        first_connections = self.vertex_info[start_vertex].connections[start_direction]
+        first_connections = sorted(self.vertex_info[start_vertex].connections[start_direction])
         vertex_to_copy = deepcopy(self.vertex_to_copy)
         vertex_to_copy[start_vertex] -= 1
         if vertex_to_copy[start_vertex] <= 0:
@@ -2372,7 +2392,7 @@ class Assembly(object):
             sorted_paths = []
             total_len = len(list(paths)[0])
             record_pattern = False
-            for this_path in paths:
+            for original_id, this_path in enumerate(paths):
                 acc_dist = 0
                 for copy_num in self.copy_to_vertex:
                     if copy_num > 2:
@@ -2381,9 +2401,9 @@ class Assembly(object):
                             loc_ids = [go_to_id for go_to_id, (v, e) in enumerate(this_path) if v == vertex_name]
                             for id_a, id_b in combinations(loc_ids, 2):
                                 acc_dist += min((id_a - id_b) % total_len, (id_b - id_a) % total_len)
-                sorted_paths.append((this_path, acc_dist))
+                sorted_paths.append((this_path, acc_dist, original_id))
             if record_pattern:
-                sorted_paths.sort(key=lambda x: -x[1])
+                sorted_paths.sort(key=lambda x: (-x[1], x[2]))
                 pattern_dict = {acc_distance: ad_id + 1
                                 for ad_id, acc_distance in enumerate(sorted(set([x[1] for x in sorted_paths]),
                                                                             reverse=True))}
@@ -2398,11 +2418,11 @@ class Assembly(object):
                                              "a more balanced pattern (always the repeat_pattern1) would be suggested "
                                              "for plastomes with the canonical IR!\n")
                     sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
-                                    for this_path, acc_distance in sorted_paths]
+                                    for this_path, acc_distance, foo_id in sorted_paths]
                 else:
-                    sorted_paths = [(this_path, "") for this_path in sorted(paths)]
+                    sorted_paths = [(this_path, "") for this_path in paths]
             else:
-                sorted_paths = [(this_path, "") for this_path in sorted(paths)]
+                sorted_paths = [(this_path, "") for this_path in paths]
 
             if mode == "embplant_pt":
                 if len(sorted_paths) > 2 and not (100000 < len(self.export_path(sorted_paths[0][0]).seq) < 200000):
@@ -2473,11 +2493,15 @@ class Assembly(object):
                     new_left[next_vertex] -= 1
                     if not new_left[next_vertex]:
                         del new_left[next_vertex]
-                    new_connections = self.vertex_info[next_vertex].connections[not next_end]
+                    new_connections = sorted(self.vertex_info[next_vertex].connections[not next_end])
                     if not new_left:
                         path_paris.append([new_paths, standardize_paths(new_paths)])
                         return
                     else:
+                        if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == \
+                                new_connections[1][0]:
+                            new_connections.sort(
+                                key=lambda x: self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
                         directed_graph_solver(new_paths, new_connections, new_left, in_all_start_ve)
             if not find_next:
                 new_all_start_ve = deepcopy(in_all_start_ve)
@@ -2490,11 +2514,15 @@ class Assembly(object):
                         new_left[new_start_vertex] -= 1
                         if not new_left[new_start_vertex]:
                             del new_left[new_start_vertex]
-                        new_connections = self.vertex_info[new_start_vertex].connections[new_start_end]
+                        new_connections = sorted(self.vertex_info[new_start_vertex].connections[new_start_end])
                         if not new_left:
                             path_paris.append([new_paths, standardize_paths(new_paths)])
                             return
                         else:
+                            if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == \
+                                    new_connections[1][0]:
+                                new_connections.sort(
+                                    key=lambda x: self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
                             directed_graph_solver(new_paths, new_connections, new_left, new_all_start_ve)
                             break
                 if not new_all_start_ve:
@@ -2503,6 +2531,7 @@ class Assembly(object):
         path_paris = list()
         # start from a terminal vertex in an open graph/subgraph
         #         or a single copy vertex in a closed graph/subgraph
+        self.update_orf_total_len()
         all_start_v_e = []
         start_vertices = set()
         for go_set, v_set in enumerate(self.vertex_clusters):
@@ -2531,7 +2560,7 @@ class Assembly(object):
 
         start_v_e = all_start_v_e.pop(0)
         first_path = [[start_v_e]]
-        first_connections = self.vertex_info[start_v_e[0]].connections[start_v_e[1]]
+        first_connections = sorted(self.vertex_info[start_v_e[0]].connections[start_v_e[1]])
         vertex_to_copy = deepcopy(self.vertex_to_copy)
         vertex_to_copy[start_v_e[0]] -= 1
         if not vertex_to_copy[start_v_e[0]]:
@@ -2551,7 +2580,7 @@ class Assembly(object):
             sorted_paths = []
             # total_len = len(list(set(paths))[0])
             record_pattern = False
-            for this_path in paths:
+            for original_id, this_path in enumerate(paths):
                 acc_dist = 0
                 for copy_num in self.copy_to_vertex:
                     if copy_num > 2:
@@ -2569,9 +2598,9 @@ class Assembly(object):
                                     else:
                                         for id_a, id_b in combinations(loc_ids, 2):
                                             acc_dist += id_b - id_a
-                sorted_paths.append((this_path, acc_dist))
+                sorted_paths.append((this_path, acc_dist, original_id))
             if record_pattern:
-                sorted_paths.sort(key=lambda x: -x[1])
+                sorted_paths.sort(key=lambda x: (-x[1], x[2]))
                 pattern_dict = {acc_distance: ad_id + 1
                                 for ad_id, acc_distance
                                 in enumerate(sorted(set([x[1] for x in sorted_paths]), reverse=True))}
@@ -2591,7 +2620,7 @@ class Assembly(object):
                         else:
                             sys.stdout.write("Warning: Multiple repeat patterns appeared in your data.\n")
                     sorted_paths = [(this_path, ".repeat_pattern" + str(pattern_dict[acc_distance]))
-                                    for this_path, acc_distance in sorted_paths]
+                                    for this_path, acc_distance, foo_id in sorted_paths]
                 else:
                     sorted_paths = [(this_path, "") for this_path in sorted(paths)]
             else:

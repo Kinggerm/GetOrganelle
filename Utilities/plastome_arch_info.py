@@ -99,7 +99,7 @@ def main():
                      "## This script helps you count the LSC/SSC/IR-DR lengths from a batch of plastome sequences.\n"
                      "## by jinjianjun@mail.kib.ac.cn\n\n")
     options, argv = get_options()
-    sys.stdout.write("file_name\tsequence_name\ttotal_length\tLSC_length\tSSC_length\tIR/DR_length\tNotes\n")
+    sys.stdout.write("file_name\tsequence_name\ttotal_length\tLSC_length\tSSC_length\tIR/DR_length\tarch_Notes\tGC_content\n")
     if options.output:
         out_handler = open(options.output, "w")
         out_handler.close()
@@ -107,8 +107,15 @@ def main():
         this_matrix = read_fasta(this_f)
         for i in range(len(this_matrix[0])):
             arch = detect_architecture(this_matrix[1][i], options.min_ir_length, options.valid_bases)
+            this_upper = this_matrix[1][i].upper()
+            this_gc = this_upper.count("G") + this_upper.count("C")
+            this_at = this_upper.count("A") + this_upper.count("T")
+            if this_gc + this_at == len(this_upper):
+                gc_content = "%.4f" % (this_gc / float(len(this_upper)))
+            else:
+                gc_content = "ca. " + "%.8f" % (this_gc / float(len(this_upper)))
             out_line = "\t".join([this_f, this_matrix[0][i], str(len(this_matrix[1][i]))] +
-                                 [str(x) for x in arch]) + "\n"
+                                 [str(x) for x in arch] + [gc_content]) + "\n"
             sys.stdout.write(out_line)
             if options.output:
                 open(options.output, "a").write(out_line)

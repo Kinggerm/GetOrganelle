@@ -10,6 +10,7 @@ versions = [
          "1. GetOrganelleLib/assembly_parser.py: SSC direction set according to orf",
          "2. disentangle: --reverse-lsc option added; fix a bug for disentangling contigs with no overlaps",
          "3. Utilities/plastome_arch_info.py: GC content added",
+         "4. get_organelle_from_reads.py: fix a bug for --flush-step inf"
      ]},
     {"number": "1.6.2b",
      "features": [

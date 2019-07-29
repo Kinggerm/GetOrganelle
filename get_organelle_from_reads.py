@@ -179,12 +179,9 @@ def get_options(description, version):
                                     "a certain value during pregrouping process and later changed during reads "
                                     "extending process. Similar to word size. Default: the same to word size.")
     group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=inf,
-                               help="Maximum number of running rounds (suggested: >=2). "
+                               help="Maximum number of extending rounds (suggested: >=2). "
                                     "Default: 15 (-F embplant_pt), 30 (-F embplant_mt/other_pt), "
                                     "10 (-F embplant_nr/animal_mt/fungus_mt), inf (-P 0).")
-    # group_extending.add_option("-r", "--min-rounds", dest="min_rounds", type=int, default=5,
-    #                            help="Minimum number of running rounds (>=1). Only for printing warnings. "
-    #                                 "Default: %default")
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
                                     "Default: 4E8 (-F embplant_pt), 2E8 (-F embplant_nr/fungus_mt/animal_mt), "
@@ -355,8 +352,8 @@ def get_options(description, version):
                                         "Choose 0 to disable this process. "
                                         "Note that whether choose or not will not disable "
                                         "the calling of replicate reads. Default: %default.")
-    group_computational.add_option("--flush-step", dest="echo_step", default=54321, type=int,
-                                   help="Flush step for presenting progress. "
+    group_computational.add_option("--flush-step", dest="echo_step", default=54321,
+                                   help="Flush step (INTEGER OR INF) for presenting progress. "
                                         "For running in the background, you could set this to inf, "
                                         "which would disable this. Default: %default")
     group_computational.add_option("--random-seed", dest="random_seed", default=12345, type=int,
@@ -520,24 +517,36 @@ def get_options(description, version):
             options.unpaired_fq_files = []
         if options.jump_step < 1:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: Jump step MUST be an integer that >= 1")
+                             "\nERROR: Jump step MUST be an integer that >= 1\n")
             exit()
         if options.mesh_size < 1:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: Mesh size MUST be an integer that >= 1")
+                             "\nERROR: Mesh size MUST be an integer that >= 1\n")
             exit()
         if options.fq_file_1 == options.fq_file_2 and options.fq_file_1:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: 1st fastq file is the same with 2nd fastq file!")
+                             "\nERROR: 1st fastq file is the same with 2nd fastq file!\n")
             exit()
         if options.memory_save and options.memory_unlimited:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: \"--memory-save\" and \"--memory-unlimited\" are not compatible!")
+                             "\nERROR: \"--memory-save\" and \"--memory-unlimited\" are not compatible!\n")
         assert options.threads > 0
         if options.reduce_reads_for_cov < 10:
             sys.stdout.write("\n############################################################################"
-                             "\nERROR: value after \"--reduce-reads-for-coverage\" must be larger than 10!")
+                             "\nERROR: value after \"--reduce-reads-for-coverage\" must be larger than 10!\n")
             exit()
+        if options.echo_step == "inf":
+            options.echo_step = inf
+        elif type(options.echo_step) == int:
+            pass
+        elif type(options.echo_step) == str:
+            try:
+                options.echo_step = int(float(options.echo_step))
+            except ValueError:
+                sys.stdout.write("\n############################################################################"
+                                 "\n--flush-step should be followed by positive integer or inf!\n")
+                exit()
+        assert options.echo_step > 0
         options.prefix = os.path.basename(options.prefix)
         if options.script_resume and os.path.isdir(options.output_base):
             previous_attributes = LogInfo(options.output_base, options.prefix)

@@ -5,6 +5,10 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.2d",
+     "features": [
+         "1. get_organelle_from_reads.py: fix a bug with '-F anonym'",
+     ]},
     {"number": "1.6.2c",
      "features": [
          "1. GetOrganelleLib/assembly_parser.py: SSC direction set according to orf",

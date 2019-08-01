@@ -750,8 +750,9 @@ def get_options(description, version):
                 elif sub_organelle_t == "anonym":
                     ref_seqs = read_fasta(options.genes_fasta[go_t])[1]
                     options.target_genome_size.append(2 * sum([len(this_seq) for this_seq in ref_seqs]))
-                    log_handler.info("Setting '--target-genome-size " + str(options.target_genome_size) +
-                                     "' for estimating the word size value for anonym type.")
+                    log_handler.info(
+                        "Setting '--target-genome-size " + ",".join([str(t_s) for t_s in options.target_genome_size]) +
+                        "' for estimating the word size value for anonym type.")
                 else:
                     options.target_genome_size.append(raw_default_value)
         else:
@@ -781,8 +782,9 @@ def get_options(description, version):
                 elif sub_organelle_t == "anonym":
                     ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
                     options.expected_max_size.append(10 * sum([len(this_seq) for this_seq in ref_seqs]))
-                    log_handler.info("Setting '--expected-max-size " + str(options.expected_max_size) +
-                                     "' for estimating the word size value for anonym type.")
+                    log_handler.info(
+                        "Setting '--expected-max-size " + ",".join([str(t_s) for t_s in options.expected_max_size]) +
+                        "' for estimating the word size value for anonym type.")
         else:
             temp_val_len = len(str(options.expected_max_size).split(","))
             if temp_val_len != organelle_type_len:
@@ -896,7 +898,7 @@ def get_options(description, version):
 
 def estimate_maximum_n_reads_using_mapping(
         twice_max_coverage, check_dir, original_fq_list, reads_paired,
-        designed_maximum_n_reads, seed_files, organelle_types,
+        designed_maximum_n_reads, seed_files, organelle_types, target_genome_sizes,
         keep_temp, resume, which_blast, which_spades, which_bowtie2, threads, random_seed, verbose_log, log_handler):
     if executable(os.path.join(UTILITY_PATH, "slim_fastg.py -h")):
         which_slim = UTILITY_PATH
@@ -926,9 +928,14 @@ def estimate_maximum_n_reads_using_mapping(
         original_fq_sizes[0] = original_fq_sizes[1] = (original_fq_sizes[0] + original_fq_sizes[1]) /2.
     # if the original data sizes is too small, no need to reduce
     max_organelle_base_percent = 0.2
-    for organelle_type in organelle_types:
-        min_file_size = ORGANELLE_EXPECTED_GRAPH_SIZES[organelle_type] * twice_max_coverage \
-                        / max_organelle_base_percent * GUESSING_FQ_SEQ_INFLATE_TO_FILE
+    for go_t, organelle_type in enumerate(organelle_types):
+        # temporary treat: compatible with previous
+        if organelle_type in ORGANELLE_EXPECTED_GRAPH_SIZES:
+            min_file_size = ORGANELLE_EXPECTED_GRAPH_SIZES[organelle_type] * twice_max_coverage \
+                            / max_organelle_base_percent * GUESSING_FQ_SEQ_INFLATE_TO_FILE
+        else:
+            min_file_size = target_genome_sizes[go_t] * twice_max_coverage \
+                            / max_organelle_base_percent * GUESSING_FQ_SEQ_INFLATE_TO_FILE
         if sum(original_fq_sizes) < min_file_size:
             if not keep_temp:
                 shutil.rmtree(check_dir)
@@ -3552,12 +3559,13 @@ def main():
                     # all_bases = mean_read_len * sum(all_read_nums)
             if all_read_nums is None:
                 if options.reduce_reads_for_cov != inf:
-                    log_handler.info("Estimating reads to use ...")
+                    log_handler.info("Estimating reads to use ... (to skip, set '--reduce-reads-for-coverage inf')")
                     all_read_nums = estimate_maximum_n_reads_using_mapping(
                         twice_max_coverage=options.reduce_reads_for_cov * 2, check_dir=os.path.join(out_base, "check"),
                         original_fq_list=original_fq_files, reads_paired=reads_paired["input"],
                         designed_maximum_n_reads=options.maximum_n_reads,
                         seed_files=options.seed_file, organelle_types=options.organelle_type,
+                        target_genome_sizes=options.target_genome_size,
                         keep_temp=options.keep_temp_files, resume=options.script_resume,
                         which_blast=options.which_blast, which_spades=options.which_spades,
                         which_bowtie2=options.which_bowtie2, threads=options.threads,

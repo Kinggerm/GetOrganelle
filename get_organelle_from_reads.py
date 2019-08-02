@@ -506,6 +506,10 @@ def get_options(description, version):
                     sys.stdout.write("\n############################################################################"
                                      "\nERROR: " + check_file + " not found!\n\n")
                     exit()
+                if os.path.getsize(check_file) == 0:
+                    sys.stdout.write("\n############################################################################"
+                                     "\nERROR: " + check_file + " is empty!\n\n")
+                    exit()
         if options.unpaired_fq_files:
             options.unpaired_fq_files = options.unpaired_fq_files.split(",")
             for fastq_file in options.unpaired_fq_files:

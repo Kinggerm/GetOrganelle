@@ -10,6 +10,8 @@ versions = [
          "1. seq_parser.py: fix a bug for fastq format: @*****#/1",
          "2. get_organelle_from_reads.py: separate_fq_by_pair(), fix a bug when detecting pair info failed; ",
          "3. evaluate_assembly_using_mapping.py: fix a bug for --plot-transparent",
+         "4. GetOrganelleLib.__init__.py: __version__",
+         "5. README.md: updated",
      ]},
     {"number": "1.6.2d",
      "features": [

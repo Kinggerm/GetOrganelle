@@ -26,7 +26,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation
 
-This toolkit was currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is generally more efficient under Python 3.*.
+This toolkit is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is generally more efficient under Python 3.*.
 
 There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is the way with GetOrganelleLib installed in the $PYTHONPATH ; 2) `In situ configuration` is the classic and heavy way, but easier to keep updated.
 
@@ -38,7 +38,7 @@ Execute following curl commands to download suitable version (see more versions 
     # Supposing your system is linux, otherwise change the 'linux' into 'macOS'; If you do not need the attached dependency, change 'linux' into 'light';
     # Supposing you download GetOrganelle to ~/Downloads
     cd ~/Downloads
-    curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2/v1.6.2-linux.tar.gz | tar zx
+    curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2e/v1.6.2e-linux.tar.gz | tar zx
     
 install [pip](https://pip.pypa.io/en/stable/installing/) and then install downloaded GetOrganelle with pip.
 
@@ -102,7 +102,7 @@ You are always recommended to use the latest GetOrganelle, although you could fi
 
 ### Required Dependencies
 
-Since v1.6*, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `pip install ./GetOrganelle`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2/v1.6.2-light.tar.gz) upon installing GetOrganelle. 
+Since v1.6*, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `pip install ./GetOrganelle`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2e/v1.6.2e-light.tar.gz) upon installing GetOrganelle. 
 
 Besides, no worries about interference from GetOrganelle's dependencies. Because during the installing process mentioned above, GetOrganelle would add those dependencies (SPAdes, Bowtie2, BLAST+) to the GetOrganelle-*.egg rather than to the $PATH, thereby not influence your own usage. For example, if you already installed SPAdes v3.6.2, after installing GetOrganelle, the spades version for your system would still be v3.6.2, while only GetOrganelle uses the [version in GetOrganelleDep](https://github.com/Kinggerm/GetOrganelle/blob/master/GetOrganelleDep/linux/SPAdes/share/spades/VERSION). 
 
@@ -110,14 +110,14 @@ Python libraries (numpy, scipy, sympy) is covered in the installation part.
 
 #### NOT Required Dependencies
 
-<a href='http://rrwick.github.io/Bandage/'>Bandage</a> is a fantastic tool to view the assembly graph (`*.fastg`/`*.gfa`). If you have Bandage correctly configured and add the binary folder of Bandage (which is `Bandage.app/Contents/MacOS` for MacOS) to the $PATH, get_organelle_from_*.py would automatically generate the a png formatted image of the assembly graph. 
+<a href=' '>Bandage</a > is a fantastic tool to view the assembly graph (`*.fastg`/`*.gfa`). If you have Bandage correctly configured and add the binary folder of Bandage (which is `Bandage.app/Contents/MacOS` for MacOS) to the $PATH, get_organelle_from_*.py would automatically generate the a png formatted image of the assembly graph. 
 
 If you installed python library psutil (pip install psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
 
 
 ## How To
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Example</a></b>. But you are still recommended to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Example</a ></b>. But you are still recommended to read the following introductions:
 
 <b>Preparing Data</b>
 
@@ -177,19 +177,6 @@ or see the detailed illustrations:
 
 Also see [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) for a benchmark test of `GetOrganelle` and `NOVOPlasty` using 50 online samples.
 
-
-## Published Works Using GetOrganelle
-
-It was previously cited as GetOrganelle (https://github.com/Kinggerm/GetOrganelle), but now we have a report paper (<a href="#citation">see above</a>) to cite.
-
-* Yu Song, Wen-Bin Yu, Yun-Bong Tan, Bing Liu, Xin Yao, Jian-Jun Jin, Michael Padmanaba, Jun-Bo Yang, Richard T. Corlett. 2017. Evolutionary comparisons of the chloroplast genome in Lauraceae and insights into loss events in the Magnoliids. Genome Biology and Evolution. 9(9): 2354-64. doi: [https://doi.org/10.1093/gbe/evx180](https://doi.org/10.1093/gbe/evx180)
-
-* Twyford AD, Ness RW. 2017. Strategies for complete plastid genome sequencing. Molecular Ecology Resources. 17(5):858-68. doi: [https://doi.org/10.1111/1755-0998.12626](https://doi.org/10.1111/1755-0998.12626)
-
-* Guan-Song Yang, Yin-Huan Wang, Yue-Hua Wang, Shi-Kang Shen. 2017. The complete chloroplast genome of a vulnerable species Champereia manillana (Opiliaceae). Conservation Genetics Resources. 9(3): 415-418. doi: [https://doi.org/10.1007/s12686-017-0697-1](https://doi.org/10.1007/s12686-017-0697-1)
-
-* [See here for more (10+)](http://www.wbyu.net/getorganelle.html)
-
 ## Acknowledgement
 
-Thanks to Chao-Nan Fu, Han-Tao Qin, Xiao-Jian Qu, Shuo Wang, and Rong Zhang for giving tests or suggestions.
+Thanks to Chao-Nan Fu, Han-Tao Qin, Yang Pan, Xiao-Jian Qu, Shuo Wang, Rong Zhang, Fei Zhao and lots of users for giving tests or suggestions.

@@ -5,6 +5,12 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.2e",
+     "features": [
+         "1. seq_parser.py: fix a bug for fastq format: @*****#/1",
+         "2. get_organelle_from_reads.py: separate_fq_by_pair(), fix a bug when detecting pair info failed; ",
+         "3. evaluate_assembly_using_mapping.py: fix a bug for --plot-transparent",
+     ]},
     {"number": "1.6.2d",
      "features": [
          "1. get_organelle_from_reads.py: fix a bug with '-F anonym'",

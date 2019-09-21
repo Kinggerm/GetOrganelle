@@ -65,7 +65,7 @@ def get_options():
                       help="Default: `the file name of the input fasta`")
     parser.add_option("--plot-subtitle", dest="plot_subtitle", default="",
                       help="A 4-space indicates a line break. Default: None")
-    parser.add_option("--plot-transparent", dest="plot_transparent", default=False,
+    parser.add_option("--plot-transparent", dest="plot_transparent", default=False, action="store_true",
                       help="Default: False")
     parser.add_option("--plot-x-density", dest="plot_x_density", default=12000., type=float,
                       help="Default: %default")

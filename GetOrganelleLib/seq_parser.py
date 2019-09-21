@@ -3,6 +3,7 @@ import sys
 import math
 import re
 import random
+
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
     python_version = "2.7+"
@@ -12,10 +13,10 @@ else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
 
-
 if python_version == "2.7+":
     # python2
     import string
+
     PAIRING_TRANSLATOR = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
 
 
@@ -43,7 +44,7 @@ class Sequence(object):
     def __init__(self, label, seq):
         self.label = label
         self.seq = seq
-        
+
     def __len__(self):
         return len(self.seq)
 
@@ -69,17 +70,17 @@ class SequenceList(object):
         self.interleaved = False
         if input_fasta_file:
             self.read_fasta(input_fasta_file)
-        
+
     def __len__(self):
         return len(self.sequences)
 
     def __iter__(self):
         for seq in self.sequences:
             yield seq
-    
+
     def append(self, sequence):
         self.sequences.append(sequence)
-        
+
     def read_fasta(self, fasta_file):
         fasta_file = open(fasta_file, 'r')
         this_line = fasta_file.readline()
@@ -145,16 +146,16 @@ def write_fasta(out_file, matrix, overwrite):
     fasta_file = open(out_file, 'w')
     if matrix[2]:
         for i in range(len(matrix[0])):
-            fasta_file.write('>'+matrix[0][i]+'\n')
+            fasta_file.write('>' + matrix[0][i] + '\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
-                fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
+                fasta_file.write(matrix[1][i][(j - matrix[2]):j] + '\n')
                 j += matrix[2]
-            fasta_file.write(matrix[1][i][(j-matrix[2]):j]+'\n')
+            fasta_file.write(matrix[1][i][(j - matrix[2]):j] + '\n')
     else:
         for i in range(len(matrix[0])):
-            fasta_file.write('>'+matrix[0][i]+'\n')
-            fasta_file.write(matrix[1][i]+'\n')
+            fasta_file.write('>' + matrix[0][i] + '\n')
+            fasta_file.write(matrix[1][i] + '\n')
     fasta_file.close()
 
 
@@ -186,20 +187,20 @@ def read_fasta_as_list(fasta_dir):
 def write_fasta_with_list(out_dir, matrix, overwrite):
     if not overwrite:
         while os.path.exists(out_dir):
-            out_dir = '.'.join(out_dir.split('.')[:-1])+'_.'+out_dir.split('.')[-1]
+            out_dir = '.'.join(out_dir.split('.')[:-1]) + '_.' + out_dir.split('.')[-1]
     fasta_file = open(out_dir, 'w')
     if matrix[2]:
         for i in range(len(matrix[0])):
-            fasta_file.write('>'+matrix[0][i]+'\n')
+            fasta_file.write('>' + matrix[0][i] + '\n')
             j = matrix[2]
             while j < len(matrix[1][i]):
-                fasta_file.write(''.join(matrix[1][i][(j-matrix[2]):j])+'\n')
+                fasta_file.write(''.join(matrix[1][i][(j - matrix[2]):j]) + '\n')
                 j += matrix[2]
-            fasta_file.write(''.join(matrix[1][i][(j-matrix[2]):j])+'\n')
+            fasta_file.write(''.join(matrix[1][i][(j - matrix[2]):j]) + '\n')
     else:
         for i in range(len(matrix[0])):
-            fasta_file.write('>'+matrix[0][i]+'\n')
-            fasta_file.write(''.join(matrix[1][i])+'\n')
+            fasta_file.write('>' + matrix[0][i] + '\n')
+            fasta_file.write(''.join(matrix[1][i]) + '\n')
     fasta_file.close()
 
 
@@ -447,16 +448,16 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
                 here_id, direction_trans = last_con
                 candidate_last_connect = (here_id - direction_trans, direction_trans)
                 if candidate_last_connect not in last_connections:
-                        repeats.append([])
-                        for inside_connection in coming_connections:
-                            inside_id, inside_direction = inside_connection
-                            repeats[-1].append([inside_id + (word_size - 1) * (inside_direction == -1),
-                                                inside_id + (word_size - 1) * (inside_direction == 1),
-                                                inside_direction])
-                            if inside_connection not in pointer:
-                                pointer[inside_connection] = []
-                            pointer[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
-                        break
+                    repeats.append([])
+                    for inside_connection in coming_connections:
+                        inside_id, inside_direction = inside_connection
+                        repeats[-1].append([inside_id + (word_size - 1) * (inside_direction == -1),
+                                            inside_id + (word_size - 1) * (inside_direction == 1),
+                                            inside_direction])
+                        if inside_connection not in pointer:
+                            pointer[inside_connection] = []
+                        pointer[inside_connection].append((len(repeats) - 1, len(repeats[-1]) - 1))
+                    break
 
             if i + 1 < len_indices:
                 next_index = repeat_indices[i + 1]
@@ -494,7 +495,7 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
     while count_group__ < len(final_repeat):
         here_start, here_end, here_direction = final_repeat[count_group__][0]
         if not (here_start == 0 and here_end == raw_seq_length - 1) and \
-                ((here_end - here_start + here_direction)*here_direction) % raw_seq_length < min_repeat_length:
+                ((here_end - here_start + here_direction) * here_direction) % raw_seq_length < min_repeat_length:
             del final_repeat[count_group__]
         else:
             count_group__ += 1
@@ -767,51 +768,51 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         proper_end = this_string[-1] == this_reference[-1]
         return difference, proper_end
     else:
-        dynamic_span = max(abs(len(this_string)-len(this_reference))+1, dynamic_span)
+        dynamic_span = max(abs(len(this_string) - len(this_reference)) + 1, dynamic_span)
         no_match_penal = this_string[0] != this_reference[0]
         this_matrix = {(0, 0): {"state": no_match_penal}}
         # calculate the first column
-        for i in range(1, min(int(math.ceil(dynamic_span))+1, len_str)):
-            this_matrix[(i, 0)] = {"right_out": no_match_penal+i, "state": no_match_penal+i}
+        for i in range(1, min(int(math.ceil(dynamic_span)) + 1, len_str)):
+            this_matrix[(i, 0)] = {"right_out": no_match_penal + i, "state": no_match_penal + i}
         # calculate the first line
-        for j in range(1, min(int(math.ceil(dynamic_span))+1, len_ref)):
-            this_matrix[(0, j)] = {"right_out": no_match_penal+j, "state": no_match_penal+j}
+        for j in range(1, min(int(math.ceil(dynamic_span)) + 1, len_ref)):
+            this_matrix[(0, j)] = {"right_out": no_match_penal + j, "state": no_match_penal + j}
         # calculate iteratively
         start = 0
         for i in range(1, len_str):
-            start = max(1, int(i-dynamic_span))
-            end = min(len_ref, int(math.ceil(i+dynamic_span)))
+            start = max(1, int(i - dynamic_span))
+            end = min(len_ref, int(math.ceil(i + dynamic_span)))
             # start: no right_in
             no_match_penal = this_string[i] != this_reference[start]
-            this_matrix[(i, start)] = {"diagonal_out": this_matrix[(i-1, start-1)]["state"] + no_match_penal,
-                                       "down_out": this_matrix[(i-1, start)]["state"] + 1}
+            this_matrix[(i, start)] = {"diagonal_out": this_matrix[(i - 1, start - 1)]["state"] + no_match_penal,
+                                       "down_out": this_matrix[(i - 1, start)]["state"] + 1}
             this_matrix[(i, start)]["state"] = min(this_matrix[(i, start)].values())
             # middle
-            for j in range(start+1, end-1):
+            for j in range(start + 1, end - 1):
                 no_match_penal = this_string[i] != this_reference[j]
-                this_matrix[(i, j)] = {"diagonal_out": this_matrix[(i-1, j-1)]["state"] + no_match_penal,
-                                       "down_out": this_matrix[(i-1, j)]["state"] + 1,
-                                       "right_out": this_matrix[(i, j-1)]["state"] + 1}
+                this_matrix[(i, j)] = {"diagonal_out": this_matrix[(i - 1, j - 1)]["state"] + no_match_penal,
+                                       "down_out": this_matrix[(i - 1, j)]["state"] + 1,
+                                       "right_out": this_matrix[(i, j - 1)]["state"] + 1}
                 this_matrix[(i, j)]["state"] = min(this_matrix[(i, j)].values())
             # end
             no_match_penal = this_string[i] != this_reference[end - 1]
-            this_matrix[(i, end-1)] = {"diagonal_out": this_matrix[(i-1, end-2)]["state"] + no_match_penal}
-            if (i, end-2) in this_matrix:
-                this_matrix[(i, end-1)]["right_out"] = this_matrix[(i, end-2)]["state"] + 1
-            this_matrix[(i, end-1)]["state"] = min(this_matrix[(i, end-1)].values())
+            this_matrix[(i, end - 1)] = {"diagonal_out": this_matrix[(i - 1, end - 2)]["state"] + no_match_penal}
+            if (i, end - 2) in this_matrix:
+                this_matrix[(i, end - 1)]["right_out"] = this_matrix[(i, end - 2)]["state"] + 1
+            this_matrix[(i, end - 1)]["state"] = min(this_matrix[(i, end - 1)].values())
         # print time.time()-time0
-        difference = this_matrix[(len_str-1, len_ref-1)]["state"]
+        difference = this_matrix[(len_str - 1, len_ref - 1)]["state"]
         proper_end = True
         for j in range(start, len_ref):
             try:
-                if this_matrix[(len_str-1, j)]["state"] < difference:
+                if this_matrix[(len_str - 1, j)]["state"] < difference:
                     proper_end = False
                     break
             except KeyError:
                 pass
-        for i in range(max(0, len_str-len_ref+start), len_str):
+        for i in range(max(0, len_str - len_ref + start), len_str):
             try:
-                if this_matrix[(i, len_ref-1)]["state"] < difference:
+                if this_matrix[(i, len_ref - 1)]["state"] < difference:
                     proper_end = False
                     break
             except KeyError:
@@ -820,7 +821,6 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
 
 
 DEGENERATE_BASES = {"N", "V", "H", "D", "B", "Y", "R", "K", "M", "S", "W"}
-
 
 DEGENERATE_DICT = {  # degenerate
     "N": ["A", "C", "G", "T"],
@@ -1193,7 +1193,7 @@ def simulate_fq_simple(
                 records = SequenceList(from_fasta_file)
                 total_len = sum([len(this_r.seq) for this_r in records])
                 if generate_depth:
-                    generate_spot_num = math.ceil(generate_depth * total_len/(sim_read_len * 2))
+                    generate_spot_num = math.ceil(generate_depth * total_len / (sim_read_len * 2))
                 start_ids = []
                 cat_all_seqs = []
                 accumulated_len = 0
@@ -1243,7 +1243,7 @@ def get_read_len_mean_max_count(fq_or_fq_files, maximum_n_reads, sampling_percen
                 if count_r >= maximum_n_reads:
                     break
             all_counts.append(count_r)
-    return sum(read_lengths)/len(read_lengths), max(read_lengths), all_counts
+    return sum(read_lengths) / len(read_lengths), max(read_lengths), all_counts
 
 
 def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_handler,
@@ -1314,7 +1314,8 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_hand
         log_handler.info("Resetting '--min-quality-score " + str(low_quality_score + the_s_min - the_c_min) + "'")
     if trimmed_quality_chars:
         log_handler.info("Trimming bases with qualities (" + "%.2f" % (ignore_percent * 100) + "%): " +
-                         str(ord(min("".join(trimmed_quality_chars)))) + ".." + str(ord(max("".join(trimmed_quality_chars)))) +
+                         str(ord(min("".join(trimmed_quality_chars)))) + ".." + str(
+            ord(max("".join(trimmed_quality_chars)))) +
                          "  " + "".join(trimmed_quality_chars))
     trimmed_quality_chars = "".join(trimmed_quality_chars)
 
@@ -1330,41 +1331,45 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_hand
 
 
 def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2, output_u_1, output_u_2):
-    file_h_1 = open(input_fq_1, 'r').readlines()
-    file_h_2 = open(input_fq_2, 'r')
+    file_h_1_lines = open(input_fq_1, 'r').readlines()
+    file_h_2_handler = open(input_fq_2, 'r')
     names = {}
-    # common_parts = [file_h_1[0].split()[0].split('#')[0].split(".")]
+    # common_parts = [file_h_1_lines[0].split()[0].split('#')[0].split(".")]
     # len_parts = len(common_parts)
     split_by_dot = False
     split_by_slash = False
     simple_digit_head = False
-    if file_h_1 and file_h_1[0]:
-        if file_h_1[0][-3] == "/" and file_h_1[0][-2].isdigit():
+    if file_h_1_lines and file_h_1_lines[0]:
+        if file_h_1_lines[0][-3] == "/" and file_h_1_lines[0][-2].isdigit():
             split_by_slash = True
-        elif file_h_1[0][1:-1].isdigit():
+            for i in range(0, len(file_h_1_lines), 4):
+                if file_h_1_lines[i].startswith("@"):
+                    this_n = file_h_1_lines[i].split("/")[0]
+                    names[this_n] = i
+        elif file_h_1_lines[0][1:-1].isdigit():
             simple_digit_head = True
-            for i in range(0, len(file_h_1), 4):
-                if file_h_1[i].startswith("@"):
-                    this_n = file_h_1[i][1:-1]
+            for i in range(0, len(file_h_1_lines), 4):
+                if file_h_1_lines[i].startswith("@"):
+                    this_n = file_h_1_lines[i][1:-1]
                     names[this_n] = i
         else:
-            first_n = file_h_1[0].split()[0].split('#')[0].split(".")
+            first_n = file_h_1_lines[0].split()[0].split('#')[0].split(".")
             split_by_dot = len(first_n) > 2
             if split_by_dot:
-                for i in range(0, len(file_h_1), 4):
-                    if file_h_1[i].startswith("@"):
-                        this_n = ".".join(file_h_1[i].split()[0].split('#')[0].split(".")[:2])
+                for i in range(0, len(file_h_1_lines), 4):
+                    if file_h_1_lines[i].startswith("@"):
+                        this_n = ".".join(file_h_1_lines[i].split()[0].split('#')[0].split(".")[:2])
                         names[this_n] = i
             else:
-                for i in range(0, len(file_h_1), 4):
-                    if file_h_1[i].startswith("@"):
-                        this_n = file_h_1[i].split()[0].split('#')[0]
+                for i in range(0, len(file_h_1_lines), 4):
+                    if file_h_1_lines[i].startswith("@"):
+                        this_n = file_h_1_lines[i].split()[0].split('#')[0]
                         names[this_n] = i
     out_paired_h_1 = open(output_p_1 + '.temp', 'w')
     out_paired_h_2 = open(output_p_2 + '.temp', 'w')
     out_unpaired_h_1 = open(output_u_1 + '.temp', 'w')
     out_unpaired_h_2 = open(output_u_2 + '.temp', 'w')
-    this_line = file_h_2.readline()
+    this_line = file_h_2_handler.readline()
     while this_line:
         if this_line.startswith("@"):
             if split_by_slash:
@@ -1377,23 +1382,23 @@ def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2
                 this_name = this_line.split()[0].split('#')[0]
             if this_name in names:
                 here_id = names[this_name]
-                out_paired_h_1.writelines(file_h_1[here_id:here_id + 4])
+                out_paired_h_1.writelines(file_h_1_lines[here_id:here_id + 4])
                 out_paired_h_2.write(this_line)
                 for k in range(3):
-                    out_paired_h_2.write(file_h_2.readline())
-                this_line = file_h_2.readline()
+                    out_paired_h_2.write(file_h_2_handler.readline())
+                this_line = file_h_2_handler.readline()
                 del names[this_name]
             else:
                 out_unpaired_h_2.write(this_line)
                 for k in range(3):
-                    out_unpaired_h_2.write(file_h_2.readline())
-                this_line = file_h_2.readline()
+                    out_unpaired_h_2.write(file_h_2_handler.readline())
+                this_line = file_h_2_handler.readline()
         else:
-            this_line = file_h_2.readline()
+            this_line = file_h_2_handler.readline()
     left_ids = set(names.values())
-    for i in range(0, len(file_h_1), 4):
+    for i in range(0, len(file_h_1_lines), 4):
         if i in left_ids:
-            out_unpaired_h_1.writelines(file_h_1[i:i + 4])
+            out_unpaired_h_1.writelines(file_h_1_lines[i:i + 4])
     out_paired_h_1.close()
     out_paired_h_2.close()
     out_unpaired_h_1.close()
@@ -1406,13 +1411,13 @@ def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2
 
 # Q = -10*log10(P)
 def score_2_error_prob_sanger_quality(quality_score):
-    return 10**(-quality_score / 10.)
+    return 10 ** (-quality_score / 10.)
 
 
 # Q = -10*log10(P/(1-P))
 def score_2_error_prob_solexa_quality(quality_score):
     this_sanger_prob = score_2_error_prob_sanger_quality(quality_score)
-    return this_sanger_prob/(1 + this_sanger_prob)
+    return this_sanger_prob / (1 + this_sanger_prob)
 
 
 # solexa_quality_str = ";<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefgh"

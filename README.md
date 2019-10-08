@@ -7,7 +7,7 @@ This toolkit assemblies organelle genome from genomic skimming data.
 
 Please denote the versions of GetOrganelle as well as the dependencies in your manuscript for reproducible science.
 
-<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/14/256479)
+<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](http://doi.org/10.1101/256479)
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 

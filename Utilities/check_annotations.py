@@ -3,28 +3,18 @@ __author__ = 'Kinggerm'
 
 
 import time
-import string
-import math
 import os
 import sys
 from optparse import OptionParser, OptionGroup
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.join(path_of_this_script, ".."))
+from GetOrganelleLib.seq_parser import *
+path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 # Local version 3.4
 
 stop_codons = {"TAA", "TAG", "TGA", 'taa', 'tag', 'tga'}
 initiation_codons = {"ATG", 'atg', "GTG", 'gtg', "ATT", 'att', "ATA", 'ata', "TTG", 'ttg', "ATC", 'atc', "CTG", 'ctg'}
-try:
-    # python2
-    translator = string.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return string.translate(input_seq, translator)[::-1]
-except AttributeError:
-    # python3
-    translator = str.maketrans("ATGCRMYKHBDVatgcrmykhbdv", "TACGYKRMDVHBtacgykrmdvhb")
-
-    def complementary_seq(input_seq):
-        return str.translate(input_seq, translator)[::-1]
 
 
 def get_parentheses_pairs(tree_string, sign=('(', ')')):
@@ -180,7 +170,7 @@ def read_annotation_of_gb(annotation_lines, seq_len, gb_name, by_site=True):
 
 
 def read_gb(gb_dir):
-    gb_file = [x.strip('\n') for x in open(gb_dir, 'rU').readlines()]
+    gb_file = [x.strip('\n').strip("\r") for x in open(gb_dir).readlines()]
     i = 0
     gb_structure = {}
     while i < len(gb_file):
@@ -256,26 +246,6 @@ def write_fasta(out_dir, matrix, overwrite):
     fasta_file.close()
 
 
-def read_fasta(fasta_dir):
-    fasta_file = open(fasta_dir, 'rU')
-    names = []
-    seqs = []
-    this_line = fasta_file.readline()
-    while this_line:
-        if this_line.startswith('>'):
-            names.append(this_line[1:].strip())
-            this_seq = ''
-            this_line = fasta_file.readline()
-            while this_line and not this_line.startswith('>'):
-                this_seq += this_line.strip()
-                this_line = fasta_file.readline()
-            seqs.append(this_seq)
-        else:
-            this_line = fasta_file.readline()
-    fasta_file.close()
-    return [names, seqs]
-
-
 def read_gb_as_geneious_format_fasta_matrix(gb_dir):
     sample_name, sequence, annotation_lines = read_gb(gb_dir)
     annotations = read_annotation_of_gb(annotation_lines, len(sequence), gb_dir, by_site=False)
@@ -318,74 +288,6 @@ def parse_geneious_fasta(fasta_matrix):
         else:
             seq_dict[this_annotation] = [fasta_matrix[1][i]]
     return seq_dict, list(seq_dict)
-
-
-transfer = {}
-for char in string.ascii_lowercase:
-    transfer[(char, char)] = 0
-    transfer[(char, char.upper())] = 0
-    transfer[(char.upper(), char)] = 0
-    transfer[(char.upper(), char.upper())] = 0
-
-
-def find_string_difference(this_string, this_reference, dynamic_span=2.0):
-    len_str = len(this_string)
-    len_ref = len(this_reference)
-    if dynamic_span == 0:
-        difference = sum([not (this_string[i], this_reference[i]) in transfer for i in range(min(len_ref, len_str))])+abs(len_ref-len_str)
-        proper_end = this_string[-1] == this_reference[-1]
-        return difference, proper_end
-    else:
-        dynamic_span = max(abs(len(this_string)-len(this_reference))+1, dynamic_span)
-        this_match = int(not (this_string[0], this_reference[0]) in transfer)
-        this_matrix = {(0, 0): {'state': this_match}}
-        # calculate the first column
-        for i in range(1, min(int(math.ceil(dynamic_span))+1, len_str)):
-            this_matrix[(i, 0)] = {'right_out': this_match+i, 'state': this_match+i}
-        # calculate the first line
-        for j in range(1, min(int(math.ceil(dynamic_span))+1, len_ref)):
-            this_matrix[(0, j)] = {'right_out': this_match+j, 'state': this_match+j}
-        # calculate iteratively
-        start = 0
-        for i in range(1, len_str):
-            start = max(1, int(i-dynamic_span))
-            end = min(len_ref, int(math.ceil(i+dynamic_span)))
-            # start: no right_in
-            this_match = int(not (this_string[i], this_reference[start]) in transfer)
-            this_matrix[(i, start)] = {'diagonal_out': this_matrix[(i-1, start-1)]['state'] + this_match,
-                                       'down_out': this_matrix[(i-1, start)]['state'] + 1}
-            this_matrix[(i, start)]['state'] = min(this_matrix[(i, start)].values())
-            # middle
-            for j in range(start+1, end-1):
-                this_match = not (this_string[i], this_reference[j]) in transfer
-                this_matrix[(i, j)] = {'diagonal_out': this_matrix[(i-1, j-1)]['state'] + this_match,
-                                       'down_out': this_matrix[(i-1, j)]['state'] + 1,
-                                       'right_out': this_matrix[(i, j-1)]['state'] + 1}
-                this_matrix[(i, j)]['state'] = min(this_matrix[(i, j)].values())
-            # end
-            this_match = not (this_string[i], this_reference[end - 1]) in transfer
-            this_matrix[(i, end-1)] = {'diagonal_out': this_matrix[(i-1, end-2)]['state'] + this_match}
-            if (i, end-2) in this_matrix:
-                this_matrix[(i, end-1)]['right_out'] = this_matrix[(i, end-2)]['state'] + 1
-            this_matrix[(i, end-1)]['state'] = min(this_matrix[(i, end-1)].values())
-        # print time.time()-time0
-        difference = this_matrix[(len_str-1, len_ref-1)]['state']
-        proper_end = True
-        for j in range(start, len_ref):
-            try:
-                if this_matrix[(len_str-1, j)]['state'] < difference:
-                    proper_end = False
-                    break
-            except KeyError:
-                pass
-        for i in range(max(0, len_str-len_ref+start), len_str):
-            try:
-                if this_matrix[(i, len_ref-1)]['state'] < difference:
-                    proper_end = False
-                    break
-            except KeyError:
-                pass
-        return difference, proper_end
 
 
 def require_commands():

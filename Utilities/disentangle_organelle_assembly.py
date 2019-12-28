@@ -67,6 +67,9 @@ def get_options(print_title):
                       help="Minimum coverage for a contig to be included in disentangling. Default:%default")
     parser.add_option("--max-depth", dest="max_cov", type=float, default=inf,
                       help="Minimum coverage for a contig to be included in disentangling. Default:%default")
+    parser.add_option("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
+                      help="Maximum multiplicity of contigs for disentangling genome paths. "
+                           "Should be 1~12. Default:%default")
     parser.add_option("--prefix", dest="prefix", default="target",
                       help="Prefix of output files inside output directory. Default:%default")
     parser.add_option("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
@@ -95,6 +98,7 @@ def get_options(print_title):
         sys.stdout.write("Insufficient arguments!\n")
         sys.exit()
     else:
+        assert 12 >= options.max_multiplicity >= 1
         if options.output_directory and not os.path.exists(options.output_directory):
             os.mkdir(options.output_directory)
         log_handler = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
@@ -126,24 +130,25 @@ def main():
                                       log_hard_cov_threshold=10., expected_max_size=inf, expected_min_size=0,
                                       contamination_depth=3., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
-                                      min_sigma_factor=0.1, only_max_c=True, keep_temp=False, acyclic_allowed=False,
-                                      verbose=False, log_handler=None, debug=False):
+                                      min_sigma_factor=0.1, max_copy_in=10, only_max_cov=True,
+                                      keep_temp=False, acyclic_allowed=False,
+                                      verbose=False, inner_logging=None, debug=False):
         if options.resume and os.path.exists(prefix + ".graph1.selected_graph.gfa"):
             pass
-            if log_handler:
-                log_handler.info(">>> Result graph existed!")
+            if inner_logging:
+                inner_logging.info(">>> Result graph existed!")
             else:
                 sys.stdout.write(">>> Result graph existed!\n")
         else:
             time_a = time.time()
-            if log_handler:
-                log_handler.info(">>> Parsing " + fastg_file + " ..")
+            if inner_logging:
+                inner_logging.info(">>> Parsing " + fastg_file + " ..")
             else:
                 sys.stdout.write("Parsing " + fastg_file + " ..\n")
             input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
             time_b = time.time()
-            if log_handler:
-                log_handler.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
+            if inner_logging:
+                inner_logging.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
             else:
                 sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
             temp_graph = prefix + ".temp.fastg" if keep_temp else None
@@ -158,17 +163,18 @@ def main():
                                                          degenerate_similarity=degenerate_similarity,
                                                          expected_max_size=expected_max_size,
                                                          expected_min_size=expected_min_size,
-                                                         only_keep_max_cov=only_max_c,
+                                                         max_contig_multiplicity=max_copy_in,
+                                                         only_keep_max_cov=only_max_cov,
                                                          min_sigma_factor=min_sigma_factor,
                                                          temp_graph=temp_graph,
                                                          broken_graph_allowed=acyclic_allowed,
-                                                         verbose=verbose, log_handler=log_handler,
+                                                         verbose=verbose, log_handler=inner_logging,
                                                          debug=debug)
             time_c = time.time()
-            if log_handler:
-                log_handler.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
+            if inner_logging:
+                inner_logging.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
                 if len(copy_results) > 1:
-                    log_handler.info(str(len(copy_results)) + " set(s) of graph detected.")
+                    inner_logging.info(str(len(copy_results)) + " set(s) of graph detected.")
             else:
                 sys.stdout.write("\n\n>>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s\n")
                 if len(copy_results) > 1:
@@ -180,7 +186,7 @@ def main():
                 for go_res, copy_res in enumerate(copy_results):
                     broken_graph = copy_res["graph"]
                     count_path = 0
-                    for this_paths, other_tag in broken_graph.get_all_paths(mode=mode, log_handler=log_handler):
+                    for this_paths, other_tag in broken_graph.get_all_paths(mode=mode, log_handler=inner_logging):
                         count_path += 1
                         all_contig_str = []
                         contigs_are_circular = []
@@ -201,7 +207,7 @@ def main():
                         #     still_complete.append(True)
                         # else:
                         #     still_complete.append(False)
-                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + 
+                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
                     broken_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
             else:
@@ -211,19 +217,19 @@ def main():
                     # which would be used to identify existence of a certain isomer using mapping information
                     count_path = 0
                     for this_path, other_tag in idealized_graph.get_all_circular_paths(
-                            mode=mode, log_handler=log_handler, reverse_start_direction_for_pt=options.reverse_lsc):
+                            mode=mode, log_handler=inner_logging, reverse_start_direction_for_pt=options.reverse_lsc):
                         count_path += 1
                         this_seq_obj = idealized_graph.export_path(this_path)
                         if DEGENERATE_BASES & set(this_seq_obj.seq):
                             degenerate_base_used = True
-                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) + 
+                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write(this_seq_obj.fasta_str())
                     idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
             if degenerate_base_used:
-                log_handler.warning("Degenerate base(s) used!")
+                inner_logging.warning("Degenerate base(s) used!")
             time_d = time.time()
-            if log_handler:
-                log_handler.info(">>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s")
+            if inner_logging:
+                inner_logging.info(">>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s")
             else:
                 sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
 
@@ -241,9 +247,10 @@ def main():
                                       expected_max_size=options.expected_max_size,
                                       expected_min_size=options.expected_min_size,
                                       min_sigma_factor=options.min_sigma_factor,
-                                      only_max_c=options.only_keep_max_cov, acyclic_allowed=options.acyclic_allowed,
+                                      max_copy_in=options.max_multiplicity,
+                                      only_max_cov=options.only_keep_max_cov, acyclic_allowed=options.acyclic_allowed,
                                       keep_temp=options.keep_temp_graph,
-                                      log_handler=log_handler, verbose=options.verbose, debug=options.debug)
+                                      inner_logging=log_handler, verbose=options.verbose, debug=options.debug)
         log_handler = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
 
         log_handler.info('\nTotal cost: ' + str(round(time.time() - time0, 4)) + 's\n')
@@ -257,7 +264,8 @@ def main():
             log_handler.exception(str(e))
             log_handler.error("Disentangling failed!")
             if not options.acyclic_allowed:
-                log_handler.info("You might try again with '--linear' to export contig(s) instead of circular genome.")
+                log_handler.info("You might try again with '--linear' to export contig(s) "
+                                 "instead of circular genome.")
             log_handler = simple_log(log_handler, options.output_directory, options.prefix + ".disentangle.")
             log_handler.info("\nTotal cost " + str(time.time() - time0))
             log_handler.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")
@@ -265,7 +273,8 @@ def main():
         log_handler.exception(str(e))
         log_handler.error("Disentangling failed!")
         if not options.acyclic_allowed:
-            log_handler.info("You might try again with '--linear' to export contig(s) instead of circular genome.")
+            log_handler.info("You might try again with '--linear' to export contig(s) "
+                             "instead of circular genome.")
         log_handler = simple_log(log_handler, options.output_directory, options.prefix + ".disentangle.")
         log_handler.info("\nTotal cost " + str(time.time() - time0))
         log_handler.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")

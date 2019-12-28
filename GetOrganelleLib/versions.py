@@ -5,6 +5,16 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.3",
+     "features": [
+         "1. log plastome info",
+         "2. get_organelle_from_assembly.py & disentangle_organelle_assembly.py: --max-multiplicity added",
+         "3. Assembly.estimate_copy_and_depth_precisely() modified: constraint_max_function() for --max-multiplicity",
+         "4. Assembly.tag_in_between() modified",
+         "5. Assembly.estimate_copy_and_depth_by_cov() modified: min average coverage limit"
+         "6. README.md: updated",
+     ],
+     "time": "2019-08-26 17:00 GMT+8"},
     {"number": "1.6.2e",
      "features": [
          "1. seq_parser.py: fix a bug for fastq format: @*****#/1",

@@ -262,8 +262,8 @@ def get_options(description, version):
                                    "blast database) containing or made of ONE set of protein coding genes "
                                    "and ribosomal RNAs extracted from ONE reference genome that you want to assemble. "
                                    # "This database is mainly used for labelling target organelle contigs, "
-                                   # "while the gene order of output, meaning the scaffolding/disentangling process is "
-                                   # "largely decided by the character of the de Bruijn graph and the coverage info. "
+                                   # "while the gene order of output, meaning the disentangling process is "
+                                   # "largely decided by the character of the assembly graph and the coverage info. "
                                    "Should be a list of databases split by comma(s) on a multi-organelle mode, "
                                    "with the same list length to organelle_type (followed by '-F'). "
                                    "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
@@ -480,10 +480,12 @@ def get_options(description, version):
                              "\nERROR: unbalanced paired reads!\n\n")
             exit()
         for sub_organelle_t in options.organelle_type:
-            if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt", "fungus_mt", "anonym"}:
+            if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt",
+                                       "fungus_mt", "anonym"}:
                 sys.stdout.write("\n############################################################################"
-                                 "\nERROR: \"-F\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', 'embplant_nr', "
-                                 "'animal_mt', 'fungus_mt', 'anonym', or a combination of above split by comma(s)!\n\n")
+                                 "\nERROR: \"-F\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', "
+                                 "'embplant_nr', 'animal_mt', 'fungus_mt', 'anonym', or a combination of above "
+                                 "split by comma(s)!\n\n")
                 exit()
             elif sub_organelle_t == "anonym":
                 if "*" in options.seed_file or not options.genes_fasta:
@@ -3805,7 +3807,7 @@ def main():
                 log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com "
                                  "with the get_org.log.txt file.\n")
             elif 0 in slim_stat_codes:
-                log_handler.info("Slimming assembly graphs finished\n")
+                log_handler.info("Slimming assembly graphs finished.\n")
                 organelle_type_prefix = []
                 duplicated_o_types = {o_type: 1
                                       for o_type in options.organelle_type if options.organelle_type.count(o_type) > 1}

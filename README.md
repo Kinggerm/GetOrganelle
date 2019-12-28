@@ -7,7 +7,7 @@ This toolkit assemblies organelle genome from genomic skimming data.
 
 Please denote the versions of GetOrganelle as well as the dependencies in your manuscript for reproducible science.
 
-<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](http://doi.org/10.1101/256479)
+<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](https://www.biorxiv.org/content/early/2018/03/14/256479)
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -112,7 +112,7 @@ Python libraries (numpy, scipy, sympy) is covered in the installation part.
 
 <a href=' '>Bandage</a > is a fantastic tool to view the assembly graph (`*.fastg`/`*.gfa`). If you have Bandage correctly configured and add the binary folder of Bandage (which is `Bandage.app/Contents/MacOS` for MacOS) to the $PATH, get_organelle_from_*.py would automatically generate the a png formatted image of the assembly graph. 
 
-If you installed python library psutil (pip install psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
+If you installed python library psutil (version >= 3.0; pip install psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
 
 
 ## How To
@@ -121,11 +121,11 @@ If you installed python library psutil (pip install psutil), the memory cost of 
 
 <b>Preparing Data</b>
 
-Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz). 1G per end is enough for plastome for most normal angiosperm samples, and 5G per end is enough for mitochondria data. You could simply assign a maximum number of reads (number of seqs, not number of bases) for `get_organelle_from_reads.py` to use with flag `--max-reads` (Default value: 1.5E7 for "-F embplant_pt/embplant_nr/fungus_mt"; 7.5E7 for "-F embplant_mt/animal_mt/other_pt/anonym"; 3E8 for "-F animal_mt") or manually cut raw data into certain size  using the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`) before running GetOrganelle. 
+Currently, this script was written for illumina pair-end/single-end data (fastq or fastq.gz). 1G per end is enough for plastome for most normal angiosperm samples, and 5G per end is enough for mitochondria data. You could simply assign a maximum number of reads (number of seqs, not number of bases) for `get_organelle_from_reads.py` to use with flag `--max-reads` (Default value: 1.5E7 for "-F embplant_pt/embplant_nr/fungus_mt"; 7.5E7 for "-F embplant_mt/animal_mt/other_pt/anonym"; 3E8 for "-F animal_mt") or manually cut raw data into certain size before running GetOrganelle using the Linux or Mac OS build-in command (eg. `head -n 20000000 large.fq > small.fq`). 
 
 <b>Filtering and Assembly</b>
 
-Take your input seed (fasta; the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, the script would recruit target reads in successive rounds (extending process). You could also use a seed sequence of a related species, which would be safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes upon data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. Since version 1.4.0, if there is no user assigned word size value, `get_organelle_from_reads.py` would automatically estimate a proper word size based on the data characters. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust the value if a complete/circular organelle result is produced, because the circular result by GetOrganelle is generally consistent under different options. After extending, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
+Take your input seed (fasta; the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, the script would recruit target reads in successive rounds (extending process). You could also use a seed sequence of a related species, which would be safer if the sequence quality is bad (say, degraded DNA samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes upon data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. Since version 1.4.0, if there is no user assigned word size value, GetOrganelle would automatically estimate a proper word size based on the data characters. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust the value if a complete/circular organelle result is produced, because the circular result by GetOrganelle is generally consistent under different options. After extending, this script will automatically call SPAdes to assembly the target reads produced by the former step. The best kmer depends on a wide variety of factors too.
 
 <b>Producing Result</b>
 

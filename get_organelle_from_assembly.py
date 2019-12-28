@@ -2,6 +2,7 @@
 
 import sympy
 import scipy
+
 try:
     from math import inf
 except ImportError:
@@ -17,8 +18,10 @@ import subprocess
 import sys
 import os
 from shutil import copyfile
+
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
+
 SYSTEM_NAME = ""
 if platform.system() == "Linux":
     SYSTEM_NAME = "linux"
@@ -33,7 +36,6 @@ NOT_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "LabelDatabase"))
 SEQ_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "SeedDatabase"))
 UTILITY_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities")
 
-
 MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
 if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
     PYTHON_VERSION = "2.7+"
@@ -45,7 +47,7 @@ else:
 
 
 def get_options(description, version):
-    usage = str(os.path.basename(__file__)+" -g assembly_graph_file -F embplant_pt -o output --min-depth 10")
+    usage = str(os.path.basename(__file__) + " -g assembly_graph_file -F embplant_pt -o output --min-depth 10")
     parser = OptionParser(usage=usage, version=version, description=description, add_help_option=False)
     parser.add_option("-F", dest="organelle_type",
                       help="This flag should be followed with embplant_pt (embryophyta plant plastome), "
@@ -133,6 +135,9 @@ def get_options(description, version):
                            "Choose this flag to export all combinations.")
     parser.add_option("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
                       help="Minimum deviation factor for excluding non-target contigs. Default:%default")
+    parser.add_option("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
+                      help="Maximum multiplicity of contigs for disentangling genome paths. "
+                           "Should be 1~12. Default:%default")
     parser.add_option("-t", dest="threads", type=int, default=1,
                       help="Maximum threads to use.")
     parser.add_option("--prefix", dest="prefix", default="",
@@ -156,7 +161,7 @@ def get_options(description, version):
                       help="print brief introduction for frequently-used options.")
     parser.add_option("--help", dest="verbose_help", default=False, action="store_true",
                       help="print verbose introduction for all options.")
-    
+
     if "--help" in sys.argv:
         parser.print_help()
         exit()
@@ -165,7 +170,7 @@ def get_options(description, version):
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
                                "--expected-max-size", "--expected-min-size", "--reverse-lsc",
-                               "--keep-all-polymorphic", "--min-sigma",
+                               "--keep-all-polymorphic", "--min-sigma", "--max-multiplicity",
                                "--prefix", "--which-blast", "--which-bandage",
                                "--keep-temp", "--random-seed", "--verbose"):
             parser.remove_option(not_often_used)
@@ -197,7 +202,7 @@ def get_options(description, version):
         exit()
     else:
         pass
-    
+
     # redirect organelle types before parsing arguments
     redirect_organelle_types = {"plant_cp": "embplant_pt",
                                 "plant_pt": "embplant_pt",
@@ -254,6 +259,7 @@ def get_options(description, version):
                                      "\nERROR: \"--genes\" must be specified when \"-F anonym\"!\n\n")
                     exit()
         assert options.threads > 0
+        assert 12 >= options.max_multiplicity >= 1
         organelle_type_len = len(options.organelle_type)
         options.prefix = os.path.basename(options.prefix)
         if not os.path.isdir(options.output_base):
@@ -480,15 +486,16 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              contamination_similarity=0.95, degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=0.98,
                              expected_max_size=inf, expected_min_size=0, hard_cov_threshold=10.,
-                             min_sigma_factor=0.1, here_only_max_c=True, here_acyclic_allowed=False,
+                             min_sigma_factor=0.1, here_max_copy=10,
+                             here_only_max_c=True, here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'", temp_graph=None):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
         def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt",
-                               in_db_n="embplant_pt", c_d=3., c_s=0.95,
-                               deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
+                               in_db_n="embplant_pt", c_d=3., c_s=0.95, deg=True, deg_dep=1.5, deg_sim=0.98,
+                               hard_c_t=10., min_s_f=0.1, max_copy_in=10, max_cov_in=True,
                                max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
             if acyclic_allowed_in:
-                log_in.info("Disentangling " + fastg_f + " as contig(s) ... ")
+                log_in.info("Disentangling " + fastg_f + " as scaffold(s)/contig(s) ... ")
             else:
                 log_in.info("Disentangling " + fastg_f + " as a circular genome ... ")
             image_produced = False
@@ -507,7 +514,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                                                degenerate=deg, degenerate_depth=deg_dep,
                                                                degenerate_similarity=deg_sim,
                                                                expected_max_size=max_s, expected_min_size=min_s,
-                                                               only_keep_max_cov=max_c_in,
+                                                               max_contig_multiplicity=max_copy_in,
+                                                               only_keep_max_cov=max_cov_in,
                                                                min_sigma_factor=min_s_f,
                                                                weight_factor=w_f,
                                                                broken_graph_allowed=acyclic_allowed_in,
@@ -555,7 +563,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                         else:
                             out_n = o_p + ".contigs.graph" + str(go_res + 1) + other_tag + "." + \
                                     str(count_path) + ".path_sequence.fasta"
-                            log_in.info("Writing PATH" + str(count_path) + " of " + mode_in + " contig(s) to " + out_n)
+                            log_in.info("Writing PATH" + str(count_path) + " of " + mode_in +
+                                        " scaffold(s)/contig(s) to " + out_n)
                         open(out_n, "w").write("\n".join(all_contig_str))
                     if set(still_complete[-len(these_paths):]) == {True}:
                         log_in.info(
@@ -579,7 +588,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                     log_in.info("Result status of " + mode_in + ": circular genome")
                 else:
                     log_in.info("Result status of " + mode_in + ": " +
-                                ",".join(sorted([str(c_n) for c_n in contig_num])) + " contig(s)")
+                                ",".join(sorted([str(c_n) for c_n in contig_num])) + " scaffold(s)/contig(s)")
             else:
                 for go_res, res in enumerate(target_results):
                     go_res += 1
@@ -620,7 +629,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                            type_f=type_factor, mode_in=mode, in_db_n=blast_db_base,
                            c_d=contamination_depth, c_s=contamination_similarity,
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
-                           hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
+                           hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor,
+                           max_copy_in=here_max_copy, max_cov_in=here_only_max_c,
                            max_s=expected_max_size, min_s=expected_min_size,
                            acyclic_allowed_in=here_acyclic_allowed, verbose_in=here_verbose, in_temp_graph=temp_graph)
 
@@ -638,7 +648,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         #     os.system("cp " + out_csv + " " + main_spades_folder)
         disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
                              tab_file=slim_out_csv, output=path_prefix,
-                             weight_factor=100, type_factor=options.type_factor, 
+                             weight_factor=100, type_factor=options.type_factor,
                              hard_cov_threshold=options.depth_factor,
                              contamination_depth=options.contamination_depth,
                              contamination_similarity=options.contamination_similarity,
@@ -646,6 +656,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              degenerate_similarity=options.degenerate_similarity,
                              expected_max_size=expected_maximum_size,
                              expected_min_size=expected_minimum_size,
+                             here_max_copy=options.max_multiplicity,
                              here_only_max_c=options.only_keep_max_cov,
                              min_sigma_factor=options.min_sigma_factor,
                              here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
@@ -671,7 +682,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
 
     if not export_succeeded:
         try:
-            """disentangle the graph as contig(s)"""
+            """disentangle the graph as scaffold(s)/contig(s)"""
             disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
                                  tab_file=slim_out_csv, output=path_prefix,
                                  weight_factor=100, type_factor=options.type_factor,
@@ -685,6 +696,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  expected_max_size=expected_maximum_size,
                                  expected_min_size=expected_minimum_size,
                                  min_sigma_factor=options.min_sigma_factor,
+                                 here_max_copy=options.max_multiplicity,
                                  here_only_max_c=options.only_keep_max_cov, here_acyclic_allowed=True,
                                  time_limit=3600, timeout_flag_str=timeout_flag,
                                  temp_graph=graph_temp_file)

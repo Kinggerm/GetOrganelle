@@ -2,19 +2,27 @@ import os
 import sys
 import time
 from itertools import combinations, product
+
 try:
     from sympy import Symbol, solve, lambdify
     from scipy import optimize
 except ImportError:
     def Symbol(foo, integer):
         raise ImportError("No module named sympy")
+
+
     def solve(foo1, foo2):
         raise ImportError("No module named sympy")
+
+
     def lambdify(args=None, expr=None):
         raise ImportError("No module named sympy")
+
+
     class optimize:
         def __init__(self):
             pass
+
         def minimize(self, fun=None, x0=None, jac=None, method=None, bounds=None, constraints=None, options=None):
             raise ImportError("No module named scipy")
 
@@ -22,6 +30,7 @@ path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.statistical_func import *
+
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 import random
 from copy import deepcopy
@@ -150,7 +159,7 @@ class Assembly(object):
                     flag, vertex_name, sequence, seq_len, seq_num = line.strip().split("\t")
                     seq_len = int(seq_len.split(":")[-1])
                     seq_num = int(seq_num.split(":")[-1])
-                    seq_cov = seq_num/float(seq_len)
+                    seq_cov = seq_num / float(seq_len)
                     if min_cov <= seq_cov <= max_cov:
                         self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, seq_cov, sequence)
                         # self.vertex_info[vertex_name] = {"len": seq_len, "cov": seq_cov,
@@ -342,9 +351,9 @@ class Assembly(object):
         for vertex_name in self.vertex_info:
             out_file_handler.write("\t".join([
                 "S", vertex_name, self.vertex_info[vertex_name].seq[True],
-                "LN:i:"+str(self.vertex_info[vertex_name].len),
-                "RC:i:"+str(int(self.vertex_info[vertex_name].len*self.vertex_info[vertex_name].cov))
-                ]) + "\n")
+                "LN:i:" + str(self.vertex_info[vertex_name].len),
+                "RC:i:" + str(int(self.vertex_info[vertex_name].len * self.vertex_info[vertex_name].cov))
+            ]) + "\n")
         recorded_connections = set()
         for vertex_name in self.vertex_info:
             for this_end in (False, True):
@@ -478,7 +487,7 @@ class Assembly(object):
         connection_set_t = self.vertex_info[search_vertex_name].connections[True]
         connection_set_f = self.vertex_info[search_vertex_name].connections[False]
         all_pairs_of_inner_circles = []
-        
+
         def path_without_leakage(start_v, start_e, terminating_end_set):
             in_pipe_leak = False
             circle_in_between = []
@@ -508,7 +517,7 @@ class Assembly(object):
                 return circle_in_between
             else:
                 return []
-        
+
         # branching ends
         if len(connection_set_t) == len(connection_set_f) == 2:
             for next_t_v, next_t_e in sorted(connection_set_t):
@@ -596,7 +605,7 @@ class Assembly(object):
                             += self.vertex_info[next_vertex].seq[not next_end][self.__kmer:]
                         self.vertex_info[new_vertex].seq[not this_end] \
                             = self.vertex_info[next_vertex].seq[next_end][:-self.__kmer] \
-                            + self.vertex_info[this_vertex].seq[not this_end]
+                              + self.vertex_info[this_vertex].seq[not this_end]
                         # tags
                         if copy_tags:
                             if "tags" in self.vertex_info[next_vertex].other_attr:
@@ -638,21 +647,21 @@ class Assembly(object):
     def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="embplant_pt",
                                        re_initialize=False, log_handler=None, verbose=True, debug=False):
         if mode == "embplant_pt":
-            max_majority_cov = 2
+            max_majority_copy = 2
         elif mode == "other_pt":
-            max_majority_cov = 10
+            max_majority_copy = 10
         elif mode == "embplant_mt":
-            max_majority_cov = 4
+            max_majority_copy = 4
         elif mode == "embplant_nr":
-            max_majority_cov = 2
+            max_majority_copy = 2
         elif mode == "animal_mt":
-            max_majority_cov = 4
+            max_majority_copy = 4
         elif mode == "fungus_mt":
-            max_majority_cov = 8
+            max_majority_copy = 8
         elif mode == "all":
-            max_majority_cov = 100
+            max_majority_copy = 100
         else:
-            max_majority_cov = 100
+            max_majority_copy = 100
 
         if not limited_vertices:
             limited_vertices = sorted(self.vertex_info)
@@ -673,6 +682,7 @@ class Assembly(object):
         if not given_average_cov:
             previous_val = {0.}
             new_val = -1.
+            min_average_depth = 0.9 * min([self.vertex_info[vertex_n].cov for vertex_n in self.vertex_info])
             while round(new_val, 5) not in previous_val:
                 previous_val.add(round(new_val, 5))
                 # estimate baseline depth
@@ -684,7 +694,8 @@ class Assembly(object):
                     this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
                     total_len += this_len
                     total_product += this_len * this_cov
-                new_val = total_product/total_len
+                # new_val = total_product / total_len
+                new_val = max(total_product / total_len, min_average_depth)
                 # print("new val: ", new_val)
                 # adjust this_copy according to new baseline depth
                 for vertex_name in self.vertex_info:
@@ -694,7 +705,7 @@ class Assembly(object):
                         if not self.copy_to_vertex[old_copy]:
                             del self.copy_to_vertex[old_copy]
                     this_float_copy = self.vertex_info[vertex_name].cov / new_val
-                    this_copy = min(max(1, int(round(this_float_copy, 0))), max_majority_cov)
+                    this_copy = min(max(1, int(round(this_float_copy, 0))), max_majority_copy)
                     self.vertex_to_float_copy[vertex_name] = this_float_copy
                     self.vertex_to_copy[vertex_name] = this_copy
                     if this_copy not in self.copy_to_vertex:
@@ -716,7 +727,7 @@ class Assembly(object):
                     if not self.copy_to_vertex[old_copy]:
                         del self.copy_to_vertex[old_copy]
                 this_float_copy = self.vertex_info[vertex_name].cov / given_average_cov
-                this_copy = min(max(1, int(round(this_float_copy, 0))), max_majority_cov)
+                this_copy = min(max(1, int(round(this_float_copy, 0))), max_majority_copy)
                 self.vertex_to_float_copy[vertex_name] = this_float_copy
                 self.vertex_to_copy[vertex_name] = this_copy
                 if this_copy not in self.copy_to_vertex:
@@ -724,7 +735,7 @@ class Assembly(object):
                 self.copy_to_vertex[this_copy].add(vertex_name)
             return given_average_cov
 
-    def estimate_copy_and_depth_precisely(self, maximum_copy_num=10, broken_graph_allowed=False,
+    def estimate_copy_and_depth_precisely(self, maximum_copy_num=8, broken_graph_allowed=False,
                                           return_new_graphs=True, verbose=True, log_handler=None, debug=False,
                                           target_name_for_log="target"):
 
@@ -751,17 +762,28 @@ class Assembly(object):
             return least_square_function(*tuple(x))
 
         """ create constraints by creating inequations: the copy of every contig has to be >= 1 """
+
         def constraint_min_function(x):
             replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
             expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
             min_copy = np.array([1.001] * len(all_v_symbols) + [2.001] * len(extra_symbol_to_str))
+            # effect: expression_array >= int(min_copy)
             return expression_array - min_copy
 
         def constraint_min_function_for_customized_brute(x):
             replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
             expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
             min_copy = np.array([1.0] * len(all_v_symbols) + [2.0] * len(extra_symbol_to_str))
+            # effect: expression_array >= min_copy
             return expression_array - min_copy
+
+        def constraint_max_function(x):
+            replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
+            expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
+            max_copy = np.array([maximum_copy_num] * len(all_v_symbols) +
+                                [maximum_copy_num * 2] * len(extra_symbol_to_str))
+            # effect: expression_array <= max_copy
+            return max_copy - expression_array
 
         def constraint_int_function(x):
             replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
@@ -815,7 +837,8 @@ class Assembly(object):
                     in_log_handler.info("Best solution: " + str(best_para_val))
             else:
                 if debug or display_p:
-                    sys.stdout.write("Brute valid/candidate rounds: " + str(count_valid) + "/" + str(count_round) + "\n")
+                    sys.stdout.write(
+                        "Brute valid/candidate rounds: " + str(count_valid) + "/" + str(count_round) + "\n")
                     sys.stdout.write("Brute best function value: " + str(best_fun_val) + "\n")
                 if debug:
                     sys.stdout.write("Best solution: " + str(best_para_val) + "\n")
@@ -828,9 +851,10 @@ class Assembly(object):
                 return [{"graph": deepcopy(self), "cov": cov_}]
             else:
                 if log_handler:
-                    log_handler.info("Average " + target_name_for_log +" kmer-coverage = " + str(round(cov_, 2)))
+                    log_handler.info("Average " + target_name_for_log + " kmer-coverage = " + str(round(cov_, 2)))
                 else:
-                    sys.stdout.write("Average " + target_name_for_log +" kmer-coverage = " + str(round(cov_, 2)) + "\n")
+                    sys.stdout.write(
+                        "Average " + target_name_for_log + " kmer-coverage = " + str(round(cov_, 2)) + "\n")
                 return
 
         # reduce maximum_copy_num to reduce computational burden
@@ -843,7 +867,7 @@ class Assembly(object):
                 sys.stdout.write("Maximum multiplicity: " + str(maximum_copy_num) + "\n")
 
         """ create constraints by creating multivariate equations """
-        vertex_to_symbols = {vertex_name: Symbol("V"+vertex_name, integer=True)  # positive=True)
+        vertex_to_symbols = {vertex_name: Symbol("V" + vertex_name, integer=True)  # positive=True)
                              for vertex_name in vertices_list}
         symbols_to_vertex = {vertex_to_symbols[vertex_name]: vertex_name for vertex_name in vertices_list}
         extra_str_to_symbol = {}
@@ -859,7 +883,7 @@ class Assembly(object):
                         this_formula = vertex_to_symbols[vertex_name]
                         formulized = False
                         for n_v, n_e in connection_set:
-                            if (n_v, n_e ) not in recorded_ends:
+                            if (n_v, n_e) not in recorded_ends:
                                 # if n_v in vertices_set:
                                 # recorded_ends.add((n_v, n_e))
                                 try:
@@ -890,7 +914,7 @@ class Assembly(object):
                             else:
                                 sys.stdout.write(
                                     "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
-                                    str(this_formula)+"\n")
+                                    str(this_formula) + "\n")
                         if formulized:
                             formulae.append(this_formula)
                     elif broken_graph_allowed:
@@ -996,13 +1020,15 @@ class Assembly(object):
         if maximum_copy_num ** len(free_copy_variables) < 5E6:
             # sometimes, SLSQP ignores bounds and constraints
             copy_results = minimize_brute_force(
-                func=least_square_function_v, range_list=[range(1, maximum_copy_num+1)]*len(free_copy_variables),
+                func=least_square_function_v, range_list=[range(1, maximum_copy_num + 1)] * len(free_copy_variables),
                 constraint_list=({'type': 'ineq', 'fun': constraint_min_function_for_customized_brute},
-                                 {'type': 'eq', 'fun': constraint_int_function}),
+                                 {'type': 'eq', 'fun': constraint_int_function},
+                                 {'type': 'ineq', 'fun': constraint_max_function}),
                 display_p=verbose)
         else:
             constraints = ({'type': 'ineq', 'fun': constraint_min_function},
-                           {'type': 'eq', 'fun': constraint_int_function})
+                           {'type': 'eq', 'fun': constraint_int_function},
+                           {'type': 'ineq', 'fun': constraint_max_function})
             copy_results = set()
             best_fun = inf
             opt = {'disp': verbose, "maxiter": 100}
@@ -1118,9 +1144,10 @@ class Assembly(object):
                     total_product += this_len * this_cov
                 new_val = total_product / total_len
                 if log_handler:
-                    log_handler.info("Average " + target_name_for_log +" kmer-coverage = " + str(round(new_val, 2)))
+                    log_handler.info("Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)))
                 else:
-                    sys.stdout.write("Average " + target_name_for_log +" kmer-coverage = " + str(round(new_val, 2)) + "\n")
+                    sys.stdout.write(
+                        "Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)) + "\n")
 
     def tag_in_between(self, database_n):
         # add those in between the tagged vertices to tagged_vertices, which offered the only connection
@@ -1155,33 +1182,42 @@ class Assembly(object):
                         if database_n not in self.vertex_info[can_v].other_attr["weight"]:
                             self.vertex_info[can_v].other_attr["weight"][database_n] = 0
                         self.vertex_info[can_v].other_attr["weight"][database_n] += 1 * self.vertex_info[can_v].cov
-                        # add extra circle
-                        near_by_pairs = self.is_sequential_repeat(can_v, return_pair_in_the_trunk_path=False)
-                        if near_by_pairs:
-                            checking_new = []
-                            coverage_folds = []
-                            for near_by_p in near_by_pairs:
-                                for (near_v, near_e) in near_by_p:
-                                    if (near_v, near_e) not in count_nearby_tagged:
-                                        checking_new.append(near_v)
-                                        coverage_folds.append(
-                                            round(self.vertex_info[can_v].cov /
-                                                  self.vertex_info[near_v].cov, 0))
-                            for near_v, near_e in count_nearby_tagged:
-                                coverage_folds.append(
-                                    round(self.vertex_info[can_v].cov /
-                                          self.vertex_info[near_v].cov, 0))
-                            if max(coverage_folds) >= 2:
-                                for extra_v_to_add in set(checking_new):
-                                    self.tagged_vertices[database_n].add(extra_v_to_add)
-                                    try:
-                                        candidate_vertices.remove(extra_v_to_add)
-                                    except ValueError:
-                                        pass
-                                    if "weight" not in self.vertex_info[extra_v_to_add].other_attr:
-                                        self.vertex_info[extra_v_to_add].other_attr["weight"] = {database_n: 0}
-                                    self.vertex_info[extra_v_to_add].other_attr["weight"][database_n] \
-                                        += 1 * self.vertex_info[extra_v_to_add].cov
+                        if database_n != "embplant_mt":
+                            # Adding extra circle - the contig in-between the sequential repeats
+                            # To avoid risk of tagging mt as pt by mistake,
+                            # the repeated contig must be at least 2 folds of the nearby tagged contigs
+                            near_by_pairs = self.is_sequential_repeat(can_v, return_pair_in_the_trunk_path=False)
+                            if near_by_pairs:
+                                checking_new = []
+                                coverage_folds = []
+                                for near_by_p in near_by_pairs:
+                                    for (near_v, near_e) in near_by_p:
+                                        if (near_v, near_e) not in count_nearby_tagged:
+                                            checking_new.append(near_v)
+                                            # comment out for improper design: if the untagged is mt
+                                            # coverage_folds.append(
+                                            #     round(self.vertex_info[can_v].cov /
+                                            #           self.vertex_info[near_v].cov, 0))
+                                for near_v, near_e in count_nearby_tagged:
+                                    coverage_folds.append(
+                                        round(self.vertex_info[can_v].cov /
+                                              self.vertex_info[near_v].cov, 0))
+                                # if coverage folds is
+                                if max(coverage_folds) >= 2:
+                                    for extra_v_to_add in set(checking_new):
+                                        self.tagged_vertices[database_n].add(extra_v_to_add)
+                                        try:
+                                            candidate_vertices.remove(extra_v_to_add)
+                                        except ValueError:
+                                            pass
+                                        # when a contig has no weights
+                                        if "weight" not in self.vertex_info[extra_v_to_add].other_attr:
+                                            self.vertex_info[extra_v_to_add].other_attr["weight"] = {database_n: 0}
+                                        # when a contig has weights of other database
+                                        if database_n not in self.vertex_info[extra_v_to_add].other_attr["weight"]:
+                                            self.vertex_info[extra_v_to_add].other_attr["weight"][database_n] = 0
+                                        self.vertex_info[extra_v_to_add].other_attr["weight"][database_n] \
+                                            += 1 * self.vertex_info[extra_v_to_add].cov
                         updated = True
                         break
                     else:
@@ -1243,7 +1279,8 @@ class Assembly(object):
             if "weight" in self.vertex_info[vertex_name].other_attr:
                 if len(self.vertex_info[vertex_name].other_attr["weight"]) > 1:
                     all_weights = sorted([(loc_type, self.vertex_info[vertex_name].other_attr["weight"][loc_type])
-                                          for loc_type in self.vertex_info[vertex_name].other_attr["weight"]], key=lambda x: -x[1])
+                                          for loc_type in self.vertex_info[vertex_name].other_attr["weight"]],
+                                         key=lambda x: -x[1])
                     best_t, best_w = all_weights[0]
                     for next_t, next_w in all_weights[1:]:
                         if next_w * type_factor < best_w:
@@ -1270,7 +1307,7 @@ class Assembly(object):
         # removing coverage with 10 times lower/greater than tagged_cov
         removing_low_cov = [candidate_v
                             for candidate_v in vertices
-                            if abs(log(self.vertex_info[candidate_v].cov/max_tagged_cov)) > log_hard_cov_threshold]
+                            if abs(log(self.vertex_info[candidate_v].cov / max_tagged_cov)) > log_hard_cov_threshold]
         if removing_low_cov:
             if log_handler and (debug or verbose):
                 log_handler.info("removing extremely outlying coverage contigs: " + str(removing_low_cov))
@@ -1482,7 +1519,8 @@ class Assembly(object):
                 for n_n_v, n_n_e in self.vertex_info[new_vertex].connections[new_end]:
                     self.vertex_info[n_n_v].connections[n_n_e].add((new_vertex, new_end))
 
-            consensus_s = generate_consensus(*[self.vertex_info[v].seq[directions[go]] for go, v in enumerate(vertices)])
+            consensus_s = generate_consensus(
+                *[self.vertex_info[v].seq[directions[go]] for go, v in enumerate(vertices)])
             self.vertex_info[new_vertex].seq[directions[0]] = consensus_s
             self.vertex_info[new_vertex].seq[not directions[0]] = complementary_seq(consensus_s)
             if copy_tags:
@@ -1549,15 +1587,16 @@ class Assembly(object):
         count_contamination_or_degenerate = 0
         count_using_only_max = 0
         sub_sampling = 10000
-        half_kmer = int(self.__kmer/2)
+        half_kmer = int(self.__kmer / 2)
         for prl_vertices in parallel_vertices_list:
             this_contamination_or_polymorphic = False
             this_using_only_max = False
             # sort by weight, then coverage
             prl_vertices = sorted(
                 prl_vertices,
-                key=lambda x: (-self.vertex_info[x[0]].other_attr.get("weight", {database_name: 0.}).get(database_name, 0.),
-                               -self.vertex_info[x[0]].cov))
+                key=lambda x: (
+                -self.vertex_info[x[0]].other_attr.get("weight", {database_name: 0.}).get(database_name, 0.),
+                -self.vertex_info[x[0]].cov))
             max_cov_vertex, direction_remained = prl_vertices.pop(0)
             max_cov_seq = self.vertex_info[max_cov_vertex].seq[direction_remained]
             max_cov = self.vertex_info[max_cov_vertex].cov
@@ -1566,7 +1605,7 @@ class Assembly(object):
             for this_v, this_direction in prl_vertices:
                 this_seq = self.vertex_info[this_v].seq[this_direction]
                 this_cov = self.vertex_info[this_v].cov
-                if abs(log(this_cov/max_cov)) > contamination_depth:
+                if abs(log(this_cov / max_cov)) > contamination_depth:
                     if abs(len(this_seq) - len(max_cov_seq)) / float(len(this_seq)) <= contamination_dif:
                         # too long to calculate, too long to be polymorphic
                         if max(len(max_cov_seq), len(this_seq)) > 1E5:
@@ -1584,7 +1623,7 @@ class Assembly(object):
                                 removing_irrelevant_v.add(this_v)
                     else:
                         removing_irrelevant_v.add(this_v)
-                elif degenerate and abs(log(this_cov/max_cov)) < degenerate_depth:
+                elif degenerate and abs(log(this_cov / max_cov)) < degenerate_depth:
                     if abs(len(this_seq) - len(max_cov_seq)) / float(len(this_seq)) <= degenerate_dif:
                         # too long to calculate, too long to be polymorphic
                         if max(len(max_cov_seq), len(this_seq)) > 1E5:
@@ -1605,7 +1644,8 @@ class Assembly(object):
                                     raise ProcessingGraphFailed(
                                         "Cannot degenerate inequal-length polymorphic contigs: EDGE_" +
                                         max_cov_vertex + " and EDGE_" + this_v + "!")
-                            elif only_keep_max_cov and float(base_dif)*2/(len(seq_1) + len(seq_2)) < contamination_dif:
+                            elif only_keep_max_cov and float(base_dif) * 2 / (
+                                    len(seq_1) + len(seq_2)) < contamination_dif:
                                 removing_irrelevant_v.add(this_v)
                                 this_contamination_or_polymorphic = True
                                 this_using_only_max = True
@@ -1656,8 +1696,10 @@ class Assembly(object):
                     log_handler.info("removing contaminating vertices: " + " ".join(list(removing_contaminating_v)))
                     log_handler.info("removing contaminating-like vertices: " + " ".join(list(removing_below_cut_off)))
                 else:
-                    sys.stdout.write("removing contaminating vertices: " + " ".join(list(removing_contaminating_v)) + "\n")
-                    sys.stdout.write("removing contaminating-like vertices: " + " ".join(list(removing_below_cut_off)) + "\n")
+                    sys.stdout.write(
+                        "removing contaminating vertices: " + " ".join(list(removing_contaminating_v)) + "\n")
+                    sys.stdout.write(
+                        "removing contaminating-like vertices: " + " ".join(list(removing_below_cut_off)) + "\n")
         if removing_irrelevant_v:
             for candidate_rm_v in removing_irrelevant_v:
                 if candidate_rm_v in self.tagged_vertices[database_name]:
@@ -1681,7 +1723,7 @@ class Assembly(object):
                                      str(count_using_only_max) + " polymorphic loci.\n")
 
     def find_target_graph(self, tab_file, database_name, mode="embplant_pt", type_factor=3, weight_factor=100.0,
-                          max_copy=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
+                          max_contig_multiplicity=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
                           log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
                           min_single_copy_percent=50,
@@ -1694,7 +1736,7 @@ class Assembly(object):
         :param mode:
         :param type_factor:
         :param weight_factor:
-        :param max_copy:
+        :param max_contig_multiplicity:
         :param min_sigma_factor:
         :param expected_max_size:
         :param expected_min_size:
@@ -1826,7 +1868,7 @@ class Assembly(object):
                             verbose=verbose, mode=mode)
                         while first_round or delete_those_vertices or this_del:
                             if data_contains_outlier:
-                                this_del, parameters =\
+                                this_del, parameters = \
                                     new_assembly.filter_by_coverage(database_n=database_name,
                                                                     weight_factor=weight_factor,
                                                                     log_hard_cov_threshold=log_hard_cov_threshold,
@@ -1860,7 +1902,8 @@ class Assembly(object):
                                     log_handler.info("tagged coverage: " +
                                                      str(["%.1f" % new_assembly.vertex_info[log_v].cov
                                                           for log_v
-                                                          in sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
+                                                          in
+                                                          sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
                             new_assembly.estimate_copy_and_depth_by_cov(
                                 new_assembly.tagged_vertices[database_name], debug=debug, log_handler=log_handler,
                                 verbose=verbose, mode=mode)
@@ -1881,7 +1924,8 @@ class Assembly(object):
                                                     if
                                                     "weight" in new_assembly.vertex_info[x_v].other_attr
                                                     and
-                                                    database_name in new_assembly.vertex_info[x_v].other_attr["weight"]])
+                                                    database_name in new_assembly.vertex_info[x_v].other_attr[
+                                                        "weight"]])
                                                for x in new_assembly.vertex_clusters]
                             best = max(cluster_weights)
                             best_id = cluster_weights.index(best)
@@ -1916,7 +1960,7 @@ class Assembly(object):
                                         new_assembly.write_to_gfa(temp_graph)
                                         new_assembly.write_out_tags([database_name], temp_csv)
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
-                                                                "Broken or contamination?")
+                                                                                              "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
                                     if w == second:
                                         for del_v in new_assembly.vertex_clusters[j]:
@@ -1939,7 +1983,7 @@ class Assembly(object):
                                                             new_assembly.write_out_tags([database_name], temp_csv)
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
-                                                            "# tags: " +
+                                                                                                                     "# tags: " +
                                                             str(new_assembly.vertex_info[del_v].other_attr.
                                                                 get("tags", {database_name: ""})[database_name]))
 
@@ -1985,7 +2029,7 @@ class Assembly(object):
                                             new_assembly.write_to_gfa(temp_graph)
                                             new_assembly.write_out_tags([database_name], temp_csv)
                                         raise ProcessingGraphFailed(
-                                            "Incomplete/Complicated graph: please check around EDGE_"+vertex_name + "!")
+                                            "Incomplete/Complicated graph: please check around EDGE_" + vertex_name + "!")
                                     else:
                                         delete_those_vertices.add(vertex_name)
                             if delete_those_vertices:
@@ -1993,7 +2037,8 @@ class Assembly(object):
                                     if log_handler:
                                         log_handler.info("removing terminal contigs: " + str(delete_those_vertices))
                                     else:
-                                        sys.stdout.write("removing terminal contigs: " + str(delete_those_vertices) + "\n")
+                                        sys.stdout.write(
+                                            "removing terminal contigs: " + str(delete_those_vertices) + "\n")
                                 new_assembly.remove_vertex(delete_those_vertices)
                                 changed = True
 
@@ -2059,7 +2104,8 @@ class Assembly(object):
                         else:
                             sys.stdout.write("Estimating copy and depth precisely ...\n")
                     final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
-                        maximum_copy_num=max_copy, broken_graph_allowed=broken_graph_allowed, log_handler=log_handler,
+                        maximum_copy_num=max_contig_multiplicity, broken_graph_allowed=broken_graph_allowed,
+                        log_handler=log_handler,
                         verbose=verbose, debug=debug)
                     if verbose:
                         if log_handler:
@@ -2131,7 +2177,8 @@ class Assembly(object):
                                             log_handler=log_handler, verbose=verbose, mode="all", debug=debug)
                                         final_res_combinations.extend(
                                             new_possible_graph.estimate_copy_and_depth_precisely(
-                                                maximum_copy_num=max_copy, broken_graph_allowed=broken_graph_allowed,
+                                                maximum_copy_num=max_contig_multiplicity,
+                                                broken_graph_allowed=broken_graph_allowed,
                                                 log_handler=log_handler, verbose=verbose, debug=debug))
 
                                     del final_res_combinations[go_graph]
@@ -2172,7 +2219,7 @@ class Assembly(object):
                                                                                               False: set()}
                             new_assembly.update_vertex_clusters()
                             try:
-                                here_max_copy = 1 if remove_all_connections else max_copy
+                                here_max_copy = 1 if remove_all_connections else max_contig_multiplicity
                                 final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
                                     maximum_copy_num=here_max_copy, broken_graph_allowed=True, log_handler=log_handler,
                                     verbose=verbose, debug=debug)
@@ -2340,8 +2387,10 @@ class Assembly(object):
                     else:
                         new_connections = sorted(new_connections)
                         # if next_connections is SSC, reorder
-                        if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == new_connections[1][0]:
-                            new_connections.sort(key=lambda x: -self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
+                        if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == \
+                                new_connections[1][0]:
+                            new_connections.sort(
+                                key=lambda x: -self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
                         circular_directed_graph_solver(new_path, new_connections, new_left, check_all_kinds)
 
         paths = []
@@ -2430,7 +2479,8 @@ class Assembly(object):
                         log_handler.warning("Multiple circular genome structures with abnormal length produced!")
                         log_handler.warning("Please check the assembly graph and selected graph to confirm.")
                     else:
-                        sys.stdout.write("Warning: Multiple circular genome structures with abnormal length produced!\n")
+                        sys.stdout.write(
+                            "Warning: Multiple circular genome structures with abnormal length produced!\n")
                         sys.stdout.write("Please check the assembly graph and selected graph to confirm.\n")
                 elif len(sorted_paths) > 2:
                     if log_handler:
@@ -2628,7 +2678,8 @@ class Assembly(object):
 
             if mode == "embplant_pt":
                 if len(sorted_paths) > 2 and \
-                        not (100000 < sum([len(self.export_path(part_p).seq) for part_p in sorted_paths[0][0]]) < 200000):
+                        not (100000 < sum(
+                            [len(self.export_path(part_p).seq) for part_p in sorted_paths[0][0]]) < 200000):
                     if log_handler:
                         log_handler.warning("Multiple structures (gene order) with abnormal plastome length produced!")
                         log_handler.warning("Please check the assembly graph and selected graph to confirm.")
@@ -2717,12 +2768,12 @@ def get_graph_coverage_dict_simple(fasta_matrix, is_fastg):
 
 
 def average_weighted_np_free(vals, weights):
-    return sum([val * weights[go_v] for go_v, val in enumerate(vals)])/float(sum(weights))
+    return sum([val * weights[go_v] for go_v, val in enumerate(vals)]) / float(sum(weights))
 
 
 def weighted_mean_and_std_np_free(values, weights):
     mean = average_weighted_np_free(values, weights=weights)
-    std = average_weighted_np_free([(val-mean)**2 for val in values], weights=weights)**0.5
+    std = average_weighted_np_free([(val - mean) ** 2 for val in values], weights=weights) ** 0.5
     return mean, std
 
 
@@ -2793,7 +2844,7 @@ def filter_fastg_by_depth_simple(fas_file, max_depth, min_depth, log_handler=Non
         if log_handler:
             log_handler.info('filtering by depth cost: ' + str(round(time.time() - time0, 2)))
         else:
-            sys.stdout.write('\nfiltering by depth cost: '+str(round(time.time()-time0, 2)) + "\n")
+            sys.stdout.write('\nfiltering by depth cost: ' + str(round(time.time() - time0, 2)) + "\n")
         return out_fasta
     else:
         return fas_file

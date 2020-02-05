@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""This script converts a gfa (Graphical Fragment Assembly) file into a fastg file"""
+"""This script converts a gfa (Graphical Fragment Assembly) file into a fasta file"""
 import sys
 import os
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]

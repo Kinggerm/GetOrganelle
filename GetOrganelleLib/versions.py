@@ -11,10 +11,13 @@ versions = [
          "2. get_organelle_from_assembly.py & disentangle_organelle_assembly.py: --max-multiplicity added",
          "3. Assembly.estimate_copy_and_depth_precisely() modified: constraint_max_function() for --max-multiplicity",
          "4. Assembly.tag_in_between() modified",
-         "5. Assembly.estimate_copy_and_depth_by_cov() modified: min average coverage limit"
-         "6. README.md: updated",
+         "5. Assembly.estimate_copy_and_depth_by_cov() modified: min average coverage limit",
+         "6. Assembly: too many results due to palindromic repeats, problem solved",
+         "7. Utilities/reconstruct_graph_from_fasta.py & NaiveDeBruijnGraph added",
+         "8. Utilities/gfa_to_fasta.py, Utilities/fastg_to_gfa.py: description corrected",
+         "9. README.md: updated",
      ],
-     "time": "2019-08-26 17:00 GMT+8"},
+     "time": "2019-12-28 17:00 GMT-6"},
     {"number": "1.6.2e",
      "features": [
          "1. seq_parser.py: fix a bug for fastq format: @*****#/1",

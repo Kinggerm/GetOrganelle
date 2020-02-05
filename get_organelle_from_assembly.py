@@ -176,7 +176,7 @@ def get_options(description, version):
             parser.remove_option(not_often_used)
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type",
-                          help="Target organelle genome type: "
+                          help="Target organelle genome type(s): "
                                "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/anonym/"
                                "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
         parser.remove_option("-g")

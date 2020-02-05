@@ -100,13 +100,15 @@ You are always recommended to use the latest GetOrganelle, although you could fi
         git pull
         python setup.py --in-situ
 
-### Required Dependencies
+### Requirement & Dependencies
 
 Since v1.6*, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `pip install ./GetOrganelle`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2e/v1.6.2e-light.tar.gz) upon installing GetOrganelle. 
 
 Besides, no worries about interference from GetOrganelle's dependencies. Because during the installing process mentioned above, GetOrganelle would add those dependencies (SPAdes, Bowtie2, BLAST+) to the GetOrganelle-*.egg rather than to the $PATH, thereby not influence your own usage. For example, if you already installed SPAdes v3.6.2, after installing GetOrganelle, the spades version for your system would still be v3.6.2, while only GetOrganelle uses the [version in GetOrganelleDep](https://github.com/Kinggerm/GetOrganelle/blob/master/GetOrganelleDep/linux/SPAdes/share/spades/VERSION). 
 
-Python libraries (numpy, scipy, sympy) is covered in the installation part.
+Python libraries (numpy, scipy, sympy) is covered in the installation part. 
+
+Perl is required for the wrapper of Bowtie2, but we assume that it was builtin in your system.
 
 #### NOT Required Dependencies
 

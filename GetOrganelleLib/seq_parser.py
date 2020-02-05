@@ -114,6 +114,34 @@ class SequenceList(object):
         fasta_file_handler.close()
 
 
+class SeqKmerIndexer(object):
+    def __init__(self, sequence, kmer, is_circular=False):
+        self.__kmer = kmer
+        if is_circular:
+            self.__sequence = sequence + sequence[:kmer - 1]
+            self.__len = len(sequence)
+        else:
+            self.__sequence = sequence
+            self.__len = len(sequence) - kmer + 1
+
+    def __len__(self):
+        return self.__len
+
+    def __getitem__(self, item):
+        if -self.__len - 1 < item < -1:
+            return self.__sequence[1 - self.__kmer + item: 1 + item]
+        elif item == -1:
+            return self.__sequence[1 - self.__kmer + item:]
+        elif -1 < item < self.__len:
+            return self.__sequence[item: item + self.__kmer]
+        else:
+            raise IndexError("index out of range")
+
+    def __enumerate__(self):
+        for i in range(self.__len):
+            yield i, self.__getitem__(i)
+
+
 def read_fasta(fasta_dir):
     fasta_file = open(fasta_dir, 'r')
     names = []

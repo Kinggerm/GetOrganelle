@@ -28,9 +28,10 @@ except ImportError:
 
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
+# for test
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.statistical_func import *
-
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 import random
 from copy import deepcopy
@@ -45,6 +46,14 @@ else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
 ECHO_DIRECTION = ["_tail", "_head"]
+
+
+class ProcessingGraphFailed(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
 
 
 class Vertex(object):
@@ -117,14 +126,14 @@ class VertexInfo(dict):
 
 
 class Assembly(object):
-    def __init__(self, graph_file=None, min_cov=0., max_cov=inf):
+    def __init__(self, graph_file=None, min_cov=0., max_cov=inf, overlap=None):
         """
         :param graph_file:
         :param min_cov:
         :param max_cov:
         """
         self.vertex_info = VertexInfo()
-        self.__kmer = 127
+        self.__overlap = overlap  # kmer in de bruijn assembly
         if graph_file:
             if graph_file.endswith(".gfa"):
                 self.parse_gfa(graph_file, min_cov=min_cov, max_cov=max_cov)
@@ -178,11 +187,11 @@ class Assembly(object):
                     self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
                     self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
             if len(kmer_values) == 0:
-                self.__kmer = None
+                self.__overlap = None
             elif len(kmer_values) > 1:
                 raise ProcessingGraphFailed("Multiple overlap values: " + ",".join(sorted(kmer_values)))
             else:
-                self.__kmer = int(kmer_values.pop()[:-1])
+                self.__overlap = int(kmer_values.pop()[:-1])
 
     def parse_fastg(self, fastg_file, min_cov=0., max_cov=inf):
         fastg_matrix = SequenceList(fastg_file)
@@ -256,7 +265,7 @@ class Assembly(object):
             if initial_kmer:
                 break
         if no_connection_at_all:
-            self.__kmer = 0
+            self.__overlap = 0
         else:
             ## check all edges
             testing_vertices = set(self.vertex_info)
@@ -270,13 +279,13 @@ class Assembly(object):
                             if this_seq != next_seq:
                                 initial_kmer.discard(test_k)
             if len(initial_kmer) >= 1:
-                self.__kmer = max(initial_kmer)
+                self.__overlap = max(initial_kmer)
             else:
                 raise ProcessingGraphFailed("No kmer detected!")
 
     def new_graph_with_vertex_reseeded(self, start_from=1):
         those_vertices = sorted(self.vertex_info)
-        new_graph = Assembly()
+        new_graph = Assembly(overlap=self.__overlap)
         name_trans = {those_vertices[go - start_from]: str(go)
                       for go in range(start_from, start_from + len(those_vertices))}
         for old_name in those_vertices:
@@ -363,7 +372,7 @@ class Assembly(object):
                         recorded_connections.add(this_con)
                         out_file_handler.write("\t".join([
                             "L", vertex_name, ("-", "+")[this_end], next_v, ("-", "+")[not next_e],
-                            str(self.__kmer) + "M"
+                            str(self.__overlap if self.__overlap else 0) + "M"
                         ]) + "\n")
 
     def write_out_tags(self, db_names, out_file):
@@ -389,7 +398,7 @@ class Assembly(object):
         open(out_file, "w").writelines(["\t".join(line) + "\n" for line in lines])
 
     def kmer(self):
-        return int(self.__kmer)
+        return int(self.__overlap)
 
     def update_orf_total_len(self, limited_vertices=None):
         if not limited_vertices:
@@ -597,14 +606,14 @@ class Assembly(object):
                         next_len = self.vertex_info[next_vertex].len
                         this_cov = self.vertex_info[this_vertex].cov
                         next_cov = self.vertex_info[next_vertex].cov
-                        self.vertex_info[new_vertex].len = this_len + next_len - self.__kmer
+                        self.vertex_info[new_vertex].len = this_len + next_len - self.__overlap
                         self.vertex_info[new_vertex].cov = \
-                            ((this_len - self.__kmer + 1) * this_cov + (next_len - self.__kmer + 1) * next_cov) \
-                            / ((this_len - self.__kmer + 1) + (next_len - self.__kmer + 1))
+                            ((this_len - self.__overlap + 1) * this_cov + (next_len - self.__overlap + 1) * next_cov) \
+                            / ((this_len - self.__overlap + 1) + (next_len - self.__overlap + 1))
                         self.vertex_info[new_vertex].seq[this_end] \
-                            += self.vertex_info[next_vertex].seq[not next_end][self.__kmer:]
+                            += self.vertex_info[next_vertex].seq[not next_end][self.__overlap:]
                         self.vertex_info[new_vertex].seq[not this_end] \
-                            = self.vertex_info[next_vertex].seq[next_end][:-self.__kmer] \
+                            = self.vertex_info[next_vertex].seq[next_end][:-self.__overlap] \
                               + self.vertex_info[this_vertex].seq[not this_end]
                         # tags
                         if copy_tags:
@@ -689,7 +698,7 @@ class Assembly(object):
                 total_product = 0.
                 total_len = 0
                 for vertex_name in limited_vertices:
-                    this_len = (self.vertex_info[vertex_name].len - self.__kmer + 1) \
+                    this_len = (self.vertex_info[vertex_name].len - self.__overlap + 1) \
                                * self.vertex_to_copy.get(vertex_name, 1)
                     this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
                     total_len += this_len
@@ -1102,7 +1111,7 @@ class Assembly(object):
                 total_product = 0.
                 total_len = 0
                 for vertex_name in vertices_list:
-                    this_len = (self.vertex_info[vertex_name].len - self.__kmer + 1) \
+                    this_len = (self.vertex_info[vertex_name].len - self.__overlap + 1) \
                                * final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)
                     this_cov = self.vertex_info[vertex_name].cov \
                                / final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)
@@ -1137,7 +1146,7 @@ class Assembly(object):
                 total_product = 0.
                 total_len = 0
                 for vertex_name in vertices_list:
-                    this_len = (self.vertex_info[vertex_name].len - self.__kmer + 1) \
+                    this_len = (self.vertex_info[vertex_name].len - self.__overlap + 1) \
                                * self.vertex_to_copy.get(vertex_name, 1)
                     this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
                     total_len += this_len
@@ -1243,7 +1252,7 @@ class Assembly(object):
                         locus_len = locus_end - locus_start + 1
                         # skip those tags concerning only the overlapping sites
                         if (locus_start == 1 or locus_end == self.vertex_info[vertex_name].len) \
-                                and locus_len == self.__kmer:
+                                and locus_len == self.__overlap:
                             continue
                         if locus_name in tag_loci[locus_type]:
                             new_weight = locus_len * self.vertex_info[vertex_name].cov
@@ -1323,7 +1332,7 @@ class Assembly(object):
                        for this_v in vertices}
 
         coverages = np.array([v_coverages[this_v] for this_v in vertices])
-        cover_weights = np.array([(self.vertex_info[this_v].len - self.__kmer)
+        cover_weights = np.array([(self.vertex_info[this_v].len - self.__overlap)
                                   # multiply by copy number
                                   * self.vertex_to_copy.get(this_v, 1)
                                   # extra weight to short non-target
@@ -1587,7 +1596,7 @@ class Assembly(object):
         count_contamination_or_degenerate = 0
         count_using_only_max = 0
         sub_sampling = 10000
-        half_kmer = int(self.__kmer / 2)
+        half_kmer = int(self.__overlap / 2)
         for prl_vertices in parallel_vertices_list:
             this_contamination_or_polymorphic = False
             this_using_only_max = False
@@ -1675,7 +1684,7 @@ class Assembly(object):
             count_using_only_max += this_using_only_max
         if removing_contaminating_v:
             contaminating_cov = np.array([self.vertex_info[con_v].cov for con_v in removing_contaminating_v])
-            contaminating_weight = np.array([len(self.vertex_info[con_v].seq[True]) - self.__kmer
+            contaminating_weight = np.array([len(self.vertex_info[con_v].seq[True]) - self.__overlap
                                              for con_v in removing_contaminating_v])
             for candidate_rm_v in removing_contaminating_v:
                 if candidate_rm_v in self.tagged_vertices[database_name]:
@@ -1778,10 +1787,10 @@ class Assembly(object):
                                                  str(this_graph.vertex_to_copy.get(vertex_name, 1)))
 
                     log_handler.info("Average " + mode + " kmer-coverage" +
-                                     ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_k_cov))
+                                     ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov)
                     if this_b_cov:
                         log_handler.info("Average " + mode + " base-coverage" +
-                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_b_cov))
+                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_b_cov)
                 else:
                     if echo_graph_id:
                         sys.stdout.write("Graph " + str(go_res + 1) + "\n")
@@ -1792,10 +1801,10 @@ class Assembly(object):
                                 sys.stdout.write("Vertex_" + vertex_name + " #copy = " +
                                                  str(this_graph.vertex_to_copy.get(vertex_name, 1)) + "\n")
                     sys.stdout.write("Average " + mode + " kmer-coverage" +
-                                     ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_k_cov) + "\n")
+                                     ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov + "\n")
                     if this_b_cov:
-                        sys.stdout.write("Average " + mode + " base-coverage" +
-                                         ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + str(this_b_cov) + "\n")
+                        sys.stdout.write("Average " + mode + " base-coverage" + ("(" + str(go_res + 1) + ")") *
+                                         echo_graph_id + " = " + "%.1f" % this_b_cov + "\n")
 
         if broken_graph_allowed:
             weight_factor = 10000.
@@ -2399,6 +2408,25 @@ class Assembly(object):
         # print(self.copy_to_vertex)
 
         self.update_orf_total_len()
+
+        # 2019-12-28 palindromic repeats
+        palindromic_repeats = set()
+        log_palindrome = False
+        for vertex_n in self.vertex_info:
+            if self.vertex_info[vertex_n].seq[True] == self.vertex_info[vertex_n].seq[False]:
+                temp_f = self.vertex_info[vertex_n].connections[True]
+                temp_r = self.vertex_info[vertex_n].conncetions[False]
+                if temp_f and temp_f == temp_r:
+                    log_palindrome = True
+                    if len(temp_f) == len(temp_r) == 2:  # simple palindromic repeats, prune repeated connections
+                        for go_d, (nb_vertex, nb_direction) in enumerate(tuple(temp_f)):
+                            self.vertex_info[nb_vertex].connections[nb_direction].remove((vertex_n, bool(go_d)))
+                            self.vertex_info[vertex_n].connections[bool(go_d)].remove((nb_vertex, nb_direction))
+                    else:  # complicated, recorded
+                        palindromic_repeats.add(vertex_n)
+        if log_palindrome:
+            log_handler.info("Palindromic repeats detected")
+        #
         if 1 not in self.copy_to_vertex:
             do_check_all_start_kinds = True
             start_vertex = sorted(self.vertex_info,
@@ -2711,22 +2739,196 @@ class Assembly(object):
         seq_names = []
         seq_segments = []
         for this_vertex, this_end in in_path:
-            seq_segments.append(self.vertex_info[this_vertex].seq[this_end][self.__kmer:])
+            seq_segments.append(self.vertex_info[this_vertex].seq[this_end][self.__overlap:])
             seq_names.append(this_vertex + ("-", "+")[this_end])
         # if not circular
         if (in_path[0][0], not in_path[0][1]) not in self.vertex_info[in_path[-1][0]].connections[in_path[-1][1]]:
-            seq_segments[0] = self.vertex_info[in_path[0][0]].seq[in_path[0][1]][:self.__kmer] + seq_segments[0]
+            seq_segments[0] = self.vertex_info[in_path[0][0]].seq[in_path[0][1]][:self.__overlap] + seq_segments[0]
         else:
             seq_names[-1] += "(circular)"
         return Sequence(",".join(seq_names), "".join(seq_segments))
 
 
-class ProcessingGraphFailed(Exception):
-    def __init__(self, value):
-        self.value = value
+class NaiveDeBruijnGraph(Assembly):
+    def __init__(self, fasta_file, kmer_len=55, circular="auto", circular_head_ends="(circular)"):
+        """
+        :param fasta_file:
+        :param kmer_len:
+        :param circular: "auto" (default), "yes", "no"
+        :param circular_head_ends:
+        :return:
+        """
+        super().__init__(overlap=kmer_len-1)
+        assert circular in ("auto", "yes", "no")
+        assert kmer_len >= 3 and kmer_len % 2 == 1
+        self.__kmer = kmer_len  # overlap is actually kmer_len - 1
+        recorded_kmers = {}
+        count_vertices = 0
+        seq_matrix = SequenceList(fasta_file)
+        for seq_record in seq_matrix.sequences:
+            if len(seq_record.seq) >= kmer_len:
+                go_circle = circular == "yes" or (circular == "auto" and seq_record.label.endswith(circular_head_ends))
+                kmer_list = SeqKmerIndexer(seq_record.seq, kmer_len, is_circular=go_circle)
+                # 1. initial kmer seq
+                this_kmer_seq = kmer_list[0]
+                if this_kmer_seq in recorded_kmers:
+                    this_vertex, this_end = recorded_kmers[this_kmer_seq]
+                    self.vertex_info[this_vertex].cov += 1.
+                else:
+                    # add kmer as a new vertex
+                    count_vertices += 1
+                    recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
+                    self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
+                    recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
+                if go_circle:
+                    # add connection between the first kmer and the last kmer if the seq is circular
+                    prev_kmer_seq = kmer_list[- 1]
+                    if prev_kmer_seq in recorded_kmers:
+                        prev_vertex, prev_end = recorded_kmers[prev_kmer_seq]
+                    else:
+                        # if the last kmer is not recorded, recorded it with coverage of zero
+                        count_vertices += 1
+                        recorded_kmers[prev_kmer_seq] = prev_vertex, prev_end = str(count_vertices), True
+                        self.vertex_info[prev_vertex] = prev_v_info = Vertex(prev_vertex, kmer_len, 0., prev_kmer_seq)
+                        recorded_kmers[prev_v_info.seq[False]] = prev_vertex, not prev_end
+                    self.vertex_info[prev_vertex].connections[prev_end].add((this_vertex, not this_end))
+                    self.vertex_info[this_vertex].connections[not this_end].add((prev_vertex, prev_end))
+                # 2. the remaining kmers
+                for go_to in range(1, len(kmer_list)):
+                    this_kmer_seq = kmer_list[go_to]
+                    if this_kmer_seq in recorded_kmers:
+                        this_vertex, this_end = recorded_kmers[this_kmer_seq]
+                        self.vertex_info[this_vertex].cov += 1.
+                    else:
+                        # add kmer as a new vertex
+                        count_vertices += 1
+                        recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
+                        self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
+                        recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
+                    # add the connection between this_kmer_seq and prev_kmer_seq
+                    prev_kmer_seq = kmer_list[go_to - 1]
+                    prev_vertex, prev_end = recorded_kmers[prev_kmer_seq]
+                    self.vertex_info[prev_vertex].connections[prev_end].add((this_vertex, not this_end))
+                    self.vertex_info[this_vertex].connections[not this_end].add((prev_vertex, prev_end))
+            else:
+                raise Warning(fasta_file + ":" + seq_record.label + ":length:" + str(len(seq_record.seq)) +
+                              " < kmer:" + str(kmer_len) + " .. skipped!")
 
-    def __str__(self):
-        return repr(self.value)
+    def generate_assembly_graph(self):
+        def generate_contig(
+                this_k_n, this_k_e, next_k_n, next_k_e, k_quo, in_graph, in_kmer_e_to_ctg_e, next_kmers=[]):
+            if next_k_n in k_quo and k_quo[next_k_n][next_k_e] > 0:
+                k_quo[this_k_n][this_k_e] -= 1
+                count_k_len = 1
+                count_k_sum = self.vertex_info[this_k_n].cov
+                forward_seq = self.vertex_info[this_k_n].seq[this_k_e]
+                while k_quo[next_k_n][next_k_e] > 0:
+                    k_quo[next_k_n][next_k_e] -= 1
+                    count_k_len += 1
+                    count_k_sum += self.vertex_info[next_k_n].cov
+                    forward_seq += self.vertex_info[next_k_n].seq[not next_k_e][-1]
+                    if next_k_n in terminal_kmers:
+                        next_kmers.append(next_k_n)
+                        break
+                    elif k_quo[next_k_n][not next_k_e] <= 0:
+                        break
+                    else:
+                        k_quo[next_k_n][not next_k_e] -= 1
+                        # update next_k_name, next_k_end
+                        next_k_n, next_k_e = \
+                            list(self.vertex_info[next_k_n].connections[not next_k_e])[0]
+                c_name = str(len(in_graph.vertex_info) + 1)
+                c_end = False  # start of a contig
+                # record connections to be added later
+                if this_k_n not in in_kmer_e_to_ctg_e:
+                    in_kmer_e_to_ctg_e[this_k_n] = {True: set(), False: set()}
+                if next_k_n not in in_kmer_e_to_ctg_e:
+                    in_kmer_e_to_ctg_e[next_k_n] = {True: set(), False: set()}
+                in_kmer_e_to_ctg_e[this_k_n][this_k_e].add((c_name, c_end))
+                in_kmer_e_to_ctg_e[next_k_n][next_k_e].add((c_name, not c_end))
+                # record contig without connections
+                c_length = count_k_len + self.__kmer - 1
+                c_coverage = count_k_sum / float(count_k_len)
+                in_graph.vertex_info[c_name] = Vertex(
+                    c_name, length=c_length, coverage=c_coverage, forward_seq=forward_seq,
+                    fastg_form_long_name="EDGE_" + c_name + "_length_" + str(c_length) + "_cov_" + str(c_coverage))
+
+        # 1. profile the graph shape, find terminal kmers and how many times a kmer will be used
+        terminal_kmers = set()
+        singletons = []
+        kmer_quotas = {}
+        for this_k_name in sorted(self.vertex_info):
+            connect_num_tail = len(self.vertex_info[this_k_name].connections[True])
+            connect_num_head = len(self.vertex_info[this_k_name].connections[False])
+            if connect_num_head + connect_num_tail:
+                # head, tail, total
+                kmer_quotas[this_k_name] = {False: connect_num_head, True: connect_num_tail}
+            if connect_num_tail == 0:
+                if connect_num_head == 0:
+                    singletons.append(this_k_name)
+                else:
+                    terminal_kmers.add(this_k_name)
+            elif connect_num_tail == 1:
+                if connect_num_head == 0:
+                    terminal_kmers.add(this_k_name)
+                elif connect_num_head == 1:
+                    pass
+                else:
+                    terminal_kmers.add(this_k_name)
+            elif connect_num_tail > 1:
+                terminal_kmers.add(this_k_name)
+
+        # 2. generating
+        # 2.1 initialization
+        assembly_graph = Assembly(overlap=self.__kmer)
+        joint_kmer_end_to_contig_end = {}  # record contig connections using joint_kmer_end_to_contig_end
+        # 2.2 add singleton
+        for this_k_name in singletons:
+            new_contig_name = str(len(assembly_graph.vertex_info) + 1)
+            assembly_graph.vertex_info[new_contig_name] = Vertex(
+                new_contig_name, length=self.__kmer, coverage=self.vertex_info[this_k_name].cov,
+                forward_seq=self.vertex_info[this_k_name].seq[True],
+                fastg_form_long_name="EDGE_" + new_contig_name + "_length_" + str(self.__kmer) + "_cov_" + str(
+                    self.vertex_info[this_k_name].cov))
+
+        # 2.3 add contigs starting from terminal kmers
+        # use waiting_list to record downstream kmers, so that we can label contigs in connecting order
+        waiting_terminal_kmers = []
+        for this_k_name in sorted(terminal_kmers):
+            while this_k_name in terminal_kmers:
+                terminal_kmers.remove(this_k_name)
+                if this_k_name in kmer_quotas:
+                    for this_k_end in (True, False):
+                        for next_k_name, next_k_end in sorted(self.vertex_info[this_k_name].connections[this_k_end]):
+                            # this_k_end_quota
+                            if kmer_quotas[this_k_name][this_k_end] > 0:
+                                generate_contig(
+                                    this_k_n=this_k_name, this_k_e=this_k_end,
+                                    next_k_n=next_k_name, next_k_e=next_k_end, k_quo=kmer_quotas,
+                                    in_graph=assembly_graph, in_kmer_e_to_ctg_e=joint_kmer_end_to_contig_end,
+                                    next_kmers=waiting_terminal_kmers)
+                    del kmer_quotas[this_k_name]
+                if waiting_terminal_kmers:
+                    this_k_name = waiting_terminal_kmers.pop(0)
+        # 2.4 add contigs starting from remaining kmers (circular sub-graphs)
+        for this_k_name in sorted(kmer_quotas):
+            for this_k_end in (True, False):
+                # clean kmer_quotas
+                if kmer_quotas[this_k_name][True] <= 0 and kmer_quotas[this_k_name][False] <= 0:
+                    del kmer_quotas[this_k_name]
+                    break
+                else:
+                    for next_k_name, next_k_end in sorted(self.vertex_info[this_k_name].connections[this_k_end]):
+                        generate_contig(this_k_n=this_k_name, this_k_e=this_k_end,
+                                        next_k_n=next_k_name, next_k_e=next_k_end, k_quo=kmer_quotas,
+                                        in_graph=assembly_graph, in_kmer_e_to_ctg_e=joint_kmer_end_to_contig_end)
+        # 2.5 transfer the connections among kmers to contigs
+        for joint_kmer_n in joint_kmer_end_to_contig_end:
+            for contig_n_1, contig_e_1 in joint_kmer_end_to_contig_end[joint_kmer_n][True]:
+                for contig_n_2, contig_e_2 in joint_kmer_end_to_contig_end[joint_kmer_n][False]:
+                    assembly_graph.vertex_info[contig_n_1].connections[contig_e_1].add((contig_n_2, contig_e_2))
+                    assembly_graph.vertex_info[contig_n_2].connections[contig_e_2].add((contig_n_1, contig_e_1))
+        return assembly_graph
 
 
 def generate_index_combinations(index_list):

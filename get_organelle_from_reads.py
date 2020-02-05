@@ -71,8 +71,8 @@ def get_options(description, version):
     usage = "\n###  Embryophyta plant plastome, 2*(1G raw data, 150 bp) reads\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s cp_seed.fasta -o plastome_output " \
             " -R 15 -k 21,45,65,85,105 -F embplant_pt\n" \
-            "###  Embryophyta plant mitochondria\n" + str(os.path.basename(__file__)) + \
-            " -1 sample_1.fq -2 sample_2.fq -s mt_seed.fasta -o mitochondria_output " \
+            "###  Embryophyta plant mitogenome\n" + str(os.path.basename(__file__)) + \
+            " -1 sample_1.fq -2 sample_2.fq -s mt_seed.fasta -o mitogenome_output " \
             " -R 30 -k 21,45,65,85,105 -F embplant_mt"
     parser = OptionParser(usage=usage, version=version, description=description, add_help_option=False)
     # group 1
@@ -134,8 +134,8 @@ def get_options(description, version):
     group_scheme.add_option("-F", dest="organelle_type",
                             help="This flag should be followed with embplant_pt (embryophyta plant plastome), "
                                  "other_pt (non-embryophyta plant plastome), embplant_mt "
-                                 "(plant mitochondrion), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
-                                 "(animal mitochondrion), fungus_mt (fungus mitochondrion), "
+                                 "(plant mitogenome), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
+                                 "(animal mitogenome), fungus_mt (fungus mitogenome), "
                                  "or embplant_mt,other_pt,fungus_mt "
                                  "(the combination of any of above organelle genomes split by comma(s), "
                                  "which might be computationally more intensive than separate runs), "
@@ -405,7 +405,7 @@ def get_options(description, version):
                                                         "Default: 15 (embplant_pt)")
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type",
-                          help="Target organelle genome type: "
+                          help="Target organelle genome type(s): "
                                "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/anonym/"
                                "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
         parser.remove_option("--max-reads")

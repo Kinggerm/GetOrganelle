@@ -20,7 +20,7 @@ def get_options():
     parser.add_option("-o", dest="output",
                       help="Output graph file. The output format is GFA by default, but FASTG only when "
                            "indicated with postfix '.fastg'.")
-    parser.add_option("-k", dest="kmer", default=55,
+    parser.add_option("-k", dest="kmer", default=55, type=int,
                       help="kmer for reconstructing De Bruijn graph. Default:%default")
     parser.add_option("-c", "--circular", dest="circular", default="auto",
                       help="Sequences in input fasta file are all circular (yes/no/auto). "
@@ -42,14 +42,19 @@ def get_options():
 
 
 def main():
+    import time
+    time_0 = time.time()
     options, argv = get_options()
     # detect postfix
     de_burijn_graph = NaiveDeBruijnGraph(options.input, kmer_len=options.kmer, circular=options.circular)
+    assembly_graph = de_burijn_graph.generate_assembly_graph()
     if options.output.endswith(".fastg"):
         sys.stdout.warning("Fastg is not recommended!\n")
-        de_burijn_graph.write_to_fastg(options.output)
+        assembly_graph.write_to_fastg(options.output)
     else:
-        de_burijn_graph.write_to_gfa(options.output)
+        assembly_graph.write_to_gfa(options.output)
+    de_burijn_graph.write_to_gfa(options.output + ".db.gfa")
+    sys.stdout.write("Took " + "%.4f" % (time.time() - time_0) + "s in generating " + options.output + "\n")
 
 
 if __name__ == '__main__':

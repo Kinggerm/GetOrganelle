@@ -131,7 +131,8 @@ scripts_to_install = ["get_organelle_from_reads.py",
                       "Utilities/rm_low_coverage_duplicated_contigs.py",
                       "Utilities/round_statistics.py",
                       "Utilities/slim_fastg.py",
-                      "Utilities/summary_get_organelle_output.py"]
+                      "Utilities/summary_get_organelle_output.py",
+                      "Utilities/reconstruct_graph_from_fasta.py"]
 dep_scripts_to_change = []
 if os.path.isdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
     for spades_script in os.listdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):

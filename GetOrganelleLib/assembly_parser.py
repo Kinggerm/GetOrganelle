@@ -2339,15 +2339,23 @@ class Assembly(object):
     def get_all_circular_paths(self, mode="embplant_pt",
                                library_info=None, log_handler=None, reverse_start_direction_for_pt=False):
 
-        def circular_directed_graph_solver(ongoing_path, next_connections, vertices_left, check_all_kinds):
+        def circular_directed_graph_solver(ongoing_path, next_connections, vertices_left, check_all_kinds,
+                                           palindromic_repeat_vertices):
             # print("-----------------------------")
             # print("ongoing_path", ongoing_path)
             # print("next_connect", next_connections)
             # print("vertices_lef", vertices_left)
             if not vertices_left:
                 new_path = deepcopy(ongoing_path)
+                if palindromic_repeat_vertices:
+                    new_path = [(this_v, True) if this_v in palindromic_repeat_vertices else (this_v, this_e)
+                                for this_v, this_e in new_path]
                 if check_all_kinds:
-                    rev_path = [(this_v, not this_e) for this_v, this_e in new_path[::-1]]
+                    if palindromic_repeat_vertices:
+                        rev_path = [(this_v, True) if this_v in palindromic_repeat_vertices else (this_v, not this_e)
+                                    for this_v, this_e in new_path[::-1]]
+                    else:
+                        rev_path = [(this_v, not this_e) for this_v, this_e in new_path[::-1]]
                     this_path_derived = [new_path, rev_path]
                     for change_start in range(1, len(new_path)):
                         this_path_derived.append(new_path[change_start:] + new_path[:change_start])
@@ -2375,8 +2383,17 @@ class Assembly(object):
                     new_connections = self.vertex_info[next_vertex].connections[not next_end]
                     if not new_left:
                         if (start_vertex, not start_direction) in new_connections:
+                            if palindromic_repeat_vertices:
+                                new_path = [
+                                    (this_v, True) if this_v in palindromic_repeat_vertices else (this_v, this_e)
+                                    for this_v, this_e in new_path]
                             if check_all_kinds:
-                                rev_path = [(this_v, not this_e) for this_v, this_e in new_path[::-1]]
+                                if palindromic_repeat_vertices:
+                                    rev_path = [(this_v, True) if this_v in palindromic_repeat_vertices else
+                                                (this_v, not this_e)
+                                                for this_v, this_e in new_path[::-1]]
+                                else:
+                                    rev_path = [(this_v, not this_e) for this_v, this_e in new_path[::-1]]
                                 this_path_derived = [new_path, rev_path]
                                 for change_start in range(1, len(new_path)):
                                     this_path_derived.append(new_path[change_start:] + new_path[:change_start])
@@ -2400,7 +2417,8 @@ class Assembly(object):
                                 new_connections[1][0]:
                             new_connections.sort(
                                 key=lambda x: -self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
-                        circular_directed_graph_solver(new_path, new_connections, new_left, check_all_kinds)
+                        circular_directed_graph_solver(new_path, new_connections, new_left, check_all_kinds,
+                                                       palindromic_repeat_vertices)
 
         paths = []
         paths_set = set()
@@ -2416,16 +2434,22 @@ class Assembly(object):
             if self.vertex_info[vertex_n].seq[True] == self.vertex_info[vertex_n].seq[False]:
                 temp_f = self.vertex_info[vertex_n].connections[True]
                 temp_r = self.vertex_info[vertex_n].conncetions[False]
-                if temp_f and temp_f == temp_r:
+                # heuristic
+                # in rare case, a contig connect itself in one end:
+                #  (vertex_n, True) in temp_f or (vertex_n, False) in temp_r
+                if temp_f and (temp_f == temp_r or (vertex_n, True) in temp_f or (vertex_n, False) in temp_r):
                     log_palindrome = True
                     if len(temp_f) == len(temp_r) == 2:  # simple palindromic repeats, prune repeated connections
                         for go_d, (nb_vertex, nb_direction) in enumerate(tuple(temp_f)):
                             self.vertex_info[nb_vertex].connections[nb_direction].remove((vertex_n, bool(go_d)))
                             self.vertex_info[vertex_n].connections[bool(go_d)].remove((nb_vertex, nb_direction))
+                    elif len(temp_f) == len(temp_r) == 1:  # connect to the same inverted repeat
+                        pass
                     else:  # complicated, recorded
                         palindromic_repeats.add(vertex_n)
         if log_palindrome:
-            log_handler.info("Palindromic repeats detected")
+            log_handler.info("Palindromic repeats detected. "
+                             "Different paths generating identical sequence will be merged.")
         #
         if 1 not in self.copy_to_vertex:
             do_check_all_start_kinds = True
@@ -2458,7 +2482,8 @@ class Assembly(object):
         vertex_to_copy[start_vertex] -= 1
         if vertex_to_copy[start_vertex] <= 0:
             del vertex_to_copy[start_vertex]
-        circular_directed_graph_solver(first_path, first_connections, vertex_to_copy, do_check_all_start_kinds)
+        circular_directed_graph_solver(first_path, first_connections, vertex_to_copy, do_check_all_start_kinds,
+                                       palindromic_repeats)
 
         if not paths:
             raise ProcessingGraphFailed("Detecting path(s) from remaining graph failed!")
@@ -2532,10 +2557,20 @@ class Assembly(object):
 
     def get_all_paths(self, mode="embplant_pt", log_handler=None):
 
-        def standardize_paths(raw_paths):
+        def standardize_paths(raw_paths, undirected_vertices):
+            if undirected_vertices:
+                corrected_paths = [[(this_v, True) if this_v in undirected_vertices else (this_v, this_e)
+                                    for this_v, this_e in path_part]
+                                   for path_part in raw_paths ]
+            else:
+                corrected_paths = deepcopy(raw_paths)
             here_standardized_path = []
-            for part_path in raw_paths:
-                rev_part = [(this_v, not this_e) for this_v, this_e in part_path[::-1]]
+            for part_path in corrected_paths:
+                if undirected_vertices:
+                    rev_part = [(this_v, True) if this_v in undirected_vertices else (this_v, not this_e)
+                                for this_v, this_e in part_path[::-1]]
+                else:
+                    rev_part = [(this_v, not this_e) for this_v, this_e in part_path[::-1]]
                 if (part_path[0][0], not part_path[0][1]) \
                         in self.vertex_info[part_path[-1][0]].connections[part_path[-1][1]]:
                     # circular
@@ -2547,17 +2582,19 @@ class Assembly(object):
                 else:
                     standard_part = tuple(sorted([part_path, rev_part], key=lambda x: smart_trans_for_sort(x))[0])
                 here_standardized_path.append(standard_part)
-            return tuple(sorted(here_standardized_path, key=lambda x: smart_trans_for_sort(x)))
+            return corrected_paths, tuple(sorted(here_standardized_path, key=lambda x: smart_trans_for_sort(x)))
 
-        def directed_graph_solver(ongoing_paths, next_connections, vertices_left, in_all_start_ve):
+        def directed_graph_solver(ongoing_paths, next_connections, vertices_left, in_all_start_ve, undirected_vertices):
             # print("-----------------------------")
             # print("ongoing_path", ongoing_path)
             # print("next_connect", next_connections)
             # print("vertices_lef", vertices_left)
             # print("vertices_lef", len(vertices_left))
             if not vertices_left:
-                new_paths = deepcopy(ongoing_paths)
-                path_paris.append([new_paths, standardize_paths(new_paths)])
+                new_paths, new_standardized = standardize_paths(ongoing_paths, undirected_vertices)
+                if new_standardized not in paths_set:
+                    paths.append(new_paths)
+                    paths_set.add(new_standardized)
                 return
 
             find_next = False
@@ -2573,14 +2610,18 @@ class Assembly(object):
                         del new_left[next_vertex]
                     new_connections = sorted(self.vertex_info[next_vertex].connections[not next_end])
                     if not new_left:
-                        path_paris.append([new_paths, standardize_paths(new_paths)])
+                        new_paths, new_standardized = standardize_paths(new_paths, undirected_vertices)
+                        if new_standardized not in paths_set:
+                            paths.append(new_paths)
+                            paths_set.add(new_standardized)
                         return
                     else:
                         if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == \
                                 new_connections[1][0]:
                             new_connections.sort(
                                 key=lambda x: self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
-                        directed_graph_solver(new_paths, new_connections, new_left, in_all_start_ve)
+                        directed_graph_solver(new_paths, new_connections, new_left, in_all_start_ve,
+                                              undirected_vertices)
             if not find_next:
                 new_all_start_ve = deepcopy(in_all_start_ve)
                 while new_all_start_ve:
@@ -2594,22 +2635,48 @@ class Assembly(object):
                             del new_left[new_start_vertex]
                         new_connections = sorted(self.vertex_info[new_start_vertex].connections[new_start_end])
                         if not new_left:
-                            path_paris.append([new_paths, standardize_paths(new_paths)])
-                            return
+                            new_paths, new_standardized = standardize_paths(new_paths, undirected_vertices)
+                            if new_standardized not in paths_set:
+                                paths.append(new_paths)
+                                paths_set.add(new_standardized)
                         else:
                             if mode == "embplant_pt" and len(new_connections) == 2 and new_connections[0][0] == \
                                     new_connections[1][0]:
                                 new_connections.sort(
                                     key=lambda x: self.vertex_info[x[0]].other_attr["orf"][x[1]]["sum_len"])
-                            directed_graph_solver(new_paths, new_connections, new_left, new_all_start_ve)
+                            directed_graph_solver(new_paths, new_connections, new_left, new_all_start_ve,
+                                                  undirected_vertices)
                             break
                 if not new_all_start_ve:
                     return
 
-        path_paris = list()
+        paths = list()
+        paths_set = set()
         # start from a terminal vertex in an open graph/subgraph
         #         or a single copy vertex in a closed graph/subgraph
         self.update_orf_total_len()
+
+        # 2019-12-28 palindromic repeats
+        palindromic_repeats = set()
+        log_palindrome = False
+        for vertex_n in self.vertex_info:
+            if self.vertex_info[vertex_n].seq[True] == self.vertex_info[vertex_n].seq[False]:
+                temp_f = self.vertex_info[vertex_n].connections[True]
+                temp_r = self.vertex_info[vertex_n].conncetions[False]
+                if temp_f and temp_f == temp_r:
+                    log_palindrome = True
+                    if len(temp_f) == len(temp_r) == 2:  # simple palindromic repeats, prune repeated connections
+                        for go_d, (nb_vertex, nb_direction) in enumerate(tuple(temp_f)):
+                            self.vertex_info[nb_vertex].connections[nb_direction].remove((vertex_n, bool(go_d)))
+                            self.vertex_info[vertex_n].connections[bool(go_d)].remove((nb_vertex, nb_direction))
+                    elif len(temp_f) == len(temp_r) == 1:  # connect to the same inverted repeat
+                        pass
+                    else:  # complicated, recorded
+                        palindromic_repeats.add(vertex_n)
+        if log_palindrome:
+            log_handler.info("Palindromic repeats detected. "
+                             "Different paths generating identical sequence will be merged.")
+
         all_start_v_e = []
         start_vertices = set()
         for go_set, v_set in enumerate(self.vertex_clusters):
@@ -2643,14 +2710,15 @@ class Assembly(object):
         vertex_to_copy[start_v_e[0]] -= 1
         if not vertex_to_copy[start_v_e[0]]:
             del vertex_to_copy[start_v_e[0]]
-        directed_graph_solver(first_path, first_connections, vertex_to_copy, all_start_v_e)
+        directed_graph_solver(first_path, first_connections, vertex_to_copy, all_start_v_e,
+                              undirected_vertices=palindromic_repeats)
 
-        standardized_path_unique_set = set([this_path_pair[1] for this_path_pair in path_paris])
-        paths = []
-        for raw_path, standardized_path in path_paris:
-            if standardized_path in standardized_path_unique_set:
-                paths.append(raw_path)
-                standardized_path_unique_set.remove(standardized_path)
+        # standardized_path_unique_set = set([this_path_pair[1] for this_path_pair in path_paris])
+        # paths = []
+        # for raw_path, standardized_path in path_paris:
+        #     if standardized_path in standardized_path_unique_set:
+        #         paths.append(raw_path)
+        #         standardized_path_unique_set.remove(standardized_path)
 
         if not paths:
             raise ProcessingGraphFailed("Detecting path(s) from remaining graph failed!")
@@ -2758,7 +2826,7 @@ class NaiveDeBruijnGraph(Assembly):
         :param circular_head_ends:
         :return:
         """
-        super().__init__(overlap=kmer_len-1)
+        super(NaiveDeBruijnGraph, self).__init__(overlap=kmer_len - 1)
         assert circular in ("auto", "yes", "no")
         assert kmer_len >= 3 and kmer_len % 2 == 1
         self.__kmer = kmer_len  # overlap is actually kmer_len - 1
@@ -2779,6 +2847,8 @@ class NaiveDeBruijnGraph(Assembly):
                     count_vertices += 1
                     recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
                     self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
+                    # record the connection as dict() rather than set() for counting
+                    self.vertex_info[this_vertex].connections = {True: {}, False: {}}
                     recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
                 if go_circle:
                     # add connection between the first kmer and the last kmer if the seq is circular
@@ -2790,9 +2860,14 @@ class NaiveDeBruijnGraph(Assembly):
                         count_vertices += 1
                         recorded_kmers[prev_kmer_seq] = prev_vertex, prev_end = str(count_vertices), True
                         self.vertex_info[prev_vertex] = prev_v_info = Vertex(prev_vertex, kmer_len, 0., prev_kmer_seq)
+                        self.vertex_info[prev_vertex].connections = {True: {}, False: {}}
                         recorded_kmers[prev_v_info.seq[False]] = prev_vertex, not prev_end
-                    self.vertex_info[prev_vertex].connections[prev_end].add((this_vertex, not this_end))
-                    self.vertex_info[this_vertex].connections[not this_end].add((prev_vertex, prev_end))
+                    if (this_vertex, not this_end) not in self.vertex_info[prev_vertex].connections[prev_end]:
+                        self.vertex_info[prev_vertex].connections[prev_end][(this_vertex, not this_end)] = 0
+                    self.vertex_info[prev_vertex].connections[prev_end][(this_vertex, not this_end)] += 1
+                    if (prev_vertex, prev_end) not in self.vertex_info[this_vertex].connections[not this_end]:
+                        self.vertex_info[this_vertex].connections[not this_end][(prev_vertex, prev_end)] = 0
+                    self.vertex_info[this_vertex].connections[not this_end][(prev_vertex, prev_end)] += 1
                 # 2. the remaining kmers
                 for go_to in range(1, len(kmer_list)):
                     this_kmer_seq = kmer_list[go_to]
@@ -2804,79 +2879,92 @@ class NaiveDeBruijnGraph(Assembly):
                         count_vertices += 1
                         recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
                         self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
+                        self.vertex_info[this_vertex].connections = {True: {}, False: {}}
                         recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
                     # add the connection between this_kmer_seq and prev_kmer_seq
                     prev_kmer_seq = kmer_list[go_to - 1]
                     prev_vertex, prev_end = recorded_kmers[prev_kmer_seq]
-                    self.vertex_info[prev_vertex].connections[prev_end].add((this_vertex, not this_end))
-                    self.vertex_info[this_vertex].connections[not this_end].add((prev_vertex, prev_end))
+                    if (this_vertex, not this_end) not in self.vertex_info[prev_vertex].connections[prev_end]:
+                        self.vertex_info[prev_vertex].connections[prev_end][(this_vertex, not this_end)] = 0
+                    self.vertex_info[prev_vertex].connections[prev_end][(this_vertex, not this_end)] += 1
+                    if (prev_vertex, prev_end) not in self.vertex_info[this_vertex].connections[not this_end]:
+                        self.vertex_info[this_vertex].connections[not this_end][(prev_vertex, prev_end)] = 0
+                    self.vertex_info[this_vertex].connections[not this_end][(prev_vertex, prev_end)] += 1
             else:
                 raise Warning(fasta_file + ":" + seq_record.label + ":length:" + str(len(seq_record.seq)) +
                               " < kmer:" + str(kmer_len) + " .. skipped!")
 
     def generate_assembly_graph(self):
         def generate_contig(
-                this_k_n, this_k_e, next_k_n, next_k_e, k_quo, in_graph, in_kmer_e_to_ctg_e, next_kmers=[]):
-            if next_k_n in k_quo and k_quo[next_k_n][next_k_e] > 0:
-                k_quo[this_k_n][this_k_e] -= 1
-                count_k_len = 1
-                count_k_sum = self.vertex_info[this_k_n].cov
-                forward_seq = self.vertex_info[this_k_n].seq[this_k_e]
-                while k_quo[next_k_n][next_k_e] > 0:
-                    k_quo[next_k_n][next_k_e] -= 1
-                    count_k_len += 1
-                    count_k_sum += self.vertex_info[next_k_n].cov
-                    forward_seq += self.vertex_info[next_k_n].seq[not next_k_e][-1]
-                    if next_k_n in terminal_kmers:
-                        next_kmers.append(next_k_n)
-                        break
-                    elif k_quo[next_k_n][not next_k_e] <= 0:
-                        break
-                    else:
-                        k_quo[next_k_n][not next_k_e] -= 1
-                        # update next_k_name, next_k_end
-                        next_k_n, next_k_e = \
-                            list(self.vertex_info[next_k_n].connections[not next_k_e])[0]
-                c_name = str(len(in_graph.vertex_info) + 1)
-                c_end = False  # start of a contig
-                # record connections to be added later
-                if this_k_n not in in_kmer_e_to_ctg_e:
-                    in_kmer_e_to_ctg_e[this_k_n] = {True: set(), False: set()}
-                if next_k_n not in in_kmer_e_to_ctg_e:
-                    in_kmer_e_to_ctg_e[next_k_n] = {True: set(), False: set()}
-                in_kmer_e_to_ctg_e[this_k_n][this_k_e].add((c_name, c_end))
-                in_kmer_e_to_ctg_e[next_k_n][next_k_e].add((c_name, not c_end))
-                # record contig without connections
-                c_length = count_k_len + self.__kmer - 1
-                c_coverage = count_k_sum / float(count_k_len)
-                in_graph.vertex_info[c_name] = Vertex(
-                    c_name, length=c_length, coverage=c_coverage, forward_seq=forward_seq,
-                    fastg_form_long_name="EDGE_" + c_name + "_length_" + str(c_length) + "_cov_" + str(c_coverage))
+                this_k_n, this_k_e, next_k_n, next_k_e, terminal_k_quota, in_graph,
+                in_kmer_e_to_ctg_e, inter_ks, next_kmers):
+            kmer_ids_used_this_round = {this_k_n, next_k_n}
+            if this_k_n in terminal_k_quota:
+                terminal_k_quota[this_k_n][this_k_e] -= 1
+            count_k_len = 1
+            count_k_sum = self.vertex_info[this_k_n].cov
+            forward_seq = self.vertex_info[this_k_n].seq[this_k_e]
+            while True:
+                if next_k_n in terminal_k_quota:
+                    terminal_k_quota[next_k_n][next_k_e] -= 1
+                count_k_len += 1
+                count_k_sum += self.vertex_info[next_k_n].cov
+                forward_seq += self.vertex_info[next_k_n].seq[not next_k_e][-1]
+                kmer_ids_used_this_round.add(next_k_n)
+                if next_k_n in terminal_k_quota:  # terminal
+                    next_kmers.append(next_k_n)
+                    break
+                elif next_k_n == this_k_n and (not next_k_e) == this_k_e:  # circular
+                    break
+                else:
+                    # update next_k_name, next_k_end
+                    next_k_n, next_k_e = \
+                        list(self.vertex_info[next_k_n].connections[not next_k_e])[0]
+            c_name = str(len(in_graph.vertex_info) + 1)
+            c_end = False  # start of a contig
+            # record connections to be added later
+            if this_k_n not in in_kmer_e_to_ctg_e:
+                in_kmer_e_to_ctg_e[this_k_n] = {True: set(), False: set()}
+            if next_k_n not in in_kmer_e_to_ctg_e:
+                in_kmer_e_to_ctg_e[next_k_n] = {True: set(), False: set()}
+            in_kmer_e_to_ctg_e[this_k_n][this_k_e].add((c_name, c_end))
+            in_kmer_e_to_ctg_e[next_k_n][next_k_e].add((c_name, not c_end))
+            # record contig
+            c_length = count_k_len + self.__kmer - 1
+            c_coverage = count_k_sum / float(count_k_len)
+            in_graph.vertex_info[c_name] = this_contig = Vertex(
+                c_name, length=c_length, coverage=c_coverage, forward_seq=forward_seq,
+                fastg_form_long_name="EDGE_" + c_name + "_length_" + str(c_length) + "_cov_" + str(c_coverage))
+            for added_kmer_name in kmer_ids_used_this_round:
+                inter_ks.discard(added_kmer_name)
 
-        # 1. profile the graph shape, find terminal kmers and how many times a kmer will be used
-        terminal_kmers = set()
+        # 1. profile the graph shape
+        # find terminal kmers and how many times a terminal kmer will be used
+        # find intermediate kmers
+        # find singletons
+        point_kmer_link_quota = {}
+        intermediate_kmers = set()
         singletons = []
-        kmer_quotas = {}
         for this_k_name in sorted(self.vertex_info):
-            connect_num_tail = len(self.vertex_info[this_k_name].connections[True])
-            connect_num_head = len(self.vertex_info[this_k_name].connections[False])
-            if connect_num_head + connect_num_tail:
-                # head, tail, total
-                kmer_quotas[this_k_name] = {False: connect_num_head, True: connect_num_tail}
-            if connect_num_tail == 0:
-                if connect_num_head == 0:
+            connect_n_link_tail = len(self.vertex_info[this_k_name].connections[True])
+            connect_n_link_head = len(self.vertex_info[this_k_name].connections[False])
+            is_terminal = False
+            if connect_n_link_tail == 0:
+                if connect_n_link_head == 0:
                     singletons.append(this_k_name)
                 else:
-                    terminal_kmers.add(this_k_name)
-            elif connect_num_tail == 1:
-                if connect_num_head == 0:
-                    terminal_kmers.add(this_k_name)
-                elif connect_num_head == 1:
-                    pass
+                    is_terminal = True
+            elif connect_n_link_tail == 1:
+                if connect_n_link_head == 0:
+                    is_terminal = True
+                elif connect_n_link_head == 1:
+                    intermediate_kmers.add(this_k_name)
                 else:
-                    terminal_kmers.add(this_k_name)
-            elif connect_num_tail > 1:
-                terminal_kmers.add(this_k_name)
+                    is_terminal = True
+            else:
+                is_terminal = True
+            if is_terminal:
+                point_kmer_link_quota[this_k_name] = {False: connect_n_link_head, True: connect_n_link_tail}
 
         # 2. generating
         # 2.1 initialization
@@ -2894,34 +2982,40 @@ class NaiveDeBruijnGraph(Assembly):
         # 2.3 add contigs starting from terminal kmers
         # use waiting_list to record downstream kmers, so that we can label contigs in connecting order
         waiting_terminal_kmers = []
-        for this_k_name in sorted(terminal_kmers):
-            while this_k_name in terminal_kmers:
-                terminal_kmers.remove(this_k_name)
-                if this_k_name in kmer_quotas:
-                    for this_k_end in (True, False):
-                        for next_k_name, next_k_end in sorted(self.vertex_info[this_k_name].connections[this_k_end]):
-                            # this_k_end_quota
-                            if kmer_quotas[this_k_name][this_k_end] > 0:
-                                generate_contig(
-                                    this_k_n=this_k_name, this_k_e=this_k_end,
-                                    next_k_n=next_k_name, next_k_e=next_k_end, k_quo=kmer_quotas,
-                                    in_graph=assembly_graph, in_kmer_e_to_ctg_e=joint_kmer_end_to_contig_end,
-                                    next_kmers=waiting_terminal_kmers)
-                    del kmer_quotas[this_k_name]
+        for this_k_name in sorted(point_kmer_link_quota):
+            while True:  # this_k_name in point_kmer_link_quota:
+                # if this_k_name in point_kmer_link_quota:
+                for this_k_end in (True, False):
+                    for next_k_name, next_k_end in sorted(self.vertex_info[this_k_name].connections[this_k_end]):
+                        # check point_kmer_link_quota every time
+                        if point_kmer_link_quota[this_k_name][this_k_end] > 0 and next_k_name in intermediate_kmers:
+                            generate_contig(
+                                this_k_n=this_k_name, this_k_e=this_k_end,
+                                next_k_n=next_k_name, next_k_e=next_k_end, terminal_k_quota=point_kmer_link_quota,
+                                in_graph=assembly_graph, in_kmer_e_to_ctg_e=joint_kmer_end_to_contig_end,
+                                inter_ks=intermediate_kmers, next_kmers=waiting_terminal_kmers)
                 if waiting_terminal_kmers:
                     this_k_name = waiting_terminal_kmers.pop(0)
-        # 2.4 add contigs starting from remaining kmers (circular sub-graphs)
-        for this_k_name in sorted(kmer_quotas):
-            for this_k_end in (True, False):
-                # clean kmer_quotas
-                if kmer_quotas[this_k_name][True] <= 0 and kmer_quotas[this_k_name][False] <= 0:
-                    del kmer_quotas[this_k_name]
-                    break
                 else:
+                    break
+        # 2.4 add contigs starting from remaining kmers (circular sub-graphs)
+        # for this_k_name in sorted(point_kmer_link_quota):
+        for this_k_name in sorted(intermediate_kmers):
+            if this_k_name in intermediate_kmers:
+                for this_k_end in (True, False):
+                    # clean point_kmer_link_quota
+                    # if point_kmer_link_quota[this_k_name][True] <= 0 and \
+                    #         point_kmer_link_quota[this_k_name][False] <= 0:
+                    #     del point_kmer_link_quota[this_k_name]
+                    #     break
+                    # else:
                     for next_k_name, next_k_end in sorted(self.vertex_info[this_k_name].connections[this_k_end]):
-                        generate_contig(this_k_n=this_k_name, this_k_e=this_k_end,
-                                        next_k_n=next_k_name, next_k_e=next_k_end, k_quo=kmer_quotas,
-                                        in_graph=assembly_graph, in_kmer_e_to_ctg_e=joint_kmer_end_to_contig_end)
+                        if this_k_name in intermediate_kmers and next_k_name in intermediate_kmers:
+                            generate_contig(this_k_n=this_k_name, this_k_e=this_k_end,
+                                            next_k_n=next_k_name, next_k_e=next_k_end,
+                                            terminal_k_quota=point_kmer_link_quota,
+                                            in_graph=assembly_graph, inter_ks=intermediate_kmers,
+                                            in_kmer_e_to_ctg_e=joint_kmer_end_to_contig_end, next_kmers=[])
         # 2.5 transfer the connections among kmers to contigs
         for joint_kmer_n in joint_kmer_end_to_contig_end:
             for contig_n_1, contig_e_1 in joint_kmer_end_to_contig_end[joint_kmer_n][True]:

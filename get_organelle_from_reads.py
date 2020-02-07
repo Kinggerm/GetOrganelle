@@ -3380,6 +3380,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     log_handler.error(str(e))
                 return False
             except RuntimeError:
+                if verbose:
+                    log_handler.exception("")
                 log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
             except ProcessingGraphFailed as e:
                 log_handler.info("Disentangling failed: " + str(e).strip())

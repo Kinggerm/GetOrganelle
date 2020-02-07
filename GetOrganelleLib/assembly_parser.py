@@ -1580,7 +1580,7 @@ class Assembly(object):
                                 degenerate=False, degenerate_depth=1.5, degenerate_similarity=0.98, warning_count=4,
                                 only_keep_max_cov=False, verbose=False, debug=False, log_handler=None):
         parallel_vertices_list = self.detect_parallel_vertices(limited_vertices=limited_vertices)
-        if debug:
+        if verbose or debug:
             if log_handler:
                 log_handler.info("detected parallel vertices " + str(parallel_vertices_list))
             else:
@@ -1640,8 +1640,11 @@ class Assembly(object):
                         else:
                             seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
                             seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
-                            base_dif, proper_end = find_string_difference(
-                                seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                            if len(seq_1) + len(seq_2) > 6000:
+                                base_dif = find_string_difference_regional_kmer_counting(seq_1, seq_2)
+                            else:
+                                base_dif, proper_end = find_string_difference(
+                                    seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
                             if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < degenerate_dif:
                                 this_contamination_or_polymorphic = True
                                 if len(this_seq) == len(max_cov_seq):
@@ -1661,8 +1664,10 @@ class Assembly(object):
                     elif only_keep_max_cov:
                         seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
                         seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
-                        base_dif, proper_end = find_string_difference(
-                            seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                        if len(seq_1) + len(seq_2) > 6000:
+                            base_dif = find_string_difference_regional_kmer_counting(seq_1, seq_2)
+                        else:
+                            base_dif, proper_end = find_string_difference(seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
                         if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < contamination_dif:
                             removing_irrelevant_v.add(this_v)
                             this_contamination_or_polymorphic = True
@@ -1670,8 +1675,10 @@ class Assembly(object):
                 elif only_keep_max_cov:
                     seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
                     seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
-                    base_dif, proper_end = find_string_difference(
-                        seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                    if len(seq_1) + len(seq_2) > 6000:
+                        base_dif = find_string_difference_regional_kmer_counting(seq_1, seq_2)
+                    else:
+                        base_dif, proper_end = find_string_difference(seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
                     if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < contamination_dif:
                         removing_irrelevant_v.add(this_v)
                         this_contamination_or_polymorphic = True
@@ -1710,7 +1717,7 @@ class Assembly(object):
                     sys.stdout.write(
                         "removing contaminating-like vertices: " + " ".join(list(removing_below_cut_off)) + "\n")
         if removing_irrelevant_v:
-            for candidate_rm_v in removing_irrelevant_v:
+            for candidate_rm_v in list(removing_irrelevant_v):
                 if candidate_rm_v in self.tagged_vertices[database_name]:
                     removing_irrelevant_v.remove(candidate_rm_v)
             self.remove_vertex(removing_irrelevant_v)
@@ -1888,7 +1895,7 @@ class Assembly(object):
                                 if not this_del:
                                     raise ProcessingGraphFailed(
                                         "Unable to generate result with single copy vertex percentage < {}%"
-                                            .format(min_single_copy_percent))
+                                        .format(min_single_copy_percent))
                             else:
                                 this_del, parameters = \
                                     new_assembly.filter_by_coverage(database_n=database_name,
@@ -1969,7 +1976,7 @@ class Assembly(object):
                                         new_assembly.write_to_gfa(temp_graph)
                                         new_assembly.write_out_tags([database_name], temp_csv)
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
-                                                                                              "Broken or contamination?")
+                                                                "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
                                     if w == second:
                                         for del_v in new_assembly.vertex_clusters[j]:
@@ -2334,7 +2341,11 @@ class Assembly(object):
                         sys.stdout.write("Writing out temp graph (9): " + temp_graph + "\n")
                 new_assembly.write_to_gfa(temp_graph)
                 new_assembly.write_out_tags([database_name], temp_csv)
-            raise KeyboardInterrupt
+            if log_handler:
+                log_handler.exception("")
+                raise e
+            else:
+                raise e
 
     def get_all_circular_paths(self, mode="embplant_pt",
                                library_info=None, log_handler=None, reverse_start_direction_for_pt=False):
@@ -2420,37 +2431,37 @@ class Assembly(object):
                         circular_directed_graph_solver(new_path, new_connections, new_left, check_all_kinds,
                                                        palindromic_repeat_vertices)
 
-        paths = []
-        paths_set = set()
-
-        # print(self.copy_to_vertex)
-
-        self.update_orf_total_len()
-
-        # 2019-12-28 palindromic repeats
+        # for palindromic repeats
         palindromic_repeats = set()
         log_palindrome = False
         for vertex_n in self.vertex_info:
             if self.vertex_info[vertex_n].seq[True] == self.vertex_info[vertex_n].seq[False]:
-                temp_f = self.vertex_info[vertex_n].connections[True]
-                temp_r = self.vertex_info[vertex_n].conncetions[False]
-                # heuristic
-                # in rare case, a contig connect itself in one end:
-                #  (vertex_n, True) in temp_f or (vertex_n, False) in temp_r
-                if temp_f and (temp_f == temp_r or (vertex_n, True) in temp_f or (vertex_n, False) in temp_r):
+                forward_c = deepcopy(self.vertex_info[vertex_n].connections[True])
+                reverse_c = deepcopy(self.vertex_info[vertex_n].connections[False])
+                # This is heuristic
+                # In the rarely-used expression way, a contig connect itself in one end:
+                # (vertex_n, True) in forward_c or (vertex_n, False) in reverse_c
+                if forward_c and \
+                        ((forward_c == reverse_c) or
+                         ((vertex_n, True) in forward_c) or
+                         ((vertex_n, False) in reverse_c)):
                     log_palindrome = True
-                    if len(temp_f) == len(temp_r) == 2:  # simple palindromic repeats, prune repeated connections
-                        for go_d, (nb_vertex, nb_direction) in enumerate(tuple(temp_f)):
+                    if len(forward_c) == len(reverse_c) == 2:  # simple palindromic repeats, prune repeated connections
+                        for go_d, (nb_vertex, nb_direction) in enumerate(tuple(forward_c)):
                             self.vertex_info[nb_vertex].connections[nb_direction].remove((vertex_n, bool(go_d)))
                             self.vertex_info[vertex_n].connections[bool(go_d)].remove((nb_vertex, nb_direction))
-                    elif len(temp_f) == len(temp_r) == 1:  # connect to the same inverted repeat
+                    elif len(forward_c) == len(reverse_c) == 1:  # connect to the same inverted repeat
                         pass
                     else:  # complicated, recorded
                         palindromic_repeats.add(vertex_n)
         if log_palindrome:
             log_handler.info("Palindromic repeats detected. "
                              "Different paths generating identical sequence will be merged.")
+
         #
+        self.update_orf_total_len()
+        paths = []
+        paths_set = set()
         if 1 not in self.copy_to_vertex:
             do_check_all_start_kinds = True
             start_vertex = sorted(self.vertex_info,
@@ -2891,24 +2902,26 @@ class NaiveDeBruijnGraph(Assembly):
                         self.vertex_info[this_vertex].connections[not this_end][(prev_vertex, prev_end)] = 0
                     self.vertex_info[this_vertex].connections[not this_end][(prev_vertex, prev_end)] += 1
             else:
-                raise Warning(fasta_file + ":" + seq_record.label + ":length:" + str(len(seq_record.seq)) +
-                              " < kmer:" + str(kmer_len) + " .. skipped!")
+                sys.stderr.write("Warning: " + fasta_file + ":" + seq_record.label +
+                                 ":length:" + str(len(seq_record.seq)) + " < kmer:" + str(kmer_len) + " .. skipped!\n")
 
     def generate_assembly_graph(self):
         def generate_contig(
                 this_k_n, this_k_e, next_k_n, next_k_e, terminal_k_quota, in_graph,
                 in_kmer_e_to_ctg_e, inter_ks, next_kmers):
-            kmer_ids_used_this_round = {this_k_n, next_k_n}
+            kmer_ids_used_this_round = {this_k_n}
             if this_k_n in terminal_k_quota:
                 terminal_k_quota[this_k_n][this_k_e] -= 1
             count_k_len = 1
-            count_k_sum = self.vertex_info[this_k_n].cov
+            count_k_sum = self.vertex_info[this_k_n].cov / len(self.vertex_info[this_k_n].connections[this_k_e])
             forward_seq = self.vertex_info[this_k_n].seq[this_k_e]
             while True:
                 if next_k_n in terminal_k_quota:
                     terminal_k_quota[next_k_n][next_k_e] -= 1
                 count_k_len += 1
-                count_k_sum += self.vertex_info[next_k_n].cov
+                # avoid repeatedly counting coverage for used kmers
+                if next_k_n not in kmer_ids_used_this_round:
+                    count_k_sum += self.vertex_info[next_k_n].cov
                 forward_seq += self.vertex_info[next_k_n].seq[not next_k_e][-1]
                 kmer_ids_used_this_round.add(next_k_n)
                 if next_k_n in terminal_k_quota:  # terminal
@@ -2987,8 +3000,13 @@ class NaiveDeBruijnGraph(Assembly):
                 # if this_k_name in point_kmer_link_quota:
                 for this_k_end in (True, False):
                     for next_k_name, next_k_end in sorted(self.vertex_info[this_k_name].connections[this_k_end]):
-                        # check point_kmer_link_quota every time
-                        if point_kmer_link_quota[this_k_name][this_k_end] > 0 and next_k_name in intermediate_kmers:
+                        # for every start
+                        # check point_kmer_link_quota
+                        # check next_k: 1) valid intermediate kmers or 2) valid point kmers
+                        if point_kmer_link_quota[this_k_name][this_k_end] > 0 and (
+                                next_k_name in intermediate_kmers or (
+                                next_k_name in point_kmer_link_quota and
+                                point_kmer_link_quota[next_k_name][next_k_end] > 0)):
                             generate_contig(
                                 this_k_n=this_k_name, this_k_e=this_k_end,
                                 next_k_n=next_k_name, next_k_e=next_k_end, terminal_k_quota=point_kmer_link_quota,

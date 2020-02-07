@@ -785,6 +785,47 @@ def re_linear_circular_seqs(sequence, minimum_len_for_flip_flop_recombination=20
             return raw_rev[initial_base:] + raw_rev[:initial_base]
 
 
+def find_string_difference_regional_kmer_counting(query_seq, ref_seq, kmer_len=12, window_size=500):
+    # approximate
+    def count_kmer_match_percent(a_seq, b_seq):
+        kmer_set = {}
+        for this_a_k in SeqKmerIndexer(a_seq, kmer=kmer_len, is_circular=False):
+            if this_a_k in kmer_set:
+                kmer_set[this_a_k][0] += 1
+            else:
+                kmer_set[this_a_k] = [1, 0]
+        for this_b_k in SeqKmerIndexer(b_seq, kmer=kmer_len, is_circular=False):
+            if this_b_k in kmer_set:
+                kmer_set[this_b_k][1] += 1
+            else:
+                kmer_set[this_b_k] = [0, 1]
+        return sum([abs(x - y) for x, y in kmer_set.values()]) / float(len(a_seq) + len(b_seq))
+    query_seq = query_seq.lower()
+    ref_seq = ref_seq.lower()
+    len_que = len(query_seq)
+    len_ref = len(ref_seq)
+    assert len_que > kmer_len
+    assert len_ref > kmer_len
+    length_ratio = (10 ** abs(math.log10(len_que / float(len_ref)))) ** 0.5
+    que_ws = int(window_size * length_ratio) if len_que >= window_size else int(window_size / length_ratio)
+    ref_ws = int(window_size * length_ratio) if len_ref >= window_size else int(window_size / length_ratio)
+    block_num = min(int(round(len_que / float(que_ws))), int(round(len_ref / float(ref_ws))))
+    len_weights = []
+    regional_prob = []
+    for go_b in range(block_num - 1):
+        this_que_block = query_seq[go_b * que_ws: (go_b + 1) * que_ws]
+        this_ref_block = ref_seq[go_b * ref_ws: (go_b + 1) * ref_ws]
+        len_weights.append(len(this_que_block) + len(this_ref_block))
+        regional_prob.append(count_kmer_match_percent(this_que_block, this_ref_block))
+    this_que_block = query_seq[(block_num - 1) * que_ws:]
+    this_ref_block = ref_seq[(block_num - 1) * ref_ws:]
+    len_weights.append(len(this_que_block) + len(this_ref_block))
+    regional_prob.append(count_kmer_match_percent(this_que_block, this_ref_block))
+    weighted_average_k_diff_prob = sum([regional_prob[b_id] * len_weights[b_id]
+                                        for b_id in range(block_num)]) / (len_que + len_ref)
+    return 1 - (1 - weighted_average_k_diff_prob) ** (1. / kmer_len)
+
+
 def find_string_difference(this_string, this_reference, dynamic_span=2.0):
     this_string = this_string.lower()
     this_reference = this_reference.lower()

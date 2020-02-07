@@ -53,7 +53,7 @@ def main():
         assembly_graph.write_to_fastg(options.output)
     else:
         assembly_graph.write_to_gfa(options.output)
-    de_burijn_graph.write_to_gfa(options.output + ".db.gfa")
+    # de_burijn_graph.write_to_gfa(options.output + ".db.gfa")
     sys.stdout.write("Took " + "%.4f" % (time.time() - time_0) + "s in generating " + options.output + "\n")
 
 

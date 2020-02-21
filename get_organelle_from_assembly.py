@@ -671,7 +671,9 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     except AttributeError as e:
         if verbose:
             raise e
-    except RuntimeError:
+    except RuntimeError as e:
+        log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+    except TimeoutError:
         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
     except ProcessingGraphFailed as e:
         log_handler.info("Disentangling failed: " + str(e).strip())
@@ -704,9 +706,11 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         except (ImportError, AttributeError) as e:
             if verbose:
                 log_handler.error(str(e))
-        except RuntimeError:
+        except RuntimeError as e:
             if verbose:
                 log_handler.exception("")
+            log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+        except TimeoutError:
             log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
         except ProcessingGraphFailed as e:
             log_handler.info("Disentangling failed: " + str(e).strip())

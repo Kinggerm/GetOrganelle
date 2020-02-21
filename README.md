@@ -28,7 +28,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 This toolkit is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is generally more efficient under Python 3.*.
 
-There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is the way with GetOrganelleLib installed in the $PYTHONPATH ; 2) `In situ configuration` is the classic and heavy way, but easier to keep updated.
+There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is the way with GetOrganelleLib installed in the $PYTHONPATH ; 2) `In situ configuration` is the classic and heavy way, but easier to keep updated. The current stable version is [1.6.2e](https://github.com/Kinggerm/GetOrganelle/releases/tag/v1.6.2e), while you are very welcome to try 1.6.3 using `In situ configuration` with new features and report bugs to us.
 
 ### Using the setup.py
 

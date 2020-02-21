@@ -77,7 +77,7 @@ def timed_log(log, output_base, prefix, log_level="NOTSET"):
 def set_time_limit(num, flag_str="'--time-limit'"):
     def wrap(func):
         def handle(sig_num, interrupted_stack_frame):
-            raise RuntimeError("\n\nIncrease " + flag_str + " to meet the specific need of data!")
+            raise TimeoutError("\n\nIncrease " + flag_str + " to meet the specific need of data!")
 
         def func_modified(*args, **kwargs):
             signal.signal(signal.SIGALRM, handle)

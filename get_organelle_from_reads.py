@@ -3379,9 +3379,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 if verbose:
                     log_handler.error(str(e))
                 return False
-            except RuntimeError:
+            except RuntimeError as e:
                 if verbose:
                     log_handler.exception("")
+                log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+            except TimeoutError:
                 log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
             except ProcessingGraphFailed as e:
                 log_handler.info("Disentangling failed: " + str(e).strip())
@@ -3424,7 +3426,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         if verbose:
                             log_handler.error(str(e))
                         break
-                    except RuntimeError:
+                    except RuntimeError as e:
+                        if verbose:
+                            log_handler.exception("")
+                        log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+                    except TimeoutError:
                         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
                     except ProcessingGraphFailed as e:
                         log_handler.info("Disentangling failed: " + str(e).strip())
@@ -3567,7 +3573,8 @@ def main():
                     # all_bases = mean_read_len * sum(all_read_nums)
             if all_read_nums is None:
                 if options.reduce_reads_for_cov != inf:
-                    log_handler.info("Estimating reads to use ... (to skip, set '--reduce-reads-for-coverage inf')")
+                    log_handler.info(
+                        "Estimating reads to use ... (to use all reads, set '--reduce-reads-for-coverage inf')")
                     all_read_nums = estimate_maximum_n_reads_using_mapping(
                         twice_max_coverage=options.reduce_reads_for_cov * 2, check_dir=os.path.join(out_base, "check"),
                         original_fq_list=original_fq_files, reads_paired=reads_paired["input"],

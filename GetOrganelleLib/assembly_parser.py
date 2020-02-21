@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from itertools import combinations, product
+from hashlib import sha256
 
 try:
     from sympy import Symbol, solve, lambdify
@@ -160,32 +161,143 @@ class Assembly(object):
             res.append("\n")
         return "".join(res)
 
-    def parse_gfa(self, gfa_file, min_cov=0., max_cov=inf):
+    def parse_gfa(self, gfa_file, default_cov=1., min_cov=0., max_cov=inf):
         with open(gfa_file) as gfa_open:
             kmer_values = set()
-            for line in gfa_open:
-                if line.startswith("S\t"):
-                    flag, vertex_name, sequence, seq_len, seq_num = line.strip().split("\t")
-                    seq_len = int(seq_len.split(":")[-1])
-                    seq_num = int(seq_num.split(":")[-1])
-                    seq_cov = seq_num / float(seq_len)
-                    if min_cov <= seq_cov <= max_cov:
-                        self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, seq_cov, sequence)
-                        # self.vertex_info[vertex_name] = {"len": seq_len, "cov": seq_cov,
-                        #                                  "connections": {True: set(), False: set()},
-                        #                                  "seq": {True: sequence, False: complementary_seq(sequence)}}
-                        if vertex_name.isdigit():
-                            self.vertex_info[vertex_name].fill_fastg_form_name()
-                            # self.vertex_info[vertex_name]["long"] = \
-                            #     "EDGE_" + vertex_name + "_length_" + str(seq_len) + "_cov_" + str(round(seq_cov, 5))
-                elif line.startswith("L\t"):
-                    flag, vertex_1, end_1, vertex_2, end_2, kmer_val = line.strip().split("\t")
-                    # "head"~False, "tail"~True
-                    end_1 = {"+": True, "-": False}[end_1]
-                    end_2 = {"+": False, "-": True}[end_2]
-                    kmer_values.add(kmer_val)
-                    self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
-                    self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
+            line = gfa_open.readline()
+            gfa_version_number = "1.0"
+            if line.startswith("H\t"):
+                for element in line.strip().split("\t")[1:]:
+                    element = element.split(":")
+                    element_tag, element_type, element_description = element[0], element[1], ":".join(element[2:])
+                    if element_tag == "VN":
+                        gfa_version_number = element_description
+            gfa_open.seek(0)
+            if gfa_version_number == "1.0":
+                for line in gfa_open:
+                    if line.startswith("S\t"):
+                        elements = line.strip().split("\t")
+                        record_type = elements.pop(0)  # not used
+                        vertex_name = elements.pop(0)  # segment name
+                        sequence = elements.pop(0)
+                        seq_len_tag = None
+                        kmer_count = None
+                        seq_depth_tag = None
+                        sh_256_val = None
+                        for element in elements:
+                            element = element.split(":")  # element_tag, element_type, element_description
+                            # skip RC/FC
+                            if element[0].upper() == "LN":
+                                seq_len_tag = int(element[-1])
+                            elif element[0].upper() == "KC":
+                                kmer_count = int(element[-1])
+                            elif element[0].upper() == "DP":
+                                seq_depth_tag = float(element[-1])
+                            elif element[0].upper() == "SH":
+                                sh_256_val = ":".join(element[2:])
+                            elif element[0].upper() == "UR":
+                                seq_file_path = element[-1]
+                                if os.path.isfile(seq_file_path):
+                                    if sequence == "*":
+                                        sequence = "".join([sub_seq.strip() for sub_seq in open(seq_file_path)])
+                                    else:
+                                        tag_seq = "".join([sub_seq.strip() for sub_seq in open(seq_file_path)])
+                                        if tag_seq != sequence:
+                                            raise ProcessingGraphFailed(
+                                                vertex_name + " sequences from different sources!")
+                                else:
+                                    raise ProcessingGraphFailed(
+                                        seq_file_path + " for " + vertex_name + " does not exist!")
+                        seq_len = len(sequence)
+                        if seq_len_tag is not None and seq_len != seq_len_tag:
+                            raise ProcessingGraphFailed(vertex_name + " has unmatched sequence length as noted!")
+                        if sh_256_val is not None and sh_256_val != sha256(sequence):
+                            raise ProcessingGraphFailed(vertex_name + " has unmatched sha256 value as noted!")
+                        if kmer_count is not None or seq_depth_tag is not None:
+                            if kmer_count is not None:
+                                seq_depth = kmer_count / float(seq_len)
+                            elif seq_depth_tag is not None:
+                                seq_depth = seq_depth_tag
+                            if min_cov <= seq_depth <= max_cov:
+                                self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, seq_depth, sequence)
+                                if vertex_name.isdigit():
+                                    self.vertex_info[vertex_name].fill_fastg_form_name()
+                        else:
+                            self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, default_cov, sequence)
+                gfa_open.seek(0)
+                for line in gfa_open:
+                    if line.startswith("L\t"):
+                        flag, vertex_1, end_1, vertex_2, end_2, alignment_cigar = line.strip().split("\t")
+                        # "head"~False, "tail"~True
+                        if vertex_1 in self.vertex_info and vertex_2 in self.vertex_info:
+                            end_1 = {"+": True, "-": False}[end_1]
+                            end_2 = {"+": False, "-": True}[end_2]
+                            kmer_values.add(alignment_cigar)
+                            self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
+                            self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
+            elif gfa_version_number == "2.0":
+                for line in gfa_open:
+                    if line.startswith("S\t"):
+                        elements = line.strip().split("\t")
+                        record_type = elements.pop(0)  # not used
+                        vertex_name = elements.pop(0)  # segment name
+                        seq_len_tag = int(elements.pop(0))
+                        sequence = elements.pop(0)
+                        seq_len_tag = None
+                        kmer_count = None
+                        seq_depth_tag = None
+                        sh_256_val = None
+                        for element in elements:
+                            element = element.split(":")  # element_tag, element_type, element_description
+                            # skip RC/FC
+                            if element[0].upper() == "KC":
+                                kmer_count = int(element[-1])
+                            elif element[0].upper() == "DP":
+                                seq_depth_tag = float(element[-1])
+                            elif element[0].upper() == "SH":
+                                sh_256_val = ":".join(element[2:])
+                            elif element[0].upper() == "UR":
+                                seq_file_path = element[-1]
+                                if os.path.isfile(seq_file_path):
+                                    if sequence == "*":
+                                        sequence = "".join([sub_seq.strip() for sub_seq in open(seq_file_path)])
+                                    else:
+                                        tag_seq = "".join([sub_seq.strip() for sub_seq in open(seq_file_path)])
+                                        if tag_seq != sequence:
+                                            raise ProcessingGraphFailed(
+                                                vertex_name + " sequences from different sources!")
+                                else:
+                                    raise ProcessingGraphFailed(
+                                        seq_file_path + " for " + vertex_name + " does not exist!")
+                        seq_len = len(sequence)
+                        if seq_len_tag is not None and seq_len != seq_len_tag:
+                            raise ProcessingGraphFailed(vertex_name + " has unmatched sequence length as noted!")
+                        if sh_256_val is not None and sh_256_val != sha256(sequence):
+                            raise ProcessingGraphFailed(vertex_name + " has unmatched sha256 value as noted!")
+                        if kmer_count is not None or seq_depth_tag is not None:
+                            if kmer_count is not None:
+                                seq_depth = kmer_count / float(seq_len)
+                            elif seq_depth_tag is not None:
+                                seq_depth = seq_depth_tag
+                            if min_cov <= seq_depth <= max_cov:
+                                self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, seq_depth, sequence)
+                                if vertex_name.isdigit():
+                                    self.vertex_info[vertex_name].fill_fastg_form_name()
+                        else:
+                            self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, default_cov, sequence)
+                gfa_open.seek(0)
+                for line in gfa_open:
+                    if line.startswith("E\t"):  # gfa2 uses E
+                        flag, vertex_1, end_1, vertex_2, end_2, alignment_cigar = line.strip().split("\t")
+                        # "head"~False, "tail"~True
+                        if vertex_1 in self.vertex_info and vertex_2 in self.vertex_info:
+                            end_1 = {"+": True, "-": False}[end_1]
+                            end_2 = {"+": False, "-": True}[end_2]
+                            kmer_values.add(alignment_cigar)
+                            self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
+                            self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
+            else:
+                raise ProcessingGraphFailed("Unrecognized GFA version number: " + gfa_version_number)
             if len(kmer_values) == 0:
                 self.__overlap = None
             elif len(kmer_values) > 1:
@@ -281,7 +393,8 @@ class Assembly(object):
             if len(initial_kmer) >= 1:
                 self.__overlap = max(initial_kmer)
             else:
-                raise ProcessingGraphFailed("No kmer detected!")
+                self.__overlap = 0
+                # raise ProcessingGraphFailed("No kmer detected!")
 
     def new_graph_with_vertex_reseeded(self, start_from=1):
         those_vertices = sorted(self.vertex_info)
@@ -325,7 +438,7 @@ class Assembly(object):
                     if log_handler:
                         log_handler.info("Graph converted to new fastg with original Vertex names lost.")
                     else:
-                        sys.stdout.write("Graph converted to new fastg with original Vertex names lost.")
+                        sys.stdout.write("Graph converted to new fastg with original Vertex names lost.\n")
                 new_graph, name_trans = self.new_graph_with_vertex_reseeded()
                 new_graph.write_to_fastg(out_file, check_postfix=False)
                 if out_renaming_table:
@@ -339,7 +452,7 @@ class Assembly(object):
                                              out_renaming_table + ".")
                         else:
                             sys.stdout.write("Table (original Vertex names -> new Vertex names) written to " +
-                                             out_renaming_table + ".")
+                                             out_renaming_table + ".\n")
             else:
                 raise ProcessingGraphFailed(
                     "Merged graph cannot be written as fastg format file, please try gfa format!")
@@ -437,7 +550,7 @@ class Assembly(object):
     def remove_vertex(self, vertices, update_cluster=True):
         for vertex_name in vertices:
             for this_end, connected_set in self.vertex_info[vertex_name].connections.items():
-                for next_v, next_e in connected_set:
+                for next_v, next_e in set(connected_set):
                     self.vertex_info[next_v].connections[next_e].remove((vertex_name, this_end))
             del self.vertex_info[vertex_name]
             for tag in self.tagged_vertices:

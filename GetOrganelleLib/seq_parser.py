@@ -232,6 +232,41 @@ def write_fasta_with_list(out_dir, matrix, overwrite):
     fasta_file.close()
 
 
+# deprecated since GetOrganelle 1.6.3
+def read_gfa1_as_fastg_matrix_simple_version(gfa_file):
+    direction = {'+': True, '-': False}
+    edges = {}
+    count_edge = 0
+    for line in open(gfa_file):
+        line_split = line.rstrip().split('\t')
+        if line_split[0] == 'S':
+            count_edge += 1
+            seq_len = int(line_split[3].split(':')[-1])
+            coverage = round(float(line_split[4].split(':')[-1])/seq_len, 5)
+            edges[line_split[1]] = {'name': 'EDGE_'+str(count_edge)+'_length_'+str(seq_len)+'_cov_'+str(coverage),
+                                    ('seq', True): line_split[2],
+                                    ('seq', False): complementary_seq(line_split[2]),
+                                    True: [],
+                                    False: []}
+        elif line_split[0] == 'L':
+            edges[line_split[1]][direction[line_split[2]]].append((line_split[3], direction[line_split[4]]))
+            edges[line_split[3]][not direction[line_split[4]]].append((line_split[1], not direction[line_split[2]]))
+    fasta_matrix = [[], [], 70]
+    for original_edge_name in edges:
+        for this_direction in [True, False]:
+            if edges[original_edge_name][this_direction]:
+                seq_name = edges[original_edge_name]['name']+(not this_direction)*'\''+':'
+                list_next_edge = []
+                for next_edge, next_direction in edges[original_edge_name][this_direction]:
+                    list_next_edge.append(edges[next_edge]['name']+(not next_direction)*'\'')
+                seq_name += ','.join(list_next_edge)+';'
+            else:
+                seq_name = edges[original_edge_name]['name']+(not this_direction)*'\''+';'
+            fasta_matrix[0].append(seq_name)
+            fasta_matrix[1].append(edges[original_edge_name][('seq', this_direction)])
+    return fasta_matrix
+
+
 # from https://github.com/Kinggerm/PersonalUtilities
 # Hashing methods.
 def find_exact_repeats(sequence_string, min_repeat_length, circular,

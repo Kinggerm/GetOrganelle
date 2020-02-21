@@ -5,7 +5,7 @@ def get_versions():
 
 
 versions = [
-    {"number": "1.6.3",
+    {"number": "1.6.3-beta",
      "features": [
          "1. log plastome info",
          "2. get_organelle_from_assembly.py & disentangle_organelle_assembly.py: --max-multiplicity added",
@@ -17,7 +17,9 @@ versions = [
          "7. Assembly: too many results due to palindromic repeats, problem solved",
          "8. Utilities/reconstruct_graph_from_fasta.py & NaiveDeBruijnGraph added",
          "9. Utilities/gfa_to_fasta.py, Utilities/fastg_to_gfa.py: description corrected",
-         "10. README.md: updated",
+         "10. Assembly.parse_gfa(): compatibility increased",
+         "11. Utilities/gfa2fastg.py: compatibility increased",
+         "12. README.md: updated",
      ],
      "time": "2019-12-28 17:00 GMT-6"},
     {"number": "1.6.2e",

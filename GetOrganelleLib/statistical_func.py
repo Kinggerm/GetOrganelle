@@ -221,6 +221,7 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
 
 
 def find_greatest_common_divisor(number_list):  # euclid_algorithm
+    number_list = number_list[:]
     if len(number_list) == 1:
         return number_list[0]
     elif len(number_list) == 0:

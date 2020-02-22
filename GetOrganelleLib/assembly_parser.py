@@ -1224,7 +1224,13 @@ class Assembly(object):
                 elif min(all_copies) == 1:
                     pass
                 else:
-                    all_copies = reduce_list_with_gcd(all_copies)
+                    new_all_copies = reduce_list_with_gcd(all_copies)
+                    if verbose and new_all_copies != all_copies:
+                        if log_handler:
+                            log_handler.info("Reduced copies: " + str(new_all_copies))
+                        else:
+                            sys.stdout.write("Reduced copies: " + str(new_all_copies) + "\n")
+                    all_copies = new_all_copies
                 all_copies = tuple(all_copies)
                 if all_copies not in all_copy_sets:
                     all_copy_sets.add(all_copies)
@@ -1280,7 +1286,13 @@ class Assembly(object):
             elif min(all_copies) == 1:
                 pass
             else:
-                all_copies = reduce_list_with_gcd(all_copies)
+                new_all_copies = reduce_list_with_gcd(all_copies)
+                if verbose and new_all_copies != all_copies:
+                    if log_handler:
+                        log_handler.info("Reduced copies: " + str(new_all_copies))
+                    else:
+                        sys.stdout.write("Reduced copies: " + str(new_all_copies) + "\n")
+                all_copies = new_all_copies
 
             """ record new copy values """
             for go_s, this_symbol in enumerate(all_v_symbols):

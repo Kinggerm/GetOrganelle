@@ -19,9 +19,10 @@ versions = [
          "9. Utilities/gfa_to_fasta.py, Utilities/fastg_to_gfa.py: description corrected",
          "10. Assembly.parse_gfa(): compatibility increased",
          "11. Utilities/gfa2fastg.py: compatibility increased",
-         "12. README.md: updated",
+         "12. Assembly.estimate_copy_and_depth_precisely(): fix a bug on a rare case that multiplicities res are 4,8,4",
+         "13. README.md: updated",
      ],
-     "time": "2019-12-28 17:00 GMT-6"},
+     "time": "2020-02-22 02:40 GMT-6"},
     {"number": "1.6.2e",
      "features": [
          "1. seq_parser.py: fix a bug for fastq format: @*****#/1",

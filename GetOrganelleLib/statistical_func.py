@@ -237,7 +237,6 @@ def find_greatest_common_divisor(number_list):  # euclid_algorithm
 
 
 def reduce_list_with_gcd(number_list):
-    print(number_list)
     if len(number_list) == 1:
         return [1] if number_list[0] != 0 else number_list
     elif len(number_list) == 0:

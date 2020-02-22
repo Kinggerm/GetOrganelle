@@ -191,6 +191,8 @@ class Assembly(object):
                                 seq_len_tag = int(element[-1])
                             elif element[0].upper() == "KC":
                                 kmer_count = int(element[-1])
+                            elif element[0].upper() == "RC":  # took read counts as kmer counts
+                                kmer_count = int(element[-1])
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])
                             elif element[0].upper() == "SH":
@@ -251,6 +253,8 @@ class Assembly(object):
                             element = element.split(":")  # element_tag, element_type, element_description
                             # skip RC/FC
                             if element[0].upper() == "KC":
+                                kmer_count = int(element[-1])
+                            elif element[0].upper() == "RC":  # took read counts as kmer counts
                                 kmer_count = int(element[-1])
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])
@@ -1199,22 +1203,44 @@ class Assembly(object):
         if return_new_graphs:
             """ produce all possible vertex copy combinations """
             final_results = []
+            all_copy_sets = set()
             for go_res, copy_result in enumerate(copy_results):
-                final_results.append({"graph": deepcopy(self)})
                 free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
                                             for i, this_copy in enumerate(copy_result)}
 
-                """ record new copy values """
+                """ simplify copy values """  # 2020-02-22 added to avoid multiplicities res such as: [4, 8, 4]
+                all_copies = []
                 for this_symbol in all_v_symbols:
+                    vertex_name = symbols_to_vertex[this_symbol]
+                    this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
+                    if this_copy <= 0:
+                        raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
+                    all_copies.append(this_copy)
+                if len(all_copies) == 0:
+                    raise ProcessingGraphFailed(
+                        "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
+                elif len(all_copies) == 1:
+                    all_copies = [1]
+                elif min(all_copies) == 1:
+                    pass
+                else:
+                    all_copies = reduce_list_with_gcd(all_copies)
+                all_copies = tuple(all_copies)
+                if all_copies not in all_copy_sets:
+                    all_copy_sets.add(all_copies)
+                else:
+                    continue
+
+                """ record new copy values """
+                final_results.append({"graph": deepcopy(self)})
+                for go_s, this_symbol in enumerate(all_v_symbols):
                     vertex_name = symbols_to_vertex[this_symbol]
                     if vertex_name in final_results[go_res]["graph"].vertex_to_copy:
                         old_copy = final_results[go_res]["graph"].vertex_to_copy[vertex_name]
                         final_results[go_res]["graph"].copy_to_vertex[old_copy].remove(vertex_name)
                         if not final_results[go_res]["graph"].copy_to_vertex[old_copy]:
                             del final_results[go_res]["graph"].copy_to_vertex[old_copy]
-                    this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
-                    if this_copy <= 0:
-                        raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
+                    this_copy = all_copies[go_s]
                     final_results[go_res]["graph"].vertex_to_copy[vertex_name] = this_copy
                     if this_copy not in final_results[go_res]["graph"].copy_to_vertex:
                         final_results[go_res]["graph"].copy_to_vertex[this_copy] = set()
@@ -1238,17 +1264,33 @@ class Assembly(object):
             free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
                                         for i, this_copy in enumerate(copy_results[0])}
 
-            """ record new copy values """
+            """ simplify copy values """  # 2020-02-22 added to avoid multiplicities res such as: [4, 8, 4]
+            all_copies = []
             for this_symbol in all_v_symbols:
+                vertex_name = symbols_to_vertex[this_symbol]
+                this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
+                if this_copy <= 0:
+                    raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
+                all_copies.append(this_copy)
+            if len(all_copies) == 0:
+                raise ProcessingGraphFailed(
+                    "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
+            elif len(all_copies) == 1:
+                all_copies = [1]
+            elif min(all_copies) == 1:
+                pass
+            else:
+                all_copies = reduce_list_with_gcd(all_copies)
+
+            """ record new copy values """
+            for go_s, this_symbol in enumerate(all_v_symbols):
                 vertex_name = symbols_to_vertex[this_symbol]
                 if vertex_name in self.vertex_to_copy:
                     old_copy = self.vertex_to_copy[vertex_name]
                     self.copy_to_vertex[old_copy].remove(vertex_name)
                     if not self.copy_to_vertex[old_copy]:
                         del self.copy_to_vertex[old_copy]
-                this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
-                if this_copy <= 0:
-                    raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
+                this_copy = all_copies[go_s]
                 self.vertex_to_copy[vertex_name] = this_copy
                 if this_copy not in self.copy_to_vertex:
                     self.copy_to_vertex[this_copy] = set()
@@ -1902,9 +1944,9 @@ class Assembly(object):
                     for vertex_set in sorted(this_graph.vertex_clusters):
                         copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
                         if copies_in_a_set != {1}:
-                            for vertex_name in sorted(vertex_set):
-                                log_handler.info("Vertex_" + vertex_name + " #copy = " +
-                                                 str(this_graph.vertex_to_copy.get(vertex_name, 1)))
+                            for in_vertex_name in sorted(vertex_set):
+                                log_handler.info("Vertex_" + in_vertex_name + " #copy = " +
+                                                 str(this_graph.vertex_to_copy.get(in_vertex_name, 1)))
 
                     log_handler.info("Average " + mode + " kmer-coverage" +
                                      ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov)
@@ -1917,9 +1959,9 @@ class Assembly(object):
                     for vertex_set in sorted(this_graph.vertex_clusters):
                         copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
                         if copies_in_a_set != {1}:
-                            for vertex_name in sorted(vertex_set):
-                                sys.stdout.write("Vertex_" + vertex_name + " #copy = " +
-                                                 str(this_graph.vertex_to_copy.get(vertex_name, 1)) + "\n")
+                            for in_vertex_name in sorted(vertex_set):
+                                sys.stdout.write("Vertex_" + in_vertex_name + " #copy = " +
+                                                 str(this_graph.vertex_to_copy.get(in_vertex_name, 1)) + "\n")
                     sys.stdout.write("Average " + mode + " kmer-coverage" +
                                      ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov + "\n")
                     if this_b_cov:
@@ -2408,6 +2450,8 @@ class Assembly(object):
                         new_assembly.write_out_tags([database_name], temp_csv)
                         raise ProcessingGraphFailed("Complicated " + mode + " graph! Detecting path(s) failed!")
                     else:
+                        if verbose and log_handler:
+                            log_handler.exception("")
                         raise e
                 else:
                     test_first_g = final_res_combinations[0]["graph"]

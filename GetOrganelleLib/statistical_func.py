@@ -220,3 +220,30 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
     return best_scheme
 
 
+def find_greatest_common_divisor(number_list):  # euclid_algorithm
+    if len(number_list) == 1:
+        return number_list[0]
+    elif len(number_list) == 0:
+        return
+    else:
+        a = number_list[0]
+        for i in range(len(number_list) - 1):
+            a = number_list[i]
+            b = number_list[i + 1]
+            while b:
+                a, b = b, a % b
+            number_list[i + 1] = a
+        return a
+
+
+def reduce_list_with_gcd(number_list):
+    print(number_list)
+    if len(number_list) == 1:
+        return [1] if number_list[0] != 0 else number_list
+    elif len(number_list) == 0:
+        return []
+    else:
+        gcd_num = find_greatest_common_divisor(number_list)
+        return [int(raw_number / gcd_num) for raw_number in number_list]
+
+

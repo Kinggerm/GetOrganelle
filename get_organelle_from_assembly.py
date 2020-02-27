@@ -421,15 +421,6 @@ def get_options(description, version):
         return options, log_handler
 
 
-if MAJOR_VERSION == 2:
-    class TimeoutError(Exception):
-        def __init__(self, value):
-            self.value = value
-
-        def __str__(self):
-            return repr(self.value)
-
-
 def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_out_base,
                        verbose_log, log_handler, threads, which_slim, which_blast="", other_options="",
                        resume=False, keep_temp=False):
@@ -682,7 +673,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             raise e
     except RuntimeError as e:
         log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
-    except TimeoutError:
+    except TimeoutError as e:
         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
     except ProcessingGraphFailed as e:
         log_handler.info("Disentangling failed: " + str(e).strip())
@@ -719,7 +710,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             if verbose:
                 log_handler.exception("")
             log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
-        except TimeoutError:
+        except TimeoutError as e:
             log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
         except ProcessingGraphFailed as e:
             log_handler.info("Disentangling failed: " + str(e).strip())

@@ -5,22 +5,26 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.3a",
+     "features": [
+         "1. Minor bugs fixes",
+     ],
+     "time": "2020-02-27 17:14 GMT-6"},
     {"number": "1.6.3-beta",
      "features": [
-         "1. log plastome info",
-         "2. get_organelle_from_assembly.py & disentangle_organelle_assembly.py: --max-multiplicity added",
-         "3. Assembly.estimate_copy_and_depth_precisely() modified: constraint_max_function() for --max-multiplicity",
-         "4. Assembly.tag_in_between() modified",
-         "5. Assembly.estimate_copy_and_depth_by_cov() modified: min average coverage limit",
-         "6. Assembly.processing_polymorphism():"
+         "1. get_organelle_from_assembly.py & disentangle_organelle_assembly.py: --max-multiplicity added",
+         "2. Assembly.estimate_copy_and_depth_precisely() modified: constraint_max_function() for --max-multiplicity",
+         "3. Assembly.tag_in_between() modified",
+         "4. Assembly.estimate_copy_and_depth_by_cov() modified: min average coverage limit",
+         "5. Assembly.processing_polymorphism():"
          "   fix a bug when kmer-len repeats shared by two contigs; fix a bug that cause RuntimeError",
-         "7. Assembly: too many results due to palindromic repeats, problem solved",
-         "8. Utilities/reconstruct_graph_from_fasta.py & NaiveDeBruijnGraph added",
-         "9. Utilities/gfa_to_fasta.py, Utilities/fastg_to_gfa.py: description corrected",
-         "10. Assembly.parse_gfa(): compatibility increased",
-         "11. Utilities/gfa2fastg.py: compatibility increased",
-         "12. Assembly.estimate_copy_and_depth_precisely(): fix a bug on a rare case that multiplicities res are 4,8,4",
-         "13. README.md: updated",
+         "6. Assembly: too many results due to palindromic repeats, problem solved",
+         "7. Utilities/reconstruct_graph_from_fasta.py & NaiveKmerNodeGraph added",
+         "8. Utilities/gfa_to_fasta.py, Utilities/fastg_to_gfa.py: description corrected",
+         "9. Assembly.parse_gfa(): compatibility increased",
+         "10. Utilities/gfa2fastg.py: compatibility increased",
+         "11. Assembly.estimate_copy_and_depth_precisely(): fix a bug on a rare case that multiplicities res are 4,8,4",
+         "12. README.md: updated",
      ],
      "time": "2020-02-22 02:40 GMT-6"},
     {"number": "1.6.2e",

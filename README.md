@@ -114,7 +114,7 @@ Perl is required for the wrapper of Bowtie2, but we assume that it was builtin i
 
 <a href=' '>Bandage</a > is a fantastic tool to view the assembly graph (`*.fastg`/`*.gfa`). If you have Bandage correctly configured and add the binary folder of Bandage (which is `Bandage.app/Contents/MacOS` for MacOS) to the $PATH, get_organelle_from_*.py would automatically generate the a png formatted image of the assembly graph. 
 
-If you installed python library psutil (version >= 3.0; pip install psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
+If you installed python library psutil (version >= 3.0; pip install -U psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
 
 
 ## How To

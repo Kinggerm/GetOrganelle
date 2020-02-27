@@ -5,10 +5,10 @@ import sys
 import os
 from multiprocessing import Pool
 
-major_version, minor_version = sys.version_info[:2]
-if major_version == 2 and minor_version >= 7:
+MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
+if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
     python_version = "2.7+"
-elif major_version == 3 and minor_version >= 5:
+elif MAJOR_VERSION == 3 and MINOR_VERSION >= 5:
     python_version = "3.5+"
 else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
@@ -72,6 +72,15 @@ def timed_log(log, output_base, prefix, log_level="NOTSET"):
     log_timed.addHandler(console)
     log_timed.addHandler(logfile)
     return log_timed
+
+
+if MAJOR_VERSION == 2:
+    class TimeoutError(Exception):
+        def __init__(self, value=""):
+            self.value = value
+
+        def __str__(self):
+            return repr(self.value)
 
 
 def set_time_limit(num, flag_str="'--time-limit'"):

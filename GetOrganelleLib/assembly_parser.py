@@ -37,11 +37,11 @@ path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 import random
 from copy import deepcopy
 
-major_version, minor_version = sys.version_info[:2]
-if major_version == 2 and minor_version >= 7:
+MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
+if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
     python_version = "2.7+"
     RecursionError = RuntimeError
-elif major_version == 3 and minor_version >= 5:
+elif MAJOR_VERSION == 3 and MINOR_VERSION >= 5:
     python_version = "3.5+"
 else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
@@ -50,7 +50,7 @@ ECHO_DIRECTION = ["_tail", "_head"]
 
 
 class ProcessingGraphFailed(Exception):
-    def __init__(self, value):
+    def __init__(self, value=""):
         self.value = value
 
     def __str__(self):
@@ -3001,8 +3001,8 @@ class Assembly(object):
         return Sequence(",".join(seq_names), "".join(seq_segments))
 
 
-class NaiveDeBruijnGraph(Assembly):
-    def __init__(self, fasta_file, kmer_len=55, circular="auto", circular_head_ends="(circular)"):
+class NaiveKmerNodeGraph(Assembly):
+    def __init__(self, fasta_file, kmer_len=55, circular="auto", circular_head_ends="(circular)", single_chain=False):
         """
         :param fasta_file:
         :param kmer_len:
@@ -3010,7 +3010,7 @@ class NaiveDeBruijnGraph(Assembly):
         :param circular_head_ends:
         :return:
         """
-        super(NaiveDeBruijnGraph, self).__init__(overlap=kmer_len - 1)
+        super(NaiveKmerNodeGraph, self).__init__(overlap=kmer_len - 1)
         assert circular in ("auto", "yes", "no")
         assert kmer_len >= 3 and kmer_len % 2 == 1
         self.__kmer = kmer_len  # overlap is actually kmer_len - 1
@@ -3033,7 +3033,8 @@ class NaiveDeBruijnGraph(Assembly):
                     self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
                     # record the connection as dict() rather than set() for counting
                     self.vertex_info[this_vertex].connections = {True: {}, False: {}}
-                    recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
+                    if not single_chain:
+                        recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
                 if go_circle:
                     # add connection between the first kmer and the last kmer if the seq is circular
                     prev_kmer_seq = kmer_list[- 1]
@@ -3045,7 +3046,8 @@ class NaiveDeBruijnGraph(Assembly):
                         recorded_kmers[prev_kmer_seq] = prev_vertex, prev_end = str(count_vertices), True
                         self.vertex_info[prev_vertex] = prev_v_info = Vertex(prev_vertex, kmer_len, 0., prev_kmer_seq)
                         self.vertex_info[prev_vertex].connections = {True: {}, False: {}}
-                        recorded_kmers[prev_v_info.seq[False]] = prev_vertex, not prev_end
+                        if not single_chain:
+                            recorded_kmers[prev_v_info.seq[False]] = prev_vertex, not prev_end
                     if (this_vertex, not this_end) not in self.vertex_info[prev_vertex].connections[prev_end]:
                         self.vertex_info[prev_vertex].connections[prev_end][(this_vertex, not this_end)] = 0
                     self.vertex_info[prev_vertex].connections[prev_end][(this_vertex, not this_end)] += 1
@@ -3064,7 +3066,8 @@ class NaiveDeBruijnGraph(Assembly):
                         recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
                         self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
                         self.vertex_info[this_vertex].connections = {True: {}, False: {}}
-                        recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
+                        if not single_chain:
+                            recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
                     # add the connection between this_kmer_seq and prev_kmer_seq
                     prev_kmer_seq = kmer_list[go_to - 1]
                     prev_vertex, prev_end = recorded_kmers[prev_kmer_seq]

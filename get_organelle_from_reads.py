@@ -903,15 +903,6 @@ def get_options(description, version):
         return options, log_handler, previous_attributes
 
 
-if MAJOR_VERSION == 2:
-    class TimeoutError(Exception):
-        def __init__(self, value):
-            self.value = value
-
-        def __str__(self):
-            return repr(self.value)
-
-
 def estimate_maximum_n_reads_using_mapping(
         twice_max_coverage, check_dir, original_fq_list, reads_paired,
         designed_maximum_n_reads, seed_files, organelle_types, target_genome_sizes,

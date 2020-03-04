@@ -15,7 +15,7 @@ from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.pipe_control_func import *
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.sam_parser import *
-from GetOrganelleLib.assembly_parser import get_graph_coverages_range_simple, ProcessingGraphFailed
+from GetOrganelleLib.assembly_parser import get_graph_coverages_range_simple, ProcessingGraphFailed, Assembly
 import time
 import random
 import subprocess
@@ -316,6 +316,10 @@ def get_options(description, version):
                                    "to reverse the direction of the starting contig when result is circular. "
                                    "Actually, both directions are biologically equivalent to each other. The "
                                    "reordering of the direction is only for easier downstream analysis.")
+    group_assembly.add_option("--max-paths-num", dest="max_paths_num", default=1000, type=int,
+                              help="Repeats would dramatically increase the number of potential isomers (paths). "
+                                   "This option was used to export a certain amount of paths out of all possible paths "
+                                   "per assembly graph. Default: %default")
     # group 5
     group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "")
     group_computational.add_option("-t", dest="threads", type=int, default=1,
@@ -383,7 +387,7 @@ def get_options(description, version):
                                "--gradient-k", "--ignore-k", "--genes", "--ex-genes", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--expected-max-size", "--expected-min-size", "--reverse-lsc",
+                               "--expected-max-size", "--expected-min-size", "--reverse-lsc", "--max-paths-num",
                                "--which-blast", "--which-bowtie2", "--which-spades", "--which-bandage",
                                "--continue", "--index-in-memory",
                                "--remove-duplicates", "--flush-step", "--verbose"):
@@ -554,6 +558,7 @@ def get_options(description, version):
                                  "\n--flush-step should be followed by positive integer or inf!\n")
                 exit()
         assert options.echo_step > 0
+        assert options.max_paths_num > 0
         options.prefix = os.path.basename(options.prefix)
         if options.script_resume and os.path.isdir(options.output_base):
             previous_attributes = LogInfo(options.output_base, options.prefix)
@@ -593,7 +598,7 @@ def get_options(description, version):
             pass
         else:
             lib_versions_info.append("psutil " + psutil.__version__)
-        log_handler.info("Python libs: " + "; ".join(lib_versions_info))
+        log_handler.info("PYTHON LIBS: " + "; ".join(lib_versions_info))
         dep_versions_info = []
 
         if not options.which_bowtie2:
@@ -636,18 +641,9 @@ def get_options(description, version):
                 os.path.join(options.which_bandage, "Bandage") + " -v", stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, shell=True).communicate()
             dep_versions_info.append("Bandage " + output.decode("utf8").strip().split()[-1])
-        log_handler.info("Dependencies: " + "; ".join(dep_versions_info))
+        log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
+        log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
-
-        # for sub_organelle_t in options.organelle_type:
-        #     if sub_organelle_t in ("animal_mt", "fungus_mt"):
-        #         log_handler.info("Animal & fungus samples have much higher substitution rates, therefore no guarantee "
-        #                          "for success rate in animal & fungus samples with default seed database and "
-        #                          "label database!")
-        #         log_handler.info("If you failed after this run, a customized seed database and label database made "
-        #                          "of a close-related species (see more in '-s' & '--genes') is suggested "
-        #                          "for another run!\n")
-        #         break
 
         log_handler = timed_log(log_handler, options.output_base, options.prefix + "get_org.")
         if options.word_size is None:
@@ -2181,6 +2177,7 @@ def extending_no_lim(word_size, seed_file, original_fq_files, len_indices, pre_g
         # core extending code
         # here efficiency is more important than code conciseness,
         # so there are four similar structure with minor differences
+        reads_generator = tuple()
         while True:
             # if verbose:
             #     log_handler.info("Round " + str(round_count) + ": Start ...")
@@ -3044,10 +3041,15 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                 log_handler.info('Assembling finished with warnings.\n')
                 return True
         else:
-            log_handler.error(
-                "Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split("In case you")[
-                    0])
-            log_handler.error('Assembling failed.')
+            if "mmap(2) failed" in output.decode("utf8"):
+                # https://github.com/ablab/spades/issues/91
+                log_handler.error("Guessing your output directory is inside a VirtualBox shared folder!")
+                log_handler.error("Assembling failed.")
+            else:
+                log_handler.error(
+                    "Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split(
+                        "In case you")[ 0])
+                log_handler.error('Assembling failed.')
             return False
     elif not os.path.exists(os.path.join(spades_out_put, "assembly_graph.fastg")):
         if verbose_log:
@@ -3196,7 +3198,6 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                in_db_n="embplant_pt", c_d=3., c_s=0.95,
                                deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
                                max_s=inf, min_s=0, acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
-            from GetOrganelleLib.assembly_parser import Assembly
             image_produced = False
             this_K = os.path.split(os.path.split(fastg_f)[0])[-1]
             o_p += "." + this_K
@@ -3234,6 +3235,12 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     broken_graph = res["graph"]
                     count_path = 0
                     these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in)
+                    # reducing paths
+                    if len(these_paths) > options.max_paths_num:
+                        log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
+                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                        these_paths = these_paths[:options.max_paths_num]
+                    # exporting paths, reporting results
                     for this_paths, other_tag in these_paths:
                         count_path += 1
                         all_contig_str = []
@@ -3252,10 +3259,20 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             else:
                                 all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label +
                                                       "\n" + this_contig.seq + "\n")
+
                         if len(all_contig_str) == 1 and set(contigs_are_circular) == {True}:
                             still_complete.append(True)
+
+                            # print ir stat
+                            if count_path == 1 and in_db_n == "embplant_pt":
+                                detect_seq = broken_graph.export_path(this_paths[0]).seq
+                                ir_stats = detect_plastome_architecture(detect_seq, 1000)
+                                log_in.info("Detecting large repeats (>1000 bp) in PATH1 with " + ir_stats[-1] +
+                                            ", Total:LSC:SSC:Repeat(bp) = " + str(len(detect_seq)) + ":" +
+                                            ":".join([str(len_val) for len_val in ir_stats[:3]]))
                         else:
                             still_complete.append(False)
+
                         if still_complete[-1]:
                             out_n = o_p + ".complete.graph" + str(go_res) + "." + \
                                     str(count_path) + other_tag + ".path_sequence.fasta"
@@ -3265,6 +3282,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                     str(count_path) + ".path_sequence.fasta"
                             log_in.info("Writing PATH" + str(count_path) + " of " + mode_in + " contig(s) to " + out_n)
                         open(out_n, "w").write("\n".join(all_contig_str))
+
                     if set(still_complete[-len(these_paths):]) == {True}:
                         log_in.info(
                             "Writing GRAPH to " + o_p + ".complete.graph" + str(go_res + 1) + ".selected_graph.gfa")
@@ -3293,8 +3311,17 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     go_res += 1
                     idealized_graph = res["graph"]
                     count_path = 0
-                    for this_path, other_tag in idealized_graph.get_all_circular_paths(
-                            mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc):
+
+                    these_paths = idealized_graph.get_all_circular_paths(
+                        mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc)
+                    # reducing paths
+                    if len(these_paths) > options.max_paths_num:
+                        log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
+                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                        these_paths = these_paths[:options.max_paths_num]
+
+                    # exporting paths, reporting results
+                    for this_path, other_tag in these_paths:
                         count_path += 1
                         out_n = o_p + ".complete.graph" + str(go_res) + "." + str(
                             count_path) + other_tag + ".path_sequence.fasta"
@@ -3302,6 +3329,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         if DEGENERATE_BASES & set(this_seq_obj.seq):
                             degenerate_base_used = True
                         open(out_n, "w").write(this_seq_obj.fasta_str())
+
+                        # print ir stat
+                        if count_path == 1 and in_db_n == "embplant_pt":
+                            detect_seq = this_seq_obj.seq
+                            ir_stats = detect_plastome_architecture(detect_seq, 1000)
+                            log_in.info("Detecting large repeats (>1000 bp) in PATH1 with " + ir_stats[-1] +
+                                        ", Total:LSC:SSC:Repeat(bp) = " + str(len(detect_seq)) + ":" +
+                                        ":".join([str(len_val) for len_val in ir_stats[:3]]))
                         log_in.info("Writing PATH" + str(count_path) + " of complete " + mode_in + " to " + out_n)
                     log_in.info("Writing GRAPH to " + o_p + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
                     idealized_graph.write_to_gfa(o_p + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
@@ -3338,11 +3373,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
 
     # start
     kmer_values = sorted([int(kmer_d[1:])
-                        for kmer_d in os.listdir(spades_output)
-                        if os.path.isdir(os.path.join(spades_output, kmer_d))
-                        and kmer_d.startswith("K")
-                        and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
-                       reverse=True)
+                          for kmer_d in os.listdir(spades_output)
+                          if os.path.isdir(os.path.join(spades_output, kmer_d))
+                          and kmer_d.startswith("K")
+                          and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
+                         reverse=True)
     kmer_values = [kmer_val for kmer_val in kmer_values if kmer_val > ignore_kmer_res]
     kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val)) for kmer_val in kmer_values]
     timeout_flag = "'--disentangle-time-limit'"
@@ -3375,11 +3410,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                      time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
                                      temp_graph=graph_temp_file)
                 # currently time is not limited for exporting contigs
-            except (ImportError, AttributeError) as e:
+            except ImportError as e:
                 log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
                 if verbose:
                     log_handler.error(str(e))
                 return False
+            except AttributeError as e:
+                if verbose:
+                    raise e
             except RuntimeError as e:
                 if verbose:
                     log_handler.exception("")
@@ -3781,6 +3819,10 @@ def main():
                 options.spades_kmer = check_kmers(options.spades_kmer, options.auto_gradient_k, word_size,
                                                   max_read_len, log_handler)
                 log_handler.info("Assembling using SPAdes ...")
+                if not executable("pigz"):
+                    log_handler.warning("Compression after read correction will be skipped for lack of 'pigz'")
+                    if "--disable-gzip-output" not in other_options:
+                        other_options += " --disable-gzip-output"
                 is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                                     options.prefix, original_fq_files, reads_paired,
                                                     which_spades=options.which_spades, verbose_log=options.verbose_log,

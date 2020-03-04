@@ -43,12 +43,12 @@ def get_options():
     parser.add_option("-u", dest="unpaired_fq_files", default="",
                       help="Input file(s) with unpaired (single-end) reads to be added to the pool. "
                            "files could be comma-separated lists such as 'seq1,seq2'.")
-    parser.add_option("--max-lib-len", dest="max_lib_len", type=int, default=1200,
-                      help="default: %default.")
+    parser.add_option("-X", "--max-lib-len", dest="max_lib_len", type=int, default=1200,
+                      help="Corresponding to '-X' option in Bowtie2. Default: %default.")
     parser.add_option("-c", dest="is_circular", default="auto",
                       help="(yes/no/auto) input fasta is circular. "
                            "If auto was chosen, the input fasta would be treated as circular when the sequence name "
-                           "ends with '(circular)'."
+                           "ends with '(circular)'. "
                            "Default: auto")
     parser.add_option("-o", dest="output_base",
                       help="output folder.")
@@ -77,11 +77,22 @@ def get_options():
                       help="Default: %default")
     # parser.add_option("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
     #                   help="Default: %default")
+    parser.add_option("--plot-font", dest="plot_font", default=None,
+                      help="For plot of unicode characters in some environments. Use 'Times New Roman','Arial' etc. "
+                           "Default: %default.")
     parser.add_option("--disable-customized-error-rate", dest="customized_error_rate", default=True,
                       action="store_true")
     parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
                       help="Assign the path to Bowtie2 binary files if not added to the path. "
                       "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/bowtie2 first, then $PATH")
+    parser.add_option("--bowtie2-mode", dest="bowtie2_mode", default="--sensitive",
+                      help="Default: %default")
+    parser.add_option("--bowtie2-options", dest="other_bowtie2_options", default="--no-discordant --dovetail",
+                      help="Default: %default")
+    parser.add_option("--stat-mode", dest="stat_mode", default="best",
+                      help="Statistical mode for counting multiple hits of a single read: best/all. "
+                           "The all mode is meaningful only when '-k <INT>' was included in '--bowtie2-options'. "
+                           "Default: %default")
     parser.add_option("--debug", dest="debug_mode", default=False, action="store_true",
                       help="Turn on debug mode.")
     options, argv = parser.parse_args()
@@ -96,9 +107,23 @@ def get_options():
         log_level = "DEBUG"
     else:
         log_level = "INFO"
+    assert options.stat_mode in ("best", "all")
     log_handler = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
     log_handler.info("")
-    log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
+    log_handler.info("Python " + str(sys.version).replace("\n", " "))
+    # log versions of python libs
+    lib_versions_info = []
+    if options.draw_plot:
+        try:
+            import matplotlib
+        except ImportError:
+            pass
+        else:
+            lib_versions_info.append("matplotlib " + matplotlib.__version__)
+    lib_versions_info.append("GetOrganelleLib " + GetOrganelleLib.__version__)
+    log_handler.info("PYTHON LIBS: " + "; ".join(lib_versions_info))
+    # log versions of dependencies
+    dep_versions_info = []
     if not options.which_bowtie2:
         try_this_bin = os.path.join(GO_DEP_PATH, "bowtie2", "bowtie2")
         if os.path.isfile(try_this_bin) and executable(try_this_bin):
@@ -106,12 +131,21 @@ def get_options():
     if not executable(os.path.join(options.which_bowtie2, "bowtie2")):
         log_handler.error(os.path.join(options.which_bowtie2, "bowtie2") + " not accessible!")
         exit()
+    else:
+        output, err = subprocess.Popen(
+            os.path.join(options.which_bowtie2, "bowtie2") + " --version", stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, shell=True).communicate()
+        this_lines = output.decode("utf8").split("\n")[:3]
+        dep_versions_info.append("Bowtie2 " + this_lines[0].split()[-1].strip())
     if not executable(os.path.join(options.which_bowtie2, "bowtie2-build") + " --large-index"):
         log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build") + " not accessible!")
         exit()
+    log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
+    log_handler.info("WORKING DIR: " + os.getcwd())
     # if not executable(os.path.join(options.which_bowtie2, "bowtie2-build-l")):
     #     log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build-l") + " not accessible!")
     #     exit()
+    log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
     log_handler = timed_log(log_handler, options.output_base, "", log_level=log_level)
     return options, log_handler
 
@@ -272,8 +306,8 @@ def main():
         unpaired_fq_files = []
         if options.unpaired_fq_files:
             unpaired_fq_files = options.unpaired_fq_files.split(",")
-        other_bowtie2_options = " -X " + str(options.max_lib_len) + " --no-discordant --dovetail "
-        bowtie2_mode = " --sensitive "
+        other_bowtie2_options = " -X " + str(options.max_lib_len) + " " + options.other_bowtie2_options + " "
+        bowtie2_mode = " " + options.bowtie2_mode + " "
         map_with_bowtie2(seed_file=new_fasta,
                          original_fq_files=unpaired_fq_files,
                          bowtie_out=os.path.join(options.output_base, "check"),
@@ -284,13 +318,16 @@ def main():
         ref_lengths = get_lengths_with_seq_names_modified(options.fasta, log_handler)
         mapping_records = MapRecords(sam_file=os.path.join(options.output_base, "check.sam"),
                                      ref_real_len_dict=ref_lengths)
-        sequence_statistics = mapping_records.get_customized_mapping_characteristics()
+        sequence_statistics = \
+            mapping_records.get_customized_mapping_characteristics(multiple_hits_mode=options.stat_mode)
         num_mapped_reads = mapping_records.get_number_of_mapped_reads()
         num_paired, num_single = num_mapped_reads["paired"], num_mapped_reads["single"]
 
         if options.draw_plot:
             import matplotlib
             matplotlib.use('Agg')
+            if options.plot_font:
+                matplotlib.rc('font', family=options.plot_font)
             import matplotlib.pyplot as plt
         else:
             plt = None

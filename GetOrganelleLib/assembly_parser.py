@@ -126,7 +126,7 @@ class VertexInfo(dict):
         dict.__setitem__(self, key, val)
 
 
-class Assembly(object):
+class SimpleAssembly(object):
     def __init__(self, graph_file=None, min_cov=0., max_cov=inf, overlap=None):
         """
         :param graph_file:
@@ -134,19 +134,12 @@ class Assembly(object):
         :param max_cov:
         """
         self.vertex_info = VertexInfo()
-        self.__overlap = overlap  # kmer in de bruijn assembly
+        self.__overlap = overlap
         if graph_file:
             if graph_file.endswith(".gfa"):
                 self.parse_gfa(graph_file, min_cov=min_cov, max_cov=max_cov)
             else:
                 self.parse_fastg(graph_file, min_cov=min_cov, max_cov=max_cov)
-        self.vertex_clusters = []
-        self.update_vertex_clusters()
-        self.tagged_vertices = {}
-        self.vertex_to_copy = {}
-        self.vertex_to_float_copy = {}
-        self.copy_to_vertex = {}
-        self.__inverted_repeat_vertex = {}
 
     def __repr__(self):
         res = []
@@ -325,12 +318,6 @@ class Assembly(object):
             if vertex_name not in self.vertex_info:
                 self.vertex_info[vertex_name] = Vertex(vertex_name, int(vertex_len), vertex_cov,
                                                        fastg_form_long_name=this_vertex_str.strip("'"))
-                # self.vertex_info[vertex_name] = {"len": int(vertex_len),
-                #                                  "cov": vertex_cov,
-                #                                  "long": this_vertex_str.strip("'")}
-            # if "connections" not in self.vertex_info[vertex_name]:
-            #     self.vertex_info[vertex_name]["connections"] = {True: set(), False: set()}
-
         # adding other info based on existed names
         for i, seq in enumerate(fastg_matrix):
             if ":" in seq.label:
@@ -400,6 +387,58 @@ class Assembly(object):
                 self.__overlap = 0
                 # raise ProcessingGraphFailed("No kmer detected!")
 
+    def overlap(self):
+        return int(self.__overlap)
+
+    def write_to_fasta(self, out_file, check_postfix=True):
+        if check_postfix and not out_file.endswith(".fasta"):
+            out_file += ".fasta"
+        out_matrix = SequenceList()
+        for vertex_name in self.vertex_info:
+            out_matrix.append(Sequence(vertex_name, self.vertex_info[vertex_name].seq[True]))
+        out_matrix.interleaved = 70
+        out_matrix.write_fasta(out_file)
+
+    def write_to_gfa(self, out_file, check_postfix=True):
+        if check_postfix and not out_file.endswith(".gfa"):
+            out_file += ".gfa"
+        out_file_handler = open(out_file, "w")
+        for vertex_name in self.vertex_info:
+            out_file_handler.write("\t".join([
+                "S", vertex_name, self.vertex_info[vertex_name].seq[True],
+                "LN:i:" + str(self.vertex_info[vertex_name].len),
+                "RC:i:" + str(int(self.vertex_info[vertex_name].len * self.vertex_info[vertex_name].cov))
+            ]) + "\n")
+        recorded_connections = set()
+        for vertex_name in self.vertex_info:
+            for this_end in (False, True):
+                for next_v, next_e in self.vertex_info[vertex_name].connections[this_end]:
+                    this_con = tuple(sorted([(vertex_name, this_end), (next_v, next_e)]))
+                    if this_con not in recorded_connections:
+                        recorded_connections.add(this_con)
+                        out_file_handler.write("\t".join([
+                            "L", vertex_name, ("-", "+")[this_end], next_v, ("-", "+")[not next_e],
+                            str(self.__overlap if self.__overlap else 0) + "M"
+                        ]) + "\n")
+
+
+class Assembly(SimpleAssembly):
+    def __init__(self, graph_file=None, min_cov=0., max_cov=inf, overlap=None):
+        """
+        :param graph_file:
+        :param min_cov:
+        :param max_cov:
+        """
+        super(Assembly, self).__init__(graph_file=graph_file, min_cov=min_cov, max_cov=max_cov, overlap=overlap)
+        self.__overlap = super(Assembly, self).overlap()
+        self.vertex_clusters = []
+        self.update_vertex_clusters()
+        self.tagged_vertices = {}
+        self.vertex_to_copy = {}
+        self.vertex_to_float_copy = {}
+        self.copy_to_vertex = {}
+        self.__inverted_repeat_vertex = {}
+
     def new_graph_with_vertex_reseeded(self, start_from=1):
         those_vertices = sorted(self.vertex_info)
         new_graph = Assembly(overlap=self.__overlap)
@@ -461,37 +500,6 @@ class Assembly(object):
                 raise ProcessingGraphFailed(
                     "Merged graph cannot be written as fastg format file, please try gfa format!")
 
-    def write_to_fasta(self, out_file, check_postfix=True):
-        if check_postfix and not out_file.endswith(".fasta"):
-            out_file += ".fasta"
-        out_matrix = SequenceList()
-        for vertex_name in self.vertex_info:
-            out_matrix.append(Sequence(vertex_name, self.vertex_info[vertex_name].seq[True]))
-        out_matrix.interleaved = 70
-        out_matrix.write_fasta(out_file)
-
-    def write_to_gfa(self, out_file, check_postfix=True):
-        if check_postfix and not out_file.endswith(".gfa"):
-            out_file += ".gfa"
-        out_file_handler = open(out_file, "w")
-        for vertex_name in self.vertex_info:
-            out_file_handler.write("\t".join([
-                "S", vertex_name, self.vertex_info[vertex_name].seq[True],
-                "LN:i:" + str(self.vertex_info[vertex_name].len),
-                "RC:i:" + str(int(self.vertex_info[vertex_name].len * self.vertex_info[vertex_name].cov))
-            ]) + "\n")
-        recorded_connections = set()
-        for vertex_name in self.vertex_info:
-            for this_end in (False, True):
-                for next_v, next_e in self.vertex_info[vertex_name].connections[this_end]:
-                    this_con = tuple(sorted([(vertex_name, this_end), (next_v, next_e)]))
-                    if this_con not in recorded_connections:
-                        recorded_connections.add(this_con)
-                        out_file_handler.write("\t".join([
-                            "L", vertex_name, ("-", "+")[this_end], next_v, ("-", "+")[not next_e],
-                            str(self.__overlap if self.__overlap else 0) + "M"
-                        ]) + "\n")
-
     def write_out_tags(self, db_names, out_file):
         tagged_vertices = set()
         for db_n in db_names:
@@ -513,9 +521,6 @@ class Assembly(object):
                               ";".join(sorted(here_tags)),
                               "", ""])
         open(out_file, "w").writelines(["\t".join(line) + "\n" for line in lines])
-
-    def kmer(self):
-        return int(self.__overlap)
 
     def update_orf_total_len(self, limited_vertices=None):
         if not limited_vertices:
@@ -2331,7 +2336,7 @@ class Assembly(object):
                                 draft_size_estimates = 0
                                 for inside_v in this_assembly_g.vertex_info:
                                     draft_size_estimates += \
-                                        (this_assembly_g.vertex_info[inside_v].len - this_assembly_g.kmer()) * \
+                                        (this_assembly_g.vertex_info[inside_v].len - this_assembly_g.overlap()) * \
                                         this_assembly_g.vertex_to_copy[inside_v]
                                 if not this_absurd or expected_min_size < draft_size_estimates < expected_max_size:
                                     absurd_copy_nums = False

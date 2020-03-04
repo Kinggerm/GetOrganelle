@@ -5,6 +5,15 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.6.4",
+     "features": [
+         "1. log plastome structure",
+         "2. --max-paths-num added for get_organelle*.py & disentangle*.py",
+         "3. reorganize codes: class SimpleAssembly & detect_plastome_architecture()",
+         "4. evaluate_assembly_using_mapping.py: --stat-mode, --bowtie2-options, --plot-font added",
+         "5. README.md: updated with conda installation",
+     ],
+     "time": "2020-02-27 17:14 GMT-6"},
     {"number": "1.6.3a",
      "features": [
          "1. Minor bugs fixes",

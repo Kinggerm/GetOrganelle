@@ -57,6 +57,10 @@ def get_options(print_title):
                            "to reverse the direction of the starting contig when result is circular. "
                            "Actually, both directions are biologically equivalent to each other. The "
                            "reordering of the direction is only for easier downstream analysis.")
+    parser.add_option("--max-paths-num", dest="max_paths_num", default=1000, type=int,
+                      help="Repeats would dramatically increase the number of potential isomers (paths). "
+                           "This option was used to export a certain amount of paths out of all possible paths "
+                           "per assembly graph. Default: %default")
     parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
                       help="By default, this script would pick the contig with highest coverage among all parallel "
                            "(polymorphic) contigs when degenerating was not applicable. "
@@ -99,6 +103,7 @@ def get_options(print_title):
         sys.exit()
     else:
         assert 12 >= options.max_multiplicity >= 1
+        assert options.max_paths_num > 0
         if options.output_directory and not os.path.exists(options.output_directory):
             os.mkdir(options.output_directory)
         log_handler = simple_log(logging.getLogger(), options.output_directory, options.prefix + ".disentangle.")
@@ -186,7 +191,20 @@ def main():
                 for go_res, copy_res in enumerate(copy_results):
                     broken_graph = copy_res["graph"]
                     count_path = 0
-                    for this_paths, other_tag in broken_graph.get_all_paths(mode=mode, log_handler=inner_logging):
+
+                    these_paths = broken_graph.get_all_paths(mode=mode, log_handler=inner_logging)
+                    # reducing paths
+                    if len(these_paths) > options.max_paths_num:
+                        this_warn_str = "Only exporting " + str(options.max_paths_num) + " out of all " + \
+                                        str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)"
+                        if inner_logging:
+                            inner_logging.warning(this_warn_str)
+                        else:
+                            sys.stdout.write("Warning: " + this_warn_str + "\n")
+                        these_paths = these_paths[:options.max_paths_num]
+
+                    # exporting paths, reporting results
+                    for this_paths, other_tag in these_paths:
                         count_path += 1
                         all_contig_str = []
                         contigs_are_circular = []
@@ -203,6 +221,18 @@ def main():
                             else:
                                 all_contig_str.append(">contig_" + str(go_contig + 1) + "--" + this_contig.label +
                                                       "\n" + this_contig.seq + "\n")
+                        if len(all_contig_str) == 1 and set(contigs_are_circular) == {True}:
+                            # print ir stat
+                            if count_path == 1 and mode == "embplant_pt":
+                                detect_seq = broken_graph.export_path(this_paths[0]).seq
+                                ir_stats = detect_plastome_architecture(detect_seq, 1000)
+                                print_str = "Detecting large repeats (>1000 bp) in PATH1 with " + ir_stats[-1] +\
+                                            ", Total:LSC:SSC:Repeat(bp) = " + str(len(detect_seq)) + ":" + \
+                                            ":".join([str(len_val) for len_val in ir_stats[:3]])
+                                if inner_logging:
+                                    inner_logging.info(print_str)
+                                else:
+                                    sys.stdout.write(print_str + "\n")
                         # if len(all_contig_str) == 1 and set(contigs_are_circular) == {True}:
                         #     still_complete.append(True)
                         # else:
@@ -216,14 +246,38 @@ def main():
                     # should add making one-step-inversion pairs for paths,
                     # which would be used to identify existence of a certain isomer using mapping information
                     count_path = 0
-                    for this_path, other_tag in idealized_graph.get_all_circular_paths(
-                            mode=mode, log_handler=inner_logging, reverse_start_direction_for_pt=options.reverse_lsc):
+
+                    these_paths = idealized_graph.get_all_circular_paths(
+                        mode=mode, log_handler=inner_logging, reverse_start_direction_for_pt=options.reverse_lsc)
+                    # reducing paths
+                    if len(these_paths) > options.max_paths_num:
+                        this_warn_str = "Only exporting " + str(options.max_paths_num) + " out of all " + \
+                                        str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)"
+                        if inner_logging:
+                            inner_logging.warning(this_warn_str)
+                        else:
+                            sys.stdout.write("Warning: " + this_warn_str + "\n")
+                        these_paths = these_paths[:options.max_paths_num]
+
+                    # exporting paths, reporting results
+                    for this_path, other_tag in these_paths:
                         count_path += 1
                         this_seq_obj = idealized_graph.export_path(this_path)
                         if DEGENERATE_BASES & set(this_seq_obj.seq):
                             degenerate_base_used = True
                         open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write(this_seq_obj.fasta_str())
+                        # print ir stat
+                        if count_path == 1 and mode == "embplant_pt":
+                            detect_seq = this_seq_obj.seq
+                            ir_stats = detect_plastome_architecture(detect_seq, 1000)
+                            print_str = "Detecting large repeats (>1000 bp) in PATH1 with " + ir_stats[-1] + \
+                                        ", Total:LSC:SSC:Repeat(bp) = " + str(len(detect_seq)) + ":" + \
+                                        ":".join([str(len_val) for len_val in ir_stats[:3]])
+                            if inner_logging:
+                                inner_logging.info(print_str)
+                            else:
+                                sys.stdout.write(print_str + "\n")
                     idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
             if degenerate_base_used:
                 inner_logging.warning("Degenerate base(s) used!")

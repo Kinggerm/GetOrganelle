@@ -6,8 +6,8 @@ import time
 # from https://github.com/Kinggerm/PersonalUtilities
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 sys.path.append(os.path.join(path_of_this_script, ".."))
-from GetOrganelleLib.seq_parser import *
-from GetOrganelleLib.sam_parser import *
+from GetOrganelleLib.seq_parser import read_fasta, detect_plastome_architecture
+# from GetOrganelleLib.sam_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
@@ -31,82 +31,21 @@ def get_options():
         return options, argv
 
 
-def detect_architecture(sequence, min_repeat_length, accepted_char):
-    # assume the longest is ir
-    all_repeats = find_exact_repeats(sequence, min_repeat_length, True, accepted_char)
-    if all_repeats:
-        # Sorting makes:
-        # direct1==1 and direct2==-1
-        # start1 be the smallest forward start
-        ir_locations_1 = sorted(all_repeats[0], key=lambda x: (-x["direction"], x["start"]))
-        ir_locations_2 = sorted(reverse_repeats_info(ir_locations_1), key=lambda x: (-x["direction"], x["start"]))
-        ir_locations = sorted([ir_locations_1, ir_locations_2],
-                              key=lambda x: (-max([y["direction"] for y in x]), x[0]["start"]))[0]
-        if len(ir_locations) != 2:
-            return "-", "-", "-", "not canonical IR"
-        elif ir_locations[0]["direction"] == ir_locations[1]["direction"]:
-            start1, end1, direct1 = ir_locations[0]["start"], ir_locations[0]["end"], ir_locations[0]["direction"]
-            start2, end2, direct2 = ir_locations[1]["start"], ir_locations[1]["end"], ir_locations[1]["direction"]
-            # cross the end, meaning site:seq_len in (DR1)
-            if end1 < start1:
-                if end2 >= start1:
-                    return 0, 0, ir_locations[0]["length"], "DR detected and overlaps"
-                else:
-                    return start1 - end2 - 1, 0, ir_locations[0]["length"], "DR detected and overlaps"
-            elif end2 < start2:
-                if end2 >= start1:
-                    if end1 >= start2:
-                        return 0, 0, ir_locations[0]["length"], "DR detected and overlaps"
-                    else:
-                        return start2 - end1 - 1, 0, ir_locations[0]["length"], "DR detected and overlaps"
-                elif end1 >= start2:
-                    return start1 - end2 - 1, 0, ir_locations[0]["length"], "DR detected and overlaps"
-                else:
-                    ssc, lsc = sorted([start1 - end2 - 1, start2 - end1 - 1])
-                    return lsc, ssc, ir_locations[0]["length"], "DR detected"
-            else:
-                ssc, lsc = sorted([start2 - end1 - 1, len(sequence) + start1 - end2 - 1])
-                return lsc, ssc, ir_locations[0]["length"], "DR detected"
-        else:
-            start1, end1, direct1 = ir_locations[0]["start"], ir_locations[0]["end"], ir_locations[0]["direction"]
-            start2, end2, direct2 = ir_locations[1]["start"], ir_locations[1]["end"], ir_locations[1]["direction"]
-            # cross the end, meaning site:seq_len in (IR1)
-            if end1 < start1:
-                # seq_len >= start2 >= start1
-                if start2 >= start1:
-                    return 0, 0, ir_locations[0]["length"], "IR overlaps"
-                else:
-                    return start1 - start2 - 1, 0, ir_locations[0]["length"], "IR overlaps"
-            elif start2 < end2:
-                if start2 >= start1:
-                    if end1 >= end2:
-                        return 0, 0, ir_locations[0]["length"], "IR overlaps"
-                    else:
-                        return end2 - end1 - 1, 0, ir_locations[0]["length"], "IR overlaps"
-                else:
-                    ssc, lsc = sorted([end2 - end1 - 1, start1 - start2 - 1])
-                    return lsc, ssc, ir_locations[0]["length"], "IR detected"
-            else:
-                ssc, lsc = sorted([end2 - end1 - 1, len(sequence) + start1 - start2 - 1])
-                return lsc, ssc, ir_locations[0]["length"], "IR detected"
-    else:
-        return "-", "-", "-", "no IR found"
-
-
 def main():
     time0 = time.time()
     sys.stdout.write("\n"
                      "## This script helps you count the LSC/SSC/IR-DR lengths from a batch of plastome sequences.\n"
                      "## by jinjianjun@mail.kib.ac.cn\n\n")
     options, argv = get_options()
-    sys.stdout.write("file_name\tsequence_name\ttotal_length\tLSC_length\tSSC_length\tIR/DR_length\tarch_Notes\tGC_content\n")
+    sys.stdout.write(
+        "file_name\tsequence_name\ttotal_length\tLSC_length\tSSC_length\tIR/DR_length\tarch_Notes\tGC_content\n")
     if options.output:
         out_handler = open(options.output, "w")
         out_handler.close()
     for this_f in argv:
         this_matrix = read_fasta(this_f)
         for i in range(len(this_matrix[0])):
-            arch = detect_architecture(this_matrix[1][i], options.min_ir_length, options.valid_bases)
+            arch = detect_plastome_architecture(this_matrix[1][i], options.min_ir_length, options.valid_bases)
             this_upper = this_matrix[1][i].upper()
             this_gc = this_upper.count("G") + this_upper.count("C")
             this_at = this_upper.count("A") + this_upper.count("T")

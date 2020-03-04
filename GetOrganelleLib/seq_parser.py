@@ -581,6 +581,71 @@ def find_exact_repeats(sequence_string, min_repeat_length, circular,
     return final_repeat
 
 
+def detect_plastome_architecture(sequence, min_repeat_length, accepted_char=""):
+    # assume the longest is ir
+    if accepted_char:
+        all_repeats = find_exact_repeats(sequence, min_repeat_length, True, set(accepted_char))
+    else:
+        all_repeats = find_exact_repeats(sequence, min_repeat_length, True)
+    if all_repeats:
+        # Sorting makes:
+        # direct1==1 and direct2==-1
+        # start1 be the smallest forward start
+        ir_locations_1 = sorted(all_repeats[0], key=lambda x: (-x["direction"], x["start"]))
+        ir_locations_2 = sorted(reverse_repeats_info(ir_locations_1), key=lambda x: (-x["direction"], x["start"]))
+        ir_locations = sorted([ir_locations_1, ir_locations_2],
+                              key=lambda x: (-max([y["direction"] for y in x]), x[0]["start"]))[0]
+        if len(ir_locations) != 2:
+            return "-", "-", "-", "no canonical IR"
+        elif ir_locations[0]["direction"] == ir_locations[1]["direction"]:
+            start1, end1, direct1 = ir_locations[0]["start"], ir_locations[0]["end"], ir_locations[0]["direction"]
+            start2, end2, direct2 = ir_locations[1]["start"], ir_locations[1]["end"], ir_locations[1]["direction"]
+            # cross the end, meaning site:seq_len in (DR1)
+            if end1 < start1:
+                if end2 >= start1:
+                    return 0, 0, ir_locations[0]["length"], "DRs detected and overlapped"
+                else:
+                    return start1 - end2 - 1, 0, ir_locations[0]["length"], "DRs detected and overlapped"
+            elif end2 < start2:
+                if end2 >= start1:
+                    if end1 >= start2:
+                        return 0, 0, ir_locations[0]["length"], "DRs detected and overlapped"
+                    else:
+                        return start2 - end1 - 1, 0, ir_locations[0]["length"], "DRs detected and overlapped"
+                elif end1 >= start2:
+                    return start1 - end2 - 1, 0, ir_locations[0]["length"], "DRs detected and overlapped"
+                else:
+                    ssc, lsc = sorted([start1 - end2 - 1, start2 - end1 - 1])
+                    return lsc, ssc, ir_locations[0]["length"], "DRs detected"
+            else:
+                ssc, lsc = sorted([start2 - end1 - 1, len(sequence) + start1 - end2 - 1])
+                return lsc, ssc, ir_locations[0]["length"], "DRs detected"
+        else:
+            start1, end1, direct1 = ir_locations[0]["start"], ir_locations[0]["end"], ir_locations[0]["direction"]
+            start2, end2, direct2 = ir_locations[1]["start"], ir_locations[1]["end"], ir_locations[1]["direction"]
+            # cross the end, meaning site:seq_len in (IR1)
+            if end1 < start1:
+                # seq_len >= start2 >= start1
+                if start2 >= start1:
+                    return 0, 0, ir_locations[0]["length"], "IRs detected and overlapped"
+                else:
+                    return start1 - start2 - 1, 0, ir_locations[0]["length"], "IRs detected and overlapped"
+            elif start2 < end2:
+                if start2 >= start1:
+                    if end1 >= end2:
+                        return 0, 0, ir_locations[0]["length"], "IRs detected and overlapped"
+                    else:
+                        return end2 - end1 - 1, 0, ir_locations[0]["length"], "IRs detected and overlapped"
+                else:
+                    ssc, lsc = sorted([end2 - end1 - 1, start1 - start2 - 1])
+                    return lsc, ssc, ir_locations[0]["length"], "IRs detected"
+            else:
+                ssc, lsc = sorted([end2 - end1 - 1, len(sequence) + start1 - start2 - 1])
+                return lsc, ssc, ir_locations[0]["length"], "IRs detected"
+    else:
+        return "-", "-", "-", "no IR found"
+
+
 def reverse_repeats_info(repeats):
     new_repeats = []
     for rep in repeats:

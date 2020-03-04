@@ -40,7 +40,7 @@ def get_options():
         # parser.print_help()
         sys.stdout.write("Illegal -c input! circular mode must be one of yes/no/auto!\n")
         sys.exit()
-    elif options.kmer % 2 == 0:
+    elif options.overlap % 2 == 0:
         # parser.print_help()
         sys.stdout.write("Illegal -k input! kmer must be an odd number!\n")
     return options, argv
@@ -51,7 +51,7 @@ def main():
     time_0 = time.time()
     options, argv = get_options()
     # detect postfix
-    kmer_node_graph = NaiveKmerNodeGraph(options.input, kmer_len=options.kmer,
+    kmer_node_graph = NaiveKmerNodeGraph(options.input, kmer_len=options.overlap,
                                          circular=options.circular, single_chain=options.single_chain)
     if options.output:
         assembly_graph = kmer_node_graph.generate_assembly_graph()

@@ -1,7 +1,7 @@
 # GetOrganelle
 
 
-This toolkit assemblies organelle genome from genomic skimming data.
+This toolkit assemblies organelle genome from genomic skimming data. 
 
 <div id="citation"></div>
 
@@ -26,98 +26,17 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation
 
-This toolkit is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. GetOrganelle is generally more efficient under Python 3.*.
+GetOrganelle is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. It was built for Linux and macOS.
 
-There are generally two ways to install GetOrganelle: 1) `Using the setup.py` is the way with GetOrganelleLib installed in the $PYTHONPATH ; 2) `In situ configuration` is the classic and heavy way, but easier to keep updated. The current stable version is [1.6.2e](https://github.com/Kinggerm/GetOrganelle/releases/tag/v1.6.2e), while you are very welcome to try `1.6.3` (or named `1.6.3-beta`) using `In situ configuration` with new features and report bugs to us.
+The easiest way to install GetOrganelle and its [dependencies](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#requirement--dependencies) is using conda:
 
-### Using the setup.py
+    conda -c bioconda -c biojj getorganelle
 
-Execute following curl commands to download a stable version (see more versions [here](https://github.com/Kinggerm/GetOrganelle/releases)). You can also use [git](https://www.atlassian.com/git/tutorials/install-git) to download as explained latter in the `In situ configuration`, but without the need of cloning into the installation directory.
-
-    # To dowload GetOrganelle using curl and decompress it. 
-    # Supposing your system is linux, otherwise change the 'linux' into 'macOS'; If you do not need the attached dependency, change 'linux' into 'light';
-    # Supposing you download GetOrganelle to ~/Downloads
-    cd ~/Downloads
-    curl -L https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2e/v1.6.2e-linux.tar.gz | tar zx
-    
-install [pip](https://pip.pypa.io/en/stable/installing/) and then install downloaded GetOrganelle with pip.
-
-    # install pip, NOT neccessary if pip was already available
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    python get-pip.py
-    
-    # install GetOrganelle; add the option "--user" after "install" to install for current user
-    pip install ./GetOrganelle
-    
-Alternatively, if you have Python library setuptools installed (`sudo apt install -y python-setuptools` or `sudo yum install -y python-setuptools`), you can install GetOrganelle with `cd GetOrganelle && python setup.py install`. 
-    
-For some fresh linux systems, after above commands you still cannot execute `get_organelle_from_reads.py` in a new terminal directly, meaning `~/.local/bin` was not added to the $PATH, you have to manually add `~/.local/bin` by executing `echo "PATH=~/.local/bin:\$PATH" >> ~/.bashrc`. For fresh MacOS environment with similar situation, for example, if you installed GetOrganelle with `Python 3.6` and find scripts not in the $PATH, please execute `echo "PATH=/Library/Frameworks/Python.framework/Versions/3.6/bin:\$PATH" >> ~/.bash_profile`.
-    
-### In situ configuration
-
-You could use curl as explained above, however [git](https://www.atlassian.com/git/tutorials/install-git) would be more suggested for update and version control.
-
-    # Supposing you are going to install it at ~/Applications/bin
-    mkdir ~/Applications && mkdir ~/Applications/bin  # create directories if not existed
-    GetOrganellePATH=~/Applications/bin
-    cd $GetOrganellePATH
-    git clone git://github.com/Kinggerm/GetOrganelle
-    
-use following commands to make GetOrganelle scripts executable; and make blast-databases and bowtie2 indices for default seeds.
-    
-    cd GetOrganelle
-    python setup.py --in-situ
-
-add GetOrganelle and GetOrganelle/Utilities to the $PATH.
-    
-    # for Linux
-    echo "PATH=$GetOrganellePATH/GetOrganelle:\$PATH" >> ~/.bashrc
-    echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:\$PATH" >> ~/.bashrc
-    echo "export PATH" >> ~/.bashrc
-    source ~/.bashrc
-    
-    ## for MacOS
-    echo "PATH=$GetOrganellePATH/GetOrganelle:\$PATH" >> ~/.bash_profile
-    echo "PATH=$GetOrganellePATH/GetOrganelle/Utilities:\$PATH" >> ~/.bash_profile
-    echo "export PATH" >> ~/.bash_profile
-    source ~/.bash_profile
-    
-At last, install python libraries numpy, scipy, and sympy using [pip](https://pip.pypa.io/en/stable/installing/). Alternatively you could install package/environment management systems such as [conda](https://conda.io/en/latest/), which already have those python packages installed. [Pyenv](https://github.com/pyenv/pyenv) is highly suggested to control python versions/environments.
-    
-    pip install numpy scipy sympy
-
-### Updating GetOrganelle
-
-You are always recommended to use the latest GetOrganelle, although you could find many old versions of GetOrganelle [here](https://github.com/Kinggerm/GetOrganelle/releases).
-
-1. If you follow the way of `Using the setup.py`, to update, just do the same thing as the installation process.
-
-2. If you follow the way of `In situ configuration` with git, go to the directory where you cloned GetOrganelle:
-    
-        # Supposing you are going to installed it at ~/Applications/bin
-        cd ~/Applications/bin/GetOrganelle
-        git stash
-        git pull
-        python setup.py --in-situ
-
-### Requirement & Dependencies
-
-Since v1.6*, GetOrganelle included binary files of all dependencies (SPAdes, Bowtie2, BLAST+) in its repository. Although making GetOrganelle use your own installed dependencies is not suggested for compatibility consideration, but you could still do this. For example, if SPAdes v3.6.2 is already available in the $PATH and you would like GetOrganelle to use the installed SPAdes v3.6.2, you could remove the SPAdes folder before executing `pip install ./GetOrganelle`. If all dependencies were previously installed (using `sudo apt install spades bowtie2 ncbi-blast+` for Ubuntu), you could download the [light version](https://github.com/Kinggerm/GetOrganelle/releases/download/v1.6.2e/v1.6.2e-light.tar.gz) upon installing GetOrganelle. 
-
-Besides, no worries about interference from GetOrganelle's dependencies. Because during the installing process mentioned above, GetOrganelle would add those dependencies (SPAdes, Bowtie2, BLAST+) to the GetOrganelle-*.egg rather than to the $PATH, thereby not influence your own usage. For example, if you already installed SPAdes v3.6.2, after installing GetOrganelle, the spades version for your system would still be v3.6.2, while only GetOrganelle uses the [version in GetOrganelleDep](https://github.com/Kinggerm/GetOrganelle/blob/master/GetOrganelleDep/linux/SPAdes/share/spades/VERSION). 
-
-Python libraries (numpy, scipy, sympy) is covered in the installation part. 
-
-Perl is required for the wrapper of Bowtie2, but we assume that it was builtin in your system.
-
-#### NOT Required Dependencies
-
-<a href=' '>Bandage</a > is a fantastic tool to view the assembly graph (`*.fastg`/`*.gfa`). If you have Bandage correctly configured and add the binary folder of Bandage (which is `Bandage.app/Contents/MacOS` for MacOS) to the $PATH, get_organelle_from_*.py would automatically generate the a png formatted image of the assembly graph. 
-
-If you installed python library psutil (version >= 3.0; pip install -U psutil), the memory cost of get_organelle_from_reads.py will be automatically logged. If you want to evaluate your results and plot the evaluation with `evaluate_assembly_using_mapping.py` and `round_statistics.py`, you have to further install python library matplotlib (pip install matplotlib).
+You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using above command. Personally, I use [pyenv](https://github.com/pyenv/pyenv) to control python versions and conda environments. If you don't like conda, you can find [more installation ways here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation).
 
 
-## How To
+
+## Instruction
 
 <b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Example</a ></b>. But you are still recommended to read the following introductions:
 
@@ -183,6 +102,3 @@ or see the detailed illustrations:
 
 Also see [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) for a benchmark test of `GetOrganelle` and `NOVOPlasty` using 50 online samples.
 
-## Acknowledgement
-
-Thanks to Chao-Nan Fu, Han-Tao Qin, Yang Pan, Xiao-Jian Qu, Shuo Wang, Rong Zhang, Fei Zhao and lots of users for giving tests or suggestions.

@@ -129,6 +129,10 @@ def get_options(description, version):
                            "to reverse the direction of the starting contig when result is circular. "
                            "Actually, both directions are biologically equivalent to each other. The "
                            "reordering of the direction is only for easier downstream analysis.")
+    parser.add_option("--max-paths-num", dest="max_paths_num", default=1000, type=int,
+                      help="Repeats would dramatically increase the number of potential isomers (paths). "
+                           "This option was used to export a certain amount of paths out of all possible paths "
+                           "per assembly graph. Default: %default")
     parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
                       help="By default, this script would pick the contig with highest coverage among all parallel "
                            "(polymorphic) contigs when degenerating was not applicable. "
@@ -169,7 +173,7 @@ def get_options(description, version):
         for not_often_used in ("--genes", "--ex-genes", "--slim-options", "--depth-factor", "--type-f",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--expected-max-size", "--expected-min-size", "--reverse-lsc",
+                               "--expected-max-size", "--expected-min-size", "--reverse-lsc", "--max-paths-num",
                                "--keep-all-polymorphic", "--min-sigma", "--max-multiplicity",
                                "--prefix", "--which-blast", "--which-bandage",
                                "--keep-temp", "--random-seed", "--verbose"):
@@ -260,6 +264,7 @@ def get_options(description, version):
                     exit()
         assert options.threads > 0
         assert 12 >= options.max_multiplicity >= 1
+        assert options.max_paths_num > 0
         organelle_type_len = len(options.organelle_type)
         options.prefix = os.path.basename(options.prefix)
         if not os.path.isdir(options.output_base):
@@ -274,7 +279,7 @@ def get_options(description, version):
         lib_versions_info.append("numpy " + np.__version__)
         lib_versions_info.append("sympy " + sympy.__version__)
         lib_versions_info.append("scipy " + scipy.__version__)
-        log_handler.info("Python libs: " + "; ".join(lib_versions_info))
+        log_handler.info("PYTHON LIBS: " + "; ".join(lib_versions_info))
         dep_versions_info = []
 
         if not options.no_slim:
@@ -305,18 +310,9 @@ def get_options(description, version):
                 os.path.join(options.which_bandage, "Bandage") + " -v", stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, shell=True).communicate()
             dep_versions_info.append("Bandage " + output.decode("utf8").strip().split()[-1])
-        if dep_versions_info:
-            log_handler.info("Dependencies: " + "; ".join(dep_versions_info))
+        log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
+        log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
-
-        # for sub_organelle_t in options.organelle_type:
-        #     if sub_organelle_t in ("animal_mt", "fungus_mt"):
-        #         log_handler.info("Animal & fungus samples have much higher substitution rates, therefore no guarantee "
-        #                          "for success rate in animal & fungus samples with default label database!")
-        #         log_handler.info("If you failed after this run, a customized fasta-format label database made "
-        #                          "of protein coding & ribosomal genes extracted from a close-related species "
-        #                          "(--genes) is suggested for another run!\n")
-        #         break
 
         log_handler = timed_log(log_handler, options.output_base, options.prefix + "get_org.")
 
@@ -531,9 +527,18 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                 contig_num = set()
                 still_complete = []
                 for go_res, res in enumerate(target_results):
+
                     broken_graph = res["graph"]
                     count_path = 0
+
                     these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in)
+                    # reducing paths
+                    if len(these_paths) > options.max_paths_num:
+                        log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
+                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                        these_paths = these_paths[:options.max_paths_num]
+
+                    # exporting paths, reporting results
                     for this_paths, other_tag in these_paths:
                         count_path += 1
                         all_contig_str = []
@@ -554,6 +559,13 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                                       "\n" + this_contig.seq + "\n")
                         if len(all_contig_str) == 1 and set(contigs_are_circular) == {True}:
                             still_complete.append(True)
+                            # print ir stat
+                            if count_path == 1 and in_db_n == "embplant_pt":
+                                detect_seq = broken_graph.export_path(this_paths[0]).seq
+                                ir_stats = detect_plastome_architecture(detect_seq, 1000)
+                                log_in.info("Detecting large repeats (>1000 bp) in PATH1 with " + ir_stats[-1] +
+                                            ", Total:LSC:SSC:Repeat(bp) = " + str(len(detect_seq)) + ":" +
+                                            ":".join([str(len_val) for len_val in ir_stats[:3]]))
                         else:
                             still_complete.append(False)
                         if still_complete[-1]:
@@ -594,8 +606,18 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                     go_res += 1
                     idealized_graph = res["graph"]
                     count_path = 0
-                    for this_path, other_tag in idealized_graph.get_all_circular_paths(
-                            mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc):
+
+                    these_paths = idealized_graph.get_all_circular_paths(
+                        mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc)
+
+                    # reducing paths
+                    if len(these_paths) > options.max_paths_num:
+                        log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
+                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                        these_paths = these_paths[:options.max_paths_num]
+
+                    # exporting paths, reporting results
+                    for this_path, other_tag in these_paths:
                         count_path += 1
                         out_n = o_p + ".complete.graph" + str(go_res) + "." + str(
                             count_path) + other_tag + ".path_sequence.fasta"
@@ -603,6 +625,14 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                         if DEGENERATE_BASES & set(this_seq_obj.seq):
                             degenerate_base_used = True
                         open(out_n, "w").write(this_seq_obj.fasta_str())
+
+                        # print ir stat
+                        if count_path == 1 and in_db_n == "embplant_pt":
+                            detect_seq = this_seq_obj.seq
+                            ir_stats = detect_plastome_architecture(detect_seq, 1000)
+                            log_in.info("Detecting large repeats (>1000 bp) in PATH1 with " + ir_stats[-1] +
+                                        ", Total:LSC:SSC:Repeat(bp) = " + str(len(detect_seq)) + ":" +
+                                        ":".join([str(len_val) for len_val in ir_stats[:3]]))
                         log_in.info("Writing PATH" + str(count_path) + " of complete " + mode_in + " to " + out_n)
                     log_in.info("Writing GRAPH to " + o_p + ".complete.graph" + str(go_res) + ".selected_graph.gfa")
                     idealized_graph.write_to_gfa(o_p + ".complete.graph" + str(go_res) + ".selected_graph.gfa")

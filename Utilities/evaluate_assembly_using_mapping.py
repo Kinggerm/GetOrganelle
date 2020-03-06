@@ -75,6 +75,8 @@ def get_options():
                       help="Number of sites added in-between isolated contigs. Default: %default")
     parser.add_option("--plot-figure-height", dest="figure_height", default=5., type=float,
                       help="Default: %default")
+    parser.add_option("--plot-y-lim", dest="y_lim", type=float,
+                      help="Y axis value limit. ")
     # parser.add_option("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
     #                   help="Default: %default")
     parser.add_option("--plot-font", dest="plot_font", default=None,
@@ -408,6 +410,8 @@ def main():
 
         if not max_y_dat:
             raise ValueError("No mapped reads found!")
+        if options.y_lim:
+            max_y_dat = options.y_lim
 
         # start @20190304
         if options.customized_error_rate:

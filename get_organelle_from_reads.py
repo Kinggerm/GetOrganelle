@@ -3819,13 +3819,10 @@ def main():
                 options.spades_kmer = check_kmers(options.spades_kmer, options.auto_gradient_k, word_size,
                                                   max_read_len, log_handler)
                 log_handler.info("Assembling using SPAdes ...")
-                print("test 1")
                 if not executable("pigz -h"):
-                    print("test 3")
                     log_handler.warning("Compression after read correction will be skipped for lack of 'pigz'")
                     if "--disable-gzip-output" not in other_options:
                         other_options += " --disable-gzip-output"
-                print("test 2")
                 is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                                     options.prefix, original_fq_files, reads_paired,
                                                     which_spades=options.which_spades, verbose_log=options.verbose_log,

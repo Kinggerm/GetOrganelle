@@ -2992,9 +2992,9 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                 [os.path.join(which_spades, "spades.py"), '-t', str(threads), parameters] +
                 ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                 [kmer, spades_out_command]).strip()
-    spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     if verbose_log:
         log_handler.info(spades_command)
+    spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = spades_running.communicate()
     if "not recognized" in output.decode("utf8") or not os.path.exists(spades_out_put):
         if verbose_log:
@@ -3819,10 +3819,13 @@ def main():
                 options.spades_kmer = check_kmers(options.spades_kmer, options.auto_gradient_k, word_size,
                                                   max_read_len, log_handler)
                 log_handler.info("Assembling using SPAdes ...")
-                if not executable("pigz"):
+                print("test 1")
+                if not executable("pigz -h"):
+                    print("test 3")
                     log_handler.warning("Compression after read correction will be skipped for lack of 'pigz'")
                     if "--disable-gzip-output" not in other_options:
                         other_options += " --disable-gzip-output"
+                print("test 2")
                 is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                                     options.prefix, original_fq_files, reads_paired,
                                                     which_spades=options.which_spades, verbose_log=options.verbose_log,

@@ -256,6 +256,18 @@ else:
                            "or get SPAdes via http://cab.spbu.ru/software/spades/")
 
 
+PACKAGES = [LIB_NAME]
+PACKAGE_DATA = {LIB_NAME: [os.path.join(NOT_NAME, "*.n*"),
+                           os.path.join(SEQ_NAME, "*.bt2l"),
+                           os.path.join(SEQ_NAME, "*.fasta")]}
+if os.path.isdir(DEP_DIR) and os.path.isfile(os.path.join(DEP_DIR, "__init__.py")):
+    PACKAGES.append(DEP_NAME)
+    PACKAGE_DATA[DEP_NAME] = [this_file
+                              for this_file in
+                              get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
+                                                  start_from=DEP_DIR, exclude_files=EXCLUDE_SHARE_SPADES_PATHS)]
+
+
 if not in_situ:
     setup(
         name="GetOrganelle",
@@ -265,17 +277,11 @@ if not in_situ:
         author_email="jinjianjun@mail.kib.ac.cn",
         url="http://github.org/Kinggerm/GetOrganelle",
         license="GNU General Public License, version 3",
-        packages=[LIB_NAME, DEP_NAME],
+        packages=PACKAGES,
         platforms="linux/MacOS",
         scripts=scripts_to_install,
         # relative path to each package
-        package_data={LIB_NAME: [os.path.join(NOT_NAME, "*.n*"),
-                                 os.path.join(SEQ_NAME, "*.bt2l"),
-                                 os.path.join(SEQ_NAME, "*.fasta")],
-                      DEP_NAME: [this_file
-                                 for this_file in
-                                 get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
-                                                     start_from=DEP_DIR, exclude_files=EXCLUDE_SHARE_SPADES_PATHS)]},
+        package_data=PACKAGE_DATA,
         install_requires=install_dependencies,
         zip_safe=False
         )

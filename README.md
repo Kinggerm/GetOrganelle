@@ -11,7 +11,7 @@ Please denote the versions of GetOrganelle as well as the dependencies in your m
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
-<b>Bug&Usage contact:</b> [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn) or [phylojin@163.com](mailto:phylojin@163.com); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
+<b>Bug&Usage contact:</b> [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn) or [jj3111@columbia.edu](mailto:jj3111@columbia.edu); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
 
 Please also cite the dependencies if used:
 
@@ -32,7 +32,7 @@ The easiest way to install GetOrganelle and its [dependencies](https://github.co
 
     conda -c bioconda getorganelle
 
-You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. Personally, I use [pyenv](https://github.com/pyenv/pyenv) to control python versions and conda environments. If you don't like conda, you can find [more installation ways here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
+You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. Personally, I use [pyenv](https://github.com/pyenv/pyenv) to control python versions and conda environments. If you don't like conda which indeed takes a lot of hard disk space, you can find [more installation ways here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 
 
 
@@ -50,11 +50,11 @@ Take your input seed (fasta; the default is `GetOrganelleLib/SeedDatabase/*.fast
 
 <b>Producing Result</b>
 
-By default, SPAdes is automatically called to produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_fastg.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` if "-F embplant_pt" been used by get_organelle_from_reads.py) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`). 
+By default, SPAdes is automatically called to produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, Utilities/slim_graph.py is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` if "-F embplant_pt" been used by get_organelle_from_reads.py) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`). 
 
 The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` file would be further parsed by disentangle_organelle_assembly.py, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. 
 
-Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` and load the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` in [Bandage](http://rrwick.github.io/Bandage/), choose the best path(s) as the <b>final result</b>. You could execute `slim_fastg.py -F embplant_pt -E embplant_mt assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` to further remove mitogenome contigs for this easier visualization and manual completion.
+Otherwise, if disentangle_organelle_assembly.py failed to solve the path (produce `*contigs*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` and load the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` in [Bandage](http://rrwick.github.io/Bandage/), choose the best path(s) as the <b>final result</b>. You could execute `slim_graph.py -F embplant_pt -E embplant_mt assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` to further remove mitogenome contigs for this easier visualization and manual completion.
 [Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to manually extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
 
 

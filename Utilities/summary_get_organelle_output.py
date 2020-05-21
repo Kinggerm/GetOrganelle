@@ -5,7 +5,7 @@ import sys
 import csv
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.pipe_control_func import LogInfo
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]

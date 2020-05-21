@@ -4,7 +4,7 @@ import sys
 import platform
 from optparse import OptionParser as Option
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(PATH_OF_THIS_SCRIPT, ".."))
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.pipe_control_func import executable
 SYSTEM_NAME = ""

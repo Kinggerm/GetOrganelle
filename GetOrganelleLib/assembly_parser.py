@@ -1,6 +1,6 @@
 import os
 import sys
-import time
+import re
 from itertools import combinations, product
 from hashlib import sha256
 
@@ -28,11 +28,12 @@ except ImportError:
             raise ImportError("No module named scipy")
 
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 # for test
 sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.statistical_func import *
+
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 import random
 from copy import deepcopy
@@ -61,14 +62,14 @@ class Vertex(object):
     def __init__(self, v_name, length=None, coverage=None, forward_seq=None, reverse_seq=None,
                  tail_connections=None, head_connections=None, fastg_form_long_name=None):
         """
-        :param v_name:
-        :param length:
-        :param coverage:
-        :param forward_seq:
-        :param reverse_seq:
+        :param v_name: str
+        :param length: int
+        :param coverage: float
+        :param forward_seq: str
+        :param reverse_seq: str
         :param tail_connections: set()
         :param head_connections: set()
-        :param fastg_form_long_name:
+        :param fastg_form_long_name: str
         self.seq={True: FORWARD_SEQ, False: REVERSE_SEQ}
         self.connections={True: tail_connection_set, False: head_connection_set}
         """
@@ -93,6 +94,9 @@ class Vertex(object):
             self.connections[False] = head_connections
         self.fastg_form_name = fastg_form_long_name
         self.other_attr = {}
+
+    def __repr__(self):
+        return self.name
 
     def fill_fastg_form_name(self, check_valid=False):
         if check_valid:
@@ -153,6 +157,13 @@ class SimpleAssembly(object):
                     res.append(")")
             res.append("\n")
         return "".join(res)
+
+    def __bool__(self):
+        return bool(self.vertex_info)
+
+    def __iter__(self):
+        for vertex in sorted(self.vertex_info):
+            yield self.vertex_info[vertex]
 
     def parse_gfa(self, gfa_file, default_cov=1., min_cov=0., max_cov=inf):
         with open(gfa_file) as gfa_open:
@@ -388,16 +399,19 @@ class SimpleAssembly(object):
                 # raise ProcessingGraphFailed("No kmer detected!")
 
     def overlap(self):
-        return int(self.__overlap)
+        if self.__overlap is None:
+            return None
+        else:
+            return int(self.__overlap)
 
-    def write_to_fasta(self, out_file, check_postfix=True):
+    def write_to_fasta(self, out_file, interleaved=None, check_postfix=True):
         if check_postfix and not out_file.endswith(".fasta"):
             out_file += ".fasta"
         out_matrix = SequenceList()
         for vertex_name in self.vertex_info:
             out_matrix.append(Sequence(vertex_name, self.vertex_info[vertex_name].seq[True]))
         out_matrix.interleaved = 70
-        out_matrix.write_fasta(out_file)
+        out_matrix.write_fasta(out_file, interleaved=interleaved)
 
     def write_to_gfa(self, out_file, check_postfix=True):
         if check_postfix and not out_file.endswith(".gfa"):
@@ -686,6 +700,7 @@ class Assembly(SimpleAssembly):
         else:
             limited_vertices = sorted(limited_vertices)
         merged = False
+        overlap = self.__overlap if self.__overlap else 0
         while limited_vertices:
             this_vertex = limited_vertices.pop()
             for this_end in (True, False):
@@ -728,14 +743,14 @@ class Assembly(SimpleAssembly):
                         next_len = self.vertex_info[next_vertex].len
                         this_cov = self.vertex_info[this_vertex].cov
                         next_cov = self.vertex_info[next_vertex].cov
-                        self.vertex_info[new_vertex].len = this_len + next_len - self.__overlap
+                        self.vertex_info[new_vertex].len = this_len + next_len - overlap
                         self.vertex_info[new_vertex].cov = \
-                            ((this_len - self.__overlap + 1) * this_cov + (next_len - self.__overlap + 1) * next_cov) \
-                            / ((this_len - self.__overlap + 1) + (next_len - self.__overlap + 1))
+                            ((this_len - overlap + 1) * this_cov + (next_len - overlap + 1) * next_cov) \
+                            / ((this_len - overlap + 1) + (next_len - overlap + 1))
                         self.vertex_info[new_vertex].seq[this_end] \
-                            += self.vertex_info[next_vertex].seq[not next_end][self.__overlap:]
+                            += self.vertex_info[next_vertex].seq[not next_end][overlap:]
                         self.vertex_info[new_vertex].seq[not this_end] \
-                            = self.vertex_info[next_vertex].seq[next_end][:-self.__overlap] \
+                            = self.vertex_info[next_vertex].seq[next_end][:next_len - overlap] \
                               + self.vertex_info[this_vertex].seq[not this_end]
                         # tags
                         if copy_tags:
@@ -777,6 +792,7 @@ class Assembly(SimpleAssembly):
 
     def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="embplant_pt",
                                        re_initialize=False, log_handler=None, verbose=True, debug=False):
+        overlap = self.__overlap if self.__overlap else 0
         if mode == "embplant_pt":
             max_majority_copy = 2
         elif mode == "other_pt":
@@ -820,7 +836,7 @@ class Assembly(SimpleAssembly):
                 total_product = 0.
                 total_len = 0
                 for vertex_name in limited_vertices:
-                    this_len = (self.vertex_info[vertex_name].len - self.__overlap + 1) \
+                    this_len = (self.vertex_info[vertex_name].len - overlap + 1) \
                                * self.vertex_to_copy.get(vertex_name, 1)
                     this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
                     total_len += this_len
@@ -843,10 +859,11 @@ class Assembly(SimpleAssembly):
                         self.copy_to_vertex[this_copy] = set()
                     self.copy_to_vertex[this_copy].add(vertex_name)
             if debug or verbose:
+                cov_str = " kmer-coverage: " if bool(overlap) else " coverage: "
                 if log_handler:
-                    log_handler.info("updating average " + mode + " kmer-coverage: " + str(round(new_val, 2)))
+                    log_handler.info("updating average " + mode + cov_str + str(round(new_val, 2)))
                 else:
-                    sys.stdout.write("updating average " + mode + " kmer-coverage: " + str(round(new_val, 2)) + "\n")
+                    sys.stdout.write("updating average " + mode + cov_str + str(round(new_val, 2)) + "\n")
             # print("return ", new_val)
             return new_val
         else:
@@ -1321,8 +1338,9 @@ class Assembly(SimpleAssembly):
                 """ re-estimate baseline depth """
                 total_product = 0.
                 total_len = 0
+                overlap = self.__overlap if self.__overlap else 0
                 for vertex_name in vertices_list:
-                    this_len = (self.vertex_info[vertex_name].len - self.__overlap + 1) \
+                    this_len = (self.vertex_info[vertex_name].len - overlap + 1) \
                                * self.vertex_to_copy.get(vertex_name, 1)
                     this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
                     total_len += this_len
@@ -1478,6 +1496,7 @@ class Assembly(SimpleAssembly):
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
                            verbose=False, log_handler=None, debug=False):
         changed = False
+        overlap = self.__overlap if self.__overlap else 0
         log_hard_cov_threshold = abs(log(log_hard_cov_threshold))
         vertices = sorted(self.vertex_info)
         v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1) for this_v in vertices}
@@ -1508,7 +1527,7 @@ class Assembly(SimpleAssembly):
                        for this_v in vertices}
 
         coverages = np.array([v_coverages[this_v] for this_v in vertices])
-        cover_weights = np.array([(self.vertex_info[this_v].len - self.__overlap)
+        cover_weights = np.array([(self.vertex_info[this_v].len - overlap)
                                   # multiply by copy number
                                   * self.vertex_to_copy.get(this_v, 1)
                                   # extra weight to short non-target
@@ -1669,6 +1688,84 @@ class Assembly(SimpleAssembly):
         else:
             return False
 
+    def reduce_to_subgraph(self, bait_vertices,
+                           limit_extending_len=None, limit_offset_current_vertex=0.5,
+                           extending_len_weighted_by_depth=False):
+        rm_contigs = set()
+        rm_sub_ids = []
+        overlap = self.__overlap if self.__overlap else 0
+        for go_sub, vertices in enumerate(self.vertex_clusters):
+            for vertex in sorted(vertices):
+                if vertex in bait_vertices:
+                    break
+            else:
+                rm_sub_ids.append(go_sub)
+                rm_contigs.update(vertices)
+        # rm vertices
+        self.remove_vertex(rm_contigs, update_cluster=False)
+        # rm clusters
+        for sub_id in rm_sub_ids[::-1]:
+            del self.vertex_clusters[sub_id]
+        # searching within a certain length scope
+        if limit_extending_len not in (None, inf):
+            if extending_len_weighted_by_depth:
+                explorers = {(v_n, v_e): (limit_extending_len - self.vertex_info[v_n].len * limit_offset_current_vertex,
+                                          self.vertex_info[v_n].cov)
+                             for v_n in set(bait_vertices)
+                             for v_e in (True, False)}
+                best_explored_record = {}
+                # explore all minimum distances starting from the bait_vertices
+                while True:
+                    changed = False
+                    for (this_v, this_e), (quota_len, base_cov) in sorted(explorers.items()):
+                        # if there's any this_v active: quota_len>0 AND (not_recorded OR recorded_changed))
+                        if quota_len > 0 and \
+                                (quota_len, base_cov) != best_explored_record.get((this_v, this_e), 0):
+                            changed = True
+                            best_explored_record[(this_v, this_e)] = (quota_len, base_cov)
+                            for next_v, next_e in self.vertex_info[this_v].connections[this_e]:
+                                # not the starting vertices
+                                if next_v not in bait_vertices:
+                                    new_quota_len = quota_len - (self.vertex_info[next_v].len - overlap) * \
+                                                    max(1, self.vertex_info[next_v].cov / base_cov)
+                                    # if next_v is active: quota_len>0 AND (not_explored OR larger_len))
+                                    next_p = (next_v, not next_e)
+                                    if new_quota_len > 0 and \
+                                            (next_p not in explorers or
+                                             # follow the bait contigs with higher coverage:
+                                             # replace new_quota_len > explorers[next_p][0]): with
+                                             new_quota_len * base_cov > explorers[next_p][0] * explorers[next_p][1]):
+                                        explorers[next_p] = (new_quota_len, base_cov)
+                    if not changed:
+                        break  # if no this_v active, stop the exploring
+            else:
+                explorers = {(v_n, v_e): limit_extending_len - self.vertex_info[v_n].len * limit_offset_current_vertex
+                             for v_n in set(bait_vertices)
+                             for v_e in (True, False)}
+                best_explored_record = {}
+                # explore all minimum distances starting from the bait_vertices
+                while True:
+                    changed = False
+                    for (this_v, this_e), quota_len in sorted(explorers.items()):
+                        # if there's any this_v active: quota_len>0 AND (not_recorded OR recorded_changed))
+                        if quota_len > 0 and quota_len != best_explored_record.get((this_v, this_e), None):
+                            changed = True
+                            best_explored_record[(this_v, this_e)] = quota_len
+                            # for this_direction in (True, False):
+                            for next_v, next_e in self.vertex_info[this_v].connections[this_e]:
+                                # not the starting vertices
+                                if next_v not in bait_vertices:
+                                    new_quota_len = quota_len - (self.vertex_info[next_v].len - overlap)
+                                    # if next_v is active: quota_len>0 AND (not_explored OR larger_len))
+                                    next_p = (next_v, not next_e)
+                                    if new_quota_len > explorers.get(next_p, 0):
+                                        explorers[next_p] = new_quota_len
+                    if not changed:
+                        break  # if no this_v active, stop the exploring
+            accepted = {candidate_v for (candidate_v, candidate_e) in explorers}
+            rm_contigs = {candidate_v for candidate_v in self.vertex_info if candidate_v not in accepted}
+            self.remove_vertex(rm_contigs, update_cluster=True)
+
     def generate_consensus_vertex(self, vertices, directions, copy_tags=True, check_parallel_vertices=True,
                                   log_handler=None):
         if check_parallel_vertices:
@@ -1756,6 +1853,7 @@ class Assembly(SimpleAssembly):
                                 degenerate=False, degenerate_depth=1.5, degenerate_similarity=0.98, warning_count=4,
                                 only_keep_max_cov=False, verbose=False, debug=False, log_handler=None):
         parallel_vertices_list = self.detect_parallel_vertices(limited_vertices=limited_vertices)
+        overlap = self.__overlap if self.__overlap else 0
         if verbose or debug:
             if log_handler:
                 log_handler.info("detected parallel vertices " + str(parallel_vertices_list))
@@ -1772,7 +1870,7 @@ class Assembly(SimpleAssembly):
         count_contamination_or_degenerate = 0
         count_using_only_max = 0
         sub_sampling = 10000
-        half_kmer = int(self.__overlap / 2)
+        half_kmer = int(overlap / 2)
         for prl_vertices in parallel_vertices_list:
             this_contamination_or_polymorphic = False
             this_using_only_max = False
@@ -1780,8 +1878,8 @@ class Assembly(SimpleAssembly):
             prl_vertices = sorted(
                 prl_vertices,
                 key=lambda x: (
-                -self.vertex_info[x[0]].other_attr.get("weight", {database_name: 0.}).get(database_name, 0.),
-                -self.vertex_info[x[0]].cov))
+                    -self.vertex_info[x[0]].other_attr.get("weight", {database_name: 0.}).get(database_name, 0.),
+                    -self.vertex_info[x[0]].cov))
             max_cov_vertex, direction_remained = prl_vertices.pop(0)
             max_cov_seq = self.vertex_info[max_cov_vertex].seq[direction_remained]
             max_cov = self.vertex_info[max_cov_vertex].cov
@@ -1809,7 +1907,8 @@ class Assembly(SimpleAssembly):
                     else:
                         removing_irrelevant_v.add(this_v)
                 elif degenerate and abs(log(this_cov / max_cov)) < degenerate_depth:
-                    if abs(len(this_seq) - len(max_cov_seq)) / float(len(this_seq)) <= degenerate_dif:
+                    if abs(len(this_seq) - len(max_cov_seq)) * 2 / float(
+                            len(this_seq) + len(max_cov_seq)) <= degenerate_dif:
                         # too long to calculate, too long to be polymorphic
                         if max(len(max_cov_seq), len(this_seq)) > 1E5:
                             continue
@@ -1840,7 +1939,8 @@ class Assembly(SimpleAssembly):
                     elif only_keep_max_cov:
                         seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
                         seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
-                        if len(seq_1) + len(seq_2) > 6000:
+                        if len(seq_1) + len(seq_2) > 6000 and \
+                                2 * abs(len(seq_1) - len(seq_2)) / float(len(seq_1) + len(seq_2)) <= degenerate_dif:
                             base_dif = find_string_difference_regional_kmer_counting(seq_1, seq_2)
                         else:
                             base_dif, proper_end = find_string_difference(seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
@@ -1851,7 +1951,8 @@ class Assembly(SimpleAssembly):
                 elif only_keep_max_cov:
                     seq_1 = max_cov_seq[half_kmer: min(half_kmer + sub_sampling, len(max_cov_seq) - half_kmer)]
                     seq_2 = this_seq[half_kmer: min(half_kmer + sub_sampling, len(this_seq) - half_kmer)]
-                    if len(seq_1) + len(seq_2) > 6000:
+                    if len(seq_1) + len(seq_2) > 6000 and \
+                            2 * abs(len(seq_1) - len(seq_2)) / float(len(seq_1) + len(seq_2)) <= degenerate_dif:
                         base_dif = find_string_difference_regional_kmer_counting(seq_1, seq_2)
                     else:
                         base_dif, proper_end = find_string_difference(seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
@@ -1867,7 +1968,7 @@ class Assembly(SimpleAssembly):
             count_using_only_max += this_using_only_max
         if removing_contaminating_v:
             contaminating_cov = np.array([self.vertex_info[con_v].cov for con_v in removing_contaminating_v])
-            contaminating_weight = np.array([len(self.vertex_info[con_v].seq[True]) - self.__overlap
+            contaminating_weight = np.array([len(self.vertex_info[con_v].seq[True]) - overlap
                                              for con_v in removing_contaminating_v])
             for candidate_rm_v in removing_contaminating_v:
                 if candidate_rm_v in self.tagged_vertices[database_name]:
@@ -1949,6 +2050,7 @@ class Assembly(SimpleAssembly):
         :param debug:
         :return:
         """
+        overlap = self.__overlap if self.__overlap else 0
 
         def log_target_res(final_res_combinations_inside):
             echo_graph_id = int(bool(len(final_res_combinations_inside) - 1))
@@ -1968,8 +2070,8 @@ class Assembly(SimpleAssembly):
                             for in_vertex_name in sorted(vertex_set):
                                 log_handler.info("Vertex_" + in_vertex_name + " #copy = " +
                                                  str(this_graph.vertex_to_copy.get(in_vertex_name, 1)))
-
-                    log_handler.info("Average " + mode + " kmer-coverage" +
+                    cov_str = " kmer-coverage" if bool(overlap) else " coverage"
+                    log_handler.info("Average " + mode + cov_str +
                                      ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov)
                     if this_b_cov:
                         log_handler.info("Average " + mode + " base-coverage" +
@@ -1983,7 +2085,8 @@ class Assembly(SimpleAssembly):
                             for in_vertex_name in sorted(vertex_set):
                                 sys.stdout.write("Vertex_" + in_vertex_name + " #copy = " +
                                                  str(this_graph.vertex_to_copy.get(in_vertex_name, 1)) + "\n")
-                    sys.stdout.write("Average " + mode + " kmer-coverage" +
+                    cov_str = " kmer-coverage" if bool(overlap) else " coverage"
+                    sys.stdout.write("Average " + mode + cov_str +
                                      ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov + "\n")
                     if this_b_cov:
                         sys.stdout.write("Average " + mode + " base-coverage" + ("(" + str(go_res + 1) + ")") *
@@ -2071,7 +2174,7 @@ class Assembly(SimpleAssembly):
                                 if not this_del:
                                     raise ProcessingGraphFailed(
                                         "Unable to generate result with single copy vertex percentage < {}%"
-                                        .format(min_single_copy_percent))
+                                            .format(min_single_copy_percent))
                             else:
                                 this_del, parameters = \
                                     new_assembly.filter_by_coverage(database_n=database_name,
@@ -2152,7 +2255,7 @@ class Assembly(SimpleAssembly):
                                         new_assembly.write_to_gfa(temp_graph)
                                         new_assembly.write_out_tags([database_name], temp_csv)
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
-                                                                "Broken or contamination?")
+                                                                                              "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
                                     if w == second:
                                         for del_v in new_assembly.vertex_clusters[j]:
@@ -2525,6 +2628,40 @@ class Assembly(SimpleAssembly):
             else:
                 raise e
 
+    def add_gap_nodes_with_spades_res(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf, log_handler=None,
+                                      update_cluster=True):
+        spades_scaffolds = SpadesScaffolds(scaffold_fasta, scaffold_paths, min_cov=min_cov, max_cov=max_cov)
+        overlap = self.__overlap if self.__overlap else 0
+        go_gap = 0
+        gap_added = False
+        for (this_v, this_e), (next_v, next_e), gap_len in spades_scaffolds.vertex_jumping_over_gap:
+            if this_v in self.vertex_info and next_v in self.vertex_info:
+                if (this_v, this_e) in self.vertex_info[next_v].connections[next_e]:
+                    if log_handler:
+                        log_handler.warning("Connection between " + this_v + ECHO_DIRECTION[this_e] + " and " +
+                                            next_v + ECHO_DIRECTION[next_e] + " already existed!")
+                    else:
+                        sys.stdout.write("Warning: Connection between " + this_v + ECHO_DIRECTION[this_e] + " and " +
+                                         next_v + ECHO_DIRECTION[next_e] + " already existed!\n")
+                else:
+                    gap_added = True
+                    go_gap += 1
+                    this_gap_name = str(go_gap) + "GAP" + str(gap_len)
+                    this_gap_seq = self.vertex_info[this_v].seq[this_e][self.vertex_info[this_v].len - overlap:] + \
+                                   "N" * gap_len + self.vertex_info[next_v].seq[not next_e][:overlap]
+                    self.vertex_info[this_gap_name] = Vertex(this_gap_name,
+                                                             length=len(this_gap_seq),
+                                                             coverage=(self.vertex_info[this_v].cov +
+                                                                       self.vertex_info[next_v].cov) / 2.,
+                                                             forward_seq=this_gap_seq,
+                                                             head_connections={(this_v, this_e)},
+                                                             tail_connections={(next_v, next_e)})
+                    self.vertex_info[this_v].connections[this_e].add((this_gap_name, False))
+                    self.vertex_info[next_v].connections[next_e].add((this_gap_name, True))
+        if gap_added and update_cluster:
+            self.update_vertex_clusters()
+        return gap_added
+
     def get_all_circular_paths(self, mode="embplant_pt",
                                library_info=None, log_handler=None, reverse_start_direction_for_pt=False):
 
@@ -2750,7 +2887,7 @@ class Assembly(SimpleAssembly):
             if undirected_vertices:
                 corrected_paths = [[(this_v, True) if this_v in undirected_vertices else (this_v, this_e)
                                     for this_v, this_e in path_part]
-                                   for path_part in raw_paths ]
+                                   for path_part in raw_paths]
             else:
                 corrected_paths = deepcopy(raw_paths)
             here_standardized_path = []
@@ -2993,14 +3130,15 @@ class Assembly(SimpleAssembly):
             return sorted_paths
 
     def export_path(self, in_path):
+        overlap = self.__overlap if self.__overlap else 0
         seq_names = []
         seq_segments = []
         for this_vertex, this_end in in_path:
-            seq_segments.append(self.vertex_info[this_vertex].seq[this_end][self.__overlap:])
+            seq_segments.append(self.vertex_info[this_vertex].seq[this_end][overlap:])
             seq_names.append(this_vertex + ("-", "+")[this_end])
         # if not circular
         if (in_path[0][0], not in_path[0][1]) not in self.vertex_info[in_path[-1][0]].connections[in_path[-1][1]]:
-            seq_segments[0] = self.vertex_info[in_path[0][0]].seq[in_path[0][1]][:self.__overlap] + seq_segments[0]
+            seq_segments[0] = self.vertex_info[in_path[0][0]].seq[in_path[0][1]][:overlap] + seq_segments[0]
         else:
             seq_names[-1] += "(circular)"
         return Sequence(",".join(seq_names), "".join(seq_segments))
@@ -3224,6 +3362,92 @@ class NaiveKmerNodeGraph(Assembly):
         return assembly_graph
 
 
+VERTEX_DIRECTION_STR_TO_BOOL = {"+": True, "-": False}
+
+
+class SpadesNodes(Vertex):
+    def __init__(self, v_name, length=None, coverage=None, forward_seq=None, reverse_seq=None,
+                 tail_connections=None, head_connections=None, path_str=None):
+        super(SpadesNodes, self).__init__(v_name=v_name, length=length, coverage=coverage, forward_seq=forward_seq,
+                                          reverse_seq=reverse_seq, tail_connections=tail_connections,
+                                          head_connections=head_connections)
+        self.vertices_path = []
+        if path_str:
+            for this_v_str in path_str.strip().split(","):
+                self.vertices_path.append((this_v_str[:-1], VERTEX_DIRECTION_STR_TO_BOOL[this_v_str[-1]]))
+
+    def __eq__(self, other):
+        return self.name == other.name and self.len == other.len and self.cov == other.cov and self.seq == other.seq
+
+
+class SpadesScaffolds(object):
+    def __init__(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf):
+        if not os.path.exists(scaffold_fasta):
+            raise FileNotFoundError(scaffold_fasta + " not found!")
+        if not os.path.exists(scaffold_paths):
+            raise FileNotFoundError(scaffold_paths + " not found!")
+        self.nodes = {}
+        # self.vertex_jumping_over_gap_dict = {}  # {(v_name, v_end): {"next": (next_name, next_end), "len": int}}
+        self.vertex_jumping_over_gap = []  # item = [(v_name, v_end), (next_name, next_end), gap_len<int>]
+        sequence_matrix = SequenceList(scaffold_fasta, indexed=True)
+        with open(scaffold_paths) as path_handler:
+            go_gap = len(sequence_matrix) + 1
+            line = path_handler.readline().strip()
+            while line:
+                # supposing it's recorded in balance by SPAdes, skip the reverse direction record
+                if line.startswith("NODE") and not line.endswith("'"):
+                    n_tag, node_name, l_tag, node_len, c_tag, node_cov = line.split("_")
+                    long_name = line
+                    # skip nodes with cov out of bounds
+                    node_cov = float(node_cov)
+                    if not (min_cov <= node_cov <= max_cov):
+                        continue
+                    # read paths
+                    path_strings = []
+                    line = path_handler.readline().strip()
+                    path_strings.append(line.strip(";"))
+                    while line and line.endswith(";"):
+                        line = path_handler.readline().strip()
+                        path_strings.append(line.strip(";"))
+                    # read sequences
+                    sub_seqs = re.split("([N]+)", sequence_matrix[long_name].seq)
+                    last_gap_name = ""
+                    last_vertex_end = []
+                    for go_sub_path, sub_path in enumerate(path_strings):
+                        sub_name = node_name + "S" + str(go_sub_path)
+                        # if sub_name not in self.nodes:  # check file validity
+                        sub_seq = sub_seqs.pop(0)
+                        self.nodes[sub_name] = SpadesNodes(sub_name, len(sub_seq), node_cov,
+                                                           forward_seq=sub_seq, path_str=sub_path)
+                        if last_gap_name:  # if there's an previous gap, add the conncetion
+                            self.nodes[sub_name].connections[False].add((last_gap_name, True))
+                            self.nodes[last_gap_name].connections[True].add((sub_name, False))
+                            this_vertex, this_end = self.nodes[sub_name].vertices_path[0]
+                            last_gap_len = self.nodes[last_gap_name].len
+                            # self.vertex_jumping_over_gap_dict[(this_vertex, not this_end)] = \
+                            #     {"len": last_gap_len, "next": last_vertex_end}
+                            # self.vertex_jumping_over_gap_dict[last_vertex_end] = \
+                            #     {"len": last_gap_len, "next": (this_vertex, not this_end)}
+                            self.vertex_jumping_over_gap.append(
+                                [last_vertex_end, (this_vertex, not this_end), last_gap_len])
+                        # else:
+                        # raise ValueError("Repeated node name: " + str(node_name) + " in " + fasta_file)
+                        if sub_seqs:
+                            sub_seq = sub_seqs.pop(0)
+                            gap_name = str(go_gap) + "GAP" + str(len(sub_seq))
+                            self.nodes[gap_name] = SpadesNodes(gap_name, len(sub_seq), 1.0, forward_seq=sub_seq)
+                            self.nodes[sub_name].connections[True].add((gap_name, False))
+                            self.nodes[gap_name].connections[False].add((sub_name, True))
+                            last_gap_name = gap_name
+                            last_vertex_end = self.nodes[sub_name].vertices_path[-1]
+                            go_gap += 1
+                line = path_handler.readline().strip()
+
+
+# test = SpadesScaffolds("Test/test9/filtered_spades/scaffolds.fasta", "Test/test9/filtered_spades/scaffolds.paths")
+# print(test.vertex_jumping_over_gap)
+
+
 def generate_index_combinations(index_list):
     if not index_list:
         yield []
@@ -3249,17 +3473,6 @@ def smart_trans_for_sort(candidate_item):
                 except ValueError:
                     pass
         return all_e
-
-
-def get_graph_coverage_dict_simple(fasta_matrix, is_fastg):
-    if is_fastg:
-        coverages = {}
-        for fastg_name in fasta_matrix[0]:
-            this_coverage = float(fastg_name.split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0])
-            coverages[fastg_name.split('_')[1]] = this_coverage
-        return coverages
-    else:
-        return {}
 
 
 def average_weighted_np_free(vals, weights):
@@ -3316,31 +3529,3 @@ def get_graph_coverages_range_simple(fasta_matrix, drop_low_percent=0.10, drop_h
     except ZeroDivisionError:
         cov_mean, cov_std = 0., 0.
     return max(cov_mean - cov_std, min(coverages)), cov_mean, min(cov_mean + cov_std, max(coverages))
-
-
-def filter_fastg_by_depth_simple(fas_file, max_depth, min_depth, log_handler=None, out_dir=None):
-    bounded = (max_depth and float(max_depth) and float(max_depth) != inf) or (min_depth and float(min_depth))
-    if fas_file.endswith('.fastg') and bounded:
-        max_depth = float(max_depth)
-        min_depth = float(min_depth)
-        time0 = time.time()
-        fastg_matrix = read_fasta(fas_file)
-        new_fastg_matrix = [[], [], fastg_matrix[2]]
-        for i in range(len(fastg_matrix[0])):
-            if max_depth > float(fastg_matrix[0][i].split('cov_')[1].split(':')[0].split(';')[0].split('\'')[0]) \
-                    >= min_depth:
-                new_fastg_matrix[0].append(fastg_matrix[0][i])
-                new_fastg_matrix[1].append(fastg_matrix[1][i])
-        out_fasta = '.'.join(fas_file.split('.')[:-1]) + '.depth' + str(min_depth) + "-" + str(max_depth) + \
-                    '.' + fas_file.split('.')[-1]
-        if out_dir:
-            out_fasta = os.path.join(out_dir, os.path.basename(out_fasta))
-        write_fasta(out_file=out_fasta, matrix=new_fastg_matrix, overwrite=True)
-        if log_handler:
-            log_handler.info('filtering by depth cost: ' + str(round(time.time() - time0, 2)))
-        else:
-            sys.stdout.write('\nfiltering by depth cost: ' + str(round(time.time() - time0, 2)) + "\n")
-        return out_fasta
-    else:
-        return fas_file
-

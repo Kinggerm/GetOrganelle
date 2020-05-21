@@ -5,7 +5,7 @@ import sys
 import os
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.assembly_parser import *
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
@@ -20,8 +20,8 @@ def get_options():
     parser.add_option("-o", dest="output", default="",
                       help="Output graph file. The output format is GFA by default, but FASTG only when "
                            "indicated with postfix '.fastg'.")
-    parser.add_option("-k", dest="kmer", default=55, type=int,
-                      help="kmer for reconstructing De Bruijn graph. Default:%default")
+    parser.add_option("-L", "--overlap", dest="overlap", default=55, type=int,
+                      help="overlap for reconstructing De Bruijn graph. Default:%default")
     parser.add_option("-c", "--circular", dest="circular", default="auto",
                       help="Sequences in input fasta file are all circular (yes/no/auto). "
                            "The auto mode enables detection by checking the existence of '(circular)' in "

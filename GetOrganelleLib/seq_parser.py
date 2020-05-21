@@ -65,11 +65,15 @@ class Sequence(object):
 
 
 class SequenceList(object):
-    def __init__(self, input_fasta_file=None):
+    def __init__(self, input_fasta_file=None, indexed=False):
         self.sequences = []
         self.interleaved = False
+        self.__dict = {}
         if input_fasta_file:
             self.read_fasta(input_fasta_file)
+            if indexed:
+                for go_s, seq in enumerate(self.sequences):
+                    self.__dict[seq.label] = go_s
 
     def __len__(self):
         return len(self.sequences)
@@ -78,8 +82,26 @@ class SequenceList(object):
         for seq in self.sequences:
             yield seq
 
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self.sequences[self.__dict[item]]
+        else:
+            return self.sequences[item]
+
     def append(self, sequence):
         self.sequences.append(sequence)
+
+    def remove(self, names):
+        del_names = set(names)
+        go_to = 0
+        while go_to < len(self.sequences):
+            if self.sequences[go_to].label in del_names:
+                del_names.remove(self.sequences[go_to].label)
+                del self.sequences[go_to]
+            else:
+                go_to += 1
+        if del_names:
+            sys.stdout.write("Warning: sequence(s) " + ",".join(sorted(del_names)) + " not found!\n")
 
     def read_fasta(self, fasta_file):
         fasta_file = open(fasta_file, 'r')
@@ -143,27 +165,27 @@ class SeqKmerIndexer(object):
 
 
 def read_fasta(fasta_dir):
-    fasta_file = open(fasta_dir, 'r')
     names = []
     seqs = []
-    this_line = fasta_file.readline()
     interleaved = 0
-    while this_line:
-        if this_line.startswith('>'):
-            names.append(this_line[1:].strip())
-            this_seq = ''
-            this_line = fasta_file.readline()
-            seq_line_count = 0
-            while this_line and not this_line.startswith('>'):
-                if seq_line_count == 1:
-                    interleaved = len(this_seq)
-                this_seq += this_line.strip()
-                this_line = fasta_file.readline()
-                seq_line_count += 1
-            seqs.append(this_seq)
-        else:
-            this_line = fasta_file.readline()
-    fasta_file.close()
+    with open(fasta_dir) as fasta_input:
+        this_line = fasta_input.readline()
+        while this_line:
+            if this_line.startswith(">"):
+                names.append(this_line[1:].strip())
+                this_seq = ""
+                this_line = fasta_input.readline()
+                seq_line_count = 0
+                while this_line and not this_line.startswith(">"):
+                    if seq_line_count == 1:
+                        interleaved = len(this_seq)
+                    this_seq += this_line.strip()
+                    this_line = fasta_input.readline()
+                    seq_line_count += 1
+                seqs.append(this_seq)
+            else:
+                this_line = fasta_input.readline()
+        fasta_input.close()
     return [names, seqs, interleaved]
 
 
@@ -904,8 +926,12 @@ def find_string_difference_regional_kmer_counting(query_seq, ref_seq, kmer_len=1
     ref_seq = ref_seq.lower()
     len_que = len(query_seq)
     len_ref = len(ref_seq)
-    assert len_que > kmer_len
-    assert len_ref > kmer_len
+    # assert len_que > kmer_len, str(len_que) + " vs " + str(kmer_len)
+    # assert len_ref > kmer_len, str(len_ref) + " vs " + str(kmer_len)
+    if len_que <= kmer_len:
+        return 0.9999  # just to return a large dif ratio number
+    if len_ref <= kmer_len:
+        return 0.9999  # just to return a large dif ratio number
     length_ratio = (10 ** abs(math.log10(len_que / float(len_ref)))) ** 0.5
     que_ws = int(window_size * length_ratio) if len_que >= window_size else int(window_size / length_ratio)
     ref_ws = int(window_size * length_ratio) if len_ref >= window_size else int(window_size / length_ratio)

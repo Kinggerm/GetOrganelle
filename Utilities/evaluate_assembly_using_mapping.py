@@ -5,7 +5,7 @@ from optparse import OptionParser
 import os
 import sys
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.pipe_control_func import *
 from GetOrganelleLib.seq_parser import *

@@ -8,7 +8,7 @@ except:
     pass
 import os
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.pipe_control_func import executable, make_blast_db, execute_blast

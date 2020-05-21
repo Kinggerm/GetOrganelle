@@ -12,7 +12,7 @@ except:
     pass
 from optparse import OptionParser
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(PATH_OF_THIS_SCRIPT, ".."))
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.pipe_control_func import executable, make_blast_db, execute_blast

@@ -3,7 +3,10 @@ import time
 import logging
 import sys
 import os
+import hashlib
 from multiprocessing import Pool
+import requests
+
 
 MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
 if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
@@ -22,10 +25,20 @@ import subprocess
 DEAD_CODE = {"2.7+": 32512, "3.5+": 127}[python_version]
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(PATH_OF_THIS_SCRIPT, ".."))
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from GetOrganelleLib.seq_parser import *
-from GetOrganelleLib.assembly_parser import Assembly
+
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+
+ORGANELLE_TYPE_SET = {"embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "animal_mt", "other_pt"}
+ORGANELLE_TYPE_LIST = ["embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "animal_mt", "other_pt"]
+MAX_SLIM_EXTENDING_LENS = {"embplant_pt": 15000,
+                           "embplant_mt": 50000,
+                           "embplant_nr": 12500,
+                           "fungus_mt": 50000,
+                           "animal_mt": 12500,
+                           "other_pt": 50000,
+                           "anonym": float("inf")}
 
 
 def simple_log(log, output_base, prefix, log_level="NOTSET"):
@@ -131,6 +144,15 @@ def executable(test_this):
     return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != DEAD_CODE else False
 
 
+def run_command(command, print_command=False, check_echo_error=True):
+    if print_command:
+        print(command)
+    this_pip = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output, err = this_pip.communicate()
+    if check_echo_error and "error" in output.decode("utf-8").lower():
+        raise Exception("Error in running "+command.split()[0]+"\n"+output.decode("utf-8"))
+
+
 def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assembly_graph_ob=None,
                                       resume=False, log_handler=None, verbose_log=False, which_bandage=""):
     if resume and os.path.exists(output_image_file):
@@ -164,7 +186,7 @@ def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assem
                 sys.stdout.write(this_command + "\n")
         draw_image = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = draw_image.communicate()
-        if "error" in output.decode("utf8") or "Abort trap" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+        if "error" in output.decode("utf8").lower() or "Abort trap" in output.decode("utf8"):
             if verbose_log:
                 if log_handler:
                     log_handler.error("\n" + output.decode("utf8").strip())
@@ -200,7 +222,7 @@ def make_blast_db(input_file, output_base, which_blast="", log_handler=None, ver
             sys.stdout.write(this_command + "\n")
     mk_blast_db_run = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = mk_blast_db_run.communicate()
-    if "error" in output.decode("utf8") or "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
+    if "error" in output.decode("utf8").lower() or "(ERR)" in output.decode("utf8"):
         if log_handler:
             log_handler.error(output.decode("utf8"))
         else:
@@ -221,7 +243,7 @@ def execute_blast(query, blast_db, output, threads, outfmt=6, e_value="1e-25", w
         " -query " + query + " -db " + blast_db + " -out " + output + " -outfmt " + str(outfmt),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = make_blast.communicate()
-    if "(ERR)" in str(output) or "Error:" in str(output) or "error" in str(output):
+    if "(ERR)" in output.decode("utf-8") or "Error:" in output.decode("utf-8") or "error" in output.decode("utf-8"):
         if log_handler:
             log_handler.error(output.decode("utf-8"))
         else:
@@ -708,8 +730,7 @@ def zip_file(source, target, verbose_log=False, log_handler=None, remove_source=
         log_handler.info(run_command)
     output, err = zipping.communicate()
     if "Unrecognized" not in output.decode("utf8") and \
-            "Error" not in output.decode("utf8") and \
-            "error" not in output.decode("utf8"):
+            "error" not in output.decode("utf8").lower():
         success = True
     if success:
         if verbose_log and log_handler:
@@ -744,8 +765,7 @@ def unzip(source, target, line_limit=1000000000000000, verbose_log=False, log_ha
             log_handler.info(run_command)
         output, err = unzipping.communicate()
         if "Unrecognized" not in output.decode("utf8") and \
-                "Error" not in output.decode("utf8") and \
-                "error" not in output.decode("utf8"):
+                "error" not in output.decode("utf8").lower():
             success = True
             break
     if success:
@@ -760,3 +780,233 @@ def unzip(source, target, line_limit=1000000000000000, verbose_log=False, log_ha
         except:
             pass
         raise NotImplementedError("unzipping failed!")
+
+
+def detect_bowtie2_path(which_bowtie2, dependency_path):
+    if not which_bowtie2:
+        try_this_bin = os.path.join(dependency_path, "bowtie2", "bowtie2")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            which_bowtie2 = os.path.split(try_this_bin)[0]
+    return which_bowtie2
+
+
+def detect_spades_path(which_spades, dependency_path):
+    if not which_spades:
+        try_this_bin = os.path.join(dependency_path, "SPAdes", "bin", "spades.py")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            which_spades = os.path.split(try_this_bin)[0]
+    return which_spades
+
+
+def detect_blast_path(which_blast, dependency_path):
+    if not which_blast:
+        try_this_bin = os.path.join(dependency_path, "ncbi-blast", "blastn")
+        if os.path.isfile(try_this_bin) and executable(try_this_bin):
+            output, err = subprocess.Popen(
+                try_this_bin + " -version", stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, shell=True).communicate()
+            if "not found" in output.decode("utf8"):
+                sys.stderr.write(output.decode("utf8") + "\n")
+                sys.exit()
+            else:
+                which_blast = os.path.split(try_this_bin)[0]
+    return which_blast
+
+
+def detect_bowtie2_version(which_bowtie2):
+    if executable(os.path.join(which_bowtie2, "bowtie2")):
+        output, err = subprocess.Popen(
+            os.path.join(which_bowtie2, "bowtie2") + " --version", stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, shell=True).communicate()
+        this_lines = output.decode("utf8").split("\n")[:3]
+        return "Bowtie2 " + this_lines[0].split()[-1].strip()
+    else:
+        return "Bowtie2 N/A"
+
+
+def detect_spades_version(which_spades):
+    if executable(os.path.join(which_spades, "spades.py")):
+        output, err = subprocess.Popen(
+            os.path.join(which_spades, "spades.py") + " -v", stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, shell=True).communicate()
+        return output.decode("utf8").replace("v", "").strip()
+    else:
+        return "SPAdes N/A"
+
+
+def detect_blast_version(which_blast):
+    if executable(os.path.join(which_blast, "blastn")):
+        output, err = subprocess.Popen(
+            os.path.join(which_blast, "blastn") + " -version", stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, shell=True).communicate()
+        this_lines = output.decode("utf8").split("\n")[:2]
+        return "Blast " + this_lines[1].strip().split()[2].replace(",", "").strip()
+    else:
+        return "Blast N/A"
+
+
+def detect_bandage_version(which_bandage):
+    if executable(os.path.join(which_bandage, "Bandage -v")):
+        output, err = subprocess.Popen(
+            os.path.join(which_bandage, "Bandage") + " -v", stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, shell=True).communicate()
+        return "Bandage " + output.decode("utf8").strip().split()[-1]
+    else:
+        return "Bandage N/A"
+
+
+def get_static_html_context(remote_url, try_times=3, timeout=10):
+    response = False
+    count = 0
+    while not response and count < try_times:
+        try:
+            response = requests.get(remote_url, timeout=timeout)
+        except requests.exceptions.ConnectTimeout as e:
+            if count + 1 == try_times:
+                return {"status": False, "info": "timeout", "content": ""}
+        if response and response.status_code == requests.codes.ok:
+            # here_data_str = base64.decodebytes(remote_data_api.json()["content"].encode("utf-8")).decode("utf-8")
+            return {"status": True, "info": "", "content": response.content.decode("utf-8")}
+        count += 1
+    return {"status": False, "info": "unknown", "content": ""}
+
+
+def download_file_with_progress(remote_url, output_file, log_handler=None, allow_empty=False,
+                                sha256_v=None, try_times=3, timeout=100000):
+    time_0 = time.time()
+    temp_file = output_file + ".Temp"
+    count_try = 0
+    info_list = []
+    while count_try < try_times:
+        count_try += 1
+        with open(temp_file, "w") as file_h:
+            try:
+                response = requests.get(remote_url, stream=True, timeout=timeout)
+                if response.status_code == requests.codes.ok:
+                    total_length = response.headers.get("content-length")
+                    if total_length is None:
+                        file_h.write(response.content.decode("utf-8"))
+                    else:
+                        total_length = int(total_length)
+                        chunk_num = 50
+                        chunk_size = int(total_length / chunk_num) + 1
+                        go_chunk = 0
+                        for data_chunk in response.iter_content(chunk_size=chunk_size):
+                            data_chunk = data_chunk.decode("utf-8")
+                            file_h.write(data_chunk)
+                            go_chunk += 1
+                            sys.stdout.write("\rDownloading %s [%s%s] %i%%" %
+                                             (os.path.basename(output_file),
+                                              "=" * go_chunk,
+                                              " " * (chunk_num - go_chunk),
+                                              go_chunk * 2))
+                            sys.stdout.flush()
+                        sys.stdout.write("\n")
+                else:
+                    info_list.append("404")
+                    continue
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout) as e:
+                info_list.append("timeout")
+                os.remove(temp_file)
+                if count_try == try_times:
+                    sys.stdout.write("Downloading %s failed, cost %.2f s\n" %
+                                     (os.path.basename(output_file), time.time() - time_0))
+                    return {"status": False, "info": ",".join(info_list), "content": ""}
+                else:
+                    continue
+        # check sha256
+        if sha256_v:
+            this_sha256 = cal_f_sha256(temp_file)
+            if this_sha256 != sha256_v:
+                os.remove(temp_file)
+                info_list.append("sha256_unmatch")
+                if count_try == try_times:
+                    sys.stdout.write("Downloading %s failed, cost %.2f s\n" %
+                                     (os.path.basename(output_file), time.time() - time_0))
+                    return {"status": False, "info": ",".join(info_list), "content": ""}
+            else:
+                break
+        else:
+            break
+
+    # check size
+    if os.path.exists(temp_file) and (os.path.getsize(temp_file) or allow_empty):
+        os.rename(temp_file, output_file)
+        if log_handler:
+            log_handler.info("Downloaded %s (%i bytes), cost %.2f s" %
+                             (os.path.basename(output_file), os.path.getsize(output_file), time.time() - time_0))
+        else:
+            sys.stdout.write("Downloaded %s (%i bytes), cost %.2f s\n" %
+                             (os.path.basename(output_file), os.path.getsize(output_file), time.time() - time_0))
+        return {"status": True, "info": "", "content": ""}
+    else:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        if log_handler:
+            if count_try < try_times:
+                log_handler.error("Downloading %s failed. Try again .." % os.path.basename(output_file))
+            else:
+                log_handler.error("Downloading %s failed, cost %.2f s" %
+                                  (os.path.basename(output_file), time.time() - time_0))
+        else:
+            if count_try < try_times:
+                sys.stdout.write("Downloading %s failed. Try again ..\n" % os.path.basename(output_file))
+            else:
+                sys.stdout.write("Downloading %s failed, cost %.2f s\n" %
+                                 (os.path.basename(output_file), time.time() - time_0))
+        return {"status": False, "info": ",".join(info_list), "content": ""}
+
+
+def cal_f_sha256(file_name):
+    hash_class = hashlib.sha256()
+    hash_class.update(open(file_name).read().encode("utf8"))
+    return hash_class.hexdigest()
+
+
+# for f in os.listdir("GetOrganelleLib/LabelDatabase/"):
+#     h = hashlib.sha256()
+#     h.update(open("GetOrganelleLib/LabelDatabase/"+f).read().encode("utf8"))
+#     print("\""+f[:-6]+"\": {\"sha256\": \"" + str(h.hexdigest()) +
+#           "\", \"size\": " + str(os.path.getsize("GetOrganelleLib/LabelDatabase/"+f)) + "},")
+# for f in os.listdir("GetOrganelleLib/SeedDatabase/"):
+#     h = hashlib.sha256()
+#     h.update(open("GetOrganelleLib/SeedDatabase/"+f).read().encode("utf8"))
+#     print("\""+f[:-6]+"\": {\"sha256\": \"" + str(h.hexdigest()) +
+#           "\", \"size\": " + str(os.path.getsize("GetOrganelleLib/SeedDatabase/"+f)) + "},")
+LABEL_DB_HASH = \
+    {
+     "0.0.0":
+         {"embplant_nr":
+              {"sha256": "603033541683b7c53fb63970c188eb2891844f6419eca342fa648f6ff5e29d71", "size": 16500},
+          "embplant_pt":
+              {"sha256": "cca977f68f5764bdd9e4b82e711adcfc12d752e78f088cea05c8283dea74fa7e", "size": 370580},
+          "animal_mt":
+              {"sha256": "af9541621107623ed13f668b4744ddbdcc1e6a8157aa53132717d90e7ac63c4e", "size": 6674918},
+          "fungus_mt":
+              {"sha256": "e0c6968372ba3fec892532a9231d1e8de789323156b3d23fb5216915a2811b27", "size": 659823},
+          "embplant_mt":
+              {"sha256": "f3621444441fbf4fa98835999b20e7ac1673a8866cb119707200412c46263570", "size": 148338},
+          "other_pt":
+              {"sha256": "84346c42ff7e85e5d0859ecdee1de4f06f45fd072851d57ba31c894bcbee3cd8", "size": 412866}
+          }
+     }
+
+SEED_DB_HASH = \
+    {
+     "0.0.0":
+         {"embplant_nr":
+              {"sha256": "e19365f85b3bda29aabb5cf1ceb5c814e667ba251b08388d805b52b1f1fe1445", "size": 18309},
+          "embplant_pt":
+              {"sha256": "e8e5f461d6e5fe67c5314e46c61265e6ff1079886af3b959609dde2be97d870d", "size": 15342405},
+          "animal_mt":
+              {"sha256": "a293c02e0c0496beb29383927cc7c643b13e09f8cfa03f7688b352315a43f898", "size": 30285897},
+          "fungus_mt":
+              {"sha256": "abbc7658c9431d11454f2fec75b7b5f4deeb12bc3590351dc93883655c7c194e", "size": 7977301},
+          "embplant_mt":
+              {"sha256": "2f28612e7c2280a7273738eded0dd2fcfb59c6153c1cf3bac15e4e7ed1bf4e89", "size": 407052},
+          "other_pt":
+              {"sha256": "a548538ef6560ededefb7e0d9c41f1dcb8585dccb1d06124ffb95e6770df2c6b", "size": 14667508}
+        }
+    }
+
+

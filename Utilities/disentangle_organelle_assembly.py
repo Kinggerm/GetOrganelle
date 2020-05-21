@@ -5,7 +5,7 @@ import os
 import sys
 from optparse import OptionParser
 path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.append(os.path.join(path_of_this_script, ".."))
+sys.path.insert(0, os.path.join(path_of_this_script, ".."))
 from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.assembly_parser import *
 from GetOrganelleLib.seq_parser import *
@@ -20,7 +20,7 @@ def get_options(print_title):
                       help="input fastg format file.")
     parser.add_option("-t", dest="tab_file",
                       help="input tab format file (*.csv; the postfix 'csv' was in conformity with Bandage) "
-                           "produced by slim_fastg.py.")
+                           "produced by slim_graph.py.")
     parser.add_option("-o", dest="output_directory",
                       help="output directory.")
     parser.add_option("-F", dest="mode",

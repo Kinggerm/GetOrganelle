@@ -1,8 +1,6 @@
 import setuptools
 from setuptools import setup
 from GetOrganelleLib.versions import get_versions
-from GetOrganelleLib.pipe_control_func \
-    import remove_db_postfix, check_fasta_seq_names, make_blast_db, build_bowtie2_db, executable
 import platform
 import sys
 import os
@@ -63,13 +61,13 @@ else:
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 LIB_NAME = "GetOrganelleLib"
-LIB_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME)
+# LIB_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME)
 DEP_NAME = "GetOrganelleDep"
 DEP_DIR = os.path.join(PATH_OF_THIS_SCRIPT, DEP_NAME)
-NOT_NAME = "LabelDatabase"
-NOT_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME, NOT_NAME)
+LBL_NAME = "LabelDatabase"
+# LBL_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME, LBL_NAME)
 SEQ_NAME = "SeedDatabase"
-SEQ_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME, SEQ_NAME)
+# SEQ_DIR = os.path.join(PATH_OF_THIS_SCRIPT, LIB_NAME, SEQ_NAME)
 if "--continue" in sys.argv:
     RESUME = True
     sys.argv.remove("--continue")
@@ -80,11 +78,11 @@ if "--in-situ" in sys.argv:
     sys.argv.remove("--in-situ")
 else:
     in_situ = False
-if "--keep-index" in sys.argv:
-    keep_index = True
-    sys.argv.remove("--keep-index")
+if "--keep-temp" in sys.argv:
+    keep_temp = True
+    sys.argv.remove("--keep-temp")
 else:
-    keep_index = False
+    keep_temp = False
 
 
 def get_recursive_files(target_dir, start_from="", exclude_files=None):
@@ -99,19 +97,6 @@ def get_recursive_files(target_dir, start_from="", exclude_files=None):
 
 
 EXCLUDE_SHARE_SPADES_PATHS = set()
-# do not exclude other version in case some users install it at root with python2 but use it with python3 ...
-# if os.path.exists(DEP_DIR):
-#     if MAJOR_VERSION == 2:
-#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/joblib3"), DEP_DIR):
-#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/pyyaml3"), DEP_DIR):
-#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-#     elif MAJOR_VERSION == 3:
-#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/joblib2"), DEP_DIR):
-#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-#         for ex_f in get_recursive_files(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes/share/spades/pyyaml2"), DEP_DIR):
-#             EXCLUDE_SHARE_SPADES_PATHS.add(ex_f)
-
 
 scripts_to_install = ["get_organelle_from_reads.py",
                       "get_organelle_from_assembly.py",
@@ -120,6 +105,7 @@ scripts_to_install = ["get_organelle_from_reads.py",
                       "Utilities/disentangle_organelle_assembly.py",
                       "Utilities/evaluate_assembly_using_mapping.py",
                       "Utilities/fastg_to_gfa.py",
+                      "Utilities/get_organelle_config.py",
                       "Utilities/get_pair_reads.py",
                       "Utilities/gfa_to_fastg.py",
                       "Utilities/gfa_to_fasta.py",
@@ -130,9 +116,10 @@ scripts_to_install = ["get_organelle_from_reads.py",
                       "Utilities/plastome_arch_info.py",
                       "Utilities/rm_low_coverage_duplicated_contigs.py",
                       "Utilities/round_statistics.py",
-                      "Utilities/slim_fastg.py",
+                      "Utilities/slim_graph.py",
                       "Utilities/summary_get_organelle_output.py",
                       "Utilities/reconstruct_graph_from_fasta.py"]
+# rename execution program if not python
 dep_scripts_to_change = []
 if os.path.isdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
     for spades_script in os.listdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
@@ -140,7 +127,6 @@ if os.path.isdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
             dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin", spades_script))
 if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build")):
     dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build"))
-# rename execution program if not python
 if os.path.basename(sys.executable) != "python":
     for rename_py_script in scripts_to_install + dep_scripts_to_change:
         original_lines = open(rename_py_script).readlines()
@@ -148,50 +134,7 @@ if os.path.basename(sys.executable) != "python":
         open(rename_py_script, "w").writelines(original_lines)
 
 
-def initialize_notation_database(which_blast, overwrite=False):
-    for fasta_f in os.listdir(NOT_DIR):
-        if fasta_f.endswith(".fasta") and fasta_f[:-6] in ("embplant_pt", "other_pt", "embplant_mt", "embplant_nr",
-                                                           "animal_mt", "fungus_mt"):
-            fasta_f = os.path.join(NOT_DIR, fasta_f)
-            output_base = remove_db_postfix(fasta_f)
-            sys.stdout.write("makeblastdb " + output_base + " ... ")
-            sys.stdout.flush()
-            if overwrite or sum([os.path.exists(output_base + postfix) for postfix in (".nhr", ".nin", ".nsq")]) != 3:
-                make_blast_db(input_file=fasta_f,
-                              output_base=output_base,
-                              which_blast=which_blast)
-                sys.stdout.write("finished\n")
-            else:
-                sys.stdout.write("skipped\n")
-
-
-def initialize_seed_database(which_bowtie2, overwrite=False):
-    for fasta_f in os.listdir(SEQ_DIR):
-        if fasta_f.endswith(".fasta") and fasta_f[:-6] in ("embplant_pt", "other_pt", "embplant_mt", "embplant_nr",
-                                                           "animal_mt", "fungus_mt"):
-            fasta_f = os.path.join(SEQ_DIR, fasta_f)
-            new_seed_file = fasta_f + ".modified"
-            changed = check_fasta_seq_names(fasta_f, new_seed_file)
-            if changed:
-                seed_file = new_seed_file
-            else:
-                seed_file = fasta_f
-            output_base = remove_db_postfix(fasta_f) + ".index"
-            sys.stdout.write("bowtie2-build " + output_base + " ... ")
-            sys.stdout.flush()
-            if overwrite or sum([os.path.exists(output_base + postfix)
-                                 for postfix in
-                                 (".1.bt2l", ".2.bt2l", ".3.bt2l", ".4.bt2l", ".rev.1.bt2l", ".rev.2.bt2l")]) != 6:
-                build_bowtie2_db(seed_file=seed_file, seed_index_base=output_base, which_bowtie2=which_bowtie2,
-                                 overwrite=overwrite, random_seed=12345, silent=True)
-                sys.stdout.write("finished\n")
-            else:
-                sys.stdout.write("skipped\n")
-            if changed:
-                os.remove(seed_file)
-
-
-# check BLAST and make blast database
+# check local BLAST
 if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast")):
     files_to_check = ["blastn", "makeblastdb"]
     for check_f in files_to_check:
@@ -199,18 +142,8 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast")):
         if not os.path.exists(check_file_path):
             raise EnvironmentError(check_file_path + " not exists!")
         os.chmod(check_file_path, 0o755)
-# TODO set overwrite=True
-if executable(os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast", "makeblastdb")):
-    initialize_notation_database(which_blast=os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast"), overwrite=not RESUME)
-elif executable("makeblastdb"):
-    initialize_notation_database(which_blast="", overwrite=not RESUME)
-else:
-    raise EnvironmentError("makeblastdb not found in the $PATH nor in " +
-                           os.path.join(DEP_DIR, SYSTEM_NAME, "ncbi-blast") + "!\n"
-                           "change directory to GetOrganelle and git clone git://github.com/Kinggerm/GetOrganelleDep\n"
-                           "or get BLAST via http://ftp.ncbi.nlm.nih.gov/blast/executables/magicblast/LATEST")
 
-# check Bowtie2 and build seed index
+# check local Bowtie2
 if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2")):
     files_to_check = ["bowtie2", "bowtie2-align-l", "bowtie2-build", "bowtie2-build-l"]
     for check_f in files_to_check:
@@ -218,18 +151,8 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2")):
         if not os.path.exists(check_file_path):
             raise EnvironmentError(check_file_path + " not exists!")
         os.chmod(check_file_path, 0o755)
-# TODO set overwrite=True
-if executable(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build")):
-    initialize_seed_database(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2"), overwrite=not RESUME)
-elif executable("bowtie2-build"):
-    initialize_seed_database("", overwrite=not RESUME)
-else:
-    raise EnvironmentError("bowtie2-build not found in the $PATH nor in " +
-                           os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2") + "!\n"
-                           "change directory to GetOrganelle and git clone git://github.com/Kinggerm/GetOrganelleDep\n"
-                           "or get Bowtie2 via http://bowtie-bio.sourceforge.net/bowtie2/index.shtml")
 
-# check SPAdes
+# check local SPAdes
 if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes")):
     files_to_check = ["metaspades.py", "spades-bwa", "spades-gbuilder", "spades-ionhammer", "spades.py",
                       "plasmidspades.py", "spades-core", "spades-gmapper", "spades-kmercount", "spades_init.py",
@@ -245,21 +168,11 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes")):
         check_file_path = os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "share", "spades", check_f)
         if not os.path.exists(check_file_path):
             raise EnvironmentError(check_file_path + " not exists!")
-if executable(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin", "spades.py")):
-    pass
-elif executable("spades.py"):
-    pass
-else:
-    raise EnvironmentError("spades.py not found in the $PATH nor in " +
-                           os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin") + "!\n"
-                           "change directory to GetOrganelle and git clone git://github.com/Kinggerm/GetOrganelleDep\n"
-                           "or get SPAdes via http://cab.spbu.ru/software/spades/")
 
 
 PACKAGES = [LIB_NAME]
-PACKAGE_DATA = {LIB_NAME: [os.path.join(NOT_NAME, "*.n*"),
-                           os.path.join(SEQ_NAME, "*.bt2l"),
-                           os.path.join(SEQ_NAME, "*.fasta")]}
+PACKAGE_DATA = {LIB_NAME: [os.path.join(LBL_NAME, "VERSION"),
+                           os.path.join(SEQ_NAME, "VERSION")]}
 if os.path.isdir(DEP_DIR) and os.path.isfile(os.path.join(DEP_DIR, "__init__.py")):
     PACKAGES.append(DEP_NAME)
     PACKAGE_DATA[DEP_NAME] = [this_file
@@ -275,7 +188,7 @@ if not in_situ:
         description="a fast and versatile toolkit for accurate de novo assembly of organelle genomes.",
         author="Jian-Jun Jin",
         author_email="jinjianjun@mail.kib.ac.cn",
-        url="http://github.org/Kinggerm/GetOrganelle",
+        url="http://github.com/Kinggerm/GetOrganelle",
         license="GNU General Public License, version 3",
         packages=PACKAGES,
         platforms="linux/MacOS",
@@ -285,12 +198,12 @@ if not in_situ:
         install_requires=install_dependencies,
         zip_safe=False
         )
-    if keep_index:
+    if keep_temp:
         for temp_dir_or_files in ("build", "dist", "*.pyc", "*.tgz", "*.egg-info"):
             os.system("rm -vrf " + str(os.path.join(PATH_OF_THIS_SCRIPT, temp_dir_or_files)))
     else:
         for temp_dir_or_files in ("build", "dist", "*.pyc", "*.tgz", "*.egg-info",
-                                  os.path.join(LIB_NAME, NOT_NAME, "*.n*"), os.path.join(LIB_NAME, SEQ_NAME, "*.bt2l")):
+                                  os.path.join(LIB_NAME, LBL_NAME, "*.n*"), os.path.join(LIB_NAME, SEQ_NAME, "*.bt2l")):
             os.system("rm -vrf " + str(os.path.join(PATH_OF_THIS_SCRIPT, temp_dir_or_files)))
 else:
     for script_chmod in scripts_to_install:

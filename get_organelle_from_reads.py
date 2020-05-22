@@ -488,10 +488,10 @@ def get_options(description, version):
                     (options.genes_fasta and options.seed_file)):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
-                                 " database has not been added yet!"
+                                 " database has not been added yet!\n"
                                  "\nInstall it by: get_organelle_config.py -a " + this_sub_organelle +
                                  "," * int(bool(extra_type)) + extra_type +
-                                 "\nor install all types by: get_organelle_config.py -a all\n")
+                                 "\nor\nInstall all types by: get_organelle_config.py -a all\n")
                 exit()
         for sub_organelle_t in options.organelle_type:
             if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt",
@@ -3292,7 +3292,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     else:
-                        this_out_base = o_p + ".incomplete.graph" + str(go_res + 1) + ".selected_graph."
+                        this_out_base = o_p + ".contigs.graph" + str(go_res + 1) + ".selected_graph."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(

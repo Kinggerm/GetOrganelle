@@ -306,6 +306,19 @@ def get_options(print_title):
         #     options.exclude = [os.path.join(LBL_DB_PATH, 'embplant_pt.fasta')]
         else:
             if options.organelle_types:
+
+                def _check_default_db(this_sub_organelle, extra_type=""):
+                    if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) and
+                             os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta"))) or
+                            (options.genes_fasta and options.seed_file)):
+                        sys.stdout.write(
+                            "\n############################################################################"
+                            "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
+                            " database has not been added yet!\n"
+                            "\nInstall it by: get_organelle_config.py -a " + this_sub_organelle +
+                            "," * int(bool(extra_type)) + extra_type +
+                            "\nor\nInstall all types by: get_organelle_config.py -a all\n")
+                        exit()
                 options.include_priority = []
                 options.organelle_types = options.organelle_types.split(",")
                 for sub_organelle_t in options.organelle_types:
@@ -319,14 +332,11 @@ def get_options(print_title):
                     else:
                         if not (os.path.isfile(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta")) and
                                 os.path.isfile(os.path.join(SEQ_DB_PATH, sub_organelle_t + ".fasta"))):
-                            print(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta"))
-                            print(os.path.join(SEQ_DB_PATH, sub_organelle_t + ".fasta"))
-                            sys.stdout.write(
-                                "\n############################################################################"
-                                "\nERROR: default " + sub_organelle_t + " database has not been added yet!"
-                                "\nInstall it by: get_organelle_config.py -a " + sub_organelle_t +
-                                "\nor install all types by: get_organelle_config.py -a all\n")
-                            exit()
+                            if sub_organelle_t in ("embplant_pt", "embplant_mt"):
+                                for go_t, check_sub in enumerate(["embplant_pt", "embplant_mt"]):
+                                    _check_default_db(check_sub, ["embplant_pt", "embplant_mt"][not go_t])
+                            else:
+                                _check_default_db(sub_organelle_t)
                         else:
                             options.include_priority.append(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta"))
             else:

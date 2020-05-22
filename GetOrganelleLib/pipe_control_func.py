@@ -19,6 +19,12 @@ else:
 
 if python_version == "2.7+":
     from commands import getstatusoutput
+    class ConnectionRefusedError(Exception):
+        def __init__(self, value=""):
+            self.value = value
+
+        def __str__(self):
+            return repr(self.value)
 else:
     from subprocess import getstatusoutput
 import subprocess
@@ -153,7 +159,7 @@ def run_command(command, print_command=False, check_echo_error=True):
         raise Exception("Error in running "+command.split()[0]+"\n"+output.decode("utf-8"))
 
 
-def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assembly_graph_ob=None,
+def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assembly_graph_ob,
                                       resume=False, log_handler=None, verbose_log=False, which_bandage=""):
     if resume and os.path.exists(output_image_file):
         return True
@@ -161,9 +167,6 @@ def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assem
         assert output_image_file.split(".")[-1] in {"png", "jpg", "svg"}, "Output image format must be png/jpg/svg!"
         temp_file = os.path.join(os.path.split(output_image_file)[0], os.path.split(output_image_file)[1])
         # preparing for color
-        if assembly_graph_ob is None:
-            assembly_graph_ob = Assembly(input_graph_file)
-            assembly_graph_ob.estimate_copy_and_depth_by_cov(mode="all", verbose=verbose_log, log_handler=log_handler)
         if not assembly_graph_ob.vertex_to_copy:
             assembly_graph_ob.estimate_copy_and_depth_by_cov(mode="all", verbose=verbose_log, log_handler=log_handler)
         all_coverages = [assembly_graph_ob.vertex_info[g_v].cov for g_v in assembly_graph_ob.vertex_info]
@@ -855,24 +858,32 @@ def detect_bandage_version(which_bandage):
         return "Bandage N/A"
 
 
-def get_static_html_context(remote_url, try_times=3, timeout=10):
+def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, log_handler=None):
     response = False
     count = 0
     while not response and count < try_times:
         try:
+            if verbose:
+                if log_handler:
+                    log_handler.info("Connecting to " + remote_url)
+                else:
+                    sys.stdout.write("Connecting to " + remote_url + "\n")
             response = requests.get(remote_url, timeout=timeout)
-        except requests.exceptions.ConnectTimeout as e:
+        except (requests.exceptions.ConnectTimeout,
+                requests.exceptions.ConnectionError,
+                ConnectionRefusedError) as e:
             if count + 1 == try_times:
                 return {"status": False, "info": "timeout", "content": ""}
         if response and response.status_code == requests.codes.ok:
             # here_data_str = base64.decodebytes(remote_data_api.json()["content"].encode("utf-8")).decode("utf-8")
             return {"status": True, "info": "", "content": response.content.decode("utf-8")}
+        time.sleep(1)
         count += 1
     return {"status": False, "info": "unknown", "content": ""}
 
 
 def download_file_with_progress(remote_url, output_file, log_handler=None, allow_empty=False,
-                                sha256_v=None, try_times=3, timeout=100000):
+                                sha256_v=None, try_times=5, timeout=100000, verbose=False):
     time_0 = time.time()
     temp_file = output_file + ".Temp"
     count_try = 0
@@ -881,6 +892,8 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
         count_try += 1
         with open(temp_file, "w") as file_h:
             try:
+                if verbose:
+                    sys.stdout.write("Connecting to " + remote_url + "\n")
                 response = requests.get(remote_url, stream=True, timeout=timeout)
                 if response.status_code == requests.codes.ok:
                     total_length = response.headers.get("content-length")
@@ -905,7 +918,10 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
                 else:
                     info_list.append("404")
                     continue
-            except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout) as e:
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.ConnectTimeout,
+                    requests.exceptions.ReadTimeout,
+                    ConnectionRefusedError) as e:
                 info_list.append("timeout")
                 os.remove(temp_file)
                 if count_try == try_times:
@@ -913,6 +929,7 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
                                      (os.path.basename(output_file), time.time() - time_0))
                     return {"status": False, "info": ",".join(info_list), "content": ""}
                 else:
+                    time.sleep(1)
                     continue
         # check sha256
         if sha256_v:
@@ -928,6 +945,7 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
                 break
         else:
             break
+        time.sleep(1)
 
     # check size
     if os.path.exists(temp_file) and (os.path.getsize(temp_file) or allow_empty):

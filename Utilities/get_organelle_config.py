@@ -86,6 +86,8 @@ def get_options(description):
                       help="Assign the path to Bowtie2 binary files if not added to the path. "
                            "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
                            "/bowtie2\" first, then $PATH")
+    parser.add_option("--verbose", dest="verbose", default=False, action="store_true",
+                      help="verbose output to the screen. Default: %default")
     options, argv = parser.parse_args()
     assert options.db_type in ("seed", "label", "both")
 
@@ -174,12 +176,14 @@ def get_options(description):
             options.version = "latest"
         if options.version == "latest":
             remote_version_url = "https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/VERSION"
-            remote_quest = get_static_html_context(remote_version_url)
+            remote_quest = get_static_html_context(remote_version_url, verbose=options.verbose)
             if remote_quest["status"]:
                 options.version = remote_quest["content"].strip()
             else:
                 sys.stderr.write("Error: " + remote_quest["info"] + "\n")
                 sys.stderr.write("Please check your connection to github!\n")
+                sys.stdout.write("\nYou can download the database files from www.github.com/Kinggerm/GetOrganelleDB "
+                                 "and install it from from local (flag --use-local)\n")
                 sys.exit()
 
     return options, argv
@@ -328,7 +332,7 @@ def main():
                     del existing_seed_db[rm_o_type]
                 else:
                     sys.stdout.write("Warning: " + rm_o_type + " Seed Database not found!\n")
-            write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
+                write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
         if options.db_type in ("label", "both"):
             for rm_o_type in options.rm_organelle_type:
                 if rm_o_type in existing_label_db:
@@ -336,7 +340,7 @@ def main():
                     del existing_label_db[rm_o_type]
                 else:
                     sys.stdout.write("Warning: " + rm_o_type + " Label Database not found!\n")
-            write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
+                write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
     # Case 3
     if options.update:
@@ -375,7 +379,8 @@ def main():
                             this_url = seed_url_temp.format(options.version, sub_o_type)
                             check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
                             status = download_file_with_progress(
-                                remote_url=this_url, output_file=target_output, sha256_v=check_sha256, timeout=time_out)
+                                remote_url=this_url, output_file=target_output, sha256_v=check_sha256,
+                                timeout=time_out, verbose=options.verbose)
                             if not status["status"]:
                                 sys.stdout.write(
                                     "Installing %s Seed Database failed: %s\n" % (sub_o_type, status["info"]))
@@ -383,7 +388,7 @@ def main():
                             initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                      fasta_f=target_output, overwrite=True)
                             existing_seed_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
-            write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
+                write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
 
         if options.db_type in ("label", "both"):
             for sub_o_type in ORGANELLE_TYPE_LIST:
@@ -429,7 +434,7 @@ def main():
                             initialize_notation_database(which_blast=options.which_blast,
                                                      fasta_f=target_output, overwrite=True)
                             existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
-            write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
+                write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
     # Case 4
     if options.add_organelle_type:
@@ -462,7 +467,7 @@ def main():
                     initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                              fasta_f=target_output, overwrite=True)
                     existing_seed_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
-            write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
+                write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
 
         if options.db_type in ("label", "both"):
             for sub_o_type in options.add_organelle_type:
@@ -494,7 +499,7 @@ def main():
                     initialize_notation_database(which_blast=options.which_blast,
                                                  fasta_f=target_output, overwrite=True)
                     existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
-            write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
+                write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
     sys.stdout.write("\nTotal cost: %.2f s\n" % (time.time() - time_start))
 

@@ -278,7 +278,7 @@ def get_options(description, version):
                     (options.genes_fasta and options.seed_file)):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
-                                 " database has not been added yet!\n"
+                                 " database not added yet!\n"
                                  "\nInstall it by: get_organelle_config.py -a " + this_sub_organelle +
                                  "," * int(bool(extra_type)) + extra_type +
                                  "\nor\nInstall all types by: get_organelle_config.py -a all\n")

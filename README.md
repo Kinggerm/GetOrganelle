@@ -34,6 +34,9 @@ The easiest way to install GetOrganelle and its [dependencies](https://github.co
 
 You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. Personally, I use [pyenv](https://github.com/pyenv/pyenv) to control python versions and conda environments. If you don't like conda which indeed takes a lot of hard disk space, you can find [more installation ways here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 
+Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDatabase](https://github.com/Kinggerm/GetOrganelleDatabase). After installation of GetOrganelle v1.7.0+, add the organelle type (supposing you are assembling chloroplast genomes) by:
+
+    get_organelle_config.py -a embplant_pt,embplant_mt
 
 
 ## Instruction

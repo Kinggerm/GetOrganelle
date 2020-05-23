@@ -2630,9 +2630,10 @@ class Assembly(SimpleAssembly):
 
     def add_gap_nodes_with_spades_res(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf, log_handler=None,
                                       update_cluster=True):
-        spades_scaffolds = SpadesScaffolds(scaffold_fasta, scaffold_paths, min_cov=min_cov, max_cov=max_cov)
+        spades_scaffolds = SpadesScaffolds(scaffold_fasta, scaffold_paths, assembly_obj=self,
+                                           min_cov=min_cov, max_cov=max_cov)
         overlap = self.__overlap if self.__overlap else 0
-        go_gap = 0
+        go_extra = 0
         gap_added = False
         for (this_v, this_e), (next_v, next_e), gap_len in spades_scaffolds.vertex_jumping_over_gap:
             if this_v in self.vertex_info and next_v in self.vertex_info:
@@ -2645,10 +2646,21 @@ class Assembly(SimpleAssembly):
                                          next_v + ECHO_DIRECTION[next_e] + " already existed!\n")
                 else:
                     gap_added = True
-                    go_gap += 1
-                    this_gap_name = str(go_gap) + "GAP" + str(gap_len)
-                    this_gap_seq = self.vertex_info[this_v].seq[this_e][self.vertex_info[this_v].len - overlap:] + \
-                                   "N" * gap_len + self.vertex_info[next_v].seq[not next_e][:overlap]
+                    go_extra += 1
+                    if gap_len >= 0:
+                        this_gap_name = str(go_extra) + "GAP" + str(gap_len)
+                        this_gap_seq = self.vertex_info[this_v].seq[this_e][self.vertex_info[this_v].len - overlap:] + \
+                                       "N" * gap_len + self.vertex_info[next_v].seq[not next_e][:overlap]
+                    elif -overlap < gap_len < 0:
+                        this_gap_name = str(go_extra) + "OVL" + str(-gap_len)
+                        shrink_1 = int(-gap_len/2)
+                        shrink_2 = -gap_len - shrink_1
+                        this_gap_seq = \
+                            self.vertex_info[this_v].seq[this_e][self.vertex_info[this_v].len - overlap: -shrink_1] + \
+                                       self.vertex_info[next_v].seq[not next_e][shrink_2:overlap]
+                    else:
+                        raise ProcessingGraphFailed("Overlap between " + this_v + " and " + next_v + " (" +
+                                                    str(gap_len) + ") is larger than kmer (" + str(overlap) + ")")
                     self.vertex_info[this_gap_name] = Vertex(this_gap_name,
                                                              length=len(this_gap_seq),
                                                              coverage=(self.vertex_info[this_v].cov +
@@ -3367,21 +3379,30 @@ VERTEX_DIRECTION_STR_TO_BOOL = {"+": True, "-": False}
 
 class SpadesNodes(Vertex):
     def __init__(self, v_name, length=None, coverage=None, forward_seq=None, reverse_seq=None,
-                 tail_connections=None, head_connections=None, path_str=None):
+                 tail_connections=None, head_connections=None, path_str=None, assembly_obj=None):
+        vertices_path = []
+        if path_str:
+            for this_v_str in path_str.strip().split(","):
+                vertices_path.append((this_v_str[:-1], VERTEX_DIRECTION_STR_TO_BOOL[this_v_str[-1]]))
+            if assembly_obj:
+                path_seq = assembly_obj.export_path(vertices_path).seq
+                if forward_seq:
+                    if path_seq != forward_seq:
+                        raise ProcessingGraphFailed("incompatible assembly_graph and scaffolds.fasta/scaffolds.paths!")
+                else:
+                    forward_seq = path_seq
+                    length = len(forward_seq)
         super(SpadesNodes, self).__init__(v_name=v_name, length=length, coverage=coverage, forward_seq=forward_seq,
                                           reverse_seq=reverse_seq, tail_connections=tail_connections,
                                           head_connections=head_connections)
-        self.vertices_path = []
-        if path_str:
-            for this_v_str in path_str.strip().split(","):
-                self.vertices_path.append((this_v_str[:-1], VERTEX_DIRECTION_STR_TO_BOOL[this_v_str[-1]]))
+        self.vertices_path = vertices_path
 
     def __eq__(self, other):
         return self.name == other.name and self.len == other.len and self.cov == other.cov and self.seq == other.seq
 
 
 class SpadesScaffolds(object):
-    def __init__(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf):
+    def __init__(self, scaffold_fasta, scaffold_paths, assembly_obj, min_cov=0., max_cov=inf, ):
         if not os.path.exists(scaffold_fasta):
             raise FileNotFoundError(scaffold_fasta + " not found!")
         if not os.path.exists(scaffold_paths):
@@ -3410,42 +3431,86 @@ class SpadesScaffolds(object):
                         line = path_handler.readline().strip()
                         path_strings.append(line.strip(";"))
                     # read sequences
-                    sub_seqs = re.split("([N]+)", sequence_matrix[long_name].seq)
-                    last_gap_name = ""
-                    last_vertex_end = []
-                    for go_sub_path, sub_path in enumerate(path_strings):
-                        sub_name = node_name + "S" + str(go_sub_path)
-                        # if sub_name not in self.nodes:  # check file validity
-                        sub_seq = sub_seqs.pop(0)
-                        self.nodes[sub_name] = SpadesNodes(sub_name, len(sub_seq), node_cov,
-                                                           forward_seq=sub_seq, path_str=sub_path)
-                        if last_gap_name:  # if there's an previous gap, add the conncetion
-                            self.nodes[sub_name].connections[False].add((last_gap_name, True))
-                            self.nodes[last_gap_name].connections[True].add((sub_name, False))
-                            this_vertex, this_end = self.nodes[sub_name].vertices_path[0]
-                            last_gap_len = self.nodes[last_gap_name].len
-                            # self.vertex_jumping_over_gap_dict[(this_vertex, not this_end)] = \
-                            #     {"len": last_gap_len, "next": last_vertex_end}
-                            # self.vertex_jumping_over_gap_dict[last_vertex_end] = \
-                            #     {"len": last_gap_len, "next": (this_vertex, not this_end)}
-                            self.vertex_jumping_over_gap.append(
-                                [last_vertex_end, (this_vertex, not this_end), last_gap_len])
-                        # else:
-                        # raise ValueError("Repeated node name: " + str(node_name) + " in " + fasta_file)
-                        if sub_seqs:
-                            sub_seq = sub_seqs.pop(0)
-                            gap_name = str(go_gap) + "GAP" + str(len(sub_seq))
-                            self.nodes[gap_name] = SpadesNodes(gap_name, len(sub_seq), 1.0, forward_seq=sub_seq)
-                            self.nodes[sub_name].connections[True].add((gap_name, False))
-                            self.nodes[gap_name].connections[False].add((sub_name, True))
-                            last_gap_name = gap_name
+                    if len(path_strings) == 1:
+                        sub_name = node_name + "S" + str(0)
+                        try:
+                            self.nodes[sub_name] = SpadesNodes(sub_name, coverage=node_cov,
+                                                               path_str=path_strings[0], assembly_obj=assembly_obj)
+                        except KeyError:
+                            line = path_handler.readline().strip()
+                            continue
+                    else:
+                        full_path_seq = sequence_matrix[long_name].seq
+                        last_vertex_end = []
+                        last_sub_seq_range = []
+                        arbitrary_jump = False  # cannot find the position of this sub-seq in scaffolds.fasta
+                        for go_sub_path, sub_path in enumerate(path_strings):
+                            sub_name = node_name + "S" + str(go_sub_path)
+                            try:
+                                self.nodes[sub_name] = SpadesNodes(sub_name, coverage=node_cov,
+                                                                   path_str=sub_path, assembly_obj=assembly_obj)
+                            except KeyError:
+                                break
+                            this_sub_seq = str(self.nodes[sub_name].seq[True])
+                            if arbitrary_jump:
+                                start_point = last_sub_seq_range[1] + 10
+                            else:
+                                if len(this_sub_seq) < len(full_path_seq):
+                                    # shrink half kmer because terminals are usually error-prone
+                                    shrink_end = int(assembly_obj.overlap()/2)
+                                    start_point = [m.start() for m in
+                                                   re.finditer(this_sub_seq[shrink_end:-shrink_end], full_path_seq)]
+                                    if len(start_point) == 0:  # cannot find the substring, shrink more
+                                        middle_point = int(len(this_sub_seq) / 2)
+                                        check_start = middle_point - min(shrink_end, int(0.25 * len(this_sub_seq)))
+                                        check_end = middle_point + min(shrink_end, int(0.25 * len(this_sub_seq))) + 1
+                                        start_point = [m.start() for m in
+                                                       re.finditer(this_sub_seq[check_start:check_end], full_path_seq)]
+                                        if len(start_point) == 0:  # cannot find the substring in the end
+                                            arbitrary_jump = True
+                                            start_point = 0 if go_sub_path == 0 else last_sub_seq_range[1] + 10
+                                            # raise ProcessingGraphFailed(
+                                            #     "incompatible(1) assembly_graph and scaffolds.fasta/scaffolds.paths!")
+                                        elif len(start_point) > 1:
+                                            arbitrary_jump = True
+                                            start_point = 0 if go_sub_path == 0 else last_sub_seq_range[1] + 10
+                                        else:
+                                            start_point = start_point[0] - check_start
+                                    elif len(start_point) > 1:
+                                        arbitrary_jump = True
+                                        start_point = 0 if go_sub_path == 0 else last_sub_seq_range[1] + 10
+                                        # raise ProcessingGraphFailed(
+                                        #     "multiple matches of " + node_name + " in scaffolds.fasta/scaffolds.paths!")
+                                    else:
+                                        start_point = start_point[0] - shrink_end
+                                else:
+                                    start_point = 0
+                            end_point = start_point + self.nodes[sub_name].len
+                            # print(start_point, end_point)
+                            if go_sub_path > 0:  # if there's an previous gap/overlap, add the connection
+                                this_gap_len = start_point - last_sub_seq_range[1]
+                                if this_gap_len >= 0:
+                                    gap_name = str(go_gap) + "GAP" + str(this_gap_len)
+                                else:
+                                    gap_name = str(go_gap) + "OVL" + str(-this_gap_len)
+                                self.nodes[gap_name] = SpadesNodes(gap_name, this_gap_len, 1.0, forward_seq="")
+                                self.nodes[sub_name].connections[False].add((gap_name, True))
+                                self.nodes[gap_name].connections[True].add((sub_name, False))
+                                previous_sub_name = node_name + "S" + str(go_sub_path - 1)
+                                self.nodes[previous_sub_name].connections[True].add((gap_name, False))
+                                self.nodes[gap_name].connections[False].add((previous_sub_name, True))
+                                #
+                                this_vertex, this_end = self.nodes[sub_name].vertices_path[0]
+                                self.vertex_jumping_over_gap.append(
+                                    [last_vertex_end, (this_vertex, not this_end), this_gap_len])
+                                go_gap += 1
+                            # elif go_sub_path == len(path_strings) - 1:
+                            #     if not end_point == len(full_path_seq):
+                            #         raise ProcessingGraphFailed(
+                            #             "incompatible(2) assembly_graph and scaffolds.fasta/scaffolds.paths!")
                             last_vertex_end = self.nodes[sub_name].vertices_path[-1]
-                            go_gap += 1
+                            last_sub_seq_range = [start_point, end_point]
                 line = path_handler.readline().strip()
-
-
-# test = SpadesScaffolds("Test/test9/filtered_spades/scaffolds.fasta", "Test/test9/filtered_spades/scaffolds.paths")
-# print(test.vertex_jumping_over_gap)
 
 
 def generate_index_combinations(index_list):

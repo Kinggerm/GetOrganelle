@@ -5,18 +5,21 @@ def get_versions():
 
 
 versions = [
-    {"number": "1.7.0-beta1",
+    {"number": "1.7.0-beta2",
      "features": [
          "1. Utilities/slim_fastg -> Utilities/slim_fastg: 1) reorganized; 2) added support for gfa format graph file;"
              "3) --max-slim-extending-len added",
          "2. get_organelle_config.py added with *Database removed",
          "3. get_organelle_from_reads.py: "
-             "1) use SPAdes generated scaffolds.paths to create gap containing scaffolds"
+             "1) use SPAdes generated scaffolds.paths to create gap containing scaffolds (assembly_parser.py)"
              "2) rm --gradient-k ",
-         "4. assembly_parser.py: 1) merge_all_possible_vertices: fix a bug for overlap=0; 2) reduce_to_subgraph added; "
-             "3) processing_polymorphism: fix a bug",
-         "5. Utilities/reconstruct_graph_from_fasta.py: fix a bug",
-         "6. README.md: updated",
+         "4. get_organelle_from_assembly.py: use SPAdes generated scaffolds.paths to create gap containing "
+             "scaffolds (assembly_parser.py)",
+         "5. assembly_parser.py: 1) merge_all_possible_vertices: fix a bug for overlap=0; 2) reduce_to_subgraph added; "
+             "3) processing_polymorphism: fix a bug; "
+             "4) use SPAdes generated scaffolds.paths to create gap containing scaffolds",
+         "6. Utilities/reconstruct_graph_from_fasta.py: fix a bug",
+         "7. README.md: updated",
      ],
      "time": "2020-03-?? 00:00 GMT-6"},
     {"number": "1.6.4",

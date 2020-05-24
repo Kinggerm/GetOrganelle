@@ -165,7 +165,11 @@ def get_options(description):
             raise NotADirectoryError(options.use_local)
         if options.add_organelle_type:
             for sub_type in options.add_organelle_type:
-                this_fas_f = os.path.join(options.use_local, sub_type + ".fasta")
+                this_fas_f = os.path.join(options.use_local, SEQ_NAME, sub_type + ".fasta")
+                if not os.path.isfile(this_fas_f):
+                    sys.stdout.write("File " + this_fas_f + " not available!\n")
+                    sys.exit()
+                this_fas_f = os.path.join(options.use_local, LBL_NAME, sub_type + ".fasta")
                 if not os.path.isfile(this_fas_f):
                     sys.stdout.write("File " + this_fas_f + " not available!\n")
                     sys.exit()

@@ -977,7 +977,7 @@ def main():
         log_handler.exception("")
         log_handler = simple_log(log_handler, options.output_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com if you find bugs!")
+        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or jianjun.jin@columbia.edu if you find bugs!")
         log_handler.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()
 

@@ -165,7 +165,7 @@ def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assem
         return True
     elif executable(os.path.join(which_bandage, "Bandage -v")):
         assert output_image_file.split(".")[-1] in {"png", "jpg", "svg"}, "Output image format must be png/jpg/svg!"
-        temp_file = os.path.join(os.path.split(output_image_file)[0], os.path.split(output_image_file)[1])
+        temp_file = os.path.join(os.path.split(output_image_file)[0], "temp." + os.path.split(output_image_file)[1])
         # preparing for color
         if not assembly_graph_ob.vertex_to_copy:
             assembly_graph_ob.estimate_copy_and_depth_by_cov(mode="all", verbose=verbose_log, log_handler=log_handler)

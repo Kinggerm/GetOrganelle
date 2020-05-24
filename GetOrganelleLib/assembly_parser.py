@@ -3402,7 +3402,7 @@ class SpadesNodes(Vertex):
 
 
 class SpadesScaffolds(object):
-    def __init__(self, scaffold_fasta, scaffold_paths, assembly_obj, min_cov=0., max_cov=inf, ):
+    def __init__(self, scaffold_fasta, scaffold_paths, assembly_obj, min_cov=0., max_cov=inf, simple_mode=True):
         if not os.path.exists(scaffold_fasta):
             raise FileNotFoundError(scaffold_fasta + " not found!")
         if not os.path.exists(scaffold_paths):
@@ -3432,13 +3432,14 @@ class SpadesScaffolds(object):
                         path_strings.append(line.strip(";"))
                     # read sequences
                     if len(path_strings) == 1:
-                        sub_name = node_name + "S" + str(0)
-                        try:
-                            self.nodes[sub_name] = SpadesNodes(sub_name, coverage=node_cov,
-                                                               path_str=path_strings[0], assembly_obj=assembly_obj)
-                        except KeyError:
-                            line = path_handler.readline().strip()
-                            continue
+                        if not simple_mode:
+                            sub_name = node_name + "S" + str(0)
+                            try:
+                                self.nodes[sub_name] = SpadesNodes(sub_name, coverage=node_cov,
+                                                                   path_str=path_strings[0], assembly_obj=assembly_obj)
+                            except KeyError:
+                                line = path_handler.readline().strip()
+                                continue
                     else:
                         full_path_seq = sequence_matrix[long_name].seq
                         last_vertex_end = []
@@ -3494,11 +3495,12 @@ class SpadesScaffolds(object):
                                 else:
                                     gap_name = str(go_gap) + "OVL" + str(-this_gap_len)
                                 self.nodes[gap_name] = SpadesNodes(gap_name, this_gap_len, 1.0, forward_seq="")
-                                self.nodes[sub_name].connections[False].add((gap_name, True))
-                                self.nodes[gap_name].connections[True].add((sub_name, False))
-                                previous_sub_name = node_name + "S" + str(go_sub_path - 1)
-                                self.nodes[previous_sub_name].connections[True].add((gap_name, False))
-                                self.nodes[gap_name].connections[False].add((previous_sub_name, True))
+                                if not simple_mode:
+                                    self.nodes[sub_name].connections[False].add((gap_name, True))
+                                    self.nodes[gap_name].connections[True].add((sub_name, False))
+                                    previous_sub_name = node_name + "S" + str(go_sub_path - 1)
+                                    self.nodes[previous_sub_name].connections[True].add((gap_name, False))
+                                    self.nodes[gap_name].connections[False].add((previous_sub_name, True))
                                 #
                                 this_vertex, this_end = self.nodes[sub_name].vertices_path[0]
                                 self.vertex_jumping_over_gap.append(

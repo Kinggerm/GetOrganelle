@@ -1213,7 +1213,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                 output, err = do_slim.communicate()
                 if not os.path.exists(this_modified_graph):
                     if log_handler:
-                        log_handler.warning("slimming the pre-assembled graph failed.")
+                        log_handler.error("slimming the pre-assembled graph failed.")
                     if verbose_log and log_handler:
                         log_handler.error("\n" + output.decode("utf8").strip())
                     subprocess.Popen(cp_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -1270,7 +1270,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                     output, err = do_slim.communicate()
                     if not os.path.exists(more_modified_graph):
                         if log_handler:
-                            log_handler.warning("slimming the pre-assembled graph failed.")
+                            log_handler.error("slimming the pre-assembled graph failed.")
                         if verbose_log and log_handler:
                             log_handler.error("\n" + output.decode("utf8").strip())
                         subprocess.Popen(
@@ -3123,7 +3123,7 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
             if log_handler:
                 if verbose_log:
                     log_handler.error(output.decode("utf8"))
-                log_handler.warning("Slimming " + graph_file + " failed.")
+                log_handler.error("Slimming " + graph_file + " failed.")
             slim_stat_list.append((1, None))
         elif output_file_list and os.path.getsize(output_file_list[0]) == 0:
             if log_handler:
@@ -3913,7 +3913,7 @@ def main():
             if set(slim_stat_codes) == {2}:
                 log_handler.warning("No sequence hit our LabelDatabase!")
                 log_handler.warning("This might due to unreasonable seed/parameter choices or a bug.")
-                log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com "
+                log_handler.info("Please email jinjianjun@mail.kib.ac.cn or jianjun.jin@columbia.edu "
                                  "with the get_org.log.txt file.\n")
             elif 0 in slim_stat_codes:
                 log_handler.info("Slimming assembly graphs finished.\n")
@@ -3966,7 +3966,7 @@ def main():
         log_handler.exception("")
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or phylojin@163.com if you find bugs!")
+        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or jianjun.jin@columbia.edu if you find bugs!")
         log_handler.info("Please provide me with the get_org.log.txt file!")
     logging.shutdown()
 

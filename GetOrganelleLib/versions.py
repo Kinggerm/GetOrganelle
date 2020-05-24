@@ -13,7 +13,7 @@ versions = [
          "3. get_organelle_from_reads.py: "
              "1) use SPAdes generated scaffolds.paths to create gap containing scaffolds (assembly_parser.py)"
              "2) rm --gradient-k "
-             "3）output fasta name modified",
+             "3) output fasta name modified",
          "4. get_organelle_from_assembly.py: use SPAdes generated scaffolds.paths to create gap containing "
              "scaffolds (assembly_parser.py)",
          "5. assembly_parser.py: 1) merge_all_possible_vertices: fix a bug for overlap=0; 2) reduce_to_subgraph added; "

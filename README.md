@@ -50,7 +50,7 @@ download the seed - the complete plastome of the common bean (_Phaseolus vulgari
     
     wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/seed/Phaseolus_vulgaris_plastome.fasta
 
-then do the plastome assembly:
+then do the fast plastome assembly (memory: ~600MB, CPU time: ~60s):
 
     get_organelle_from_reads.py -1 Arabidopsis_simulated.1.fq.gz -2 Arabidopsis_simulated.2.fq.gz -t 1 -o Arabidopsis_simulated.plastome -F embplant_pt -R 10 -s Phaseolus_vulgaris_plastome.fasta
 

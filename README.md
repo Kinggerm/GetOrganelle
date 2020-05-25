@@ -37,11 +37,31 @@ You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [
 Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, add the organelle type (supposing you are assembling chloroplast genomes) by:
 
     get_organelle_config.py -a embplant_pt,embplant_mt
+    
+
+## Test
+
+Let's get started with assembling the _Arabidopsis thaliana_ chloroplast genome from [a simulated WGS dataset](https://github.com/Kinggerm/GetOrganelleComparison/tree/master/test/data1):
+
+    wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/data1/Arabidopsis_simulated.1.fq.gz
+    wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/data1/Arabidopsis_simulated.2.fq.gz
+
+download the seed - the complete plastome of the common bean (_Phaseolus vulgaris_ L., [EU196765.1](https://www.ncbi.nlm.nih.gov/nuccore/EU196765.1/)):
+    
+    wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/seed/Phaseolus_vulgaris_plastome.fasta
+
+then do the plastome assembly:
+
+    get_organelle_from_reads.py -1 Arabidopsis_simulated.1.fq.gz -2 Arabidopsis_simulated.2.fq.gz -t 1 -o Arabidopsis_simulated.plastome -F embplant_pt -R 10 -s Phaseolus_vulgaris_plastome.fasta
+
+You are going to get a similar running log as [here](https://github.com/Kinggerm/GetOrganelle/wiki/Example-2#running-log) and the same result as [here](https://github.com/Kinggerm/GetOrganelleComparison/tree/master/test/data1/Arabidopsis_simulated.plastome-user.seed).
+
+Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/GetOrganelle/wiki/Examples) and the [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) repository.
 
 
 ## Instruction
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Example</a ></b>. But you are still recommended to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Recipe</a ></b>. But you are still recommended to read the following introductions:
 
 <b>Preparing Data</b>
 
@@ -65,7 +85,7 @@ Otherwise, if GetOrganelle failed to solve the path (produce `*scaffolds*path_se
 
 ![flowchart](https://user-images.githubusercontent.com/8598031/65656060-086f5e80-e051-11e9-97a2-fb1d2a79375b.png)
 
-## Example
+## Recipe
 
 To assembly Embryophyta plant plastome (e.g. using 2G raw data of 150 bp paired reads), typically I use:
 
@@ -103,5 +123,4 @@ or see the detailed illustrations:
     
     get_organelle_from_reads.py --help
 
-Also see [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) for a benchmark test of `GetOrganelle` and `NOVOPlasty` using 50 online samples.
 

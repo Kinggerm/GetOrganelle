@@ -483,9 +483,9 @@ def get_options(description, version):
             exit()
 
         def _check_default_db(this_sub_organelle, extra_type=""):
-            if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) and
-                     os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta"))) or
-                    (options.genes_fasta and options.seed_file)):
+            if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta)
+                    and
+                    (os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta")) or options.seed_file)):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
@@ -514,8 +514,10 @@ def get_options(description, version):
                     _check_default_db(sub_organelle_t)
 
         organelle_type_len = len(options.organelle_type)
+        use_default_seed = False
         if "*" in options.seed_file:
             options.seed_file = [str(options.seed_file).replace("*", sub_o) for sub_o in options.organelle_type]
+            use_default_seed = True
         else:
             options.seed_file = str(options.seed_file).split(",")
             if len(options.seed_file) != organelle_type_len:
@@ -627,6 +629,24 @@ def get_options(description, version):
         if executable(os.path.join(options.which_bandage, "Bandage -v")):
             dep_versions_info.append(detect_bandage_version(options.which_bandage))
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
+        # log database
+        existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=SEQ_DB_PATH,
+                                                                   lbl_db_path=LBL_DB_PATH, silent=True)
+        if use_default_seed:
+            log_seed_types = deepcopy(options.organelle_type)
+            if "embplant_pt" in log_seed_types and "embplant_mt" not in log_seed_types:
+                log_seed_types.append("embplant_mt")
+            if "embplant_mt" in log_seed_types and "embplant_pt" not in log_seed_types:
+                log_seed_types.append("embplant_pt")
+            log_handler.info("SEED  DB: " + single_line_db_versions(existing_seed_db, log_seed_types))
+        if not options.genes_fasta:
+            log_label_types = deepcopy(options.organelle_type)
+            if "embplant_pt" in log_label_types and "embplant_mt" not in log_label_types:
+                log_label_types.append("embplant_mt")
+            if "embplant_mt" in log_label_types and "embplant_pt" not in log_label_types:
+                log_label_types.append("embplant_pt")
+            log_handler.info("LABEL DB: " + single_line_db_versions(existing_label_db, log_label_types))
+        # working directory
         log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 

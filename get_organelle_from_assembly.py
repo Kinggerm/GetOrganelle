@@ -273,9 +273,7 @@ def get_options(description, version):
             options.organelle_type = options.organelle_type.split(",")
 
         def _check_default_db(this_sub_organelle, extra_type=""):
-            if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) and
-                     os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta"))) or
-                    (options.genes_fasta and options.seed_file)):
+            if not (os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
@@ -344,6 +342,17 @@ def get_options(description, version):
         if executable(os.path.join(options.which_bandage, "Bandage -v")):
             dep_versions_info.append(detect_bandage_version(options.which_bandage))
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
+        # existing default database
+        if not options.no_slim:
+            existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=SEQ_DB_PATH,
+                                                                       lbl_db_path=LBL_DB_PATH, silent=True)
+            log_types = ["" if options.genes_fasta else this_type for this_type in options.organelle_type]
+            if "embplant_pt" in log_types and "embplant_mt" not in log_types:
+                log_types.append("embplant_mt")
+            if "embplant_mt" in log_types and "embplant_pt" not in log_types:
+                log_types.append("embplant_pt")
+            log_handler.info("LABEL DB: " + single_line_db_versions(existing_label_db, log_types))
+        # working directory
         log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 

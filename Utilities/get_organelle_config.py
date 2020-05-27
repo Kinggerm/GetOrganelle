@@ -16,7 +16,7 @@ from GetOrganelleLib.pipe_control_func \
     detect_bowtie2_path, detect_blast_path, detect_bowtie2_version, detect_blast_version, \
     cal_f_sha256, run_command, \
     ORGANELLE_TYPE_LIST, ORGANELLE_TYPE_SET, SEED_DB_HASH, LABEL_DB_HASH, \
-    get_static_html_context, download_file_with_progress
+    get_static_html_context, download_file_with_progress, get_current_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 
 # system info
@@ -193,66 +193,6 @@ def get_options(description):
     return options, argv
 
 
-def get_current_versions(db_type, check_db=False):
-    existing_seed_db = {}
-    if check_db:
-        sys.stdout.write("Checking existing database(s) ... \n")
-    else:
-        sys.stdout.write("Existing databases(s): \n")
-    if db_type in ("seed", "both"):
-        seed_version_file = os.path.join(SEQ_DB_PATH, "VERSION")
-        if os.path.isfile(seed_version_file):
-            with open(seed_version_file) as open_version:
-                for line in open_version:
-                    og_type, db_version, db_hash = line.strip().split("\t")
-                    existing_seed_db[og_type] = {"version": db_version, "sha256": db_hash}
-                    if check_db:
-                        seed_f = os.path.join(SEQ_DB_PATH, og_type + ".fasta")
-                        if not os.path.isfile(seed_f):
-                            sys.stdout.write(os.path.join(SEQ_DB_PATH, og_type + ".fasta") + " not available! "
-                                             "Please run `get_organelle_config.py --clean` to reset!\n")
-                        else:
-                            seed_f_hash = cal_f_sha256(seed_f)
-                            if db_version not in SEED_DB_HASH or \
-                                seed_f_hash != SEED_DB_HASH[db_version][og_type]["sha256"] or \
-                                seed_f_hash != db_hash:
-                                sys.stdout.write(os.path.join(SEQ_DB_PATH, og_type + ".fasta") + " not damaged! "
-                                                 "Please run `get_organelle_config.py --clean` to reset!\n")
-        for og_type in sorted(existing_seed_db):
-            db_version = existing_seed_db[og_type]["version"]
-            db_hash = existing_seed_db[og_type]["sha256"]
-            sys.stdout.write(og_type + " Seed Database:\t" + db_version +
-                             str("\t" + db_hash) * int(bool(db_version == "customized")) + "\n")
-
-    existing_label_db = {}
-    if db_type in ("label", "both"):
-        label_version_file = os.path.join(LBL_DB_PATH, "VERSION")
-        if os.path.isfile(label_version_file):
-            with open(label_version_file) as open_version:
-                for line in open_version:
-                    og_type, db_version, db_hash = line.strip().split("\t")
-                    existing_label_db[og_type] = {"version": db_version, "sha256": db_hash}
-                    if check_db:
-                        label_f = os.path.join(LBL_DB_PATH, og_type + ".fasta")
-                        if not os.path.isfile(label_f):
-                            sys.stdout.write(os.path.join(LBL_DB_PATH, og_type + ".fasta") + " not available! "
-                                             "Please run `get_organelle_config.py --clean` to reset!\n")
-                        else:
-                            label_f_hash = cal_f_sha256(label_f)
-                            if db_version not in LABEL_DB_HASH or \
-                                label_f_hash != LABEL_DB_HASH[db_version][og_type]["sha256"] or \
-                                label_f_hash != db_hash:
-                                sys.stdout.write(os.path.join(LBL_DB_PATH, og_type + ".fasta") + " not damaged! "
-                                                 "Please run `get_organelle_config.py --clean` to reset!\n")
-        for og_type in sorted(existing_label_db):
-            db_version = existing_label_db[og_type]["version"]
-            db_hash = existing_label_db[og_type]["sha256"]
-            sys.stdout.write(og_type + " Label Database:\t" + db_version +
-                             str("\t" + db_hash) * int(bool(db_version == "customized")) + "\n")
-    sys.stdout.write("\n")
-    return existing_seed_db, existing_label_db
-
-
 def write_version_file(version_dict, output_to_file):
     with open(output_to_file, "w") as output_f_handler:
         for organelle_type in ORGANELLE_TYPE_LIST:
@@ -307,7 +247,8 @@ def main():
     time_start = time.time()
     description = "get_organelle_config.py " + get_versions() + " is used for setting up default GetOrganelle database."
     options, argv = get_options(description=description)
-    existing_seed_db, existing_label_db = get_current_versions(options.db_type, check_db=options.check)
+    existing_seed_db, existing_label_db = get_current_versions(options.db_type, seq_db_path=SEQ_DB_PATH,
+                                                               lbl_db_path=LBL_DB_PATH, check_db=options.check)
     seed_version_f = os.path.join(SEQ_DB_PATH, "VERSION")
     label_version_f = os.path.join(LBL_DB_PATH, "VERSION")
     seed_url_temp = "https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/SeedDatabase/{1}.fasta"

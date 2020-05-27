@@ -5,7 +5,7 @@ def get_versions():
 
 
 versions = [
-    {"number": "1.7.0-beta3",
+    {"number": "1.7.0-beta4",
      "features": [
          "1. Utilities/slim_fastg -> Utilities/slim_fastg: 1) reorganized; 2) added support for gfa format graph file;"
              "3) --max-slim-extending-len added",
@@ -13,9 +13,12 @@ versions = [
          "3. get_organelle_from_reads.py: "
              "1) use SPAdes generated scaffolds.paths to create gap containing scaffolds (assembly_parser.py)"
              "2) rm --gradient-k "
-             "3) output fasta name modified",
-         "4. get_organelle_from_assembly.py: use SPAdes generated scaffolds.paths to create gap containing "
-             "scaffolds (assembly_parser.py)",
+             "3) output fasta name modified"
+             "4) log Database version",
+         "4. get_organelle_from_assembly.py: "
+             "1) use SPAdes generated scaffolds.paths to create gap containing scaffolds (assembly_parser.py)"
+             "2) output fasta name modified"
+             "3) log Database version",
          "5. assembly_parser.py: 1) merge_all_possible_vertices: fix a bug for overlap=0; 2) reduce_to_subgraph added; "
              "3) processing_polymorphism: fix a bug; "
              "4) class SPAdesScaffolds: use SPAdes generated scaffolds.paths to create gap containing scaffolds",
@@ -23,7 +26,7 @@ versions = [
          "7. Bandage generate temp file",
          "8. README.md: updated",
      ],
-     "time": "2020-03-?? 00:00 GMT-6"},
+     "time": "2020-05-26 21:00 GMT-6"},
     {"number": "1.6.4",
      "features": [
          "1. log plastome structure",

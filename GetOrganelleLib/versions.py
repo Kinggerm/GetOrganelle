@@ -5,6 +5,12 @@ def get_versions():
 
 
 versions = [
+    {"number": "1.7.0-beta5",
+     "features": [
+         "1. get_organelle_config.py: alternative repository (gitee.com/jinjianjun/GetOrganelleDB) added",
+         "2. README.md: updated",
+     ],
+     "time": "2020-05-28 18:40 GMT-6"},
     {"number": "1.7.0-beta4",
      "features": [
          "1. Utilities/slim_fastg -> Utilities/slim_fastg: 1) reorganized; 2) added support for gfa format graph file;"

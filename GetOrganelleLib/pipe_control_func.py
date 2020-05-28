@@ -865,17 +865,21 @@ def detect_bandage_version(which_bandage):
         return "Bandage N/A"
 
 
-def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, log_handler=None):
+def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, log_handler=None,
+                            alternative_url_list=None):
+    remote_urls = [remote_url]
+    if alternative_url_list:
+        remote_urls.extend(alternative_url_list)
     response = False
     count = 0
     while not response and count < try_times:
         try:
             if verbose:
                 if log_handler:
-                    log_handler.info("Connecting to " + remote_url)
+                    log_handler.info("Connecting to " + remote_urls[count % len(remote_urls)])
                 else:
-                    sys.stdout.write("Connecting to " + remote_url + "\n")
-            response = requests.get(remote_url, timeout=timeout)
+                    sys.stdout.write("Connecting to " + remote_urls[count % len(remote_urls)] + "\n")
+            response = requests.get(remote_urls[count % len(remote_urls)], timeout=timeout)
         except (requests.exceptions.ConnectTimeout,
                 requests.exceptions.ConnectionError,
                 ConnectionRefusedError) as e:
@@ -890,8 +894,11 @@ def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, 
 
 
 def download_file_with_progress(remote_url, output_file, log_handler=None, allow_empty=False,
-                                sha256_v=None, try_times=5, timeout=100000, verbose=False):
+                                sha256_v=None, try_times=5, timeout=100000, alternative_url_list=None, verbose=False):
     time_0 = time.time()
+    remote_urls = [remote_url]
+    if alternative_url_list:
+        remote_urls.extend(alternative_url_list)
     temp_file = output_file + ".Temp"
     count_try = 0
     info_list = []
@@ -900,8 +907,8 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
         with open(temp_file, "w") as file_h:
             try:
                 if verbose:
-                    sys.stdout.write("Connecting to " + remote_url + "\n")
-                response = requests.get(remote_url, stream=True, timeout=timeout)
+                    sys.stdout.write("Connecting to " + remote_urls [count_try % len(remote_urls)] + "\n")
+                response = requests.get(remote_urls [count_try % len(remote_urls)], stream=True, timeout=timeout)
                 if response.status_code == requests.codes.ok:
                     total_length = response.headers.get("content-length")
                     if total_length is None:

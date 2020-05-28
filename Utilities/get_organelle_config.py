@@ -49,6 +49,13 @@ SEQ_DB_PATH = os.path.join(GO_LIB_PATH, SEQ_NAME)
 GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", DEP_NAME, SYSTEM_NAME))
 UTILITY_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities")
 
+VERSION_URLS = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/VERSION",
+                "https://gitee.com/jinjianjun/GetOrganelleDB/raw/master/VERSION"]
+seed_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/SeedDatabase/{1}.fasta",
+                 "https://gitee.com/jinjianjun/GetOrganelleDB/raw/master/{0}/SeedDatabase/{1}.fasta"]
+label_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/LabelDatabase/{1}.fasta",
+                  "https://gitee.com/jinjianjun/GetOrganelleDB/raw/master/{0}/LabelDatabase/{1}.fasta"]
+
 
 def get_options(description):
     parser = OptionParser(description=description, usage="get_organelle_config.py -F embplant_pt")
@@ -178,13 +185,13 @@ def get_options(description):
         if options.update:
             options.version = "latest"
         if options.version == "latest":
-            remote_version_url = "https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/VERSION"
-            remote_quest = get_static_html_context(remote_version_url, verbose=options.verbose)
+            remote_quest = get_static_html_context(VERSION_URLS[0], verbose=options.verbose,
+                                                   alternative_url_list=VERSION_URLS[1:])
             if remote_quest["status"]:
                 options.version = remote_quest["content"].strip()
             else:
                 sys.stderr.write("Error: " + remote_quest["info"] + "\n")
-                sys.stderr.write("Please check your connection to github!\n")
+                sys.stderr.write("Please check your connection to github/gitee!\n")
                 sys.stdout.write("\nYou can download the database files from www.github.com/Kinggerm/GetOrganelleDB "
                                  "and install it from from local (flag --use-local)\n")
                 sys.exit()
@@ -250,8 +257,6 @@ def main():
                                                                lbl_db_path=LBL_DB_PATH, check_db=options.check)
     seed_version_f = os.path.join(SEQ_DB_PATH, "VERSION")
     label_version_f = os.path.join(LBL_DB_PATH, "VERSION")
-    seed_url_temp = "https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/SeedDatabase/{1}.fasta"
-    label_url_temp = "https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/LabelDatabase/{1}.fasta"
     time_out = 100000
 
     # Case 1
@@ -320,11 +325,11 @@ def main():
                             initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                      fasta_f=target_output, overwrite=False)
                         else:
-                            this_url = seed_url_temp.format(options.version, sub_o_type)
+                            these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in seed_url_temp]
                             check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
                             status = download_file_with_progress(
-                                remote_url=this_url, output_file=target_output, sha256_v=check_sha256,
-                                timeout=time_out, verbose=options.verbose)
+                                remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
+                                timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
                             if not status["status"]:
                                 sys.stdout.write(
                                     "Installing %s Seed Database failed: %s\n" % (sub_o_type, status["info"]))
@@ -367,10 +372,11 @@ def main():
                             initialize_notation_database(which_blast=options.which_blast,
                                                      fasta_f=target_output, overwrite=False)
                         else:
-                            this_url = label_url_temp.format(options.version, sub_o_type)
+                            these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
                             check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
                             status = download_file_with_progress(
-                                remote_url=this_url, output_file=target_output, sha256_v=check_sha256, timeout=time_out)
+                                remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
+                                timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
                             if not status["status"]:
                                 sys.stdout.write(
                                     "Installing %s Label Database failed: %s\n" % (sub_o_type, status["info"]))
@@ -401,10 +407,11 @@ def main():
                         initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                  fasta_f=target_output, overwrite=True)
                 else:
-                    this_url = seed_url_temp.format(options.version, sub_o_type)
+                    these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in seed_url_temp]
                     check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
                     status = download_file_with_progress(
-                        remote_url=this_url, output_file=target_output, sha256_v=check_sha256, timeout=time_out)
+                        remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
+                        timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
                     if not status["status"]:
                         sys.stdout.write("Installing %s Seed Database failed: %s\n" % (sub_o_type, status["info"]))
                         continue
@@ -433,10 +440,11 @@ def main():
                         initialize_notation_database(which_blast=options.which_blast,
                                                      fasta_f=target_output, overwrite=True)
                 else:
-                    this_url = label_url_temp.format(options.version, sub_o_type)
+                    these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
                     check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
                     status = download_file_with_progress(
-                        remote_url=this_url, output_file=target_output, sha256_v=check_sha256, timeout=time_out)
+                        remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
+                        timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
                     if not status["status"]:
                         sys.stdout.write("Installing %s Label Database failed: %s\n" % (sub_o_type, status["info"]))
                         continue

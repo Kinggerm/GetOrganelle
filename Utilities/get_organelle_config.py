@@ -113,7 +113,6 @@ def get_options(description):
     sys.stdout.write("\nPython " + str(sys.version).replace("\n", " ") + "\n")
     options.which_bowtie2 = detect_bowtie2_path(options.which_bowtie2, GO_DEP_PATH)
     options.which_blast = detect_blast_path(options.which_blast, GO_DEP_PATH)
-    dep_versions_info = []
     bowtie2_v = detect_bowtie2_version(options.which_bowtie2)
     if bowtie2_v.endswith("N/A"):
         sys.stdout.write("ERROR: Bowtie2 is not available!\n")
@@ -122,7 +121,7 @@ def get_options(description):
     if blast_v.endswith("N/A"):
         sys.stdout.write("ERROR: Blast is not available!\n")
         sys.exit()
-    sys.stdout.write("DEPENDENCIES: " + "; ".join(dep_versions_info) + "\n")
+    sys.stdout.write("DEPENDENCIES: " + "; ".join([bowtie2_v, blast_v]) + "\n")
     sys.stdout.write("WORKING DIR: " + os.getcwd() + "\n")
     sys.stdout.write(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n\n")
     if not (options.add_organelle_type or options.rm_organelle_type or options.update or options.clean):

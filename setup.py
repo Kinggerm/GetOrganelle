@@ -58,6 +58,12 @@ except ImportError:
         install_dependencies.append("sympy==1.4")
 else:
     sys.stdout.write("Existed module sympy " + str(sympy.__version__) + "\n")
+try:
+    import requests
+except ImportError:
+    install_dependencies.append("requests")
+else:
+    sys.stdout.write("Existed module requests " + str(requests.__version__) + "\n")
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 LIB_NAME = "GetOrganelleLib"

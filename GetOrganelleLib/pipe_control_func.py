@@ -907,8 +907,8 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
         with open(temp_file, "w") as file_h:
             try:
                 if verbose:
-                    sys.stdout.write("Connecting to " + remote_urls [count_try % len(remote_urls)] + "\n")
-                response = requests.get(remote_urls [count_try % len(remote_urls)], stream=True, timeout=timeout)
+                    sys.stdout.write("Connecting to " + remote_urls[(count_try - 1) % len(remote_urls)] + "\n")
+                response = requests.get(remote_urls[(count_try - 1) % len(remote_urls)], stream=True, timeout=timeout)
                 if response.status_code == requests.codes.ok:
                     total_length = response.headers.get("content-length")
                     if total_length is None:

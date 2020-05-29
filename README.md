@@ -11,8 +11,6 @@ Please denote the versions of GetOrganelle as well as the dependencies in your m
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
-<b>Bug&Usage contact:</b> [jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn) or [jianjun.jin@columbia.edu](mailto:jianjun.jin@columbia.edu); [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn)
-
 Please also cite the dependencies if used:
 
 SPAdes: [Bankevich, A., S. Nurk, D. Antipov, A. A. Gurevich, M. Dvorkin, A. S. Kulikov, V. M. Lesin, S. I. Nikolenko, S. Pham, A. D. Prjibelski, A. V. Pyshkin, A. V. Sirotkin, N. Vyahhi, G. Tesler, M. A. Alekseyev and P. A. Pevzner. 2012. SPAdes: a new genome assembly algorithm and its applications to single-cell sequencing. Journal of Computational Biology 19: 455-477.](https://www.liebertpub.com/doi/abs/10.1089/cmb.2012.0021)
@@ -124,3 +122,12 @@ or see the detailed illustrations:
     get_organelle_from_reads.py --help
 
 
+## Contact
+
+If your question is running specific, please attach the `get_org.log.txt` file and the assembly graph (could be *.png format to protect your data privacy).
+
+* Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues).
+
+* Send email to us ([jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn)/[jianjun.jin@columbia.edu](mailto:jianjun.jin@columbia.edu), [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn))
+
+* Join the QQ group (ID: 859158590)

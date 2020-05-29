@@ -61,7 +61,7 @@ else:
 try:
     import requests
 except ImportError:
-    install_dependencies.append("requests")
+    install_dependencies.append("requests[security]")
 else:
     sys.stdout.write("Existed module requests " + str(requests.__version__) + "\n")
 

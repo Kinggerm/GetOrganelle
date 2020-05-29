@@ -904,7 +904,7 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
     info_list = []
     while count_try < try_times:
         count_try += 1
-        with open(temp_file, "w") as file_h:
+        with open(temp_file, "wb") as file_h:
             try:
                 if verbose:
                     sys.stdout.write("Connecting to " + remote_urls[(count_try - 1) % len(remote_urls)] + "\n")
@@ -912,14 +912,13 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
                 if response.status_code == requests.codes.ok:
                     total_length = response.headers.get("content-length")
                     if total_length is None:
-                        file_h.write(response.content.decode("utf-8"))
+                        file_h.write(response.content)
                     else:
                         total_length = int(total_length)
                         chunk_num = 50
                         chunk_size = int(total_length / chunk_num) + 1
                         go_chunk = 0
                         for data_chunk in response.iter_content(chunk_size=chunk_size):
-                            data_chunk = data_chunk.decode("utf-8")
                             file_h.write(data_chunk)
                             go_chunk += 1
                             sys.stdout.write("\rDownloading %s [%s%s] %i%%" %
@@ -991,7 +990,7 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
 
 def cal_f_sha256(file_name):
     hash_class = hashlib.sha256()
-    hash_class.update(open(file_name).read().encode("utf8"))
+    hash_class.update(open(file_name, "rb").read())
     return hash_class.hexdigest()
 
 

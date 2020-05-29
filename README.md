@@ -36,6 +36,8 @@ Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDB
 
     get_organelle_config.py -a embplant_pt,embplant_mt
     
+Check [Installation from local](https://github.com/Kinggerm/GetOrganelleDB#installation-from-local) if connection keeps failing.
+    
 
 ## Test
 

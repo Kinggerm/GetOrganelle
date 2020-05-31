@@ -36,7 +36,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 * Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, download and initialize the database of your organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, or other_pt). Supposing you are assembling chloroplast genomes:
 
     
-      get_organelle_config.py -a embplant_pt,embplant_mt
+      get_organelle_config.py --add embplant_pt,embplant_mt
     
   Check [Initialization from local files](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization#initialization-from-local-files) if connection keeps failing.
     

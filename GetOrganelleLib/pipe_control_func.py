@@ -912,6 +912,7 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
                 if response.status_code == requests.codes.ok:
                     total_length = response.headers.get("content-length")
                     if total_length is None:
+                        sys.stdout.write("Downloading %s ... \n" % os.path.basename(output_file))
                         file_h.write(response.content)
                     else:
                         total_length = int(total_length)

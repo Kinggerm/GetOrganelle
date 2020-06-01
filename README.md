@@ -63,7 +63,7 @@ Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/
 
 ## Instruction
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#example">Recipe</a ></b>. But you are still recommended to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#recipe">Recipe</a ></b>. But you are still recommended to read the following introductions:
 
 <b>Preparing Data</b>
 

@@ -63,7 +63,7 @@ Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/
 
 ## Instruction
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#recipe">Recipe</a ></b>. But you are still recommended to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#recipe">Recipes</a ></b>. But you are still recommended to read the following introductions:
 
 <b>Preparing Data</b>
 
@@ -87,7 +87,7 @@ Otherwise, if GetOrganelle failed to solve the path (produce `*scaffolds*path_se
 
 ![flowchart](https://user-images.githubusercontent.com/8598031/65656060-086f5e80-e051-11e9-97a2-fb1d2a79375b.png)
 
-## Recipe
+## Recipes
 
 To assembly Embryophyta plant plastome (e.g. using 2G raw data of 150 bp paired reads), typically I use:
 

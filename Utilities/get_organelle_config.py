@@ -50,10 +50,13 @@ GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", DEP_NAME, SYSTEM_
 UTILITY_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities")
 
 VERSION_URLS = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/VERSION",
+                "https://gitlab.com/Kinggerm/GetOrganelleDB/-/raw/master/VERSION",
                 "https://gitee.com/jinjianjun/GetOrganelleDB/raw/master/VERSION"]
 seed_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/SeedDatabase/{1}.fasta",
+                 "https://gitlab.com/Kinggerm/GetOrganelleDB/-/raw/master/{0}/SeedDatabase/{1}.fasta",
                  "https://gitee.com/jinjianjun/GetOrganelleDB/raw/master/{0}/SeedDatabase/{1}.fasta"]
 label_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/{0}/LabelDatabase/{1}.fasta",
+                  "https://gitlab.com/Kinggerm/GetOrganelleDB/-/raw/master/{0}/LabelDatabase/{1}.fasta",
                   "https://gitee.com/jinjianjun/GetOrganelleDB/raw/master/{0}/LabelDatabase/{1}.fasta"]
 
 

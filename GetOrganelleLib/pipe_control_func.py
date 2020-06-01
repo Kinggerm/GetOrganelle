@@ -902,6 +902,7 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
     temp_file = output_file + ".Temp"
     count_try = 0
     info_list = []
+    sys.stdout.write("Downloading %s \n" % os.path.basename(output_file))
     while count_try < try_times:
         count_try += 1
         with open(temp_file, "wb") as file_h:
@@ -912,7 +913,6 @@ def download_file_with_progress(remote_url, output_file, log_handler=None, allow
                 if response.status_code == requests.codes.ok:
                     total_length = response.headers.get("content-length")
                     if total_length is None:
-                        sys.stdout.write("Downloading %s ... \n" % os.path.basename(output_file))
                         file_h.write(response.content)
                     else:
                         total_length = int(total_length)

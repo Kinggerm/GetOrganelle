@@ -85,7 +85,7 @@ Otherwise, if GetOrganelle failed to solve the path (produce `*scaffolds*path_se
 
 <b>GetOrganelle flowchart</b>
 
-![flowchart](https://user-images.githubusercontent.com/8598031/65656060-086f5e80-e051-11e9-97a2-fb1d2a79375b.png)
+![flowchart](https://user-images.githubusercontent.com/8598031/83836465-85afa080-a6c1-11ea-8b08-b08623d974f4.png)
 
 ## Recipes
 

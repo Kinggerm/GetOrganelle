@@ -111,11 +111,11 @@ To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
 To assembly fungus mitochondria:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s fungus_mt_seed.fasta --genes fungus_mt_genes.fasta -R 10 -k 21,45,65,85,105 -F fungus_mt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -R 10 -k 21,45,65,85,105 -F fungus_mt # use your own seed database and label database with "-s" and "--genes" if you fails with the default ones
 
 To assembly animal mitochondria:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -s animal_mt_seed.fasta --genes animal_mt_genes.fasta -R 10 -k 21,45,65,85,105 -F animal_mt
+    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -R 10 -k 21,45,65,85,105 -F animal_mt # use your own seed database and label database with "-s" and "--genes" if you fails with the default ones
 
 See a brief illustrations of those arguments by typing in:
 

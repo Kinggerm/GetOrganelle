@@ -33,7 +33,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 
   You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. If you don't like conda, or want to follow the latest versions, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 
-* Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, download and initialize the database of your organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, or other_pt). Supposing you are assembling chloroplast genomes:
+* Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
 
     
       get_organelle_config.py --add embplant_pt,embplant_mt

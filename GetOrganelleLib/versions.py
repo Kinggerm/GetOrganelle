@@ -5,7 +5,14 @@ def get_versions():
 
 
 versions = [
-    {"number": "1.7.0-beta5",
+    {
+     "number": "1.7.0-beta6",
+     "features": [
+         "1. get_organelle_from_reads.py: make pre-assembly and --ignore-k work for small read length",
+     ],
+     "time": "2020-06-07 01:40 GMT-6"},
+    {
+     "number": "1.7.0-beta5",
      "features": [
          "1. get_organelle_config.py: alternative repository (gitee.com/jinjianjun/GetOrganelleDB) added",
          "2. setup.py: dependent python lib requests added",

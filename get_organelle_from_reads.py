@@ -1178,7 +1178,7 @@ def extend_with_constant_words(baits_pool, raw_fq_files, word_size, output, jump
 def pre_assembly_mapped_reads_for_base_cov(
         original_fq_files, mapped_fq_file, seed_fs_file, mean_read_len, organelle_type,
         threads, resume, which_spades, which_slim, which_blast, log_handler=None, verbose_log=False, keep_temp=False):
-    draft_kmer = 45
+    draft_kmer = min(45, int(mean_read_len / 2) * 2 - 3)
     this_modified_dir = os.path.realpath(mapped_fq_file) + ".spades"
     this_original_graph = os.path.join(this_modified_dir, "assembly_graph.fastg")
     this_modified_base = "assembly_graph.fastg.modified"
@@ -3111,6 +3111,9 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
                           and kmer_d.startswith("K")
                           and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
                          reverse=True)
+    if max(kmer_values) <= ignore_kmer_res:
+        log_handler.info("Small kmer values, resetting \"--ignore-k -1\"")
+        ignore_kmer_res = -1
     kmer_dirs = [os.path.join(spades_output, "K" + str(kmer_val))
                  for kmer_val in kmer_values if kmer_val > ignore_kmer_res]
     in_ex_info = generate_in_ex_info_name(include_indices=include_priority_db, exclude_indices=exclude_db)

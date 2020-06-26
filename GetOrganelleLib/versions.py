@@ -6,6 +6,21 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.0-beta7",
+     "features": [
+         "1. get_organelle_from_reads.py: "
+         "   1) fix option --max-extending-len typo "
+         "   2) --disentangle-time-limit 600 => 1800",
+         "2. get_organelle_from_assembly.py: echo scaffolding.",
+         "3. assembly_parser.Assembly: "
+         "   1) --keep-temp generate more intermediate results "
+         "   2) Vertex: connections[end]: set() -> OrderedDict() "
+         "   3) fix a bug of multiplicity estimation on assembly graph with self-loop contigs",
+         "4. assembly_parser.SPAdesScaffolds: improved with more situations",
+         "5. README.md: updated",
+     ],
+     "time": "2020-06-20 14:00 GMT-6"},
+    {
      "number": "1.7.0-beta6",
      "features": [
          "1. get_organelle_from_reads.py: make pre-assembly and --ignore-k work for small read length",

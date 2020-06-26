@@ -1015,6 +1015,114 @@ def find_string_difference(this_string, this_reference, dynamic_span=2.0):
         return difference, proper_end
 
 
+def map_contigs_to_scaffolds(scaffold, contig, scaffold_start_searching_min=None, scaffold_start_searching_max=None,
+                             word_size=17):
+    # import time
+    # time0 = time.time()
+    # find aligned location
+    len_scaffold = len(scaffold)
+    len_contig = len(contig)
+    assert len_scaffold >= len_contig >= word_size
+    scaffold_start_max = len_scaffold - len_contig
+    if scaffold_start_searching_min is None:
+        scaffold_start_searching_min = 0
+    else:
+        scaffold_start_searching_min = max(min(scaffold_start_searching_min, len_scaffold - word_size), 0)
+    if scaffold_start_searching_max is None:
+        scaffold_start_searching_max = len_scaffold - word_size
+    else:
+        scaffold_start_searching_max = max(min(scaffold_start_searching_max, len_scaffold - word_size), 0)
+    # fast searching for candidates using word size
+    if scaffold_start_searching_min == scaffold_start_searching_max:
+        if scaffold[scaffold_start_searching_min: scaffold_start_searching_min + word_size] != contig[:word_size]:
+            return [None, None, None]
+        alignment_start_at_scaffold = scaffold_start_searching_min
+    else:
+        # generate jump steps, empirically, for speeding up
+        max_jump_space = (scaffold_start_searching_max - scaffold_start_searching_min) ** 0.25
+        jump_s = 1
+        while max_jump_space >= 2:
+            jump_s *= 2
+            max_jump_space /= 2.
+        max_jump_space = (len_contig - word_size + 1) ** 0.25
+        jump_c = 1
+        while max_jump_space >= 3:
+            jump_c *= 3
+            max_jump_space /= 3.
+        candidate_starts = {}
+        while (jump_s >= 1 or jump_c >= 1) and not candidate_starts:
+            scaffold_word_id = {}
+            for go_w in range(scaffold_start_searching_min, scaffold_start_searching_max + 1, jump_s):
+                this_word = scaffold[go_w: go_w + word_size]
+                if this_word not in scaffold_word_id:
+                    scaffold_word_id[this_word] = []
+                scaffold_word_id[this_word].append(go_w)
+            for go_w in range(0, len_contig - word_size, jump_c):
+                this_word = contig[go_w: go_w + word_size]
+                for match_scaffold_id in scaffold_word_id.get(this_word, []):
+                    if 0 <= match_scaffold_id - go_w <= scaffold_start_max:
+                        candidate_starts[match_scaffold_id - go_w] = candidate_starts.get(match_scaffold_id - go_w, 0) + 1
+            if jump_s > jump_c:
+                jump_s = int(jump_s/2) if jump_s >= 2 else jump_s
+            else:
+                jump_c = int(jump_c/3) if jump_c >= 3 else jump_c
+        # # no jump
+        # candidate_starts = {}
+        # scaffold_word_id = {}
+        # for go_w in range(scaffold_start_searching_min, scaffold_start_searching_max + 1):
+        #     this_word = scaffold[go_w: go_w + word_size]
+        #     if this_word not in scaffold_word_id:
+        #         scaffold_word_id[this_word] = []
+        #     scaffold_word_id[this_word].append(go_w)
+
+        # print(len(scaffold_word_id), "len sca word")
+        for go_w in range(0, len_contig - word_size):
+            this_word = contig[go_w: go_w + word_size]
+            for match_scaffold_id in scaffold_word_id.get(this_word, []):
+                if 0 <= match_scaffold_id - go_w <= scaffold_start_max:
+                    candidate_starts[match_scaffold_id - go_w] = candidate_starts.get(match_scaffold_id - go_w, 0) + 1
+        # print(candidate_starts)
+        if not candidate_starts:
+            return [None, None, None]
+        # find the start with the best score
+        alignment_start_at_scaffold = sorted(candidate_starts.items(), key=lambda x: (-x[1], x[0]))[0][0]
+    # time1 = time.time()
+    # find largest matching block
+    matches = [scaffold[alignment_start_at_scaffold + i] == contig[i] for i in range(len_contig)]
+    matching_blocks = []
+    go_base = 0
+    if matches[go_base]:
+        matching_blocks.append([go_base])
+        try:
+            go_base = matches.index(False, go_base)
+        except ValueError:
+            matching_blocks[-1].append(len_contig - 1)   # end_closed_position
+            go_base = len_contig
+    else:
+        try:
+            go_base = matches.index(True, go_base)
+        except ValueError:
+            return [None, None, None]
+    while go_base < len_contig:
+        if matches[go_base]:
+            matching_blocks.append([go_base])
+            try:
+                go_base = matches.index(False, go_base)
+            except ValueError:
+                matching_blocks[-1].append(len_contig - 1)   # end_closed_position
+                go_base = len_contig
+        else:
+            matching_blocks[-1].append(go_base - 1)  # end_closed_position
+            try:
+                go_base = matches.index(True, go_base)
+            except ValueError:
+                break
+    matching_blocks.sort(key=lambda x: x[0] - x[1])  # sort by large_length
+    matching_start_pos_at_contig, matching_end_pos_at_contig = matching_blocks[0]
+    # print(time1-time0, time.time()-time1)
+    return [alignment_start_at_scaffold, matching_start_pos_at_contig, matching_end_pos_at_contig]
+
+
 DEGENERATE_BASES = {"N", "V", "H", "D", "B", "Y", "R", "K", "M", "S", "W"}
 
 DEGENERATE_DICT = {  # degenerate

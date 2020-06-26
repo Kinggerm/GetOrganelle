@@ -149,7 +149,7 @@ def get_options(description, version):
                                  "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
     group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
                             help="=\"-R 10 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws "
-                                 "--disentangle-time-limit 180\" "
+                                 "--disentangle-time-limit 360\" "
                                  "This option is suggested for homogeneously and highly covered data (very fine data). "
                                  "You can overwrite the value of a specific option listed above by adding "
                                  "that option along with the \"--fast\" flag. "
@@ -222,7 +222,7 @@ def get_options(description, version):
                                     ",".join([str(ORGANELLE_EXPECTED_GRAPH_SIZES[this_type])
                                               for this_type in mixed_organelles]) +
                                     " (-F " + ",".join(mixed_organelles) + ")")
-    group_extending.add_option("--max-extending-len", dest="max_slim_extending_len", type=str,
+    group_extending.add_option("--max-extending-len", dest="max_extending_len", type=str,
                                help="Maximum extending length(s) derived from the seed(s). "
                                     "A single value could be a non-negative number, or inf (infinite) "
                                     "or auto (automatic estimation). "
@@ -288,7 +288,7 @@ def get_options(description, version):
                               help="Depth factor for confirming parallel contigs. Default: %default")
     group_assembly.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
                               help="Similarity threshold for confirming parallel contigs. Default: %default")
-    group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=600, type=int,
+    group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=1800, type=int,
                               help="Time limit (second) for each try of disentangling a graph file as a circular "
                                    "genome. Disentangling a graph as contigs is not limited. Default: %default")
     group_assembly.add_option("--expected-max-size", dest="expected_max_size", default='250000', type=str,
@@ -418,7 +418,7 @@ def get_options(description, version):
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
                           help="=\"-R 10 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
-                               "--disentangle-time-limit 180\"")
+                               "--disentangle-time-limit 360\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="21,55,85,115",
                           help="SPAdes kmer settings. Default: %default")
@@ -683,7 +683,7 @@ def get_options(description, version):
                 options.maximum_n_words = 3E7
             options.larger_auto_ws = True
             if "--disentangle-time-limit" not in sys.argv:
-                options.disentangle_time_limit = 180
+                options.disentangle_time_limit = 360
 
         if options.memory_save:
             if "-P" not in sys.argv:
@@ -3201,7 +3201,9 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
             this_K = os.path.split(os.path.split(fastg_f)[0])[-1]
             o_p += "." + this_K
             if with_spades_scaffolds_in:
-                log_in.info("Scaffolding disconnected contigs with GAPs using SPAdes scaffolds ... ")
+                log_in.info("Scaffolding disconnected contigs using SPAdes scaffolds ... ")
+                log_in.warning("Assembly based on scaffolding may not be as accurate as "
+                               "the ones directly exported from the assembly graph.")
             if acyclic_allowed_in:
                 log_in.info("Disentangling " + fastg_f + " as a/an " + in_db_n + "-insufficient graph ... ")
             else:
@@ -3209,8 +3211,17 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
             input_graph = Assembly(fastg_f)
             if with_spades_scaffolds_in:
                 if not input_graph.add_gap_nodes_with_spades_res(os.path.join(spades_output, "scaffolds.fasta"),
-                                                                 os.path.join(spades_output, "scaffolds.paths")):
+                                                                 os.path.join(spades_output, "scaffolds.paths"),
+                                                                 min_cov=options.min_depth, max_cov=options.max_depth,
+                                                                 log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
+                else:
+                    if in_temp_graph:
+                        if in_temp_graph.endswith(".gfa"):
+                            this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"
+                        else:
+                            this_tmp_graph = in_temp_graph + ".scaffolds.gfa"
+                        input_graph.write_to_gfa(this_tmp_graph)
             target_results = input_graph.find_target_graph(tab_f,
                                                            mode=mode_in, database_name=in_db_n, type_factor=type_f,
                                                            log_hard_cov_threshold=hard_c_t,

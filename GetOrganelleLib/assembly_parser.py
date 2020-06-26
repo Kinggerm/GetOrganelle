@@ -3,6 +3,7 @@ import sys
 import re
 from itertools import combinations, product
 from hashlib import sha256
+from collections import OrderedDict
 
 try:
     from sympy import Symbol, solve, lambdify
@@ -67,8 +68,8 @@ class Vertex(object):
         :param coverage: float
         :param forward_seq: str
         :param reverse_seq: str
-        :param tail_connections: set()
-        :param head_connections: set()
+        :param tail_connections: OrderedDict()
+        :param head_connections: OrderedDict()
         :param fastg_form_long_name: str
         self.seq={True: FORWARD_SEQ, False: REVERSE_SEQ}
         self.connections={True: tail_connection_set, False: head_connection_set}
@@ -87,7 +88,11 @@ class Vertex(object):
         else:
             self.seq = {True: None, False: None}
         """ True: tail, False: head """
-        self.connections = {True: set(), False: set()}
+        self.connections = {True: OrderedDict(), False: OrderedDict()}
+        assert tail_connections is None or isinstance(tail_connections, OrderedDict), \
+            "tail_connections must be an OrderedDict()"
+        assert head_connections is None or isinstance(head_connections, OrderedDict), \
+            "head_connections must be an OrderedDict()"
         if tail_connections:
             self.connections[True] = tail_connections
         if head_connections:
@@ -239,8 +244,8 @@ class SimpleAssembly(object):
                             end_1 = {"+": True, "-": False}[end_1]
                             end_2 = {"+": False, "-": True}[end_2]
                             kmer_values.add(alignment_cigar)
-                            self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
-                            self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
+                            self.vertex_info[vertex_1].connections[end_1][(vertex_2, end_2)] = None
+                            self.vertex_info[vertex_2].connections[end_2][(vertex_1, end_1)] = None
             elif gfa_version_number == "2.0":
                 for line in gfa_open:
                     if line.startswith("S\t"):
@@ -302,8 +307,8 @@ class SimpleAssembly(object):
                             end_1 = {"+": True, "-": False}[end_1]
                             end_2 = {"+": False, "-": True}[end_2]
                             kmer_values.add(alignment_cigar)
-                            self.vertex_info[vertex_1].connections[end_1].add((vertex_2, end_2))
-                            self.vertex_info[vertex_2].connections[end_2].add((vertex_1, end_1))
+                            self.vertex_info[vertex_1].connections[end_1][(vertex_2, end_2)] = None
+                            self.vertex_info[vertex_2].connections[end_2][(vertex_1, end_1)] = None
             else:
                 raise ProcessingGraphFailed("Unrecognized GFA version number: " + gfa_version_number)
             if len(kmer_values) == 0:
@@ -347,8 +352,8 @@ class SimpleAssembly(object):
                             next_end = next_vertex_str.endswith("'")
                             # Adding connection information (edge) to both of the related vertices
                             # even it is only mentioned once in some SPAdes output files
-                            self.vertex_info[vertex_name].connections[this_end].add((next_name, next_end))
-                            self.vertex_info[next_name].connections[next_end].add((vertex_name, this_end))
+                            self.vertex_info[vertex_name].connections[this_end][(next_name, next_end)] = None
+                            self.vertex_info[next_name].connections[next_end][(vertex_name, this_end)] = None
                 # sequence
                 if not self.vertex_info[vertex_name].seq[True]:
                     # self.vertex_info[vertex_name]["seq"] = {}
@@ -462,10 +467,10 @@ class Assembly(SimpleAssembly):
             new_name = name_trans[old_name]
             this_v_info = deepcopy(self.vertex_info[old_name])
             this_v_info.name = new_name
-            this_v_info.connections = {True: set(), False: set()}
+            this_v_info.connections = {True: OrderedDict(), False: OrderedDict()}
             for this_end in self.vertex_info[old_name].connections:
                 for next_name, next_end in self.vertex_info[old_name].connections[this_end]:
-                    this_v_info.connections[this_end].add((name_trans[next_name], next_end))
+                    this_v_info.connections[this_end][(name_trans[next_name], next_end)] = None
             this_v_info.fill_fastg_form_name()
             new_graph.vertex_info[new_name] = this_v_info
         return new_graph, name_trans
@@ -572,9 +577,9 @@ class Assembly(SimpleAssembly):
 
     def remove_vertex(self, vertices, update_cluster=True):
         for vertex_name in vertices:
-            for this_end, connected_set in self.vertex_info[vertex_name].connections.items():
-                for next_v, next_e in set(connected_set):
-                    self.vertex_info[next_v].connections[next_e].remove((vertex_name, this_end))
+            for this_end, connected_dict in self.vertex_info[vertex_name].connections.items():
+                for next_v, next_e in connected_dict:
+                    del self.vertex_info[next_v].connections[next_e][(vertex_name, this_end)]
             del self.vertex_info[vertex_name]
             for tag in self.tagged_vertices:
                 if vertex_name in self.tagged_vertices[tag]:
@@ -589,6 +594,39 @@ class Assembly(SimpleAssembly):
         if update_cluster:
             self.update_vertex_clusters()
         self.__inverted_repeat_vertex = {}
+
+    def rename_vertex(self, old_vertex, new_vertex, update_cluster=True):
+        assert old_vertex != new_vertex
+        assert new_vertex not in self.vertex_info, new_vertex + " exists!"
+        self.vertex_info[new_vertex] = deepcopy(self.vertex_info[old_vertex])
+        self.vertex_info[new_vertex].name = new_vertex
+        for this_end in (True, False):
+            for next_v, next_e in self.vertex_info[new_vertex].connections[this_end]:
+                self.vertex_info[next_v].connections[next_e][(new_vertex, this_end)] = \
+                    self.vertex_info[next_v].connections[next_e][(old_vertex, this_end)]
+                del self.vertex_info[next_v].connections[next_e][(old_vertex, this_end)]
+        for tag in self.tagged_vertices:
+            if old_vertex in self.tagged_vertices[tag]:
+                self.tagged_vertices[tag].add(new_vertex)
+                self.tagged_vertices[tag].remove(old_vertex)
+        if old_vertex in self.vertex_to_copy:
+            this_copy = self.vertex_to_copy[old_vertex]
+            self.copy_to_vertex[this_copy].remove(old_vertex)
+            self.copy_to_vertex[this_copy].add(new_vertex)
+            self.vertex_to_copy[new_vertex] = self.vertex_to_copy[old_vertex]
+            del self.vertex_to_copy[old_vertex]
+            self.vertex_to_float_copy[new_vertex] = self.vertex_to_float_copy[old_vertex]
+            del self.vertex_to_float_copy[old_vertex]
+        if self.vertex_info[old_vertex].fastg_form_name:
+            split_long_name = self.vertex_info[old_vertex].fastg_form_name.split("_")
+            self.vertex_info[new_vertex].fastg_form_name = \
+                "_".join([split_long_name[0], new_vertex] + split_long_name[2:])
+        del self.vertex_info[old_vertex]
+        if update_cluster:
+            for go_c, v_cluster in enumerate(self.vertex_clusters):
+                if old_vertex in v_cluster:
+                    self.vertex_clusters[go_c].remove(old_vertex)
+                    self.vertex_clusters[go_c].add(new_vertex)
 
     def detect_parallel_vertices(self, limited_vertices=None):
         if not limited_vertices:
@@ -665,7 +703,7 @@ class Assembly(SimpleAssembly):
 
         # branching ends
         if len(connection_set_t) == len(connection_set_f) == 2:
-            for next_t_v, next_t_e in sorted(connection_set_t):
+            for next_t_v, next_t_e in list(connection_set_t):
                 this_inner_circle = path_without_leakage(next_t_v, next_t_e, connection_set_f)
                 if this_inner_circle:
                     # check leakage in reverse direction
@@ -681,7 +719,7 @@ class Assembly(SimpleAssembly):
                 # keep those prone to be located in the "trunk road" of the repeat
                 single_pair_in_main_path = []
                 if len(all_pairs_of_inner_circles) == 1:
-                    for next_v, next_e in sorted(connection_set_t) + sorted(connection_set_f):
+                    for next_v, next_e in list(connection_set_t) + list(connection_set_f):
                         if (next_v, next_e) not in all_pairs_of_inner_circles[0]:
                             single_pair_in_main_path.append((next_v, next_e))
                     single_pair_in_main_path = tuple(single_pair_in_main_path)
@@ -704,9 +742,9 @@ class Assembly(SimpleAssembly):
         while limited_vertices:
             this_vertex = limited_vertices.pop()
             for this_end in (True, False):
-                connected_set = self.vertex_info[this_vertex].connections[this_end]
-                if len(connected_set) == 1:
-                    next_vertex, next_end = list(connected_set)[0]
+                connected_dict = self.vertex_info[this_vertex].connections[this_end]
+                if len(connected_dict) == 1:
+                    next_vertex, next_end = list(connected_dict)[0]
                     if len(self.vertex_info[next_vertex].connections[next_end]) == 1 and this_vertex != next_vertex:
                         # reverse the names
                         merged = True
@@ -727,17 +765,16 @@ class Assembly(SimpleAssembly):
                         self.vertex_info[new_vertex] = deepcopy(self.vertex_info[this_vertex])
                         self.vertex_info[new_vertex].name = new_vertex
                         self.vertex_info[new_vertex].fastg_form_name = None
-                        # if "long" in self.vertex_info[new_vertex]:
-                        #     del self.vertex_info[new_vertex]["long"]
-                        # connections
+                        # modify connections
                         self.vertex_info[new_vertex].connections[this_end] \
                             = deepcopy(self.vertex_info[next_vertex].connections[not next_end])
                         if (this_vertex, not this_end) in self.vertex_info[new_vertex].connections[this_end]:
-                            self.vertex_info[new_vertex].connections[this_end].remove((this_vertex, not this_end))
-                            self.vertex_info[new_vertex].connections[this_end].add((new_vertex, not this_end))
+                            # forms a circle
+                            del self.vertex_info[new_vertex].connections[this_end][(this_vertex, not this_end)]
+                            self.vertex_info[new_vertex].connections[this_end][(new_vertex, not this_end)] = None
                         for new_end in (True, False):
                             for n_n_v, n_n_e in self.vertex_info[new_vertex].connections[new_end]:
-                                self.vertex_info[n_n_v].connections[n_n_e].add((new_vertex, new_end))
+                                self.vertex_info[n_n_v].connections[n_n_e][(new_vertex, new_end)] = None
                         # len & cov
                         this_len = self.vertex_info[this_vertex].len
                         next_len = self.vertex_info[next_vertex].len
@@ -895,11 +932,13 @@ class Assembly(SimpleAssembly):
                 for next_v, next_e in self.vertex_info[from_vertex].connections[from_end]:
                     # if next_v ~ from_vertex (next_v == from_vertex) form a loop, add a pseudo vertex
                     if (next_v, next_e) == (from_vertex, not from_end):
-                        pseudo_self_circle_str = "P" + from_vertex
-                        if pseudo_self_circle_str not in extra_str_to_symbol:
-                            extra_str_to_symbol[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
-                            extra_symbol_to_str[extra_str_to_symbol[pseudo_self_circle_str]] = pseudo_self_circle_str
-                        result_form -= (extra_str_to_symbol[pseudo_self_circle_str] - 1)
+                        # skip every self-loop 2020-06-23
+                        # pseudo_self_circle_str = "P" + from_vertex
+                        # if pseudo_self_circle_str not in extra_str_to_symbol:
+                        #     extra_str_to_symbol[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
+                        #     extra_symbol_to_str[extra_str_to_symbol[pseudo_self_circle_str]] = pseudo_self_circle_str
+                        # result_form -= (extra_str_to_symbol[pseudo_self_circle_str] - 1)
+                        pass
                     # elif (next_v, next_e) != (back_to_vertex, back_to_end):
                     elif (next_v, next_e) not in here_record_ends:
                         result_form -= get_formula(next_v, next_e, from_vertex, from_end, here_record_ends)
@@ -1026,11 +1065,10 @@ class Assembly(SimpleAssembly):
             for this_end in (True, False):
                 if (vertex_name, this_end) not in recorded_ends:
                     recorded_ends.add((vertex_name, this_end))
-                    connection_set = self.vertex_info[vertex_name].connections[this_end]
-                    if connection_set:  # len([n_v for n_v, n_e in connection_set if n_v in vertices_set]):
+                    if self.vertex_info[vertex_name].connections[this_end]:
                         this_formula = vertex_to_symbols[vertex_name]
                         formulized = False
-                        for n_v, n_e in connection_set:
+                        for n_v, n_e in self.vertex_info[vertex_name].connections[this_end]:
                             if (n_v, n_e) not in recorded_ends:
                                 # if n_v in vertices_set:
                                 # recorded_ends.add((n_v, n_e))
@@ -1081,7 +1119,7 @@ class Assembly(SimpleAssembly):
                 if pseudo_self_loop_str not in extra_str_to_symbol:
                     extra_str_to_symbol[pseudo_self_loop_str] = Symbol(pseudo_self_loop_str, integer=True)
                     extra_symbol_to_str[extra_str_to_symbol[pseudo_self_loop_str]] = pseudo_self_loop_str
-                this_formula = vertex_to_symbols[vertex_name] - (extra_str_to_symbol[pseudo_self_loop_str] - 1)
+                this_formula = vertex_to_symbols[vertex_name] - extra_str_to_symbol[pseudo_self_loop_str]
                 formulae.append(this_formula)
                 if verbose:
                     if log_handler:
@@ -1369,8 +1407,8 @@ class Assembly(SimpleAssembly):
                         del candidate_vertices[go_to_v]
                         continue
                     count_nearby_tagged = []
-                    for can_end, can_connect in self.vertex_info[can_v].connections.items():
-                        for next_v, next_e in can_connect:
+                    for can_end in (True, False):
+                        for next_v, next_e in self.vertex_info[can_v].connections[can_end]:
                             # candidate_v is the only output vertex to next_v
                             if next_v in self.tagged_vertices[database_n] and \
                                     len(self.vertex_info[next_v].connections[next_e]) == 1:
@@ -1799,7 +1837,7 @@ class Assembly(SimpleAssembly):
 
             for new_end in (True, False):
                 for n_n_v, n_n_e in self.vertex_info[new_vertex].connections[new_end]:
-                    self.vertex_info[n_n_v].connections[n_n_e].add((new_vertex, new_end))
+                    self.vertex_info[n_n_v].connections[n_n_e][(new_vertex, new_end)] = None
 
             consensus_s = generate_consensus(
                 *[self.vertex_info[v].seq[directions[go]] for go, v in enumerate(vertices)])
@@ -2092,9 +2130,6 @@ class Assembly(SimpleAssembly):
                         sys.stdout.write("Average " + mode + " base-coverage" + ("(" + str(go_res + 1) + ")") *
                                          echo_graph_id + " = " + "%.1f" % this_b_cov + "\n")
 
-        if broken_graph_allowed:
-            weight_factor = 10000.
-
         if temp_graph:
             if temp_graph.endswith(".gfa"):
                 temp_csv = temp_graph[:-3] + "csv"
@@ -2106,6 +2141,32 @@ class Assembly(SimpleAssembly):
                 temp_csv = temp_graph + ".csv"
         else:
             temp_csv = None
+        count_all_temp = [1]
+
+        def add_temp_id(old_temp_file, extra_str=""):
+            if old_temp_file.endswith(".gfa"):
+                return old_temp_file[:-4] + extra_str + ".gfa"
+            elif old_temp_file.endswith(".csv"):
+                return old_temp_file[:-4] + extra_str + ".csv"
+            else:
+                return old_temp_file + extra_str
+
+        def write_temp_out(_assembly, _database_name, _temp_graph, _temp_csv, go_id):
+            if _temp_graph:
+                tmp_graph_1 = add_temp_id(_temp_graph, ".%02d.%02d" % (count_all_temp[0], go_id))
+                tmp_csv_1 = add_temp_id(_temp_csv, ".%02d.%02d" % (count_all_temp[0], go_id))
+                if verbose:
+                    if log_handler:
+                        log_handler.info("Writing out temp graph (%d): %s" % (go_id, tmp_graph_1))
+                    else:
+                        sys.stdout.write("Writing out temp graph (%d): %s" % (go_id, tmp_graph_1) + "\n")
+                _assembly.write_to_gfa(tmp_graph_1)
+                _assembly.write_out_tags([_database_name], tmp_csv_1)
+                count_all_temp[0] += 1
+
+        if broken_graph_allowed:
+            weight_factor = 10000.
+
         self.parse_tab_file(tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
         is_reasonable_res = False
@@ -2131,14 +2192,7 @@ class Assembly(SimpleAssembly):
                 #                                      contamination_similarity=contamination_similarity,
                 #                                      degenerate=False, verbose=verbose, debug=debug,
                 #                                      log_handler=log_handler)
-                if temp_graph:
-                    if verbose:
-                        if log_handler:
-                            log_handler.info("Writing out temp graph (1): " + temp_graph)
-                        else:
-                            sys.stdout.write("Writing out temp graph (1): " + temp_graph + "\n")
-                    new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([database_name], temp_csv)
+                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 1)
                 changed = True
                 count_large_round = 0
                 while changed:
@@ -2246,14 +2300,7 @@ class Assembly(SimpleAssembly):
                                 del temp_cluster_weights[best_id]
                                 second = max(temp_cluster_weights)
                                 if best < second * weight_factor:
-                                    if temp_graph:
-                                        if verbose:
-                                            if log_handler:
-                                                log_handler.info("Writing out temp graph (2): " + temp_graph)
-                                            else:
-                                                sys.stdout.write("Writing out temp graph (2): " + temp_graph + "\n")
-                                        new_assembly.write_to_gfa(temp_graph)
-                                        new_assembly.write_out_tags([database_name], temp_csv)
+                                    write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 2)
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
                                                                                               "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
@@ -2266,19 +2313,11 @@ class Assembly(SimpleAssembly):
                                                 # print(parameters)
                                                 for mu, sigma in parameters:
                                                     if abs(new_cov - mu) < sigma:
-                                                        if temp_graph:
-                                                            if verbose:
-                                                                if log_handler:
-                                                                    log_handler.info(
-                                                                        "Writing out temp graph (3): " + temp_graph)
-                                                                else:
-                                                                    sys.stdout.write(
-                                                                        "Writing out temp graph (3): " + temp_graph + "\n")
-                                                            new_assembly.write_to_gfa(temp_graph)
-                                                            new_assembly.write_out_tags([database_name], temp_csv)
+                                                        write_temp_out(new_assembly, database_name,
+                                                                       temp_graph, temp_csv, 3)
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
-                                                                                                                     "# tags: " +
+                                                            "# tags: " +
                                                             str(new_assembly.vertex_info[del_v].other_attr.
                                                                 get("tags", {database_name: ""})[database_name]))
 
@@ -2315,14 +2354,7 @@ class Assembly(SimpleAssembly):
                                 if sum([bool(len(cn))
                                         for cn in new_assembly.vertex_info[vertex_name].connections.values()]) != 2:
                                     if vertex_name in new_assembly.tagged_vertices[database_name]:
-                                        if temp_graph:
-                                            if verbose:
-                                                if log_handler:
-                                                    log_handler.info("Writing out temp graph (4): " + temp_graph)
-                                                else:
-                                                    sys.stdout.write("Writing out temp graph (4): " + temp_graph + "\n")
-                                            new_assembly.write_to_gfa(temp_graph)
-                                            new_assembly.write_out_tags([database_name], temp_csv)
+                                        write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 4)
                                         raise ProcessingGraphFailed(
                                             "Incomplete/Complicated graph: please check around EDGE_" + vertex_name + "!")
                                     else:
@@ -2354,23 +2386,9 @@ class Assembly(SimpleAssembly):
                                                          degenerate_similarity=degenerate_similarity,
                                                          verbose=verbose, debug=debug, log_handler=log_handler)
                     new_assembly.tag_in_between(database_n=database_name)
-                    if temp_graph:
-                        if verbose:
-                            if log_handler:
-                                log_handler.info("Writing out temp graph (5): " + temp_graph)
-                            else:
-                                sys.stdout.write("Writing out temp graph (5): " + temp_graph + "\n")
-                        new_assembly.write_to_gfa(temp_graph)
-                        new_assembly.write_out_tags([database_name], temp_csv)
+                    write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 5)
 
-                if temp_graph:
-                    if verbose:
-                        if log_handler:
-                            log_handler.info("Writing out temp graph (6): " + temp_graph)
-                        else:
-                            sys.stdout.write("Writing out temp graph (6): " + temp_graph + "\n")
-                    new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([database_name], temp_csv)
+                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 6)
                 new_assembly.processing_polymorphism(database_name=database_name,
                                                      contamination_depth=contamination_depth,
                                                      contamination_similarity=contamination_similarity,
@@ -2379,14 +2397,7 @@ class Assembly(SimpleAssembly):
                                                      warning_count=1, only_keep_max_cov=only_keep_max_cov,
                                                      verbose=verbose, debug=debug, log_handler=log_handler)
                 new_assembly.merge_all_possible_vertices()
-                if temp_graph:
-                    if verbose:
-                        if log_handler:
-                            log_handler.info("Writing out temp graph (7): " + temp_graph)
-                        else:
-                            sys.stdout.write("Writing out temp graph (7): " + temp_graph + "\n")
-                    new_assembly.write_to_gfa(temp_graph)
-                    new_assembly.write_out_tags([database_name], temp_csv)
+                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 7)
 
                 # create idealized vertices and edges
                 try:
@@ -2501,8 +2512,8 @@ class Assembly(SimpleAssembly):
                         else:
                             # delete all previous connections if all present contigs are labelled
                             for del_v_connection in new_assembly.vertex_info:
-                                new_assembly.vertex_info[del_v_connection].connections = {True: set(),
-                                                                                          False: set()}
+                                new_assembly.vertex_info[del_v_connection].connections = {True: OrderedDict(),
+                                                                                          False: OrderedDict()}
                             new_assembly.update_vertex_clusters()
                         new_average_cov = new_assembly.estimate_copy_and_depth_by_cov(
                             re_initialize=True, log_handler=log_handler, verbose=verbose, mode="all", debug=debug)
@@ -2510,8 +2521,8 @@ class Assembly(SimpleAssembly):
                         for remove_all_connections in (False, True):
                             if remove_all_connections:  # delete all previous connections
                                 for del_v_connection in new_assembly.vertex_info:
-                                    new_assembly.vertex_info[del_v_connection].connections = {True: set(),
-                                                                                              False: set()}
+                                    new_assembly.vertex_info[del_v_connection].connections = {True: OrderedDict(),
+                                                                                              False: OrderedDict()}
                             new_assembly.update_vertex_clusters()
                             try:
                                 here_max_copy = 1 if remove_all_connections else max_contig_multiplicity
@@ -2565,13 +2576,7 @@ class Assembly(SimpleAssembly):
                         if outer_continue:
                             continue
                     elif temp_graph:
-                        if verbose:
-                            if log_handler:
-                                log_handler.info("Writing out temp graph (8): " + temp_graph)
-                            else:
-                                sys.stdout.write("Writing out temp graph (8): " + temp_graph + "\n")
-                        new_assembly.write_to_gfa(temp_graph)
-                        new_assembly.write_out_tags([database_name], temp_csv)
+                        write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 8)
                         raise ProcessingGraphFailed("Complicated " + mode + " graph! Detecting path(s) failed!")
                     else:
                         if verbose and log_handler:
@@ -2614,14 +2619,7 @@ class Assembly(SimpleAssembly):
                         is_reasonable_res = False
                         continue
         except KeyboardInterrupt as e:
-            if temp_graph:
-                if verbose:
-                    if log_handler:
-                        log_handler.info("Writing out temp graph (9): " + temp_graph)
-                    else:
-                        sys.stdout.write("Writing out temp graph (9): " + temp_graph + "\n")
-                new_assembly.write_to_gfa(temp_graph)
-                new_assembly.write_out_tags([database_name], temp_csv)
+            write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 9)
             if log_handler:
                 log_handler.exception("")
                 raise e
@@ -2629,47 +2627,68 @@ class Assembly(SimpleAssembly):
                 raise e
 
     def add_gap_nodes_with_spades_res(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf, log_handler=None,
-                                      update_cluster=True):
-        spades_scaffolds = SpadesScaffolds(scaffold_fasta, scaffold_paths, assembly_obj=self,
-                                           min_cov=min_cov, max_cov=max_cov)
-        overlap = self.__overlap if self.__overlap else 0
-        go_extra = 0
+                                      update_cluster=True, min_identifier_ws=12):
+        spades_scaffolds = SpadesScaffolds(scaffold_fasta, scaffold_paths, assembly_obj=self, log_handler=log_handler,
+                                           min_cov=min_cov, max_cov=max_cov, matching_ws=min_identifier_ws)
+        ctg_olp = self.__overlap if self.__overlap else 0
         gap_added = False
-        for (this_v, this_e), (next_v, next_e), gap_len in spades_scaffolds.vertex_jumping_over_gap:
-            if this_v in self.vertex_info and next_v in self.vertex_info:
-                if (this_v, this_e) in self.vertex_info[next_v].connections[next_e]:
+        rename_dict = {}
+        for (l_name, l_end, l_trim), (r_name, r_end, r_trim), (gap_name, gap_seq, gap_len) \
+                in spades_scaffolds.vertex_jumping_over_gap:
+            if l_name in self.vertex_info and r_name in self.vertex_info:
+                if (l_name, l_end) in self.vertex_info[r_name].connections[r_end]:
                     if log_handler:
-                        log_handler.warning("Connection between " + this_v + ECHO_DIRECTION[this_e] + " and " +
-                                            next_v + ECHO_DIRECTION[next_e] + " already existed!")
+                        log_handler.warning("Connection between " + l_name + ECHO_DIRECTION[l_end] + " and " +
+                                            r_name + ECHO_DIRECTION[r_end] + " already existed!")
                     else:
-                        sys.stdout.write("Warning: Connection between " + this_v + ECHO_DIRECTION[this_e] + " and " +
-                                         next_v + ECHO_DIRECTION[next_e] + " already existed!\n")
+                        sys.stdout.write("Warning: Connection between " + l_name + ECHO_DIRECTION[l_end] + " and " +
+                                         r_name + ECHO_DIRECTION[r_end] + " already existed!\n")
                 else:
-                    gap_added = True
-                    go_extra += 1
+                    if l_trim > 0:
+                        self.vertex_info[l_name].seq[l_end] = self.vertex_info[l_name].seq[l_end][:-l_trim]
+                        self.vertex_info[l_name].seq[not l_end] = self.vertex_info[l_name].seq[not l_end][l_trim:]
+                        assert self.vertex_info[l_name].seq[l_end] == complementary_seq(self.vertex_info[l_name].seq[not l_end])
+                        self.vertex_info[l_name].len -= l_trim
+                        # rename vertex: LT ~ left trimming, RT ~ right trimming
+                        if l_name in rename_dict:
+                            temp_n = rename_dict[l_name]
+                            new_name = temp_n + "RT" + str(l_trim) if l_end else temp_n + "LT" + str(l_trim)
+                        else:
+                            new_name = l_name + "RT" + str(l_trim) if l_end else l_name + "LT" + str(l_trim)
+                        rename_dict[l_name] = new_name
+                    if r_trim > 0:
+                        self.vertex_info[r_name].seq[r_end] = self.vertex_info[r_name].seq[r_end][:-r_trim]
+                        self.vertex_info[r_name].seq[not r_end] = self.vertex_info[r_name].seq[not r_end][r_trim:]
+                        self.vertex_info[r_name].len -= r_trim
+                        # rename vertex: LT ~ left trimming, RT ~ right trimming
+                        if r_name in rename_dict:
+                            temp_n = rename_dict[r_name]
+                            new_name = temp_n + "RT" + str(r_trim) if r_end else temp_n + "LT" + str(r_trim)
+                        else:
+                            new_name = r_name + "RT" + str(r_trim) if r_end else r_name + "LT" + str(r_trim)
+                        assert self.vertex_info[r_name].seq[r_end] == complementary_seq(self.vertex_info[r_name].seq[not r_end])
+                        rename_dict[r_name] = new_name
                     if gap_len >= 0:
-                        this_gap_name = str(go_extra) + "GAP" + str(gap_len)
-                        this_gap_seq = self.vertex_info[this_v].seq[this_e][self.vertex_info[this_v].len - overlap:] + \
-                                       "N" * gap_len + self.vertex_info[next_v].seq[not next_e][:overlap]
-                    elif -overlap < gap_len < 0:
-                        this_gap_name = str(go_extra) + "OVL" + str(-gap_len)
-                        shrink_1 = int(-gap_len/2)
-                        shrink_2 = -gap_len - shrink_1
-                        this_gap_seq = \
-                            self.vertex_info[this_v].seq[this_e][self.vertex_info[this_v].len - overlap: -shrink_1] + \
-                                       self.vertex_info[next_v].seq[not next_e][shrink_2:overlap]
+                        new_seq = self.vertex_info[l_name].seq[l_end][self.vertex_info[l_name].len - ctg_olp:] + \
+                                  gap_seq + \
+                                  self.vertex_info[r_name].seq[not r_end][:ctg_olp]
                     else:
-                        raise ProcessingGraphFailed("Overlap between " + this_v + " and " + next_v + " (" +
-                                                    str(gap_len) + ") is larger than kmer (" + str(overlap) + ")")
-                    self.vertex_info[this_gap_name] = Vertex(this_gap_name,
-                                                             length=len(this_gap_seq),
-                                                             coverage=(self.vertex_info[this_v].cov +
-                                                                       self.vertex_info[next_v].cov) / 2.,
-                                                             forward_seq=this_gap_seq,
-                                                             head_connections={(this_v, this_e)},
-                                                             tail_connections={(next_v, next_e)})
-                    self.vertex_info[this_v].connections[this_e].add((this_gap_name, False))
-                    self.vertex_info[next_v].connections[next_e].add((this_gap_name, True))
+                        new_seq = self.vertex_info[l_name].seq[l_end][self.vertex_info[l_name].len - ctg_olp:] + \
+                                  self.vertex_info[r_name].seq[not r_end][-gap_len:ctg_olp]
+                    new_average_cov = (self.vertex_info[l_name].cov * self.vertex_info[l_name].len +
+                                       self.vertex_info[r_name].cov * self.vertex_info[r_name].len) / \
+                                      (self.vertex_info[l_name].len + self.vertex_info[r_name].len)
+                    self.vertex_info[gap_name] = Vertex(gap_name,
+                                                        length=len(new_seq),
+                                                        coverage=new_average_cov,
+                                                        forward_seq=new_seq,
+                                                        head_connections=OrderedDict([((l_name, l_end), None)]),
+                                                        tail_connections=OrderedDict([((r_name, r_end), None)]))
+                    self.vertex_info[l_name].connections[l_end][(gap_name, False)] = None
+                    self.vertex_info[r_name].connections[r_end][(gap_name, True)] = None
+                    gap_added = True
+        for old_v_name, new_v_name in sorted(rename_dict.items()):
+            self.rename_vertex(old_v_name, new_v_name, update_cluster=False)
         if gap_added and update_cluster:
             self.update_vertex_clusters()
         return gap_added
@@ -2775,8 +2794,8 @@ class Assembly(SimpleAssembly):
                     log_palindrome = True
                     if len(forward_c) == len(reverse_c) == 2:  # simple palindromic repeats, prune repeated connections
                         for go_d, (nb_vertex, nb_direction) in enumerate(tuple(forward_c)):
-                            self.vertex_info[nb_vertex].connections[nb_direction].remove((vertex_n, bool(go_d)))
-                            self.vertex_info[vertex_n].connections[bool(go_d)].remove((nb_vertex, nb_direction))
+                            del self.vertex_info[nb_vertex].connections[nb_direction][(vertex_n, bool(go_d))]
+                            del self.vertex_info[vertex_n].connections[bool(go_d)][(nb_vertex, nb_direction)]
                     elif len(forward_c) == len(reverse_c) == 1:  # connect to the same inverted repeat
                         pass
                     else:  # complicated, recorded
@@ -3005,8 +3024,8 @@ class Assembly(SimpleAssembly):
                     log_palindrome = True
                     if len(temp_f) == len(temp_r) == 2:  # simple palindromic repeats, prune repeated connections
                         for go_d, (nb_vertex, nb_direction) in enumerate(tuple(temp_f)):
-                            self.vertex_info[nb_vertex].connections[nb_direction].remove((vertex_n, bool(go_d)))
-                            self.vertex_info[vertex_n].connections[bool(go_d)].remove((nb_vertex, nb_direction))
+                            del self.vertex_info[nb_vertex].connections[nb_direction][(vertex_n, bool(go_d))]
+                            del self.vertex_info[vertex_n].connections[bool(go_d)][(nb_vertex, nb_direction)]
                     elif len(temp_f) == len(temp_r) == 1:  # connect to the same inverted repeat
                         pass
                     else:  # complicated, recorded
@@ -3187,7 +3206,7 @@ class NaiveKmerNodeGraph(Assembly):
                     recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
                     self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
                     # record the connection as dict() rather than set() for counting
-                    self.vertex_info[this_vertex].connections = {True: {}, False: {}}
+                    self.vertex_info[this_vertex].connections = {True: OrderedDict(), False: OrderedDict()}
                     if not single_chain:
                         recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
                 if go_circle:
@@ -3200,7 +3219,7 @@ class NaiveKmerNodeGraph(Assembly):
                         count_vertices += 1
                         recorded_kmers[prev_kmer_seq] = prev_vertex, prev_end = str(count_vertices), True
                         self.vertex_info[prev_vertex] = prev_v_info = Vertex(prev_vertex, kmer_len, 0., prev_kmer_seq)
-                        self.vertex_info[prev_vertex].connections = {True: {}, False: {}}
+                        self.vertex_info[prev_vertex].connections = {True: OrderedDict(), False: OrderedDict()}
                         if not single_chain:
                             recorded_kmers[prev_v_info.seq[False]] = prev_vertex, not prev_end
                     if (this_vertex, not this_end) not in self.vertex_info[prev_vertex].connections[prev_end]:
@@ -3220,7 +3239,7 @@ class NaiveKmerNodeGraph(Assembly):
                         count_vertices += 1
                         recorded_kmers[this_kmer_seq] = this_vertex, this_end = str(count_vertices), True
                         self.vertex_info[this_vertex] = this_v_info = Vertex(this_vertex, kmer_len, 1., this_kmer_seq)
-                        self.vertex_info[this_vertex].connections = {True: {}, False: {}}
+                        self.vertex_info[this_vertex].connections = {True: OrderedDict(), False: OrderedDict()}
                         if not single_chain:
                             recorded_kmers[this_v_info.seq[False]] = this_vertex, not this_end
                     # add the connection between this_kmer_seq and prev_kmer_seq
@@ -3263,7 +3282,7 @@ class NaiveKmerNodeGraph(Assembly):
                 else:
                     # update next_k_name, next_k_end
                     next_k_n, next_k_e = \
-                        list(self.vertex_info[next_k_n].connections[not next_k_e])[0]
+                        sorted(self.vertex_info[next_k_n].connections[not next_k_e])[0]
             c_name = str(len(in_graph.vertex_info) + 1)
             c_end = False  # start of a contig
             # record connections to be added later
@@ -3369,8 +3388,8 @@ class NaiveKmerNodeGraph(Assembly):
         for joint_kmer_n in joint_kmer_end_to_contig_end:
             for contig_n_1, contig_e_1 in joint_kmer_end_to_contig_end[joint_kmer_n][True]:
                 for contig_n_2, contig_e_2 in joint_kmer_end_to_contig_end[joint_kmer_n][False]:
-                    assembly_graph.vertex_info[contig_n_1].connections[contig_e_1].add((contig_n_2, contig_e_2))
-                    assembly_graph.vertex_info[contig_n_2].connections[contig_e_2].add((contig_n_1, contig_e_1))
+                    assembly_graph.vertex_info[contig_n_1].connections[contig_e_1][(contig_n_2, contig_e_2)] = None
+                    assembly_graph.vertex_info[contig_n_2].connections[contig_e_2][(contig_n_1, contig_e_1)] = None
         return assembly_graph
 
 
@@ -3402,17 +3421,21 @@ class SpadesNodes(Vertex):
 
 
 class SpadesScaffolds(object):
-    def __init__(self, scaffold_fasta, scaffold_paths, assembly_obj, min_cov=0., max_cov=inf, simple_mode=True):
+    def __init__(self, scaffold_fasta, scaffold_paths, assembly_obj, min_cov=0., max_cov=inf,
+                 min_contig_len=11, matching_ws=15, log_handler=None):
         if not os.path.exists(scaffold_fasta):
             raise FileNotFoundError(scaffold_fasta + " not found!")
         if not os.path.exists(scaffold_paths):
             raise FileNotFoundError(scaffold_paths + " not found!")
         self.nodes = {}
-        # self.vertex_jumping_over_gap_dict = {}  # {(v_name, v_end): {"next": (next_name, next_end), "len": int}}
-        self.vertex_jumping_over_gap = []  # item = [(v_name, v_end), (next_name, next_end), gap_len<int>]
+        self.vertex_jumping_over_gap = []  
+        # each_item = [(left_name, left_end, left_trim),
+        #              (right_name, right_end, right_trim),
+        #              (gap_name, gap_seq, gap_len)]
         sequence_matrix = SequenceList(scaffold_fasta, indexed=True)
+        graph_overlap = assembly_obj.overlap()
         with open(scaffold_paths) as path_handler:
-            go_gap = len(sequence_matrix) + 1
+            go_patch = 1
             line = path_handler.readline().strip()
             while line:
                 # supposing it's recorded in balance by SPAdes, skip the reverse direction record
@@ -3431,87 +3454,137 @@ class SpadesScaffolds(object):
                         line = path_handler.readline().strip()
                         path_strings.append(line.strip(";"))
                     # read sequences
-                    if len(path_strings) == 1:
-                        if not simple_mode:
-                            sub_name = node_name + "S" + str(0)
-                            try:
-                                self.nodes[sub_name] = SpadesNodes(sub_name, coverage=node_cov,
-                                                                   path_str=path_strings[0], assembly_obj=assembly_obj)
-                            except KeyError:
-                                line = path_handler.readline().strip()
-                                continue
-                    else:
+                    if len(path_strings) != 1:
                         full_path_seq = sequence_matrix[long_name].seq
-                        last_vertex_end = []
-                        last_sub_seq_range = []
-                        arbitrary_jump = False  # cannot find the position of this sub-seq in scaffolds.fasta
+                        last_v_name, last_v_end = "", False
+                        arbitrary_break = False  # cannot find the position of this sub-seq in scaffolds.fasta
+                        gap_len = full_path_seq.count("N")
+                        last_matching_end_at_scaffold = None
+                        last_end_at_scaffold = None
                         for go_sub_path, sub_path in enumerate(path_strings):
                             sub_name = node_name + "S" + str(go_sub_path)
                             try:
                                 self.nodes[sub_name] = SpadesNodes(sub_name, coverage=node_cov,
                                                                    path_str=sub_path, assembly_obj=assembly_obj)
-                            except KeyError:
+                            except KeyError:  # skip paths with pruned nodes
                                 break
                             this_sub_seq = str(self.nodes[sub_name].seq[True])
-                            if arbitrary_jump:
-                                start_point = last_sub_seq_range[1] + 10
+                            len_this_sub = len(this_sub_seq)
+                            if len_this_sub <= min_contig_len:
+                                break
+                            check_ws = min(matching_ws, len_this_sub)
+                            if go_sub_path == 0:
+                                searching_min = 0
+                                searching_max = 0
                             else:
-                                if len(this_sub_seq) < len(full_path_seq):
-                                    # shrink half kmer because terminals are usually error-prone
-                                    shrink_end = int(assembly_obj.overlap()/2)
-                                    start_point = [m.start() for m in
-                                                   re.finditer(this_sub_seq[shrink_end:-shrink_end], full_path_seq)]
-                                    if len(start_point) == 0:  # cannot find the substring, shrink more
-                                        middle_point = int(len(this_sub_seq) / 2)
-                                        check_start = middle_point - min(shrink_end, int(0.25 * len(this_sub_seq)))
-                                        check_end = middle_point + min(shrink_end, int(0.25 * len(this_sub_seq))) + 1
-                                        start_point = [m.start() for m in
-                                                       re.finditer(this_sub_seq[check_start:check_end], full_path_seq)]
-                                        if len(start_point) == 0:  # cannot find the substring in the end
-                                            arbitrary_jump = True
-                                            start_point = 0 if go_sub_path == 0 else last_sub_seq_range[1] + 10
-                                            # raise ProcessingGraphFailed(
-                                            #     "incompatible(1) assembly_graph and scaffolds.fasta/scaffolds.paths!")
-                                        elif len(start_point) > 1:
-                                            arbitrary_jump = True
-                                            start_point = 0 if go_sub_path == 0 else last_sub_seq_range[1] + 10
-                                        else:
-                                            start_point = start_point[0] - check_start
-                                    elif len(start_point) > 1:
-                                        arbitrary_jump = True
-                                        start_point = 0 if go_sub_path == 0 else last_sub_seq_range[1] + 10
-                                        # raise ProcessingGraphFailed(
-                                        #     "multiple matches of " + node_name + " in scaffolds.fasta/scaffolds.paths!")
+                                if arbitrary_break:
+                                    if last_matching_end_at_scaffold is None:
+                                        searching_min = None
                                     else:
-                                        start_point = start_point[0] - shrink_end
+                                        searching_min = last_matching_end_at_scaffold - check_ws
+                                    searching_max = None
                                 else:
-                                    start_point = 0
-                            end_point = start_point + self.nodes[sub_name].len
-                            # print(start_point, end_point)
-                            if go_sub_path > 0:  # if there's an previous gap/overlap, add the connection
-                                this_gap_len = start_point - last_sub_seq_range[1]
-                                if this_gap_len >= 0:
-                                    gap_name = str(go_gap) + "GAP" + str(this_gap_len)
+                                    # for speeding up
+                                    searching_min = last_matching_end_at_scaffold - check_ws
+                                    searching_max = last_matching_end_at_scaffold - check_ws + gap_len + len_this_sub
+                            this_start_at_scaffold, matching_start_at_alm, matching_end_at_alm = \
+                                map_contigs_to_scaffolds(scaffold=full_path_seq, contig=this_sub_seq,
+                                                         scaffold_start_searching_min=None,  # searching_min,
+                                                         scaffold_start_searching_max=None,  # searching_max,
+                                                         word_size=check_ws)
+                            # check matching location
+                            # print((last_v_name, last_v_end), self.nodes[sub_name].vertices_path[0],
+                            #       this_start_at_scaffold, matching_start_at_alm, matching_end_at_alm)
+                            # print(this_sub_seq[:20])
+                            if this_start_at_scaffold is None or \
+                                    (matching_end_at_alm - matching_start_at_alm + 1 < graph_overlap):
+                                arbitrary_break = True
+                                continue
+                            else:
+                                arbitrary_break = False
+                                if go_sub_path == 0:
+                                    last_v_name, last_v_end = self.nodes[sub_name].vertices_path[-1]
+                                    last_matching_end_at_scaffold = this_start_at_scaffold + matching_end_at_alm
+                                    last_end_at_scaffold = this_start_at_scaffold + len_this_sub - 1
                                 else:
-                                    gap_name = str(go_gap) + "OVL" + str(-this_gap_len)
-                                self.nodes[gap_name] = SpadesNodes(gap_name, this_gap_len, 1.0, forward_seq="")
-                                if not simple_mode:
-                                    self.nodes[sub_name].connections[False].add((gap_name, True))
-                                    self.nodes[gap_name].connections[True].add((sub_name, False))
-                                    previous_sub_name = node_name + "S" + str(go_sub_path - 1)
-                                    self.nodes[previous_sub_name].connections[True].add((gap_name, False))
-                                    self.nodes[gap_name].connections[False].add((previous_sub_name, True))
-                                #
-                                this_vertex, this_end = self.nodes[sub_name].vertices_path[0]
-                                self.vertex_jumping_over_gap.append(
-                                    [last_vertex_end, (this_vertex, not this_end), this_gap_len])
-                                go_gap += 1
-                            # elif go_sub_path == len(path_strings) - 1:
-                            #     if not end_point == len(full_path_seq):
-                            #         raise ProcessingGraphFailed(
-                            #             "incompatible(2) assembly_graph and scaffolds.fasta/scaffolds.paths!")
-                            last_vertex_end = self.nodes[sub_name].vertices_path[-1]
-                            last_sub_seq_range = [start_point, end_point]
+                                    this_matching_start_at_scaffold = this_start_at_scaffold + matching_start_at_alm
+                                    this_matching_end_at_scaffold = this_start_at_scaffold + matching_end_at_alm
+                                    this_end_at_scaffold = this_start_at_scaffold + len_this_sub - 1
+                                    trim_last = last_end_at_scaffold - last_matching_end_at_scaffold
+                                    trim_this = this_matching_start_at_scaffold - this_start_at_scaffold
+                                    # code checking
+                                    assert trim_this >= 0
+                                    assert trim_last >= 0
+                                    # code checking
+                                    seemingly_gap_len = this_start_at_scaffold - last_end_at_scaffold - 1
+                                    if seemingly_gap_len >= 0:
+                                        # if there's extra bases beyond the original two sub seqs
+                                        gap_name = str(go_patch) + "GAP" + str(seemingly_gap_len)
+                                    else:
+                                        gap_name = str(go_patch) + "OVL" + str(-seemingly_gap_len)
+                                    real_gap_len = this_matching_start_at_scaffold - last_matching_end_at_scaffold - 1
+                                    this_v_name, this_v_end = self.nodes[sub_name].vertices_path[0]  
+                                    this_v_name, this_v_end = this_v_name, not this_v_end  # starting vertex
+                                    last_fix = bool(assembly_obj.vertex_info[last_v_name].connections[last_v_end])
+                                    this_fix = bool(assembly_obj.vertex_info[this_v_name].connections[this_v_end])
+                                    go_to_standard_jumping = False
+                                    if (last_fix and trim_last) or (this_fix and trim_this):
+                                        if log_handler:
+                                            log_handler.warning(
+                                                str(-gap_len) + "-bp gap/overlap between " + last_v_name + " and " +
+                                                this_v_name + " indicated while conflicting connections existed!")
+                                        else:
+                                            sys.stdout.write("Warning: " + str(-gap_len) + "-bp gap/overlap "
+                                                "between " + last_v_name + " and " + this_v_name +
+                                                " indicated while conflicting connections existed!\n")
+                                    elif last_fix and this_fix:
+                                        # trim_last == trim_this == 0
+                                        # seemingly_gap_len == real_gap_len
+                                        if -real_gap_len > graph_overlap:
+                                            # if there's >kmer overlap but both of those vertices should fix
+                                            # leading gap sequence to be illegal
+                                            if log_handler:
+                                                log_handler.warning(
+                                                    str(-gap_len) + "-bp overlap between " + last_v_name + " and " +
+                                                    this_v_name + " indicated while conflicting connections existed!")
+                                            else:
+                                                sys.stdout.write("Warning: " + str(-gap_len) + "-bp overlap "
+                                                    "between " + last_v_name + " and " + this_v_name + " indicated "
+                                                    "while conflicting connections existed!\n")
+                                        else:
+                                            go_to_standard_jumping = True
+                                    elif this_fix:
+                                        # trim_last==0
+                                        if -real_gap_len > graph_overlap:
+                                            self.vertex_jumping_over_gap.append(
+                                                [(last_v_name, last_v_end, trim_last - real_gap_len - graph_overlap),
+                                                 (this_v_name, this_v_end, trim_this),
+                                                 (gap_name, "", -graph_overlap)])
+                                            go_patch += 1
+                                        else:
+                                            go_to_standard_jumping = True
+                                    else:
+                                        # last_fix or not (this_fix or last_fix)
+                                        # trim_last==0
+                                        if -real_gap_len > graph_overlap:
+                                            self.vertex_jumping_over_gap.append(
+                                                [(last_v_name, last_v_end, trim_last),
+                                                 (this_v_name, this_v_end, trim_this - real_gap_len - graph_overlap),
+                                                 (gap_name, "", -graph_overlap)])
+                                            go_patch += 1
+                                        else:
+                                            go_to_standard_jumping = True
+                                    if go_to_standard_jumping:
+                                        this_gap_seq = full_path_seq[last_matching_end_at_scaffold + 1:
+                                                                     this_matching_start_at_scaffold]
+                                        self.vertex_jumping_over_gap.append(
+                                            [(last_v_name, last_v_end, trim_last),
+                                             (this_v_name, this_v_end, trim_this),
+                                             (gap_name, this_gap_seq, real_gap_len)])
+                                        go_patch += 1
+                                    last_v_name, last_v_end = self.nodes[sub_name].vertices_path[-1]
+                                    last_matching_end_at_scaffold = this_matching_end_at_scaffold
+                                    last_end_at_scaffold = this_end_at_scaffold
                 line = path_handler.readline().strip()
 
 

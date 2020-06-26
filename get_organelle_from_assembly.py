@@ -537,7 +537,9 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                max_s=inf, min_s=0, spades_scaffold_p_in=False,
                                acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
             if spades_scaffold_p_in:
-                log_in.info("Scaffolding disconnected contigs with GAPs using SPAdes scaffolds ... ")
+                log_in.info("Scaffolding disconnected contigs using SPAdes scaffolds ... ")
+                log_in.warning("Assembly based on scaffolding may not be as accurate as "
+                               "the ones directly exported from the assembly graph.")
             if acyclic_allowed_in:
                 log_in.info("Disentangling " + fastg_f + " as a/an " + in_db_n + "-insufficient graph ... ")
             else:
@@ -546,8 +548,17 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             input_graph = Assembly(fastg_f)
             if spades_scaffold_p_in:
                 if not input_graph.add_gap_nodes_with_spades_res(os.path.join(spades_scaffold_p_in, "scaffolds.fasta"),
-                                                                 os.path.join(spades_scaffold_p_in, "scaffolds.paths")):
+                                                                 os.path.join(spades_scaffold_p_in, "scaffolds.paths"),
+                                                                 min_cov=options.min_depth, max_cov=options.max_depth,
+                                                                 log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
+                else:
+                    if in_temp_graph:
+                        if in_temp_graph.endswith(".gfa"):
+                            this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"
+                        else:
+                            this_tmp_graph = in_temp_graph + ".scaffolds.gfa"
+                        input_graph.write_to_gfa(this_tmp_graph)
             if no_slim:
                 input_graph.estimate_copy_and_depth_by_cov(mode=mode_in, log_handler=log_in, verbose=verbose_in)
                 target_results = input_graph.estimate_copy_and_depth_precisely(

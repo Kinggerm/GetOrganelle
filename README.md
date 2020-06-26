@@ -33,7 +33,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 
   You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. If you don't like conda, or want to follow the latest versions, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 
-* Since v1.7.0, default databases are isolated to a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
+* Since v1.7.0, the default databases are isolated as a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
 
     
       get_organelle_config.py --add embplant_pt,embplant_mt
@@ -43,20 +43,16 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 
 ## Test
 
-Let's get started with assembling the _Arabidopsis thaliana_ chloroplast genome from [a simulated WGS dataset](https://github.com/Kinggerm/GetOrganelleComparison/tree/master/test/data1):
+Let's get started with assembling the _Arabidopsis thaliana_ chloroplast genome from [a simulated WGS dataset](https://github.com/Kinggerm/GetOrganelleGallery/tree/master/Test/reads):
 
-    wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/data1/Arabidopsis_simulated.1.fq.gz
-    wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/data1/Arabidopsis_simulated.2.fq.gz
-
-download the seed - the complete plastome of the common bean (_Phaseolus vulgaris_ L., [EU196765.1](https://www.ncbi.nlm.nih.gov/nuccore/EU196765.1/)):
-    
-    wget https://github.com/Kinggerm/GetOrganelleComparison/raw/master/test/seed/Phaseolus_vulgaris_plastome.fasta
+    wget https://github.com/Kinggerm/GetOrganelleGallery/raw/master/Test/reads/Arabidopsis_simulated.1.fq.gz
+    wget https://github.com/Kinggerm/GetOrganelleGallery/raw/master/Test/reads/Arabidopsis_simulated.2.fq.gz
 
 then do the fast plastome assembly (memory: ~600MB, CPU time: ~60s):
 
-    get_organelle_from_reads.py -1 Arabidopsis_simulated.1.fq.gz -2 Arabidopsis_simulated.2.fq.gz -t 1 -o Arabidopsis_simulated.plastome -F embplant_pt -R 10 -s Phaseolus_vulgaris_plastome.fasta
+    get_organelle_from_reads.py -1 Arabidopsis_simulated.1.fq.gz -2 Arabidopsis_simulated.2.fq.gz -t 1 -o Arabidopsis_simulated.plastome -F embplant_pt -R 10
 
-You are going to get a similar running log as [here](https://github.com/Kinggerm/GetOrganelle/wiki/Example-2#running-log) and the same result as [here](https://github.com/Kinggerm/GetOrganelleComparison/tree/master/test/data1/Arabidopsis_simulated.plastome-user.seed).
+You are going to get a similar running log as [here](https://github.com/Kinggerm/GetOrganelle/wiki/Example-1#running-log) and the same result as [here](https://github.com/Kinggerm/GetOrganelleGallery/tree/master/Test/results/Arabidopsis_simulated.plastome).
 
 Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/GetOrganelle/wiki/Examples) and the [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison) repository.
 

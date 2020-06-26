@@ -19,7 +19,7 @@ versions = [
          "4. assembly_parser.SPAdesScaffolds: improved with more situations",
          "5. README.md: updated",
      ],
-     "time": "2020-06-20 14:00 GMT-6"},
+     "time": "2020-06-26 03:00 GMT-6"},
     {
      "number": "1.7.0-beta6",
      "features": [

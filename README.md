@@ -43,7 +43,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 
 ## Test
 
-Let's get started with assembling the _Arabidopsis thaliana_ chloroplast genome from [a simulated WGS dataset](https://github.com/Kinggerm/GetOrganelleGallery/tree/master/Test/reads):
+Download [a simulated _Arabidopsis thaliana_ WGS dataset](https://github.com/Kinggerm/GetOrganelleGallery/tree/master/Test/reads):
 
     wget https://github.com/Kinggerm/GetOrganelleGallery/raw/master/Test/reads/Arabidopsis_simulated.1.fq.gz
     wget https://github.com/Kinggerm/GetOrganelleGallery/raw/master/Test/reads/Arabidopsis_simulated.2.fq.gz

@@ -128,7 +128,7 @@ To extract the plastome from an existing assembly graph (`*.fastg`/`*.gfa`):
 
 ## Contact
 
-If your question is running specific, please attach the `get_org.log.txt` file and the assembly graph (could be *.png format to protect your data privacy).
+If your question is running specific, please attach the `get_org.log.txt` file and the post-slimming assembly graph (`assembly_graph.fastg.extend_*.fastg`, could be Bandage-visualized *.png format to protect your data privacy).
 
 * Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues).
 

@@ -3,7 +3,6 @@
 import datetime
 import shutil
 from copy import deepcopy
-from itertools import combinations
 from math import log
 try:
     from math import inf
@@ -11,11 +10,8 @@ except ImportError:
     inf = float("inf")
 from optparse import OptionParser, OptionGroup
 import GetOrganelleLib
-from GetOrganelleLib.versions import get_versions
-from GetOrganelleLib.pipe_control_func import *
 from GetOrganelleLib.seq_parser import *
-from GetOrganelleLib.sam_parser import *
-from GetOrganelleLib.assembly_parser import get_graph_coverages_range_simple, ProcessingGraphFailed, Assembly
+from GetOrganelleLib.pipe_control_func import *
 import time
 import random
 import subprocess
@@ -592,22 +588,24 @@ def get_options(description, version):
         log_handler.info("Python " + str(sys.version).replace("\n", " "))
         # log versions of dependencies
         lib_versions_info = []
+        lib_not_available = []
+        lib_versions_info.append("GetOrganelleLib " + GetOrganelleLib.__version__)
         try:
             import numpy
         except ImportError:
-            pass
+            lib_not_available.append("numpy")
         else:
             lib_versions_info.append("numpy " + numpy.__version__)
         try:
             import sympy
         except ImportError:
-            pass
+            lib_not_available.append("sympy")
         else:
             lib_versions_info.append("sympy " + sympy.__version__)
         try:
             import scipy
         except ImportError:
-            pass
+            lib_not_available.append("scipy")
         else:
             lib_versions_info.append("scipy " + scipy.__version__)
         try:
@@ -858,10 +856,15 @@ def get_options(description, version):
         # if not executable(os.path.join(options.which_bowtie2, "bowtie2-build-l")):
         #     log_handler.error(os.path.join(options.which_bowtie2, "bowtie2-build-l") + " not accessible!")
         #     exit()
+        run_slim = False
+        run_disentangle = False
         if options.run_spades:
             if options.which_spades:
-                if not executable(os.path.join(options.which_spades, "spades.py")):
+                if not executable(os.path.join(options.which_spades, "spades.py -h")):
                     raise Exception("spades.py not found/executable in " + options.which_spades + "!")
+                else:
+                    run_slim = True
+                    run_disentangle = True
             else:
                 options.which_spades = ""
                 if not executable("spades.py -h"):
@@ -869,10 +872,22 @@ def get_options(description, version):
                                         "Adding SPAdes binary dir to the PATH or using \"--which-spades\" to fix this. "
                                         "Now only get the reads and skip assembly.")
                     options.run_spades = False
+                else:
+                    run_slim = True
+                    run_disentangle = True
             if not executable(os.path.join(options.which_blast, "blastn")):
-                log_handler.warning(os.path.join(options.which_blast, "blastn") + " not accessible!")
+                log_handler.warning(os.path.join(options.which_blast, "blastn") +
+                                    " not accessible! Slimming disabled!")
+                run_slim = False
+                run_disentangle = False
             if options.genes_fasta and not executable(os.path.join(options.which_blast, "makeblastdb")):
-                log_handler.warning(os.path.join(options.which_blast, "makeblastdb") + " not accessible!")
+                log_handler.warning(os.path.join(options.which_blast, "makeblastdb") +
+                                    " not accessible! Slimming disabled!")
+                run_slim = False
+                run_disentangle = False
+            if lib_not_available:
+                log_handler.warning("/".join(lib_not_available) + " not available! Disentangling disabled!")
+                run_disentangle = False
         options.rm_duplicates = int(options.rm_duplicates)
         options.pre_grouped = int(options.pre_grouped)
         if not options.rm_duplicates and options.pre_grouped:
@@ -900,13 +915,14 @@ def get_options(description, version):
             pass
         else:
             np.random.seed(options.random_seed)
-        return options, log_handler, previous_attributes
+        return options, log_handler, previous_attributes, run_slim, run_disentangle
 
 
 def estimate_maximum_n_reads_using_mapping(
         twice_max_coverage, check_dir, original_fq_list, reads_paired,
         designed_maximum_n_reads, seed_files, organelle_types, target_genome_sizes,
         keep_temp, resume, which_blast, which_spades, which_bowtie2, threads, random_seed, verbose_log, log_handler):
+    from GetOrganelleLib.sam_parser import MapRecords, get_cover_range
     if executable(os.path.join(UTILITY_PATH, "slim_graph.py -h")):
         which_slim = UTILITY_PATH
     elif executable(os.path.join(PATH_OF_THIS_SCRIPT, "slim_graph.py -h")):
@@ -1019,14 +1035,16 @@ def estimate_maximum_n_reads_using_mapping(
             coverages_2 = [pos for ref in coverage_info for pos in coverage_info[ref] if pos > 0]
             base_cov_values = get_cover_range(coverages_2, guessing_percent=BASE_COV_SAMPLING_PERCENT)
             mean_read_len, max_read_len, all_read_nums = get_read_len_mean_max_count(mapped_fq, inf)
-            try:
-                base_cov_values = pre_assembly_mapped_reads_for_base_cov(
-                    original_fq_files=check_fq_files, mapped_fq_file=mapped_fq, seed_fs_file=seed_f,
-                    mean_read_len=mean_read_len, organelle_type=organelle_type, threads=threads, resume=resume,
-                    which_spades=which_spades, which_slim=which_slim, which_blast=which_blast,
-                    log_handler=log_handler if verbose_log else None, verbose_log=verbose_log)
-            except NotImplementedError:
-                pass
+            if executable(os.path.join(which_spades, "spades.py -h")) and \
+                    executable(os.path.join(which_bowtie2, "bowtie2")):
+                try:
+                    base_cov_values = pre_assembly_mapped_reads_for_base_cov(
+                        original_fq_files=check_fq_files, mapped_fq_file=mapped_fq, seed_fs_file=seed_f,
+                        mean_read_len=mean_read_len, organelle_type=organelle_type, threads=threads, resume=resume,
+                        which_spades=which_spades, which_slim=which_slim, which_blast=which_blast,
+                        log_handler=log_handler if verbose_log else None, verbose_log=verbose_log)
+                except NotImplementedError:
+                    pass
             if base_cov_values[1] < min_valid_cov_to_estimate:
                 data_size_checked = [check_percents[go_f] * fq_size
                                      for go_f, fq_size in enumerate(original_fq_sizes)]
@@ -1178,18 +1196,17 @@ def extend_with_constant_words(baits_pool, raw_fq_files, word_size, output, jump
 def pre_assembly_mapped_reads_for_base_cov(
         original_fq_files, mapped_fq_file, seed_fs_file, mean_read_len, organelle_type,
         threads, resume, which_spades, which_slim, which_blast, log_handler=None, verbose_log=False, keep_temp=False):
+    from GetOrganelleLib.assembly_parser import get_graph_coverages_range_simple
     draft_kmer = min(45, int(mean_read_len / 2) * 2 - 3)
     this_modified_dir = os.path.realpath(mapped_fq_file) + ".spades"
     this_original_graph = os.path.join(this_modified_dir, "assembly_graph.fastg")
     this_modified_base = "assembly_graph.fastg.modified"
     this_modified_graph = this_original_graph + ".modified.fastg"
-    cp_command = "cp " + this_original_graph + " " + this_modified_graph
     more_fq_file = os.path.realpath(mapped_fq_file) + ".more.fq"
     more_modified_dir = more_fq_file + ".spades"
     more_original_graph = os.path.join(more_modified_dir, "assembly_graph.fastg")
     more_modified_base = "assembly_graph.fastg.modified"
     more_modified_graph = more_original_graph + ".modified.fastg"
-    cp_command_more = "cp " + more_original_graph + " " + more_modified_graph
     if resume and (os.path.exists(this_modified_graph) or os.path.exists(more_modified_graph)):
         if os.path.exists(more_modified_graph) and os.path.getsize(more_modified_graph) > 0:
             kmer_cov_values = get_graph_coverages_range_simple(read_fasta(more_modified_graph))
@@ -1218,7 +1235,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                     log_handler.error('\n' + output.decode("utf8").strip())
                 raise NotImplementedError
             if which_slim is None:
-                subprocess.Popen(cp_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                shutil.copy(this_original_graph, this_modified_graph)
             else:
                 which_bl_str = " --which-blast " + which_blast if which_blast else ""
                 slim_command = os.path.join(which_slim, "slim_graph.py") + \
@@ -1236,7 +1253,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                         log_handler.error("slimming the pre-assembled graph failed.")
                     if verbose_log and log_handler:
                         log_handler.error("\n" + output.decode("utf8").strip())
-                    subprocess.Popen(cp_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                    shutil.copy(this_original_graph, this_modified_graph)
                 elif os.path.getsize(this_modified_graph) == 0:
                     raise OSError("modified graph")
             kmer_cov_values = get_graph_coverages_range_simple(read_fasta(this_modified_graph))
@@ -1273,9 +1290,8 @@ def pre_assembly_mapped_reads_for_base_cov(
                     log_handler.error('\n' + output.decode("utf8").strip())
                 raise NotImplementedError
             else:
-                if which_slim is None:
-                    subprocess.Popen(
-                        cp_command_more, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                if which_slim is None or not executable(os.path.join(which_blast, "blastn")):
+                    shutil.copy(more_original_graph, more_modified_graph)
                 else:
                     which_bl_str = " --which-blast " + which_blast if which_blast else ""
                     slim_command = os.path.join(which_slim, "slim_graph.py") + \
@@ -1293,14 +1309,12 @@ def pre_assembly_mapped_reads_for_base_cov(
                             log_handler.error("slimming the pre-assembled graph failed.")
                         if verbose_log and log_handler:
                             log_handler.error("\n" + output.decode("utf8").strip())
-                        subprocess.Popen(
-                            cp_command_more, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                        shutil.copy(more_original_graph, more_modified_graph)
                     elif os.path.getsize(more_modified_graph) == 0:
                         if log_handler:
                             log_handler.warning("No target found in the pre-assembled graph/seed. "
                                                 "GetOrganelle is still trying ..")
-                        subprocess.Popen(
-                            cp_command_more, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                        shutil.copy(more_original_graph, more_modified_graph)
                 kmer_cov_values = get_graph_coverages_range_simple(read_fasta(more_modified_graph))
                 base_cov_values = [this_word_cov * mean_read_len / (mean_read_len - draft_kmer + 1)
                                    for this_word_cov in kmer_cov_values]
@@ -1314,6 +1328,9 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
                      log_handler, which_spades, which_blast, which_bowtie2,
                      wc_bc_ratio_constant=0.35, larger_auto_ws=False,
                      threads=1, resume=False, random_seed=12345, verbose_log=False, zip_files=False):
+    from GetOrganelleLib.sam_parser import MapRecords, get_cover_range, mapping_gap_info_from_coverage_dict
+    from itertools import combinations
+
     if word_size is None or -1 in max_extending_len:
         log_handler.info("The automatically-estimated parameter(s) do not ensure the best choice(s).")
         log_handler.info("If the result graph is not a circular organelle genome, ")
@@ -1364,90 +1381,101 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
         # if base_cov_values[0] < 100 and set(organelle_types) != {"embplant_pt"}:
         # if word_size is None:
         if word_size is None or max_extending_len[go_t] == -1:
-            log_handler.info("Pre-assembling mapped reads ...")
-            try:
-                base_cov_values = pre_assembly_mapped_reads_for_base_cov(
-                    original_fq_files=original_fq_files, mapped_fq_file=seed_fq_files[go_t],
-                    seed_fs_file=seed_fs_files[go_t], mean_read_len=mean_read_len,
-                    organelle_type=organelle_types[go_t],
-                    threads=threads, resume=resume, log_handler=log_handler, verbose_log=verbose_log,
-                    which_spades=which_spades, which_slim=which_slim, which_blast=which_blast)
-            except NotImplementedError:
-                if max_extending_len[go_t] == -1:
-                    log_handler.warning(
-                        "Pre-assembling failed. The estimations for " + organelle_types[go_t] + "-hitting "
-                        "base-coverage, -w, --max-extending-len may be misleading.")
+            if executable(os.path.join(which_spades, "spades.py -h")) and \
+                    executable(os.path.join(which_bowtie2, "bowtie2")):
+                log_handler.info("Pre-assembling mapped reads ...")
+                try:
+                    base_cov_values = pre_assembly_mapped_reads_for_base_cov(
+                        original_fq_files=original_fq_files, mapped_fq_file=seed_fq_files[go_t],
+                        seed_fs_file=seed_fs_files[go_t], mean_read_len=mean_read_len,
+                        organelle_type=organelle_types[go_t],
+                        threads=threads, resume=resume, log_handler=log_handler, verbose_log=verbose_log,
+                        which_spades=which_spades, which_slim=which_slim, which_blast=which_blast)
+                except NotImplementedError:
+                    if max_extending_len[go_t] == -1:
+                        log_handler.warning(
+                            "Pre-assembling failed. The estimations for " + organelle_types[go_t] + "-hitting "
+                            "base-coverage, -w, --max-extending-len may be misleading.")
+                    else:
+                        log_handler.warning(
+                            "Pre-assembling failed. "
+                            "The estimations for " + organelle_types[go_t] + "-hitting base-coverage "
+                            "and word size may be misleading.")
+                    pass
                 else:
-                    log_handler.warning(
-                        "Pre-assembling failed. "
-                        "The estimations for " + organelle_types[go_t] + "-hitting base-coverage "
-                        "and word size may be misleading.")
-                pass
+                    log_handler.info("Pre-assembling mapped reads finished.")
             else:
-                log_handler.info("Pre-assembling mapped reads finished.")
+                log_handler.warning(
+                    "No pre-assembling due to insufficient dependencies! "
+                    "The estimations for " + organelle_types[go_t] +
+                    "-hitting base-coverage and word size may be misleading.")
         base_coverages_by_organelles.append((base_cov_values[1], (base_cov_values[2] - base_cov_values[0]) / 2))
         log_handler.info(
             "Estimated " + organelle_types[go_t] + "-hitting base-coverage = " + "%.2f" % base_cov_values[1])
         #
-        if max_extending_len[go_t] == -1:  # auto
-            best_seed, gap_percent, largest_gap_lens = mapping_gap_info_from_coverage_dict(coverage_info)
-            log_handler.info("Closest " + organelle_types[go_t] + " seed sequence: " + str(best_seed))
-            # redo quick-mapping with the closest seed
-            if os.path.exists(this_modified_graph):
-                simulated_fq_f = os.path.join(seed_fq_files[go_t] + ".spades",
-                                              "get_org.assembly_graph.simulated.fq")
-                simulate_fq_simple(from_fasta_file=this_modified_graph,
-                                   out_dir=seed_fq_files[go_t] + ".spades",
-                                   out_name="get_org.assembly_graph.simulated.fq",
-                                   sim_read_jump_size=7, resume=resume)
-                closest_seed_f = os.path.join(seed_fq_files[go_t] + ".spades", "get_org.closest_seed.fasta")
-                seed_seq_list = SequenceList(seed_fs_files[go_t])
-                for seq_record in seed_seq_list:
-                    if seq_record.label.startswith(best_seed):
-                        with open(closest_seed_f + ".Temp", "w") as out_closest:
-                            out_closest.write(seq_record.fasta_str() + "\n")
-                        os.rename(closest_seed_f + ".Temp", closest_seed_f)
-                        break
-                bowtie_out_base = os.path.join(seed_fq_files[go_t] + ".spades", "get_org.map_to_closest")
-                map_with_bowtie2(seed_file=closest_seed_f, original_fq_files=[simulated_fq_f],
-                                 bowtie_out=bowtie_out_base, resume=resume, threads=threads,
-                                 random_seed=random_seed, target_echo_name=organelle_types[go_t],
-                                 log_handler=log_handler, generate_fq=False, silent=verbose_log,
-                                 which_bowtie2=which_bowtie2, bowtie2_mode="--very-fast-local")
-                mapping_records = MapRecords(bowtie_out_base + ".sam")
-                mapping_records.update_coverages()
-                coverage_info = mapping_records.coverages
+        if executable(os.path.join(which_spades, "spades.py -h")) and \
+                executable(os.path.join(which_bowtie2, "bowtie2")):
+            if max_extending_len[go_t] == -1:  # auto
                 best_seed, gap_percent, largest_gap_lens = mapping_gap_info_from_coverage_dict(coverage_info)
-                # if not keep_temp:
-                #     os.remove(simulated_fq_f)
-                if zip_files:
-                    zip_file(source=bowtie_out_base + ".sam", target=bowtie_out_base + ".sam.tar.gz",
-                             verbose_log=verbose_log, log_handler=log_handler, remove_source=True)
-                    zip_file(source=simulated_fq_f, target=simulated_fq_f + ".tar.gz",
-                             verbose_log=verbose_log, log_handler=log_handler, remove_source=True)
-            log_handler.info("Unmapped percentage " + "%1.4f" % gap_percent + " and unmapped lengths " +
-                             " ".join([str(g_l) for g_l in largest_gap_lens[:5]]) + " ..")
-            cov_dev_percent = (base_cov_values[2] - base_cov_values[0]) / 2 / base_cov_values[1]
-            # if organelle_types[go_t] == "animal_mt":
-            #     # empirical function
-            #     max_extending_len[go_t] = largest_gap_lens[0] / 2. * (1 + gap_percent ** 2) * (1 + cov_dev_percent ** 2)
-            #     max_extending_len[go_t] = min(int(math.ceil(max_extending_len[go_t] / 100)) * 100, 15000)
-            # else:
-            if len(coverage_info[best_seed]) < target_genome_sizes[go_t] / 10. or gap_percent > 0.4:
-                max_extending_len[go_t] = inf
-            else:
-                if largest_gap_lens:
-                    # empirical function
-                    max_extending_len[go_t] = largest_gap_lens[0] / 2. * (1 + gap_percent ** 0.5) \
-                                              * (1 + cov_dev_percent ** 0.5)
+                log_handler.info("Closest " + organelle_types[go_t] + " seed sequence: " + str(best_seed))
+                # redo quick-mapping with the closest seed
+                if os.path.exists(this_modified_graph):
+                    simulated_fq_f = os.path.join(seed_fq_files[go_t] + ".spades",
+                                                  "get_org.assembly_graph.simulated.fq")
+                    simulate_fq_simple(from_fasta_file=this_modified_graph,
+                                       out_dir=seed_fq_files[go_t] + ".spades",
+                                       out_name="get_org.assembly_graph.simulated.fq",
+                                       sim_read_jump_size=7, resume=resume)
+                    closest_seed_f = os.path.join(seed_fq_files[go_t] + ".spades", "get_org.closest_seed.fasta")
+                    seed_seq_list = SequenceList(seed_fs_files[go_t])
+                    for seq_record in seed_seq_list:
+                        if seq_record.label.startswith(best_seed):
+                            with open(closest_seed_f + ".Temp", "w") as out_closest:
+                                out_closest.write(seq_record.fasta_str() + "\n")
+                            os.rename(closest_seed_f + ".Temp", closest_seed_f)
+                            break
+                    bowtie_out_base = os.path.join(seed_fq_files[go_t] + ".spades", "get_org.map_to_closest")
+                    map_with_bowtie2(seed_file=closest_seed_f, original_fq_files=[simulated_fq_f],
+                                     bowtie_out=bowtie_out_base, resume=resume, threads=threads,
+                                     random_seed=random_seed, target_echo_name=organelle_types[go_t],
+                                     log_handler=log_handler, generate_fq=False, silent=verbose_log,
+                                     which_bowtie2=which_bowtie2, bowtie2_mode="--very-fast-local")
+                    mapping_records = MapRecords(bowtie_out_base + ".sam")
+                    mapping_records.update_coverages()
+                    coverage_info = mapping_records.coverages
+                    best_seed, gap_percent, largest_gap_lens = mapping_gap_info_from_coverage_dict(coverage_info)
+                    # if not keep_temp:
+                    #     os.remove(simulated_fq_f)
+                    if zip_files:
+                        zip_file(source=bowtie_out_base + ".sam", target=bowtie_out_base + ".sam.tar.gz",
+                                 verbose_log=verbose_log, log_handler=log_handler, remove_source=True)
+                        zip_file(source=simulated_fq_f, target=simulated_fq_f + ".tar.gz",
+                                 verbose_log=verbose_log, log_handler=log_handler, remove_source=True)
+                log_handler.info("Unmapped percentage " + "%1.4f" % gap_percent + " and unmapped lengths " +
+                                 " ".join([str(g_l) for g_l in largest_gap_lens[:5]]) + " ..")
+                cov_dev_percent = (base_cov_values[2] - base_cov_values[0]) / 2 / base_cov_values[1]
+                # if organelle_types[go_t] == "animal_mt":
+                #     # empirical function
+                #     max_extending_len[go_t] = largest_gap_lens[0] / 2. * (1 + gap_percent ** 2) * (1 + cov_dev_percent ** 2)
+                #     max_extending_len[go_t] = min(int(math.ceil(max_extending_len[go_t] / 100)) * 100, 15000)
+                # else:
+                if len(coverage_info[best_seed]) < target_genome_sizes[go_t] / 10. or gap_percent > 0.4:
+                    max_extending_len[go_t] = inf
                 else:
-                    max_extending_len[go_t] = 1
-                # if more.fq was used,
-                # previous empirical formula is not estimating the gap based on the initial mapped fq
-                # so the gap could be actually larger by 2 * (max_read_len - gathering_word_size)
-                if gathering_word_size is not None:
-                    max_extending_len[go_t] += 2 * (max_read_len - gathering_word_size)
-                max_extending_len[go_t] = int(math.ceil(max_extending_len[go_t]/100)) * 100
+                    if largest_gap_lens:
+                        # empirical function
+                        max_extending_len[go_t] = largest_gap_lens[0] / 2. * (1 + gap_percent ** 0.5) \
+                                                  * (1 + cov_dev_percent ** 0.5)
+                    else:
+                        max_extending_len[go_t] = 1
+                    # if more.fq was used,
+                    # previous empirical formula is not estimating the gap based on the initial mapped fq
+                    # so the gap could be actually larger by 2 * (max_read_len - gathering_word_size)
+                    if gathering_word_size is not None:
+                        max_extending_len[go_t] += 2 * (max_read_len - gathering_word_size)
+                    max_extending_len[go_t] = int(math.ceil(max_extending_len[go_t]/100)) * 100
+        else:
+            max_extending_len[go_t] = inf
 
     # check the divergence of coverages of different organelle genomes
     for estimated_a, estimated_b in combinations(base_coverages_by_organelles, 2):
@@ -2905,6 +2933,7 @@ def making_seed_reads_using_mapping(seed_file, original_fq_files,
 def get_anti_lines_using_mapping(anti_seed, seed_sam_files, original_fq_files,
                                  out_base, resume, verbose_log, threads,
                                  random_seed, prefix, keep_temp, bowtie2_other_options, log_handler, which_bowtie2=""):
+    from GetOrganelleLib.sam_parser import get_heads_from_sam_fast
     seed_dir = os.path.join(out_base, prefix + "seed")
     if not os.path.exists(seed_dir):
         os.mkdir(seed_dir)
@@ -3183,6 +3212,7 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
 def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_fg, organelle_prefix,
                              organelle_type, blast_db, read_len_for_log, verbose, log_handler, basic_prefix,
                              expected_maximum_size, expected_minimum_size, do_spades_scaffolding, options):
+    from GetOrganelleLib.assembly_parser import ProcessingGraphFailed, Assembly
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
                              mode="embplant_pt", blast_db_base="embplant_pt", contamination_depth=3.,
                              contamination_similarity=0.95, degenerate=True,
@@ -3212,7 +3242,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
             if with_spades_scaffolds_in:
                 if not input_graph.add_gap_nodes_with_spades_res(os.path.join(spades_output, "scaffolds.fasta"),
                                                                  os.path.join(spades_output, "scaffolds.paths"),
-                                                                 min_cov=options.min_depth, max_cov=options.max_depth,
+                                                                 # min_cov=options.min_depth, max_cov=options.max_depth,
                                                                  log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
                 else:
@@ -3452,9 +3482,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                      time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
                                      temp_graph=graph_temp_file)
             except ImportError as e:
-                log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
-                if verbose:
-                    log_handler.error(str(e))
+                log_handler.error("Disentangling failed: " + str(e))
                 return False
             except AttributeError as e:
                 if verbose:
@@ -3498,9 +3526,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 except FileNotFoundError:
                     log_handler.warning("scaffolds.fasta and/or scaffolds.paths not found!")
                 except ImportError as e:
-                    log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
-                    if verbose:
-                        log_handler.error(str(e))
+                    log_handler.error("Disentangling failed: " + str(e))
                     return False
                 except AttributeError as e:
                     if verbose:
@@ -3548,8 +3574,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                  time_limit=3600, timeout_flag_str=timeout_flag,
                                                  temp_graph=graph_temp_file)
                     except (ImportError, AttributeError) as e:
-                        if verbose:
-                            log_handler.error(str(e))
+                        log_handler.error("Disentangling failed: " + str(e))
                         break
                     except RuntimeError as e:
                         if verbose:
@@ -3575,7 +3600,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         log_handler.info("you can also adjust the arguments to try again.")
                         log_handler.info("If you have questions for us, "
                                          "please provide us with the get_org.log.txt file "
-                                         "and the graph in the format you like!")
+                                         "and the post-slimming graph in the format you like!")
                         # log.info("-------------------------------------------------------")
                         break
             if not export_succeeded:
@@ -3588,25 +3613,27 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                  "' in " + ",".join(["K" + str(k_val) for k_val in kmer_values]))
                 log_handler.info("visualize and export your result in Bandage.")
                 log_handler.info("If you have questions for us, please provide us with the get_org.log.txt file "
-                                 "and the graph in the format you like!")
+                                 "and the post-slimming graph in the format you like!")
         else:
             # slim failed with unknown error
             log_handler.info("Please ...")
             log_handler.info("load the graph file: " + os.path.join(spades_output, 'assembly_graph.fastg'))
             log_handler.info("visualize and export your result in Bandage.")
             log_handler.info("If you have questions for us, please provide us with the get_org.log.txt file "
-                             "and the graph in the format you like!")
+                             "and the post-slimming graph in the format you like!")
     return export_succeeded
 
 
 def main():
     time0 = time.time()
+    from GetOrganelleLib.versions import get_versions
     title = "GetOrganelle v" + str(get_versions()) + \
             "\n" \
             "\nget_organelle_from_reads.py assembles organelle genomes from genome skimming data." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
-    options, log_handler, previous_attributes = get_options(description=title, version=get_versions())
+    options, log_handler, previous_attributes, run_slim, run_disentangle = \
+        get_options(description=title, version=get_versions())
 
     resume = options.script_resume
     verb_log = options.verbose_log
@@ -3934,7 +3961,7 @@ def main():
                 log_handler.info("Compressing files finished.\n")
 
         """ export organelle """
-        if is_assembled:
+        if is_assembled and run_slim:
             slim_stat_list = slim_spades_result(organelle_types=options.organelle_type,
                                                 in_custom=options.genes_fasta, ex_custom=options.exclude_genes,
                                                 spades_output=spades_output, ignore_kmer_res=options.ignore_kmer_res,
@@ -3951,45 +3978,48 @@ def main():
                                  "with the get_org.log.txt file.\n")
             elif 0 in slim_stat_codes:
                 log_handler.info("Slimming assembly graphs finished.\n")
-                organelle_type_prefix = []
-                duplicated_o_types = {o_type: 1
-                                      for o_type in options.organelle_type if options.organelle_type.count(o_type) > 1}
-                for here_type in options.organelle_type:
-                    if here_type in duplicated_o_types:
-                        organelle_type_prefix.append(here_type + "-" + str(duplicated_o_types[here_type]))
-                        duplicated_o_types[here_type] += 1
-                    else:
-                        organelle_type_prefix.append(here_type)
-                for go_t, sub_organelle_type in enumerate(options.organelle_type):
-                    og_prefix = options.prefix + organelle_type_prefix[go_t]
-                    graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base)
-                                          if gfa_f.startswith(og_prefix) and gfa_f.endswith(".selected_graph.gfa")])
-                    fasta_existed = bool([fas_f for fas_f in os.listdir(out_base)
-                                          if fas_f.startswith(og_prefix) and fas_f.endswith(".path_sequence.fasta")])
-                    if resume and graph_existed and fasta_existed:
-                        log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ... skipped.\n")
-                    else:
-                        # log_handler.info("Parsing assembly graph and outputting ...")
-                        log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ...")
-                        if options.genes_fasta:
-                            db_base_name = remove_db_postfix(os.path.basename(options.genes_fasta[go_t]))
+                if run_disentangle:
+                    organelle_type_prefix = []
+                    duplicated_o_types = {o_type: 1
+                                          for o_type in options.organelle_type
+                                          if options.organelle_type.count(o_type) > 1}
+                    for here_type in options.organelle_type:
+                        if here_type in duplicated_o_types:
+                            organelle_type_prefix.append(here_type + "-" + str(duplicated_o_types[here_type]))
+                            duplicated_o_types[here_type] += 1
                         else:
-                            db_base_name = sub_organelle_type
-                        ext_res = extract_organelle_genome(out_base=out_base, spades_output=spades_output,
-                                                           ignore_kmer_res=options.ignore_kmer_res,
-                                                           slim_out_fg=slim_fastg_file, organelle_prefix=og_prefix,
-                                                           organelle_type=sub_organelle_type,
-                                                           blast_db=db_base_name,
-                                                           read_len_for_log=mean_read_len,
-                                                           verbose=options.verbose_log, log_handler=log_handler,
-                                                           basic_prefix=options.prefix,
-                                                           expected_minimum_size=options.expected_min_size[go_t],
-                                                           expected_maximum_size=options.expected_max_size[go_t],
-                                                           options=options, do_spades_scaffolding=reads_paired["input"])
-                        if ext_res:
-                            log_handler.info("Extracting " + sub_organelle_type + " from the assemblies finished.\n")
+                            organelle_type_prefix.append(here_type)
+                    for go_t, sub_organelle_type in enumerate(options.organelle_type):
+                        og_prefix = options.prefix + organelle_type_prefix[go_t]
+                        graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base)
+                                              if gfa_f.startswith(og_prefix) and gfa_f.endswith(".selected_graph.gfa")])
+                        fasta_existed = bool([fas_f for fas_f in os.listdir(out_base)
+                                              if fas_f.startswith(og_prefix) and fas_f.endswith(".path_sequence.fasta")])
+                        if resume and graph_existed and fasta_existed:
+                            log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ... skipped.\n")
                         else:
-                            log_handler.info("Extracting " + sub_organelle_type + " from the assemblies failed.\n")
+                            # log_handler.info("Parsing assembly graph and outputting ...")
+                            log_handler.info("Extracting " + sub_organelle_type + " from the assemblies ...")
+                            if options.genes_fasta:
+                                db_base_name = remove_db_postfix(os.path.basename(options.genes_fasta[go_t]))
+                            else:
+                                db_base_name = sub_organelle_type
+                            ext_res = extract_organelle_genome(out_base=out_base, spades_output=spades_output,
+                                                               ignore_kmer_res=options.ignore_kmer_res,
+                                                               slim_out_fg=slim_fastg_file, organelle_prefix=og_prefix,
+                                                               organelle_type=sub_organelle_type,
+                                                               blast_db=db_base_name,
+                                                               read_len_for_log=mean_read_len,
+                                                               verbose=options.verbose_log, log_handler=log_handler,
+                                                               basic_prefix=options.prefix,
+                                                               expected_minimum_size=options.expected_min_size[go_t],
+                                                               expected_maximum_size=options.expected_max_size[go_t],
+                                                               options=options,
+                                                               do_spades_scaffolding=reads_paired["input"])
+                            if ext_res:
+                                log_handler.info("Extracting " + sub_organelle_type + " from the assemblies finished.\n")
+                            else:
+                                log_handler.info("Extracting " + sub_organelle_type + " from the assemblies failed.\n")
 
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")

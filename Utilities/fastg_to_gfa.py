@@ -2,10 +2,6 @@
 """This script converts a fastg file into a fasta file"""
 import sys
 import os
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
-from GetOrganelleLib.assembly_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
 
 
 def main():
@@ -15,6 +11,9 @@ def main():
                 print("Usage: fastg2gfa.py *.fastg")
                 break
         else:
+            path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+            sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+            from GetOrganelleLib.assembly_parser import Assembly
             for fastg in sys.argv[1:]:
                 this_assembly = Assembly(fastg)
                 this_assembly.write_to_gfa(fastg + ".gfa")
@@ -23,6 +22,9 @@ def main():
             fastg = input('Please input gfa file:').strip()
         else:
             fastg = raw_input('Please input gfa file:').strip()
+        path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+        sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+        from GetOrganelleLib.assembly_parser import Assembly
         if fastg.strip():
             this_assembly = Assembly(fastg)
             this_assembly.write_to_gfa(fastg + ".gfa")

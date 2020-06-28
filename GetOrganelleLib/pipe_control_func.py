@@ -5,7 +5,6 @@ import sys
 import os
 import hashlib
 from multiprocessing import Pool
-import requests
 
 
 MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
@@ -39,7 +38,6 @@ DEAD_CODE = {"2.7+": 32512, "3.5+": 127}[python_version]
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
-from GetOrganelleLib.seq_parser import *
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 
@@ -463,6 +461,7 @@ MEM_TRANS = {"K": 1024, "M": 1048576, "G": 1073741824}
 
 class LogInfo:
     def __init__(self, sample_out_dir, prefix=""):
+        from GetOrganelleLib.seq_parser import SequenceList
         self.header = ["sample", "organelle_type", "fastq_format", "mean_error_rate",
                        "trim_percent", "trim_int", "trim_chars",
                        "mean_read_len", "max_read_len", "num_reads_1", "seed_read_filesize",
@@ -867,6 +866,7 @@ def detect_bandage_version(which_bandage):
 
 def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, log_handler=None,
                             alternative_url_list=None):
+    import requests
     remote_urls = [remote_url]
     if alternative_url_list:
         remote_urls.extend(alternative_url_list)
@@ -896,6 +896,7 @@ def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, 
 def download_file_with_progress(remote_url, output_file, log_handler=None, allow_empty=False,
                                 sha256_v=None, try_times=5, timeout=100000, alternative_url_list=None, verbose=False):
     time_0 = time.time()
+    import requests
     remote_urls = [remote_url]
     if alternative_url_list:
         remote_urls.extend(alternative_url_list)

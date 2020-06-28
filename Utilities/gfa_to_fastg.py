@@ -2,10 +2,7 @@
 """This script converts a gfa (Graphical Fragment Assembly) file into a fastg file"""
 import sys
 import os
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
-from GetOrganelleLib.assembly_parser import Assembly
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+
 
 
 def main():
@@ -15,6 +12,9 @@ def main():
                 print("Usage: gfa2fastg.py *.gfa")
                 break
         else:
+            path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+            sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+            from GetOrganelleLib.assembly_parser import Assembly
             for gfa_file in sys.argv[1:]:
                 Assembly(gfa_file).write_to_fastg(gfa_file + '.fastg', rename_if_needed=True, echo_rename_warning=True)
     else:
@@ -22,6 +22,9 @@ def main():
             gfa_file = input('Please input gfa file:').strip()
         else:
             gfa_file = raw_input('Please input gfa file:').strip()
+        path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+        sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+        from GetOrganelleLib.assembly_parser import Assembly
         if gfa_file.strip():
             Assembly(gfa_file).write_to_fastg(gfa_file + '.fastg', rename_if_needed=True, echo_rename_warning=True)
 

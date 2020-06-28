@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import sympy
-import scipy
 
 try:
     from math import inf
@@ -9,9 +7,8 @@ except ImportError:
     inf = float("inf")
 from optparse import OptionParser
 import GetOrganelleLib
-from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.pipe_control_func import *
-from GetOrganelleLib.assembly_parser import *
+from GetOrganelleLib.seq_parser import read_fasta, detect_plastome_architecture, DEGENERATE_BASES
 import time
 import random
 import subprocess
@@ -324,9 +321,28 @@ def get_options(description, version):
         log_handler.info("Python " + str(sys.version).replace("\n", " "))
         # log versions of dependencies
         lib_versions_info = list()
-        lib_versions_info.append("numpy " + np.__version__)
-        lib_versions_info.append("sympy " + sympy.__version__)
-        lib_versions_info.append("scipy " + scipy.__version__)
+        lib_versions_info.append("GetOrganelleLib " + GetOrganelleLib.__version__)
+        try:
+            import numpy as np
+        except ImportError:
+            log_handler.error("numpy is not available! Please install numpy!")
+            sys.exit()
+        else:
+            lib_versions_info.append("numpy " + np.__version__)
+        try:
+            import sympy
+        except ImportError:
+            log_handler.error("sympy is not available! Please install sympy!")
+            sys.exit()
+        else:
+            lib_versions_info.append("sympy " + sympy.__version__)
+        try:
+            import scipy
+        except ImportError:
+            log_handler.error("scipy is not available! Please install scipy!")
+            sys.exit()
+        else:
+            lib_versions_info.append("scipy " + scipy.__version__)
         log_handler.info("PYTHON LIBS: " + "; ".join(lib_versions_info))
         dep_versions_info = []
         if not options.no_slim:
@@ -455,7 +471,12 @@ def get_options(description, version):
                                  "\" taken/invalid for wrapped slim_graph.py, removed.")
                 options.slim_options = " ".join(slim_op_parts)
         random.seed(options.random_seed)
-        np.random.seed(options.random_seed)
+        try:
+            import numpy as np
+        except ImportError:
+            pass
+        else:
+            np.random.seed(options.random_seed)
         return options, log_handler
 
 
@@ -522,6 +543,8 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_ou
 
 def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_prefix, organelle_type, blast_db,
                              verbose, log_handler, expected_maximum_size, expected_minimum_size, no_slim, options):
+    from GetOrganelleLib.assembly_parser import Assembly, ProcessingGraphFailed
+
     def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
                              mode="embplant_pt", blast_db_base="embplant_pt", contamination_depth=3.,
                              contamination_similarity=0.95, degenerate=True,
@@ -534,9 +557,9 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt",
                                in_db_n="embplant_pt", c_d=3., c_s=0.95, deg=True, deg_dep=1.5, deg_sim=0.98,
                                hard_c_t=10., min_s_f=0.1, max_copy_in=10, max_cov_in=True,
-                               max_s=inf, min_s=0, spades_scaffold_p_in=False,
+                               max_s=inf, min_s=0, spades_scaffold_p_in=None,
                                acyclic_allowed_in=False, verbose_in=False, in_temp_graph=None):
-            if spades_scaffold_p_in:
+            if spades_scaffold_p_in is not None:
                 log_in.info("Scaffolding disconnected contigs using SPAdes scaffolds ... ")
                 log_in.warning("Assembly based on scaffolding may not be as accurate as "
                                "the ones directly exported from the assembly graph.")
@@ -546,7 +569,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                 log_in.info("Disentangling " + fastg_f + " as a circular genome ... ")
             image_produced = False
             input_graph = Assembly(fastg_f)
-            if spades_scaffold_p_in:
+            if spades_scaffold_p_in is not None:
                 if not input_graph.add_gap_nodes_with_spades_res(os.path.join(spades_scaffold_p_in, "scaffolds.fasta"),
                                                                  os.path.join(spades_scaffold_p_in, "scaffolds.paths"),
                                                                  min_cov=options.min_depth, max_cov=options.max_depth,
@@ -776,9 +799,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
                              temp_graph=graph_temp_file)
     except ImportError as e:
-        log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
-        if verbose:
-            log_handler.error(str(e))
+        log_handler.error("Disentangling failed: " + str(e))
         return False
     except AttributeError as e:
         if verbose:
@@ -816,9 +837,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
                                  temp_graph=graph_temp_file)
         except ImportError as e:
-            log_handler.warning("Disentangling failed: numpy/scipy/sympy not installed!")
-            if verbose:
-                log_handler.error(str(e))
+            log_handler.error("Disentangling failed: " + str(e))
             return False
         except AttributeError as e:
             if verbose:
@@ -856,8 +875,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  time_limit=3600, timeout_flag_str=timeout_flag,
                                  temp_graph=graph_temp_file)
         except (ImportError, AttributeError) as e:
-            if verbose:
-                log_handler.error(str(e))
+            log_handler.error("Disentangling failed: " + str(e).strip())
         except RuntimeError as e:
             if verbose:
                 log_handler.exception("")
@@ -879,7 +897,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              "N-gaps in-between contigs with a closely-related reference.")
             log_handler.info("If you have questions for us, "
                              "please provide us with the get_org.log.txt file "
-                             "and the graph in the format you like!")
+                             "and the post-slimming graph in the format you like!")
             # log.info("-------------------------------------------------------")
         if not export_succeeded:
             if slim_out_csv:
@@ -889,18 +907,20 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             # log.info("-------------------------------------------------------")
             log_handler.info("If you have questions for us, "
                              "please provide us with the get_org.log.txt file "
-                             "and the graph in the format you like!")
+                             "and the post-slimming graph in the format you like!")
     return export_succeeded
 
 
 def main():
     time0 = time.time()
+    from GetOrganelleLib.versions import get_versions
     title = "GetOrganelle v" + str(get_versions()) + \
             "\n" \
             "\nget_organelle_from_assembly.py isolates organelle genomes from assembly graph." \
             "\nFind updates in https://github.com/Kinggerm/GetOrganelle and see README.md for more information." \
             "\n"
     options, log_handler = get_options(description=title, version=get_versions())
+    from GetOrganelleLib.assembly_parser import Assembly
     try:
         if executable(os.path.join(UTILITY_PATH, "slim_graph.py")):
             which_slim = UTILITY_PATH

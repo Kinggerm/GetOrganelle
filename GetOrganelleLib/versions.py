@@ -6,11 +6,19 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.0",
+     "features": [
+         "1. get_organelle_from*.py: reorganize some importing code, fix minor issues"
+     ],
+     "time": "2020-06-28 00:00 GMT-6"
+    },
+    {
      "number": "1.7.0-beta7",
      "features": [
          "1. get_organelle_from_reads.py: "
          "   1) fix option --max-extending-len typo "
-         "   2) --disentangle-time-limit 600 => 1800",
+         "   2) --disentangle-time-limit 600 => 1800"
+         "   3) fix parameter estimation, pre-assembly minor bug",
          "2. get_organelle_from_assembly.py: echo scaffolding.",
          "3. assembly_parser.Assembly: "
          "   1) --keep-temp generate more intermediate results "

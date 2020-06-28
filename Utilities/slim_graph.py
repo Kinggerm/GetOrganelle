@@ -10,17 +10,14 @@ try:
 except:
     pass
 inf = float("inf")
-from optparse import OptionParser
+from optparse import OptionParser, OptionConflictError
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.pipe_control_func import *
-from GetOrganelleLib.assembly_parser import Assembly
-from GetOrganelleLib.seq_parser import *
-import optparse
+import math
 import copy
-from shutil import copyfile
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
 SYSTEM_NAME = ""
@@ -195,7 +192,7 @@ def get_options(print_title):
     #
     try:
         options, args = parser.parse_args()
-    except optparse.OptionConflictError as e:
+    except OptionConflictError as e:
         sys.stdout.write('\n\n######################################'+str(e))
         sys.stdout.write('\n\n"-h" for more usage\n')
         exit()
@@ -865,6 +862,8 @@ def main():
                   "from assembly graph file (*.fastg/*.fasta) by blast\n" \
                   "By jinjianjun@mail.kib.ac.cn\n"
     options, args, log_handler = get_options(print_title)
+    from GetOrganelleLib.assembly_parser import Assembly
+    from GetOrganelleLib.seq_parser import SequenceList
     log_output_dir = options.out_dir if options.out_dir else os.path.split(args[0])[0]
     log_output_name = str((options.prefix + options.out_base + ".") * int(bool(options.out_base))) + "slim."
     try:

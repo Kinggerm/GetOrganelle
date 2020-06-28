@@ -1223,7 +1223,7 @@ def pre_assembly_mapped_reads_for_base_cov(
             # log_handler.info(" ...")
             this_command = os.path.join(which_spades, "spades.py") + " -t " + str(threads) + \
                            " -s " + mapped_fq_file + \
-                           " -k " + str(draft_kmer) + " --only-assembler -o " + mapped_fq_file + ".spades"
+                           " -k " + str(draft_kmer) + " --only-assembler -o " + this_modified_dir
             pre_assembly = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log and log_handler:
                 log_handler.info(this_command)
@@ -1275,7 +1275,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                 extend_with_constant_words(
                     theses_words, original_fq_files, word_size=gathering_word_size, output=more_fq_file)
             more_command = os.path.join(which_spades, "spades.py") + " -t " + str(threads) + " -s " + \
-                           more_fq_file + " -k " + str(draft_kmer) + " --only-assembler -o " + mapped_fq_file + ".spades"
+                           more_fq_file + " -k " + str(draft_kmer) + " --only-assembler -o " + this_modified_dir
             pre_assembly = subprocess.Popen(
                 more_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log and log_handler:
@@ -1318,6 +1318,8 @@ def pre_assembly_mapped_reads_for_base_cov(
                 kmer_cov_values = get_graph_coverages_range_simple(read_fasta(more_modified_graph))
                 base_cov_values = [this_word_cov * mean_read_len / (mean_read_len - draft_kmer + 1)
                                    for this_word_cov in kmer_cov_values]
+    if not keep_temp and os.path.exists(this_modified_dir):
+        shutil.rmtree(this_modified_dir)
     return base_cov_values
 
 

@@ -8,7 +8,8 @@ versions = [
     {
      "number": "1.7.0",
      "features": [
-         "1. get_organelle_from*.py: reorganize some importing code, fix minor issues"
+         "1. get_organelle_from*.py: reorganize some importing code, fix minor issues",
+         "2. get_organelle_from_reads.py: rm output/seed/embplant_pt.initial.fq.spades by default",
      ],
      "time": "2020-06-28 00:00 GMT-6"
     },

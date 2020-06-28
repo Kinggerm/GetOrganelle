@@ -121,7 +121,7 @@ or see the detailed illustrations:
     
     get_organelle_from_reads.py --help
     
-To extract the plastome from an existing assembly graph (*.fastg/*.gfa):
+To extract the plastome from an existing assembly graph (`*.fastg`/`*.gfa`):
 
     get_organelle_from_assembly.py -F embplant_pt -g ONT_assembly_graph.gfa
 

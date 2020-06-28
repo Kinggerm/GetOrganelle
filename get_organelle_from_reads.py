@@ -877,16 +877,16 @@ def get_options(description, version):
                     run_disentangle = True
             if not executable(os.path.join(options.which_blast, "blastn")):
                 log_handler.warning(os.path.join(options.which_blast, "blastn") +
-                                    " not accessible! Slimming disabled!")
+                                    " not accessible! Slimming/Disentangling disabled!!\n")
                 run_slim = False
                 run_disentangle = False
             if options.genes_fasta and not executable(os.path.join(options.which_blast, "makeblastdb")):
                 log_handler.warning(os.path.join(options.which_blast, "makeblastdb") +
-                                    " not accessible! Slimming disabled!")
+                                    " not accessible! Slimming/Disentangling disabled!!\n")
                 run_slim = False
                 run_disentangle = False
             if lib_not_available:
-                log_handler.warning("/".join(lib_not_available) + " not available! Disentangling disabled!")
+                log_handler.warning("/".join(lib_not_available) + " not available! Disentangling disabled!!\n")
                 run_disentangle = False
         options.rm_duplicates = int(options.rm_duplicates)
         options.pre_grouped = int(options.pre_grouped)

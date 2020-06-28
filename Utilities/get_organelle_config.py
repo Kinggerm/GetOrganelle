@@ -10,9 +10,10 @@ PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.versions import get_versions
+from GetOrganelleLib.seq_parser import check_fasta_seq_names
 from GetOrganelleLib.pipe_control_func \
     import \
-    remove_db_postfix, check_fasta_seq_names, make_blast_db, build_bowtie2_db, executable, simple_log, \
+    remove_db_postfix, make_blast_db, build_bowtie2_db, executable, simple_log, \
     detect_bowtie2_path, detect_blast_path, detect_bowtie2_version, detect_blast_version, \
     cal_f_sha256, run_command, \
     ORGANELLE_TYPE_LIST, ORGANELLE_TYPE_SET, SEED_DB_HASH, LABEL_DB_HASH, \

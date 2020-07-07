@@ -921,7 +921,7 @@ class Assembly(SimpleAssembly):
             return given_average_cov
 
     def estimate_copy_and_depth_precisely(self, maximum_copy_num=8, broken_graph_allowed=False,
-                                          return_new_graphs=True, verbose=True, log_handler=None, debug=False,
+                                          return_new_graphs=False, verbose=False, log_handler=None, debug=False,
                                           target_name_for_log="target"):
 
         def get_formula(from_vertex, from_end, back_to_vertex, back_to_end, here_record_ends):
@@ -2411,7 +2411,7 @@ class Assembly(SimpleAssembly):
                             sys.stdout.write("Estimating copy and depth precisely ...\n")
                     final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
                         maximum_copy_num=max_contig_multiplicity, broken_graph_allowed=broken_graph_allowed,
-                        log_handler=log_handler,
+                        return_new_graphs=True, log_handler=log_handler,
                         verbose=verbose, debug=debug)
                     if verbose:
                         if log_handler:
@@ -2484,7 +2484,7 @@ class Assembly(SimpleAssembly):
                                         final_res_combinations.extend(
                                             new_possible_graph.estimate_copy_and_depth_precisely(
                                                 maximum_copy_num=max_contig_multiplicity,
-                                                broken_graph_allowed=broken_graph_allowed,
+                                                broken_graph_allowed=broken_graph_allowed, return_new_graphs=True,
                                                 log_handler=log_handler, verbose=verbose, debug=debug))
 
                                     del final_res_combinations[go_graph]
@@ -2527,8 +2527,8 @@ class Assembly(SimpleAssembly):
                             try:
                                 here_max_copy = 1 if remove_all_connections else max_contig_multiplicity
                                 final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
-                                    maximum_copy_num=here_max_copy, broken_graph_allowed=True, log_handler=log_handler,
-                                    verbose=verbose, debug=debug)
+                                    maximum_copy_num=here_max_copy, broken_graph_allowed=True, return_new_graphs=True,
+                                    log_handler=log_handler, verbose=verbose, debug=debug)
                             except ImportError as e:
                                 raise e
                             except Exception as e:

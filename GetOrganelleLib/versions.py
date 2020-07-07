@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.0a",
+     "features": [
+         "1. get_organelle_from_reads.py: --ignore-k work for small k disentanglement",
+         "2. better log info",
+     ],
+     "time": "2020-? 00:00 GMT-6"
+    },
+    {
      "number": "1.7.0",
      "features": [
          "1. get_organelle_from*.py: reorganize some importing code, fix minor issues",

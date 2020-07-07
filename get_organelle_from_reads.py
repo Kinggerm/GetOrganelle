@@ -3191,7 +3191,7 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
             slim_stat_list.append((0, this_fastg_file_out))
         else:
             slim_stat_list.append((1, None))
-    return slim_stat_list
+    return slim_stat_list, ignore_kmer_res
 
 
 def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
@@ -3964,15 +3964,15 @@ def main():
 
         """ export organelle """
         if is_assembled and run_slim:
-            slim_stat_list = slim_spades_result(organelle_types=options.organelle_type,
-                                                in_custom=options.genes_fasta, ex_custom=options.exclude_genes,
-                                                spades_output=spades_output, ignore_kmer_res=options.ignore_kmer_res,
-                                                max_slim_extending_len=slim_extending_len,
-                                                verbose_log=options.verbose_log, log_handler=log_handler,
-                                                threads=options.threads, which_blast=options.which_blast,
-                                                resume=options.script_resume, keep_temp=options.keep_temp_files)
+            slim_stat_list, ignore_k = slim_spades_result(
+                organelle_types=options.organelle_type, in_custom=options.genes_fasta, ex_custom=options.exclude_genes,
+                spades_output=spades_output, ignore_kmer_res=options.ignore_kmer_res,
+                max_slim_extending_len=slim_extending_len,
+                verbose_log=options.verbose_log, log_handler=log_handler, threads=options.threads,
+                which_blast=options.which_blast, resume=options.script_resume, keep_temp=options.keep_temp_files)
             slim_stat_codes = [s_code for s_code, fastg_out in slim_stat_list]
             slim_fastg_file = [fastg_out for s_code, fastg_out in slim_stat_list]
+            options.ignore_kmer_res = ignore_k
             if set(slim_stat_codes) == {2}:
                 log_handler.warning("No sequence hit our LabelDatabase!")
                 log_handler.warning("This might due to unreasonable seed/parameter choices or a bug.")
@@ -4022,7 +4022,8 @@ def main():
                                 log_handler.info("Extracting " + sub_organelle_type + " from the assemblies finished.\n")
                             else:
                                 log_handler.info("Extracting " + sub_organelle_type + " from the assemblies failed.\n")
-
+            else:
+                log_handler.error("No valid assembly graph found!")
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
         log_handler.info("Thank you!")

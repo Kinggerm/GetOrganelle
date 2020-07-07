@@ -87,31 +87,31 @@ Otherwise, if GetOrganelle failed to solve the path (produce `*scaffolds*path_se
 
 To assembly Embryophyta plant plastome (e.g. using 2G raw data of 150 bp paired reads), typically I use:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output -R 15 -k 21,45,65,85,105 -F embplant_pt
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output -R 15 -k 21,45,65,85,105 -F embplant_pt
 
 or in a draft way:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output --fast -k 21,65,105 -w 0.68 -F embplant_pt
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output --fast -k 21,65,105 -w 0.68 -F embplant_pt
 
 or in a slow and memory-economic way:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save
 
 To assembly Embryophyta plant mitochondria (usually you need more than 5G raw data):
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt
     
 To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -o nr_output -R 7 -k 35,85,115 -F embplant_nr
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o nr_output -R 7 -k 35,85,115 -F embplant_nr
 
 To assembly fungus mitochondria:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out  # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out  # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
 
 To assembly animal mitochondria:
 
-    get_organelle_from_reads.py -1 sample_1.fq -2 sample_2.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   # if you fails with the default database, use your own seed database and label database with "-s" and "--genes"
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   # if you fails with the default database, use your own seed database and label database with "-s" and "--genes"
 
 See a brief illustrations of those arguments by typing in:
 

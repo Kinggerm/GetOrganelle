@@ -258,7 +258,9 @@ def main():
     description = "get_organelle_config.py " + get_versions() + " is used for setting up default GetOrganelle database."
     options, argv = get_options(description=description)
     existing_seed_db, existing_label_db = get_current_versions(options.db_type, seq_db_path=SEQ_DB_PATH,
-                                                               lbl_db_path=LBL_DB_PATH, check_db=options.check)
+                                                               lbl_db_path=LBL_DB_PATH,
+                                                               clean_mode=options.clean,
+                                                               check_hash=options.check)
     seed_version_f = os.path.join(SEQ_DB_PATH, "VERSION")
     label_version_f = os.path.join(LBL_DB_PATH, "VERSION")
     time_out = 100000

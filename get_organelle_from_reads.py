@@ -2128,7 +2128,7 @@ def extending_no_lim(word_size, seed_file, original_fq_files, len_indices, pre_g
     prev_aw_count = initial_aw_count
     accumulated_num_words = initial_aw_count
     check_times = 1000
-    check_step = int(len_indices / check_times)
+    check_step = max(int(len_indices / check_times), 1)
     if fg_out_per_round:
         round_dir = os.path.join(output_base, "intermediate_reads")
         if not os.path.exists(round_dir):
@@ -2468,7 +2468,7 @@ def extending_with_lim(word_size, seed_file, original_fq_files, len_indices, pre
     prev_aw_count = initial_aw_count
     accumulated_num_words = initial_aw_count
     check_times = 1000
-    check_step = int(len_indices / check_times)
+    check_step = max(int(len_indices / check_times), 1)
     if fg_out_per_round:
         round_dir = os.path.join(output_base, "intermediate_reads")
         if not os.path.exists(round_dir):

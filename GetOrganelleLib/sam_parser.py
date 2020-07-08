@@ -109,6 +109,8 @@ class MapRecords(object):
                             optional_fields[op_flag] = int(op_val)
                         elif op_type == "Z":
                             optional_fields[op_flag] = op_val
+                        elif op_type == "f":
+                            optional_fields[op_flag] = float(op_val)
                     flag_fields = [bool(int(bit)) for bit in '{:012b}'.format(int(flag))][::-1]
                     is_paired, is_all_mp, not_mp, not_next_mp, is_reversed, is_next_reversed, is_first, is_last = \
                         flag_fields[:8]

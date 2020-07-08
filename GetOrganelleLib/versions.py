@@ -6,12 +6,14 @@ def get_versions():
 
 versions = [
     {
-     "number": "1.7.0a",
+     "number": "1.7.0b",
      "features": [
-         "1. get_organelle_from_reads.py: --ignore-k work for small k disentanglement",
+         "1. get_organelle_from_reads.py: "
+         "  1) --ignore-k work for small k disentanglement "
+         "  2) fix a bug when input reads are very few ",
          "2. better log info",
      ],
-     "time": "2020-? 00:00 GMT-6"
+     "time": "2020-07-08 22:30 UTC+8"
     },
     {
      "number": "1.7.0",
@@ -19,7 +21,7 @@ versions = [
          "1. get_organelle_from*.py: reorganize some importing code, fix minor issues",
          "2. get_organelle_from_reads.py: rm output/seed/embplant_pt.initial.fq.spades by default",
      ],
-     "time": "2020-06-28 00:00 GMT-6"
+     "time": "2020-06-28 00:00 UTC+8"
     },
     {
      "number": "1.7.0-beta7",

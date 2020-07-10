@@ -348,7 +348,7 @@ def main():
         plot_area_l, plot_area_r = extra_percent * add_extra_to_left, 1 - extra_percent * (1 - add_extra_to_left)
         plot_area_b, plot_area_t = title_height_percent, 1 - title_height_percent
         cigar_chars = ["M", "X", "I", "D"]
-        cigar_char_dict = {"M": "Aligned", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
+        cigar_char_dict = {"M": "Matched", "X": "Mismatched", "I": "Inserted", "D": "Deleted"}
         color_used = {"M": [(0.133, 0.616, 0.361), 0.5],
                       "X": [(0.145, 0.651, 0.961), 0.3],
                       "I": [(0.996, 0.804, 0.322), 0.8],

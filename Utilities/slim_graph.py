@@ -220,7 +220,7 @@ def get_options(print_title):
         priority_chosen = int(bool(options.include_priority)) + int(bool(options.exclude_priority))
         secondary_chosen = int(bool(options.include)) + int(bool(options.exclude))
         if priority_chosen + secondary_chosen > 0:
-            sys.stdout.write("\norganelle_types is disabled since you assign the customized index/indices.\n")
+            # sys.stdout.write("\norganelle_types is disabled since you assign the customized index/indices.\n")
             if priority_chosen > 1:
                 sys.stdout.write('\n\nLogical Error: only one option with "-priority" allowed!\n')
                 exit()
@@ -246,9 +246,9 @@ def get_options(print_title):
                     if not os.path.exists(sub_i_p):
                         sys.stdout.write("Error: " + sub_i_p + " not found!\n")
                         exit()
-                    elif not os.path.exists(remove_db_postfix(sub_i_p) + ".nhr"):
-                        sys.stdout.write("Error: " + remove_db_postfix(sub_i_p) + ".nhr not found!\n")
-                        exit()
+                    # elif not os.path.exists(remove_db_postfix(sub_i_p) + ".nhr"):
+                    #     sys.stdout.write("Error: " + remove_db_postfix(sub_i_p) + ".nhr not found!\n")
+                    #     exit()
                     else:
                         options.include_priority.append(sub_i_p)
             else:
@@ -260,9 +260,9 @@ def get_options(print_title):
                     if not os.path.exists(sub_e_p):
                         sys.stdout.write("Error: " + sub_e_p + " not found!\n")
                         exit()
-                    elif not os.path.exists(remove_db_postfix(sub_e_p) + ".nhr"):
-                        sys.stdout.write("Error: " + remove_db_postfix(sub_e_p) + ".nhr not found!\n")
-                        exit()
+                    # elif not os.path.exists(remove_db_postfix(sub_e_p) + ".nhr"):
+                    #     sys.stdout.write("Error: " + remove_db_postfix(sub_e_p) + ".nhr not found!\n")
+                    #     exit()
                     else:
                         options.exclude_priority.append(sub_e_p)
             else:
@@ -274,9 +274,9 @@ def get_options(print_title):
                     if not os.path.exists(sub_i):
                         sys.stdout.write("Error: " + sub_i + " not found!\n")
                         exit()
-                    elif not os.path.exists(remove_db_postfix(sub_i) + ".nhr"):
-                        sys.stdout.write("Error: " + remove_db_postfix(sub_i) + ".nhr not found!\n")
-                        exit()
+                    # elif not os.path.exists(remove_db_postfix(sub_i) + ".nhr"):
+                    #     sys.stdout.write("Error: " + remove_db_postfix(sub_i) + ".nhr not found!\n")
+                    #     exit()
                     else:
                         options.include.append(sub_i)
             else:
@@ -288,9 +288,9 @@ def get_options(print_title):
                     if not os.path.exists(sub_e):
                         sys.stdout.write("Error: " + sub_e + " not found!\n")
                         exit()
-                    elif not os.path.exists(remove_db_postfix(sub_e) + ".nhr"):
-                        sys.stdout.write("Error: " + remove_db_postfix(sub_e) + ".nhr not found!\n")
-                        exit()
+                    # elif not os.path.exists(remove_db_postfix(sub_e) + ".nhr"):
+                    #     sys.stdout.write("Error: " + remove_db_postfix(sub_e) + ".nhr not found!\n")
+                    #     exit()
                     else:
                         options.exclude.append(sub_e)
             else:
@@ -364,15 +364,15 @@ def get_options(print_title):
             default = options.max_slim_extending_len
             if options.organelle_types:
                 options.max_slim_extending_len = 0
-            for sub_organelle_t in options.organelle_types:
-                if sub_organelle_t in ("embplant_mt", "other_pt", "fungus_mt"):
-                    options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_mt"], options.max_slim_extending_len)
-                elif sub_organelle_t == "embplant_pt":
-                    options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_pt"], options.max_slim_extending_len)
-                elif sub_organelle_t in ("embplant_nr", "animal_mt"):
-                    options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_nr"], options.max_slim_extending_len)
-                else:
-                    options.max_slim_extending_len = default
+                for sub_organelle_t in options.organelle_types:
+                    if sub_organelle_t in ("embplant_mt", "other_pt", "fungus_mt"):
+                        options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_mt"], options.max_slim_extending_len)
+                    elif sub_organelle_t == "embplant_pt":
+                        options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_pt"], options.max_slim_extending_len)
+                    elif sub_organelle_t in ("embplant_nr", "animal_mt"):
+                        options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_nr"], options.max_slim_extending_len)
+                    else:
+                        options.max_slim_extending_len = default
         else:
             if options.max_slim_extending_len != inf:
                 options.max_slim_extending_len = int(options.max_slim_extending_len)
@@ -875,7 +875,8 @@ def main():
         other_files_to_remove = []
         include_indices, exclude_indices, database_made = \
             check_db(options.include_priority, options.include,
-                     options.exclude_priority, options.exclude, options.out_dir,
+                     options.exclude_priority, options.exclude,
+                     new_db_dir=options.out_dir if options.out_dir else os.path.split(args[0])[0],
                      which_blast=options.which_blast, log_handler=log_handler, verbose_log=options.verbose_log)
         other_files_to_remove.extend(database_made)
 

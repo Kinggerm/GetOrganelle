@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.0c",
+     "features": [
+         "Utilities/slim_fastg.py: fix a bug with anonym mode",
+         "README.md: updated"
+     ],
+     "time": "2020-07-21 10:55 UTC+8"
+    },
+    {
      "number": "1.7.0b",
      "features": [
          "1. get_organelle_from_reads.py: "

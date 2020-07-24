@@ -301,9 +301,9 @@ def get_options(description, version):
                                    "Default: %default for all.")
     group_assembly.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
                               help="For '-F embplant_pt' with complete circular result, "
-                                   "by default, the direction of the starting sequence (usually "
+                                   "by default, the direction of the starting contig (usually "
                                    "the LSC region) is determined as the direction with less ORFs. Choose this option "
-                                   "to reverse the direction of the starting sequence when result is circular. "
+                                   "to reverse the direction of the starting contig when result is circular. "
                                    "Actually, both directions are biologically equivalent to each other. The "
                                    "reordering of the direction is only for easier downstream analysis.")
     group_assembly.add_option("--max-paths-num", dest="max_paths_num", default=1000, type=int,
@@ -3177,7 +3177,8 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
             if log_handler:
                 if verbose_log:
                     log_handler.error(output.decode("utf8"))
-                log_handler.error("Slimming " + graph_file + " failed.")
+                log_handler.error("Slimming " + graph_file + " failed. "
+                                  "Please check " + os.path.join(kmer_dir, "slim.log.txt") + " for details. ")
             slim_stat_list.append((1, None))
         elif output_file_list and os.path.getsize(output_file_list[0]) == 0:
             if log_handler:
@@ -3270,6 +3271,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                            kmer_for_log=int(this_K[1:]),
                                                            log_handler=log_in, verbose=verbose_in,
                                                            temp_graph=in_temp_graph)
+            if not target_results:
+                raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
                 log_in.warning(str(len(target_results)) + " sets of graph detected!")
             # log_in.info("Slimming and disentangling graph finished!")

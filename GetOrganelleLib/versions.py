@@ -6,6 +6,16 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.1",
+     "features": [
+         "get_organelle_from_assembly.py: do not convert gfa to fastg; ",
+         "Assembly.get_all_circular_paths(): optimized for plastome order",
+         "Assembly.reduce_to_subgraph: limit_offset_current_vertex -> bait_offsets; safer slim_graph.py performance",
+         "README.md: updated"
+     ],
+     "time": "2020-07-25 02:50 UTC+8"
+    },
+    {
      "number": "1.7.0c",
      "features": [
          "Utilities/slim_fastg.py: fix a bug with anonym mode",

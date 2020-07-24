@@ -1726,9 +1726,19 @@ class Assembly(SimpleAssembly):
         else:
             return False
 
-    def reduce_to_subgraph(self, bait_vertices,
-                           limit_extending_len=None, limit_offset_current_vertex=0.5,
+    def reduce_to_subgraph(self, bait_vertices, bait_offsets=None,
+                           limit_extending_len=None,
                            extending_len_weighted_by_depth=False):
+        """
+        :param bait_vertices:
+        :param bait_offsets:
+        :param limit_extending_len:
+        :param limit_offset_current_vertex:
+        :param extending_len_weighted_by_depth:
+        :return:
+        """
+        if bait_offsets is None:
+            bait_offsets = {}
         rm_contigs = set()
         rm_sub_ids = []
         overlap = self.__overlap if self.__overlap else 0
@@ -1747,7 +1757,7 @@ class Assembly(SimpleAssembly):
         # searching within a certain length scope
         if limit_extending_len not in (None, inf):
             if extending_len_weighted_by_depth:
-                explorers = {(v_n, v_e): (limit_extending_len - self.vertex_info[v_n].len * limit_offset_current_vertex,
+                explorers = {(v_n, v_e): (limit_extending_len - bait_offsets.get((v_n, v_e), 0),
                                           self.vertex_info[v_n].cov)
                              for v_n in set(bait_vertices)
                              for v_e in (True, False)}
@@ -1777,7 +1787,7 @@ class Assembly(SimpleAssembly):
                     if not changed:
                         break  # if no this_v active, stop the exploring
             else:
-                explorers = {(v_n, v_e): limit_extending_len - self.vertex_info[v_n].len * limit_offset_current_vertex
+                explorers = {(v_n, v_e): limit_extending_len - bait_offsets.get((v_n, v_e), 0)
                              for v_n in set(bait_vertices)
                              for v_e in (True, False)}
                 best_explored_record = {}
@@ -2317,7 +2327,7 @@ class Assembly(SimpleAssembly):
                                                                        temp_graph, temp_csv, 3)
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
-                                                            "# tags: " +
+                                                                                                                     "# tags: " +
                                                             str(new_assembly.vertex_info[del_v].other_attr.
                                                                 get("tags", {database_name: ""})[database_name]))
 
@@ -2647,7 +2657,8 @@ class Assembly(SimpleAssembly):
                     if l_trim > 0:
                         self.vertex_info[l_name].seq[l_end] = self.vertex_info[l_name].seq[l_end][:-l_trim]
                         self.vertex_info[l_name].seq[not l_end] = self.vertex_info[l_name].seq[not l_end][l_trim:]
-                        assert self.vertex_info[l_name].seq[l_end] == complementary_seq(self.vertex_info[l_name].seq[not l_end])
+                        assert self.vertex_info[l_name].seq[l_end] == complementary_seq(
+                            self.vertex_info[l_name].seq[not l_end])
                         self.vertex_info[l_name].len -= l_trim
                         # rename vertex: LT ~ left trimming, RT ~ right trimming
                         if l_name in rename_dict:
@@ -2666,7 +2677,8 @@ class Assembly(SimpleAssembly):
                             new_name = temp_n + "RT" + str(r_trim) if r_end else temp_n + "LT" + str(r_trim)
                         else:
                             new_name = r_name + "RT" + str(r_trim) if r_end else r_name + "LT" + str(r_trim)
-                        assert self.vertex_info[r_name].seq[r_end] == complementary_seq(self.vertex_info[r_name].seq[not r_end])
+                        assert self.vertex_info[r_name].seq[r_end] == complementary_seq(
+                            self.vertex_info[r_name].seq[not r_end])
                         rename_dict[r_name] = new_name
                     if gap_len >= 0:
                         new_seq = self.vertex_info[l_name].seq[l_end][self.vertex_info[l_name].len - ctg_olp:] + \
@@ -2819,19 +2831,9 @@ class Assembly(SimpleAssembly):
         else:
             # start from a single copy vertex, no need to check all kinds of start vertex
             do_check_all_start_kinds = False
-            start_vertex = sorted(self.copy_to_vertex[1],
-                                  key=lambda x: (-self.vertex_info[x].len,
-                                                 -max(self.vertex_info[x].other_attr["orf"][True]["sum_len"],
-                                                      self.vertex_info[x].other_attr["orf"][False]["sum_len"]),
-                                                 x))[0]
-            if mode == "embplant_pt":
-                # more orfs found in the reverse direction of LSC of a typical plastome
-                start_direction = self.vertex_info[start_vertex].other_attr["orf"][True]["sum_len"] \
-                                  < self.vertex_info[start_vertex].other_attr["orf"][False]["sum_len"]
-                if reverse_start_direction_for_pt:
-                    start_direction = not start_direction
-            else:
-                start_direction = True
+            start_vertex = sorted(self.copy_to_vertex[1])[0]
+            start_direction = True
+
         # each contig stored format:
         first_path = [(start_vertex, start_direction)]
         first_connections = sorted(self.vertex_info[start_vertex].connections[start_direction])
@@ -2845,6 +2847,90 @@ class Assembly(SimpleAssembly):
         if not paths:
             raise ProcessingGraphFailed("Detecting path(s) from remaining graph failed!")
         else:
+            # modify start_vertex based on the whole path, if starting from a single copy vertex
+            def reseed_a_path(input_path, input_unique_vertex):
+                if input_unique_vertex not in input_path:
+                    new_path = [(element_v, not element_e) for (element_v, element_e) in input_path[::-1]]
+                else:
+                    new_path = input_path
+                reseed_from = new_path.index(input_unique_vertex)
+                return new_path[reseed_from:] + new_path[:reseed_from]
+            if 1 in self.copy_to_vertex:
+                branching_single_copy_vertices = set()
+                if mode == "embplant_pt" and 2 in self.copy_to_vertex:
+                    # find branching points
+                    for candidate_name in self.copy_to_vertex[2]:
+                        if not bool(self.is_sequential_repeat(candidate_name)):
+                            for neighboring_vertices in self.vertex_info[candidate_name].connections.values():
+                                if len(neighboring_vertices) == 2:
+                                    (left_v, left_e), (right_v, right_e) = sorted(neighboring_vertices)
+                                    if left_v in self.copy_to_vertex[1] and right_v in self.copy_to_vertex[1]:
+                                        branching_single_copy_vertices.add(((left_v, not left_e), (right_v, right_e)))
+                                        branching_single_copy_vertices.add(((right_v, not right_e), (left_v, left_e)))
+                if branching_single_copy_vertices:
+                    # more orfs found in the reverse direction of LSC of a typical plastome
+                    # different paths may have different LSC
+                    # picking the sub-path with the longest length with strand of least orfs as the new start point
+                    branching_single_copy_vertices = sorted(branching_single_copy_vertices)
+                    for go_p, each_path in enumerate(paths):
+                        reverse_path = [(element_v, not element_e) for (element_v, element_e) in each_path[::-1]]
+                        sub_paths_for_checking = []
+                        for (left_v, left_e), (right_v, right_e) in branching_single_copy_vertices:
+                            if (left_v, left_e) in each_path:
+                                if (right_v, right_e) in each_path:
+                                    left_id = each_path.index((left_v, left_e))
+                                    right_id = each_path.index((right_v, right_e))
+                                    if left_id <= right_id:
+                                        sub_paths_for_checking.append(each_path[left_id: right_id + 1])
+                                    else:
+                                        sub_paths_for_checking.append(each_path[left_id:] + each_path[:right_id + 1])
+                                else:
+                                    sub_paths_for_checking.append([])
+                            else:
+                                if (right_v, right_e) in reverse_path:
+                                    left_id = reverse_path.index((left_v, left_e))
+                                    right_id = reverse_path.index((right_v, right_e))
+                                    if left_id <= right_id:
+                                        sub_paths_for_checking.append(reverse_path[left_id: right_id + 1])
+                                    else:
+                                        sub_paths_for_checking.append(
+                                            reverse_path[left_id:] + reverse_path[:right_id + 1])
+                                else:
+                                    sub_paths_for_checking.append([])
+                        # picking the vertex with the longest length with strand of least orfs
+                        lsc_pair_id = sorted(range(len(sub_paths_for_checking)),
+                                             key=lambda x:
+                                             (-sum([self.vertex_info[sub_v].len
+                                                    for sub_v, sub_e in sub_paths_for_checking[x]]) +
+                                                  self.__overlap * (len(sub_paths_for_checking) - 1),
+                                              sum([self.vertex_info[sub_v].other_attr["orf"][sub_e]["sum_len"]
+                                                   for sub_v, sub_e in sub_paths_for_checking[x]]),
+                                              x))[0]
+                        paths[go_p] = reseed_a_path(each_path, branching_single_copy_vertices[lsc_pair_id][0])
+                else:
+                    candidate_single_copy_vertices = set()
+                    for single_v in self.copy_to_vertex[1]:
+                        candidate_single_copy_vertices.add((single_v, True))
+                        candidate_single_copy_vertices.add((single_v, False))
+                    if mode == "embplant_pt":
+                        # more orfs found in the reverse direction of LSC of a typical plastome
+                        # picking the vertex with the longest length with strand of least orfs
+                        start_vertex, start_direction = sorted(candidate_single_copy_vertices,
+                                                               key=lambda x: (-self.vertex_info[x[0]].len,
+                                                                              self.vertex_info[x[0]].other_attr["orf"][
+                                                                                  x[1]]["sum_len"],
+                                                                              x))[0]
+                        if reverse_start_direction_for_pt:
+                            start_direction = not start_direction
+                    else:
+                        # picking the vertex with the longest length with strand of most orfs
+                        start_vertex, start_direction = sorted(candidate_single_copy_vertices,
+                                                               key=lambda x: (-self.vertex_info[x[0]].len,
+                                                                              -self.vertex_info[x[0]].other_attr["orf"][
+                                                                                  x[1]]["sum_len"],
+                                                                              x))[0]
+                    for go_p, each_path in enumerate(paths):
+                        paths[go_p] = reseed_a_path(each_path, (start_vertex, start_direction))
 
             # sorting path by average distance among multi-copy loci
             # the highest would be more symmetrical IR, which turns out to be more reasonable
@@ -3428,7 +3514,7 @@ class SpadesScaffolds(object):
         if not os.path.exists(scaffold_paths):
             raise FileNotFoundError(scaffold_paths + " not found!")
         self.nodes = {}
-        self.vertex_jumping_over_gap = []  
+        self.vertex_jumping_over_gap = []
         # each_item = [(left_name, left_end, left_trim),
         #              (right_name, right_end, right_trim),
         #              (gap_name, gap_seq, gap_len)]
@@ -3523,7 +3609,7 @@ class SpadesScaffolds(object):
                                     else:
                                         gap_name = str(go_patch) + "OVL" + str(-seemingly_gap_len)
                                     real_gap_len = this_matching_start_at_scaffold - last_matching_end_at_scaffold - 1
-                                    this_v_name, this_v_end = self.nodes[sub_name].vertices_path[0]  
+                                    this_v_name, this_v_end = self.nodes[sub_name].vertices_path[0]
                                     this_v_name, this_v_end = this_v_name, not this_v_end  # starting vertex
                                     last_fix = bool(assembly_obj.vertex_info[last_v_name].connections[last_v_end])
                                     this_fix = bool(assembly_obj.vertex_info[this_v_name].connections[this_v_end])
@@ -3535,8 +3621,8 @@ class SpadesScaffolds(object):
                                                 this_v_name + " indicated while conflicting connections existed!")
                                         else:
                                             sys.stdout.write("Warning: " + str(-gap_len) + "-bp gap/overlap "
-                                                "between " + last_v_name + " and " + this_v_name +
-                                                " indicated while conflicting connections existed!\n")
+                                                                                           "between " + last_v_name + " and " + this_v_name +
+                                                             " indicated while conflicting connections existed!\n")
                                     elif last_fix and this_fix:
                                         # trim_last == trim_this == 0
                                         # seemingly_gap_len == real_gap_len
@@ -3549,8 +3635,8 @@ class SpadesScaffolds(object):
                                                     this_v_name + " indicated while conflicting connections existed!")
                                             else:
                                                 sys.stdout.write("Warning: " + str(-gap_len) + "-bp overlap "
-                                                    "between " + last_v_name + " and " + this_v_name + " indicated "
-                                                    "while conflicting connections existed!\n")
+                                                                                               "between " + last_v_name + " and " + this_v_name + " indicated "
+                                                                                                                                                  "while conflicting connections existed!\n")
                                         else:
                                             go_to_standard_jumping = True
                                     elif this_fix:

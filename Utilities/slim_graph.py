@@ -676,7 +676,25 @@ def modify_in_ex_according_to_depth(in_names, ex_names, significant, assembly_gr
     return here_in_names, here_ex_names, None
 
 
-def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_extending_len,
+def generate_baits_offsets(in_names, databases, assembly_graph):
+    vertex_trimming = {}
+    # structure: names[query][this_database][label] = [(q_min, q_max, q_score)]
+    for vertex_name in in_names:
+        these_hit_list = []
+        for include_db_file in databases:
+            include_db_file = os.path.split(include_db_file)[-1].split(" ")[0]
+            if include_db_file in in_names[vertex_name]:
+                for hit_info_list in in_names[vertex_name][include_db_file].values():
+                    these_hit_list.extend(hit_info_list)
+        all_loc_values = [x[0] for x in these_hit_list] + [x[1] for x in these_hit_list]
+        min_loc = min(all_loc_values)
+        max_loc = min(all_loc_values)
+        vertex_trimming[(vertex_name, False)] = min_loc - 1
+        vertex_trimming[(vertex_name, True)] = assembly_graph.vertex_info[vertex_name].len - max_loc
+    return vertex_trimming
+
+
+def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_extending_len, bait_offsets,
                   aver_in_dep, depth_cutoff, treat_no_hits,
                   include_priority_assigned, include_assigned, exclude_priority_assigned, exclude_assigned,
                   log_handler=None):
@@ -693,7 +711,9 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
         if exclude_priority_assigned:
             assembly_graph.remove_vertex(ex_names)
             if treat_no_hits == "ex_no_con":
-                assembly_graph.reduce_to_subgraph(bait_vertices=in_names, limit_extending_len=max_slim_extending_len,
+                assembly_graph.reduce_to_subgraph(bait_vertices=in_names,
+                                                  bait_offsets=bait_offsets,
+                                                  limit_extending_len=max_slim_extending_len,
                                                   extending_len_weighted_by_depth=True)
             elif treat_no_hits == "ex_no_hit":
                 assembly_graph.remove_vertex([rm_c for rm_c in assembly_graph.vertex_info if rm_c not in in_names])
@@ -702,7 +722,9 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
         elif include_priority_assigned or include_assigned:
             if treat_no_hits == "ex_no_con":
                 assembly_graph.remove_vertex([rm_c for rm_c in ex_names if rm_c not in in_names])
-                assembly_graph.reduce_to_subgraph(bait_vertices=in_names, limit_extending_len=max_slim_extending_len,
+                assembly_graph.reduce_to_subgraph(bait_vertices=in_names,
+                                                  bait_offsets=bait_offsets,
+                                                  limit_extending_len=max_slim_extending_len,
                                                   extending_len_weighted_by_depth=True)
             elif treat_no_hits == "ex_no_hit":
                 assembly_graph.remove_vertex([rm_c for rm_c in assembly_graph.vertex_info if rm_c not in in_names])
@@ -961,8 +983,7 @@ def main():
             # 3. BLAST #
             ############
             try:
-
-                # structure: names[query][this_database][hit] = [(q_min, q_max, q_score)]
+                # structure: names[query][this_database][label] = [(q_min, q_max, q_score)]
                 in_names = blast_and_call_names(fasta_file=blast_fas, index_files=include_indices,
                                                 out_file=blast_fas+'.blast_in', threads=options.threads,
                                                 which_blast=options.which_blast, log_handler=log_handler)
@@ -975,10 +996,18 @@ def main():
                         assembly_graph=this_assembly, depth_cutoff=options.depth_cutoff, log_handler=log_handler)
                 else:
                     in_names_r, ex_names_r, aver_dep = in_names, ex_names, None
+                # prepare bait_offsets: trim unlabeled terminal regions from bait vertices, for more accurate
+                # control of "maximum slimming extending length"
+                if this_assembly and options.treat_no_hits == "ex_no_con" and \
+                        options.max_slim_extending_len not in (None, inf):
+                    bait_offsets = generate_baits_offsets(
+                        in_names=in_names, databases=include_indices, assembly_graph=this_assembly)
+                else:
+                    bait_offsets = {}
                 new_assembly, new_matrix = \
-                    reduce_matrix(in_names=set(in_names_r), ex_names=set(ex_names_r), seq_matrix=this_matrix,
+                    reduce_matrix(in_names=in_names_r, ex_names=ex_names_r, seq_matrix=this_matrix,
                                   assembly_graph=this_assembly, max_slim_extending_len=options.max_slim_extending_len,
-                                  aver_in_dep=aver_dep,
+                                  bait_offsets=bait_offsets, aver_in_dep=aver_dep,
                                   depth_cutoff=options.depth_cutoff, treat_no_hits=options.treat_no_hits,
                                   include_priority_assigned=options.include_priority,
                                   include_assigned=options.include,
@@ -1003,13 +1032,18 @@ def main():
             except Exception as e:
                 if log_handler:
                     log_handler.error("\n" + str(e).strip())
-                    log_handler.error('Slimming file ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!\n')
-                else:
+                    log_handler.error(
+                        'Slimming file ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!\n')
                     if options.verbose_log:
                         raise e
+
+                else:
                     sys.stdout.write("\n" + str(e).strip() + "\n")
-                    sys.stdout.write('\nSlimming file ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!'
-                                     '\n' + '=' * 100 + "\n")
+                    sys.stdout.write(
+                        '\nSlimming file ' + str(i + 1) + '/' + str(len(args)) + ': ' + args[i] + ' failed!'
+                        '\n' + '=' * 100 + "\n")
+                    if options.verbose_log:
+                        raise e
             else:
                 if log_handler:
                     log_handler.info('Slimming file ' + str(i+1) + '/' + str(len(args)) + ': ' + args[i] + ' finished!\n')

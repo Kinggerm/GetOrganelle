@@ -480,9 +480,9 @@ def get_options(description, version):
         return options, log_handler
 
 
-def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_out_base, max_slim_extending_len,
-                       verbose_log, log_handler, threads, which_slim, which_blast="", other_options="",
-                       resume=False, keep_temp=False):
+def slim_assembly_graph(organelle_types, in_custom, ex_custom, graph_in, graph_out_base, max_slim_extending_len,
+                        verbose_log, log_handler, threads, which_slim, which_blast="", other_options="",
+                        resume=False, keep_temp=False):
     include_priority_db = []
     exclude_db = []
     if in_custom or ex_custom:
@@ -531,7 +531,8 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, graph_in, graph_ou
     #     return os.path.join(which_slim, "slim_graph.py") + " not accessible!\n" + output.decode("utf8").strip()
     if "failed" in output.decode("utf8") or "error" in output.decode("utf8").lower():
         if log_handler:
-            log_handler.error("Slimming " + graph_in + " failed.")
+            log_handler.error("Slimming " + graph_in + " failed. "
+                              "Please check *slim.log.txt for details. ")
         return "\n" + output.decode("utf8").strip()
     else:
         if log_handler:
@@ -603,6 +604,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                                                broken_graph_allowed=acyclic_allowed_in,
                                                                log_handler=log_in, verbose=verbose_in,
                                                                temp_graph=in_temp_graph)
+            if not target_results:
+                raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
                 log_in.warning(str(len(target_results)) + " sets of graph detected!")
             # log_in.info("Slimming and disentangling graph finished!")
@@ -934,42 +937,55 @@ def main():
         if os.path.getsize(options.input_graph) == 0:
             raise Exception("No contigs found in " + options.input_graph + "!")
 
-        processed_graph_file = os.path.join(options.output_base, options.prefix + "initial_assembly_graph.fastg")
-        if options.max_depth != inf or options.min_depth != 0. or options.input_graph.endswith(".gfa"):
+        in_postfix = ""
+        if options.input_graph.lower().endswith(".gfa"):
+            in_postfix = "gfa"
+        elif options.input_graph.lower().endswith(".fastg"):
+            in_postfix = "fastg"
+        else:
+            raise Exception("Input assembly graph file must have name suffix '.gfa' or '.fastg'.")
+        processed_graph_file = os.path.join(options.output_base, options.prefix + "initial_assembly_graph." + in_postfix)
+        if options.max_depth != inf or options.min_depth != 0.:
             this_graph = Assembly(options.input_graph, max_cov=options.max_depth, min_cov=options.min_depth)
-            this_graph.write_to_fastg(
-                out_file=processed_graph_file, check_postfix=False, rename_if_needed=True,
-                out_renaming_table=os.path.join(
-                    options.output_base, options.prefix + "initial_assembly_graph.vertex_trans.tab"),
-                echo_rename_warning=True, log_handler=log_handler)
+            if in_postfix.endswith("gfa"):
+                this_graph.write_to_gfa(out_file=processed_graph_file, check_postfix=False)
+            else:
+                this_graph.write_to_fastg(
+                    out_file=processed_graph_file, check_postfix=False, rename_if_needed=True,
+                    out_renaming_table=os.path.join(
+                        options.output_base, options.prefix + "initial_assembly_graph.vertex_trans.tab"),
+                    echo_rename_warning=True, log_handler=log_handler)
         else:
             copyfile(options.input_graph, processed_graph_file)
         log_handler.info("Processing assembly graph finished.\n")
 
         if options.no_slim:
-            slimmed_fastg_file = processed_graph_file
+            slimmed_graph_file = processed_graph_file
             slimmed_csv_file = None
         else:
             if os.path.getsize(processed_graph_file) == 0:
                 raise Exception("No contigs left in " + processed_graph_file + "! Please adjust the depth range!")
             log_handler.info("Slimming assembly graph ...")
-            slimmed_graph_file_base = os.path.join(options.output_base, options.prefix + "slimmed_assembly_graph")
-            slimmed_fastg_file = os.path.join(options.output_base, options.prefix + "slimmed_assembly_graph.fastg")
-            slimmed_csv_file = os.path.join(options.output_base, options.prefix + "slimmed_assembly_graph.csv")
-            run_stat = slim_spades_result(organelle_types=options.organelle_type, in_custom=options.genes_fasta,
-                                          ex_custom=options.exclude_genes, graph_in=processed_graph_file,
-                                          graph_out_base=slimmed_graph_file_base,
-                                          max_slim_extending_len=options.max_slim_extending_len,
-                                          verbose_log=options.verbose_log,
-                                          log_handler=log_handler, threads=options.threads,
-                                          which_blast=options.which_blast,
-                                          which_slim=which_slim, other_options=options.slim_options,
-                                          resume=options.script_resume, keep_temp=options.keep_temp_files)
+            slimmed_graph_file_base = os.path.join(
+                options.output_base, options.prefix + "slimmed_assembly_graph")
+            slimmed_graph_file = os.path.join(
+                options.output_base, options.prefix + "slimmed_assembly_graph." + in_postfix)
+            slimmed_csv_file = os.path.join(
+                options.output_base, options.prefix + "slimmed_assembly_graph.csv")
+            run_stat = slim_assembly_graph(organelle_types=options.organelle_type, in_custom=options.genes_fasta,
+                                           ex_custom=options.exclude_genes, graph_in=processed_graph_file,
+                                           graph_out_base=slimmed_graph_file_base,
+                                           max_slim_extending_len=options.max_slim_extending_len,
+                                           verbose_log=options.verbose_log,
+                                           log_handler=log_handler, threads=options.threads,
+                                           which_blast=options.which_blast,
+                                           which_slim=which_slim, other_options=options.slim_options,
+                                           resume=options.script_resume, keep_temp=options.keep_temp_files)
             if run_stat:
                 log_handler.error(run_stat + "\n")
                 exit()
             else:
-                if os.path.getsize(slimmed_fastg_file) == 0:
+                if os.path.getsize(slimmed_graph_file) == 0:
                     return "Slimming " + processed_graph_file + " finished with no target organelle contigs found!"
                 log_handler.info("Slimming assembly graph finished.\n")
 
@@ -998,7 +1014,7 @@ def main():
                 else:
                     db_base_name = sub_organelle_type
                 ext_res = extract_organelle_genome(out_base=options.output_base,
-                                                   slim_out_fg=slimmed_fastg_file, slim_out_csv=slimmed_csv_file,
+                                                   slim_out_fg=slimmed_graph_file, slim_out_csv=slimmed_csv_file,
                                                    organelle_prefix=og_prefix,
                                                    organelle_type=sub_organelle_type,
                                                    blast_db=db_base_name,

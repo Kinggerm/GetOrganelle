@@ -29,7 +29,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 * The easiest way to install GetOrganelle and its [dependencies](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#requirement--dependencies) is using conda:
        
        
-      conda -c bioconda getorganelle
+      conda install -c bioconda getorganelle
 
   You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. If you don't like conda, or want to follow the latest versions, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 

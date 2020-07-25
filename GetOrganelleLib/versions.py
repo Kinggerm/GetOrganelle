@@ -11,6 +11,7 @@ versions = [
          "get_organelle_from_assembly.py: do not convert gfa to fastg; ",
          "Assembly.get_all_circular_paths(): optimized for plastome order",
          "Assembly.reduce_to_subgraph: limit_offset_current_vertex -> bait_offsets; safer slim_graph.py performance",
+         "Assembly.get_all*_paths(): more detailed log info",
      ],
      "time": "2020-07-25 02:50 UTC+8"
     },

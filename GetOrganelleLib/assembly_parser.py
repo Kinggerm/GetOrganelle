@@ -2991,11 +2991,11 @@ class Assembly(SimpleAssembly):
                     if log_handler:
                         log_handler.warning("More than one circular genome structure produced ...")
                         log_handler.warning("Please check the final result to confirm whether they are "
-                                            "simply flip-flop configurations!")
+                                            " simply different in SSC direction (two flip-flop configurations)!")
                     else:
                         sys.stdout.write("More than one circular genome structure produced ...\n")
                         sys.stdout.write("Please check the final result to confirm whether they are "
-                                         "simply flip-flop configurations!\n")
+                                         "simply different in SSC direction (two flip-flop configurations)!\n")
             return sorted_paths
 
     def get_all_paths(self, mode="embplant_pt", log_handler=None):
@@ -3239,11 +3239,11 @@ class Assembly(SimpleAssembly):
                     if log_handler:
                         log_handler.warning("More than one structure (gene order) produced ...")
                         log_handler.warning("Please check the final result to confirm whether they are "
-                                            "simply flip-flop configurations!")
+                                            " simply different in SSC direction (two flip-flop configurations)!")
                     else:
                         sys.stdout.write("More than one structure (gene order) produced ...\n")
                         sys.stdout.write("Please check the final result to confirm whether they are "
-                                         "simply flip-flop configurations!\n")
+                                         " simply different in SSC direction (two flip-flop configurations)!\n")
             return sorted_paths
 
     def export_path(self, in_path):

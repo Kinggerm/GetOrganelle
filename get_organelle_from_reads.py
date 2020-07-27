@@ -143,6 +143,8 @@ def get_options(description, version):
                                  "would be automatically fulfilled without warning:\t"
                                  "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
                                  "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
+    group_scheme.add_option("--meta", dest="meta_mode", default=False, action="store_true",
+                            help="This is a developing function. Currently only compatible with \"-F animal_mt\".")
     group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
                             help="=\"-R 10 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws "
                                  "--disentangle-time-limit 360\" "
@@ -375,7 +377,7 @@ def get_options(description, version):
         for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage",
                                "--min-quality-score", "--prefix", "--out-per-round", "--zip-files", "--keep-temp",
                                "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
-                               "-J", "-M", "--bowtie2-options",
+                               "-J", "-M", "--bowtie2-options", "--meta",
                                "--larger-auto-ws", "--target-genome-size", "--spades-options", "--no-spades",
                                "--ignore-k", "--genes", "--ex-genes", "--disentangle-df",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
@@ -508,6 +510,16 @@ def get_options(description, version):
                         _check_default_db(check_sub, ["embplant_pt", "embplant_mt"][not go_t])
                 else:
                     _check_default_db(sub_organelle_t)
+
+        if options.meta_mode:
+            if options.organelle_type != ["animal_mt"]:
+                sys.stdout.write("\n############################################################################"
+                                 "\nERROR: Currently \"--meta\" is only compatible with \"-F animal_mt\"!\n\n")
+                exit()
+            if options.unpaired_fq_files:
+                options.unpaired_fq_files = []
+                sys.stdout.write("\n############################################################################"
+                                 "\nWARNING: Currently \"--meta\" is incompatible with unpaired reads as input!\n\n")
 
         organelle_type_len = len(options.organelle_type)
         use_default_seed = False
@@ -2969,7 +2981,7 @@ def get_anti_lines_using_mapping(anti_seed, seed_sam_files, original_fq_files,
 
 
 def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, prefix, original_fq_files, reads_paired,
-                         which_spades, verbose_log, resume, threads, log_handler):
+                         meta_mode, which_spades, verbose_log, resume, threads, log_handler):
     if '-k' in parameters or not spades_kmer:
         kmer = ''
     else:
@@ -2980,11 +2992,13 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         spades_out_command = '-o ' + spades_out_put
         if reads_paired['input'] and reads_paired['pair_out']:
             all_unpaired = []
-            # spades does not accept empty files
-            if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_unpaired.fq")):
-                all_unpaired.append(os.path.join(out_base, prefix + "filtered_1_unpaired.fq"))
-            if os.path.getsize(os.path.join(out_base, prefix + "filtered_2_unpaired.fq")):
-                all_unpaired.append(os.path.join(out_base, prefix + "filtered_2_unpaired.fq"))
+            if not meta_mode:
+                # metaSPAdes does not accept unpaired reads
+                # spades does not accept empty files
+                if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_unpaired.fq")):
+                    all_unpaired.append(os.path.join(out_base, prefix + "filtered_1_unpaired.fq"))
+                if os.path.getsize(os.path.join(out_base, prefix + "filtered_2_unpaired.fq")):
+                    all_unpaired.append(os.path.join(out_base, prefix + "filtered_2_unpaired.fq"))
             for iter_unpaired in range(len(original_fq_files) - 2):
                 if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq"))):
                     all_unpaired.append(
@@ -3002,6 +3016,10 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                     [os.path.join(which_spades, "spades.py"), '-t', str(threads), parameters] +
                     ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                     [kmer, spades_out_command]).strip()
+        elif meta_mode:
+            log_handler.error("Paired-end reads is required for metaSPAdes!")
+            log_handler.error('Assembling failed.')
+            return False
         else:
             all_unpaired = []
             for iter_unpaired in range(len(original_fq_files)):
@@ -3255,22 +3273,82 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         else:
                             this_tmp_graph = in_temp_graph + ".scaffolds.gfa"
                         input_graph.write_to_gfa(this_tmp_graph)
-            target_results = input_graph.find_target_graph(tab_f,
-                                                           mode=mode_in, database_name=in_db_n, type_factor=type_f,
-                                                           log_hard_cov_threshold=hard_c_t,
-                                                           contamination_depth=c_d,
-                                                           contamination_similarity=c_s,
-                                                           degenerate=deg, degenerate_depth=deg_dep,
-                                                           degenerate_similarity=deg_sim,
-                                                           expected_max_size=max_s, expected_min_size=min_s,
-                                                           only_keep_max_cov=max_c_in,
-                                                           min_sigma_factor=min_s_f,
-                                                           weight_factor=w_f,
-                                                           broken_graph_allowed=acyclic_allowed_in,
-                                                           read_len_for_log=read_len_for_log,
-                                                           kmer_for_log=int(this_K[1:]),
-                                                           log_handler=log_in, verbose=verbose_in,
-                                                           temp_graph=in_temp_graph)
+            if options.meta_mode:
+                target_results = []
+                input_graph.vertex_clusters.sort(key=lambda
+                    x: (-sum([input_graph.vertex_info[m].other_attr.get("weight", 0) for m in x]),
+                        -sum([input_graph.vertex_info[m].len * input_graph.vertex_info[m].cov for m in x]),
+                        sorted(x)))
+                for go_sub in range(len(input_graph.vertex_clusters)):
+                    in_subgraph = deepcopy(input_graph)
+                    remove_vertices = []
+                    for remove_sub in range(len(input_graph.vertex_clusters)):
+                        if remove_sub != go_sub:
+                            remove_vertices.extend(list(input_graph.vertex_clusters[remove_sub]))
+                    in_subgraph.remove_vertex(remove_vertices)
+                    while in_subgraph:
+                        new_res = False
+                        for in_round_broken_graph in (True, False):
+                            try:
+                                new_res = in_subgraph.find_target_graph(
+                                    tab_f,
+                                    mode=mode_in, database_name=in_db_n, type_factor=type_f,
+                                    log_hard_cov_threshold=hard_c_t,
+                                    contamination_depth=c_d,
+                                    contamination_similarity=c_s,
+                                    degenerate=deg, degenerate_depth=deg_dep,
+                                    degenerate_similarity=deg_sim,
+                                    expected_max_size=max_s, expected_min_size=min_s,
+                                    only_keep_max_cov=True,
+                                    min_sigma_factor=min_s_f,
+                                    weight_factor=5.,
+                                    broken_graph_allowed=in_round_broken_graph,
+                                    read_len_for_log=read_len_for_log,
+                                    kmer_for_log=int(this_K[1:]),
+                                    log_handler=log_in, verbose=verbose_in,
+                                    temp_graph=in_temp_graph)
+                            except ImportError as e:
+                                log_in.error("Disentangling failed: " + str(e))
+                                break
+                            except AttributeError as e:
+                                if verbose:
+                                    raise e
+                                break
+                            except RuntimeError as e:
+                                if verbose:
+                                    log_in.exception("")
+                                continue
+                            except ProcessingGraphFailed as e:
+                                continue
+                            except Exception as e:
+                                log_in.exception("")
+                                sys.exit()
+                            else:
+                                for peel_res in new_res:
+                                    in_subgraph.peel_subgraph(
+                                        peel_res["graph"], mode_in, subgraph_was_merged=True,
+                                        verbose=verbose_in, log_handler=log_in)
+                                target_results.extend(new_res)
+                                break
+                        if not new_res:
+                            break
+            else:
+                target_results = input_graph.find_target_graph(tab_f,
+                                                               mode=mode_in, database_name=in_db_n, type_factor=type_f,
+                                                               log_hard_cov_threshold=hard_c_t,
+                                                               contamination_depth=c_d,
+                                                               contamination_similarity=c_s,
+                                                               degenerate=deg, degenerate_depth=deg_dep,
+                                                               degenerate_similarity=deg_sim,
+                                                               expected_max_size=max_s, expected_min_size=min_s,
+                                                               only_keep_max_cov=max_c_in,
+                                                               min_sigma_factor=min_s_f,
+                                                               weight_factor=w_f,
+                                                               broken_graph_allowed=acyclic_allowed_in,
+                                                               read_len_for_log=read_len_for_log,
+                                                               kmer_for_log=int(this_K[1:]),
+                                                               log_handler=log_in, verbose=verbose_in,
+                                                               temp_graph=in_temp_graph)
             if not target_results:
                 raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
@@ -3279,7 +3357,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
 
             log_in.info("Writing output ...")
             ambiguous_base_used = False
-            if acyclic_allowed_in:
+            if acyclic_allowed_in or options.meta_mode:
                 contig_num = set()
                 still_complete = []
                 for go_res, res in enumerate(target_results):
@@ -3507,7 +3585,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 export_succeeded = True
                 break
 
-    if not export_succeeded and do_spades_scaffolding:
+    if not options.meta_mode and not export_succeeded and do_spades_scaffolding:
         largest_k_graph_f_exist = bool(slim_out_fg[0])
         if kmer_dirs and largest_k_graph_f_exist:
             out_fastg = slim_out_fg[0]
@@ -3550,7 +3628,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 else:
                     export_succeeded = True
 
-    if not export_succeeded:
+    if not export_succeeded and not options.meta_mode:
         largest_k_graph_f_exist = bool(slim_out_fg[0])
         if kmer_dirs and largest_k_graph_f_exist:
             for go_k, kmer_dir in enumerate(kmer_dirs):
@@ -3673,6 +3751,8 @@ def main():
             del other_options[which_out: which_out + 2]
         else:
             spades_output = os.path.join(out_base, options.prefix + "filtered_spades")
+        if "--meta" in other_options:
+            other_options.remove("--meta")
         other_options = ' '.join(other_options)
 
         """ get reads """
@@ -3719,6 +3799,13 @@ def main():
             pre_grp = options.pre_grouped
             in_memory = options.index_in_memory
             log_handler.info("Pre-reading fastq ...")
+            if options.meta_mode:
+                options.reduce_reads_for_cov = inf
+                log_handler.info("\"--meta\" used, setting \"--reduce-reads-for-cov inf\"")
+                options.maximum_n_reads = inf
+                log_handler.info("\"--meta\" used, setting \"--max-n-reads inf\"")
+                # options.larger_auto_ws = True
+                # log_handler.info("\"--meta\" used, setting \"--larger-auto-ws\"")
             # using mapping to estimate maximum_n_reads when options.reduce_reads_for_cov != inf.
             all_read_nums = None
             if resume:
@@ -3759,8 +3846,12 @@ def main():
                         target_fq = os.path.join(out_base, str(file_id + 1) + "-" +
                                                  os.path.basename(read_file)) + ".fastq"
                         if not (os.path.exists(target_fq) and resume):
-                            unzip(read_file, target_fq, int(4 * all_read_nums[file_id]),
-                                  options.verbose_log, log_handler)
+                            if all_read_nums[file_id] == inf:
+                                unzip(read_file, target_fq,
+                                      verbose_log=options.verbose_log, log_handler=log_handler)
+                            else:
+                                unzip(read_file, target_fq, int(4 * all_read_nums[file_id]),
+                                      options.verbose_log, log_handler)
                     else:
                         target_fq = os.path.join(out_base, str(file_id + 1) + "-" +
                                                  os.path.basename(read_file))
@@ -3768,8 +3859,11 @@ def main():
                             log_handler.error("Do not put original reads file(s) in the output directory!")
                             exit()
                         if not (os.path.exists(target_fq) and resume):
-                            os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +
-                                      read_file + " > " + target_fq)
+                            if all_read_nums[file_id] == inf:
+                                shutil.copy(read_file, target_fq)
+                            else:
+                                os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +
+                                          read_file + " > " + target_fq)
                     if os.path.getsize(target_fq) == 0:
                         raise ValueError("Empty file " + target_fq)
                     original_fq_files[file_id] = target_fq
@@ -3946,8 +4040,11 @@ def main():
                     log_handler.warning("Compression after read correction will be skipped for lack of 'pigz'")
                     if "--disable-gzip-output" not in other_options:
                         other_options += " --disable-gzip-output"
+                if options.meta_mode:
+                    other_options += " --meta"
                 is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                                     options.prefix, original_fq_files, reads_paired,
+                                                    meta_mode=options.meta_mode,
                                                     which_spades=options.which_spades, verbose_log=options.verbose_log,
                                                     resume=resume, threads=options.threads, log_handler=log_handler)
             else:

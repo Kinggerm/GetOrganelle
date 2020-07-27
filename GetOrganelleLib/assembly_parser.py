@@ -457,6 +457,7 @@ class Assembly(SimpleAssembly):
         self.vertex_to_float_copy = {}
         self.copy_to_vertex = {}
         self.__inverted_repeat_vertex = {}
+        self.merging_history = {}
 
     def new_graph_with_vertex_reseeded(self, start_from=1):
         those_vertices = sorted(self.vertex_info)
@@ -591,6 +592,8 @@ class Assembly(SimpleAssembly):
                     del self.copy_to_vertex[this_copy]
                 del self.vertex_to_copy[vertex_name]
                 del self.vertex_to_float_copy[vertex_name]
+            if vertex_name in self.merging_history:
+                del self.merging_history[vertex_name]
         if update_cluster:
             self.update_vertex_clusters()
         self.__inverted_repeat_vertex = {}
@@ -627,6 +630,9 @@ class Assembly(SimpleAssembly):
                 if old_vertex in v_cluster:
                     self.vertex_clusters[go_c].remove(old_vertex)
                     self.vertex_clusters[go_c].add(new_vertex)
+        if old_vertex in self.merging_history:
+            self.merging_history[new_vertex] = self.merging_history[old_vertex]
+            del self.merging_history[old_vertex]
 
     def detect_parallel_vertices(self, limited_vertices=None):
         if not limited_vertices:
@@ -758,6 +764,14 @@ class Assembly(SimpleAssembly):
                                 new_vertex = next_vertex + "_" + this_vertex
                             else:
                                 new_vertex = "_".join(next_vertex.split("_")[::-1]) + "_" + this_vertex
+
+                        # record merging history
+                        self.merging_history[new_vertex] = self.merging_history.get(this_vertex, {this_vertex}) | \
+                                                           self.merging_history.get(next_vertex, {next_vertex})
+                        if this_vertex in self.merging_history:
+                            del self.merging_history[this_vertex]
+                        if next_vertex in self.merging_history:
+                            del self.merging_history[next_vertex]
 
                         limited_vertices.remove(next_vertex)
                         limited_vertices.append(new_vertex)
@@ -1528,7 +1542,7 @@ class Assembly(SimpleAssembly):
                             self.tagged_vertices[next_t].remove(vertex_name)
 
         if database_name not in self.tagged_vertices or len(self.tagged_vertices[database_name]) == 0:
-            raise Exception("No available " + database_name + " information found in " + tab_file)
+            raise ProcessingGraphFailed("No available " + database_name + " information found in " + tab_file)
 
     def filter_by_coverage(self, drop_num=1, database_n="embplant_pt", log_hard_cov_threshold=10.,
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
@@ -1845,6 +1859,14 @@ class Assembly(SimpleAssembly):
             # if "long" in self.vertex_info[new_vertex]:
             #     del self.vertex_info[new_vertex]["long"]
 
+            self.merging_history[new_vertex] = set()
+            for candidate_v in vertices:
+                if candidate_v in self.merging_history:
+                    for sub_v_n in self.merging_history[candidate_v]:
+                        self.merging_history[new_vertex].add(sub_v_n)
+                else:
+                    self.merging_history[new_vertex].add(candidate_v)
+
             for new_end in (True, False):
                 for n_n_v, n_n_e in self.vertex_info[new_vertex].connections[new_end]:
                     self.vertex_info[n_n_v].connections[n_n_e][(new_vertex, new_end)] = None
@@ -2067,7 +2089,7 @@ class Assembly(SimpleAssembly):
                           max_contig_multiplicity=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
                           log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
-                          min_single_copy_percent=50,
+                          min_single_copy_percent=50, meta=False,
                           broken_graph_allowed=False, temp_graph=None, verbose=True,
                           read_len_for_log=None, kmer_for_log=None,
                           log_handler=None, debug=False):
@@ -2174,10 +2196,17 @@ class Assembly(SimpleAssembly):
                 _assembly.write_out_tags([_database_name], tmp_csv_1)
                 count_all_temp[0] += 1
 
-        if broken_graph_allowed:
+        if broken_graph_allowed and not meta:
             weight_factor = 10000.
 
-        self.parse_tab_file(tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
+        if meta:
+            try:
+                self.parse_tab_file(
+                    tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
+            except ProcessingGraphFailed:
+                return []
+        else:
+            self.parse_tab_file(tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
         is_reasonable_res = False
         data_contains_outlier = False
@@ -2635,6 +2664,68 @@ class Assembly(SimpleAssembly):
                 raise e
             else:
                 raise e
+
+    def peel_subgraph(self, subgraph, mode="", subgraph_was_merged=False, log_handler=None, verbose=False):
+        assert isinstance(subgraph, Assembly)
+        if subgraph_was_merged:
+            subgraph_vertices = set()
+            for merged_v_name in subgraph.vertex_info:
+                if merged_v_name in subgraph.merging_history:
+                    subgraph_vertices |= subgraph.merging_history[merged_v_name]
+                else:
+                    subgraph_vertices.add(merged_v_name)
+        else:
+            subgraph_vertices = set(subgraph.vertex_info)
+        limited_vertices = set(self.vertex_info) & set(subgraph_vertices)
+        if not limited_vertices:
+            if log_handler:
+                log_handler.warning("No overlapped vertices found for peeling!")
+            else:
+                sys.stdout.write("No overlapped vertices found for peeling!\n")
+            if verbose:
+                if log_handler:
+                    log_handler.warning("graph vertices: " + str(sorted(self.vertex_info)))
+                    log_handler.warning("subgraph vertices: " + str(sorted(subgraph.vertex_info)))
+                else:
+                    sys.stdout.write("graph vertices: " + str(sorted(self.vertex_info)))
+                    sys.stdout.write("subgraph vertices: " + str(sorted(subgraph.vertex_info)))
+        average_cov = self.estimate_copy_and_depth_by_cov(
+            limited_vertices, mode=mode, re_initialize=True, verbose=verbose)
+        vertices_peeling_ratios = {}
+        checked = set()
+        for peel_name in sorted(limited_vertices):
+            for peel_end, peel_connection_set in self.vertex_info[peel_name].connections.items():
+                if (peel_name, not peel_end) in checked:
+                    continue
+                else:
+                    checked.add((peel_name, not peel_end))
+                for (external_v_n, external_v_e) in sorted(peel_connection_set):
+                    if external_v_n in subgraph_vertices:
+                        continue
+                    if self.vertex_to_float_copy[peel_name] > self.vertex_to_copy[peel_name]:
+                        # only peel the average part
+                        vertices_peeling_ratios[peel_name] = \
+                            1 - self.vertex_to_copy[peel_name] / self.vertex_to_float_copy[peel_name]
+                        forward_peeling = [(next_n, not next_e)
+                                           for next_n, next_e in self.vertex_info[peel_name].connections[not peel_end]
+                                           if next_n in limited_vertices and (next_n, not next_e) not in checked]
+                        while forward_peeling:
+                            next_name, next_end = forward_peeling.pop(0)
+                            if self.vertex_to_float_copy[next_name] > self.vertex_to_copy[next_name]:
+                                vertices_peeling_ratios[next_name] = \
+                                    1 - self.vertex_to_copy[next_name] / self.vertex_to_float_copy[next_name]
+                                checked.add((next_name, next_end))
+                                forward_peeling.extend(
+                                    [(nx_nx_n, not nx_nx_e)
+                                     for nx_nx_n, nx_nx_e in self.vertex_info[next_name].connections[next_end]
+                                     if nx_nx_n in limited_vertices and (nx_nx_n, not nx_nx_e) not in checked])
+        remove_vertices = {del_v for del_v in limited_vertices if del_v not in vertices_peeling_ratios}
+        self.remove_vertex(remove_vertices)
+        for peel_this_n in sorted(vertices_peeling_ratios):
+            self.vertex_info[peel_this_n].cov *= vertices_peeling_ratios[peel_this_n]
+            if "weight" in self.vertex_info[peel_this_n].other_attr and \
+                    mode in self.vertex_info[peel_this_n].other_attr["weight"]:
+                self.vertex_info[peel_this_n].other_attr["weight"][mode] *= vertices_peeling_ratios[peel_this_n]
 
     def add_gap_nodes_with_spades_res(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf, log_handler=None,
                                       update_cluster=True, min_identifier_ws=12):

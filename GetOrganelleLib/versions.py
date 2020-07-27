@@ -6,6 +6,13 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.1-meta",
+     "features": [
+         "get_organelle_from_reads.py & assembly_parser.Assembly: --meta added for testing ",
+     ],
+     "time": "2020-07-27 19:10 UTC+8"
+    },
+    {
      "number": "1.7.1",
      "features": [
          "get_organelle_from_assembly.py: do not convert gfa to fastg; ",

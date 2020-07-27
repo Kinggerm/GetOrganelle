@@ -3361,6 +3361,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 contig_num = set()
                 still_complete = []
                 for go_res, res in enumerate(target_results):
+                    go_res += 1
                     broken_graph = res["graph"]
                     count_path = 0
                     these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in)
@@ -3414,14 +3415,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             log_in.info(
                                 "Writing PATH" + str(count_path) + " of nearly-complete " + mode_in + " to " + out_n)
                         else:
-                            out_n = o_p + ".scaffolds.graph" + str(go_res + 1) + other_tag + "." + \
+                            out_n = o_p + ".scaffolds.graph" + str(go_res) + other_tag + "." + \
                                     str(count_path) + ".path_sequence.fasta"
                             log_in.info(
                                 "Writing PATH" + str(count_path) + " of " + mode_in + " scaffold(s) to " + out_n)
                         open(out_n, "w").write("\n".join(all_contig_str))
 
                     if set(still_complete[-len(these_paths):]) == {"complete"}:
-                        this_out_base = o_p + ".complete.graph" + str(go_res + 1) + ".selected_graph."
+                        this_out_base = o_p + ".complete.graph" + str(go_res) + ".selected_graph."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(
@@ -3430,7 +3431,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     elif set(still_complete[-len(these_paths):]) == {"nearly-complete"}:
-                        this_out_base = o_p + ".nearly-complete.graph" + str(go_res + 1) + ".selected_graph."
+                        this_out_base = o_p + ".nearly-complete.graph" + str(go_res) + ".selected_graph."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(
@@ -3439,7 +3440,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     else:
-                        this_out_base = o_p + ".contigs.graph" + str(go_res + 1) + ".selected_graph."
+                        this_out_base = o_p + ".contigs.graph" + str(go_res) + ".selected_graph."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(

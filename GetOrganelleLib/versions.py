@@ -6,6 +6,13 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.1a",
+     "features": [
+         "output index bug fixed",
+     ],
+     "time": "2020-07-28 01:30 UTC+8"
+    },
+    {
      "number": "1.7.1",
      "features": [
          "get_organelle_from_assembly.py: do not convert gfa to fastg; ",

@@ -189,6 +189,7 @@ def main():
             if acyclic_allowed:
                 # still_complete = []
                 for go_res, copy_res in enumerate(copy_results):
+                    go_res += 1
                     broken_graph = copy_res["graph"]
                     count_path = 0
 
@@ -237,11 +238,12 @@ def main():
                         #     still_complete.append(True)
                         # else:
                         #     still_complete.append(False)
-                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                        open(prefix + ".graph" + str(go_res) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
-                    broken_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
+                    broken_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
             else:
                 for go_res, copy_res in enumerate(copy_results):
+                    go_res += 1
                     idealized_graph = copy_res["graph"]
                     # should add making one-step-inversion pairs for paths,
                     # which would be used to identify existence of a certain isomer using mapping information
@@ -265,7 +267,7 @@ def main():
                         this_seq_obj = idealized_graph.export_path(this_path)
                         if DEGENERATE_BASES & set(this_seq_obj.seq):
                             degenerate_base_used = True
-                        open(prefix + ".graph" + str(go_res + 1) + other_tag + "." + str(count_path) +
+                        open(prefix + ".graph" + str(go_res) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write(this_seq_obj.fasta_str())
                         # print ir stat
                         if count_path == 1 and mode == "embplant_pt":
@@ -278,7 +280,7 @@ def main():
                                 inner_logging.info(print_str)
                             else:
                                 sys.stdout.write(print_str + "\n")
-                    idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res + 1) + ".selected_graph.gfa")
+                    idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
             if degenerate_base_used:
                 inner_logging.warning("Degenerate base(s) used!")
             time_d = time.time()

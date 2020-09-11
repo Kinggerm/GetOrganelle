@@ -1,5 +1,8 @@
 # GetOrganelle
 
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda) 
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/license.svg)](https://anaconda.org/bioconda/getorganelle)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/latest_release_date.svg)](https://anaconda.org/bioconda/getorganelle)
 
 This toolkit assemblies organelle genome from genomic skimming data. 
 
@@ -7,7 +10,7 @@ This toolkit assemblies organelle genome from genomic skimming data.
 
 Please denote the version of GetOrganelle as well as the dependencies in your manuscript for reproducible science.
 
-<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Ting-Shuang Yi, De-Zhu Li. 2018. GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes. bioRxiv, 256479. [http://doi.org/10.1101/256479](http://doi.org/10.1101/256479)
+<b>Citation:</b> Jian-Jun Jin*, Wen-Bin Yu*, Jun-Bo Yang, Yu Song, Claude W. dePamphilis, Ting-Shuang Yi, De-Zhu Li. <i>GetOrganelle: a fast and versatile toolkit for accurate de novo assembly of organelle genomes.</i> Genome Biology 21, 241 (2020). [https://doi.org/10.1186/s13059-020-02154-5](https://doi.org/10.1186/s13059-020-02154-5)
 
 <b>License:</b> GPL https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -76,7 +79,7 @@ By default, `SPAdes` is automatically called to produce the assembly graph file 
 The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` file would be further parsed by `disentangle_organelle_assembly.py`, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the path. 
 
 Otherwise, if GetOrganelle failed to solve the path (produce `*scaffolds*path_sequence.fasta`), you could use the incomplete sequence to conduct downstream analysis or manually view `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` and load the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` in [Bandage](http://rrwick.github.io/Bandage/), choose the best path(s) as the <b>final result</b>. You could execute `slim_graph.py -F embplant_pt -E embplant_mt assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` to further remove mitogenome contigs for this easier visualization and manual completion.
-[Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to manually extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples with more complicated (do not miss `3m01s - 5m53s`) situations.
+[Here](http://player.youku.com/embed/XMzUxODc3MDQyOA) (or [here](https://youtu.be/NqOIi-fBma4)) is a short video showing a standard way to manually extract the plastome from the assembly graph with Bandage. See [here](https://v.qq.com/x/page/g0602unrcsf.html) or [here](https://www.youtube.com/watch?v=cXUV7k-F26w) for more examples.
 
 
 <b>GetOrganelle flowchart</b>

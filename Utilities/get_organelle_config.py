@@ -62,7 +62,7 @@ label_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/mas
 
 
 def get_options(description):
-    parser = OptionParser(description=description, usage="get_organelle_config.py -F embplant_pt")
+    parser = OptionParser(description=description, usage="get_organelle_config.py -a embplant_pt,embplant_mt")
     parser.add_option("-a", "--add", dest="add_organelle_type",
                       help="Add database for organelle type(s). Followed by any of all/" +
                            "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma such as "
@@ -83,7 +83,7 @@ def get_options(description):
                            "organelle type you want add, such as fungus_mt.fasta. ")
     parser.add_option("--clean", dest="clean", default=False, action="store_true",
                       help="Remove all configured database files (==\"--rm all\").")
-    parser.add_option("--list", dest="list", default=False, action="store_true",
+    parser.add_option("--list", dest="list_available", default=False, action="store_true",
                       help="List configured databases checking and exit. ")
     parser.add_option("--check", dest="check", default=False, action="store_true",
                       help="Check configured database files and exit. ")
@@ -103,7 +103,7 @@ def get_options(description):
     assert options.db_type in ("seed", "label", "both")
 
     # only print
-    if options.list:
+    if options.list_available:
         if options.db_type in ("seed", "both"):
             version_file = os.path.join(SEQ_DB_PATH, "VERSION")
             if os.path.isfile(version_file):

@@ -6,6 +6,18 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.2beta",
+     "features": [
+         "1. slim_graph.py: fix a bug in parsing options",
+         "2. automatically adding --phred-offset to avoid hammer failures",
+         "3. MergingHistory and ConsensusHistory added, in replace of using the names to detect merging history",
+         "4. Compatible with flye gfa format",
+         "4. Scaffolding function bug fixed & improved",
+         "5. get_organelle_config.py: example typo fixed",
+     ],
+     "time": "2020-07-28 01:30 UTC+8"
+    },
+    {
      "number": "1.7.1a",
      "features": [
          "output index bug fixed",

@@ -135,6 +135,6 @@ If your question is running specific, please attach the `get_org.log.txt` file a
 
 * Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues).
 
-* Send email to us ([jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn)/[jianjun.jin@columbia.edu](mailto:jianjun.jin@columbia.edu), [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn))
+* Send email to us ([jianjun.jin@columbia.edu](mailto:jianjun.jin@columbia.edu)&[jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn), [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn))
 
 * Join the QQ group (ID: 859158590)

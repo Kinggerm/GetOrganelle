@@ -49,6 +49,8 @@ else:
     sys.stdout.write("Python version have to be 2.7+ or 3.5+")
     sys.exit(0)
 ECHO_DIRECTION = ["_tail", "_head"]
+VERTEX_DIRECTION_STR_TO_BOOL = {"+": True, "-": False}
+VERTEX_DIRECTION_BOOL_TO_STR = {True: "+", False: "-"}
 
 
 class ProcessingGraphFailed(Exception):
@@ -98,6 +100,7 @@ class Vertex(object):
         if head_connections:
             self.connections[False] = head_connections
         self.fastg_form_name = fastg_form_long_name
+        self.merging_history = MergingHistory([(v_name, True)])
         self.other_attr = {}
 
     def __repr__(self):
@@ -133,6 +136,104 @@ class VertexInfo(dict):
             raise ValueError("Value must be a Vertex type! Current: " + str(type(val)))
         val.name = key
         dict.__setitem__(self, key, val)
+
+
+class MergingHistory(object):
+    def __init__(self, history_or_path=None):
+        self.__list = []
+        if history_or_path:
+            for each_item in history_or_path:
+                is_vertex = isinstance(each_item, tuple) and len(each_item) == 2 and isinstance(each_item[1], bool)
+                is_hist = isinstance(each_item, MergingHistory)
+                assert is_vertex or is_hist
+                if is_vertex:
+                    self.__list.append(each_item)
+                else:
+                    self.__list.extend(each_item.list())
+
+    def add(self, new_history_or_vertex, add_new_to_front=False, reverse_the_latter=False):
+        is_vertex = isinstance(new_history_or_vertex, tuple) and len(new_history_or_vertex) == 2
+        is_hist = isinstance(new_history_or_vertex, MergingHistory)
+        assert is_vertex or is_hist
+        if add_new_to_front:
+            if reverse_the_latter:
+                self.reverse()
+            self.__list.insert(0, new_history_or_vertex)
+        else:
+            if reverse_the_latter:
+                if is_vertex:
+                    self.__list.append((new_history_or_vertex[0], not new_history_or_vertex[1]))
+                else:
+                    self.__list.extend(list(-new_history_or_vertex))
+            else:
+                if is_vertex:
+                    self.__list.append(new_history_or_vertex)
+                else:
+                    self.__list.extend(list(new_history_or_vertex))
+
+    def __neg__(self):
+        return MergingHistory([(each_vertex[0], not each_vertex[1]) for each_vertex in self.__list[::-1]])
+
+    def __iter__(self):
+        for item in self.__list:
+            yield item
+
+    def __str__(self):
+        return "_".join([str(each_vertex[0]) if isinstance(each_vertex, tuple) else str(each_vertex)
+                         for each_vertex in self.__list])
+
+    def reverse(self):
+        self.__list = [(each_vertex[0], not each_vertex[1]) for each_vertex in self.__list[::-1]]
+
+    def path_list(self):
+        return list(self.__list)
+        # return [each_vertex.path_list() if isinstance(each_vertex, MergingHistory) else each_vertex
+        #         for each_vertex in self.__list]
+
+    def vertex_set(self):
+        v_set = set()
+        for each_item in self.__list:
+            if isinstance(each_item[0], ConsensusHistory):
+                v_set.update(each_item[0].vertex_set())
+            else:
+                v_set.add(each_item[0])
+        return v_set
+
+
+
+class ConsensusHistory(object):
+    def __init__(self, merging_items):
+        """
+        :param merging_items: [(name1, vertex1), (name2, vertex2)]
+        """
+        self.__list = []
+        for each_item in merging_items:
+            assert isinstance(each_item, tuple) and len(each_item) == 2
+            self.__list.append(each_item)
+
+    def add_consensus(self, vertex):
+        """
+        :param vertex: (name, vertex)
+        :return: 
+        """
+        assert isinstance(vertex, tuple) and len(vertex) == 2
+        self.__list.append(vertex)
+
+    def __str__(self):
+        sorted_list = sorted(self.__list, key=lambda x: (str(x[0]), x[1]))
+        # format of consensus name, similar to newick
+        return "(" + "|".join([str(each_hist[0]) + VERTEX_DIRECTION_BOOL_TO_STR[each_hist[1]]
+                               for each_hist in sorted_list]) + ")"
+
+    def vertex_set(self):
+        v_set = set()
+        for each_item in self.__list:
+            if isinstance(each_item[0], MergingHistory):
+                v_set.update(each_item[0].vertex_set())
+            else:
+                v_set.add(each_item[0])
+        return v_set
+
 
 
 class SimpleAssembly(object):
@@ -241,6 +342,7 @@ class SimpleAssembly(object):
                         flag, vertex_1, end_1, vertex_2, end_2, alignment_cigar = line.strip().split("\t")
                         # "head"~False, "tail"~True
                         if vertex_1 in self.vertex_info and vertex_2 in self.vertex_info:
+                            # different notation as to our Assembly system
                             end_1 = {"+": True, "-": False}[end_1]
                             end_2 = {"+": False, "-": True}[end_2]
                             kmer_values.add(alignment_cigar)
@@ -457,6 +559,7 @@ class Assembly(SimpleAssembly):
         self.vertex_to_float_copy = {}
         self.copy_to_vertex = {}
         self.__inverted_repeat_vertex = {}
+        self.merging_history = {}
 
     def new_graph_with_vertex_reseeded(self, start_from=1):
         those_vertices = sorted(self.vertex_info)
@@ -577,8 +680,8 @@ class Assembly(SimpleAssembly):
 
     def remove_vertex(self, vertices, update_cluster=True):
         for vertex_name in vertices:
-            for this_end, connected_dict in self.vertex_info[vertex_name].connections.items():
-                for next_v, next_e in connected_dict:
+            for this_end, connected_dict in list(self.vertex_info[vertex_name].connections.items()):
+                for next_v, next_e in list(connected_dict):
                     del self.vertex_info[next_v].connections[next_e][(vertex_name, this_end)]
             del self.vertex_info[vertex_name]
             for tag in self.tagged_vertices:
@@ -591,6 +694,8 @@ class Assembly(SimpleAssembly):
                     del self.copy_to_vertex[this_copy]
                 del self.vertex_to_copy[vertex_name]
                 del self.vertex_to_float_copy[vertex_name]
+            # if vertex_name in self.merging_history:
+            #     del self.merging_history[vertex_name]
         if update_cluster:
             self.update_vertex_clusters()
         self.__inverted_repeat_vertex = {}
@@ -600,8 +705,10 @@ class Assembly(SimpleAssembly):
         assert new_vertex not in self.vertex_info, new_vertex + " exists!"
         self.vertex_info[new_vertex] = deepcopy(self.vertex_info[old_vertex])
         self.vertex_info[new_vertex].name = new_vertex
+        # merging history removed
+        self.vertex_info[new_vertex].merging_history = MergingHistory([(new_vertex, True)])
         for this_end in (True, False):
-            for next_v, next_e in self.vertex_info[new_vertex].connections[this_end]:
+            for next_v, next_e in list(self.vertex_info[new_vertex].connections[this_end]):
                 self.vertex_info[next_v].connections[next_e][(new_vertex, this_end)] = \
                     self.vertex_info[next_v].connections[next_e][(old_vertex, this_end)]
                 del self.vertex_info[next_v].connections[next_e][(old_vertex, this_end)]
@@ -627,6 +734,9 @@ class Assembly(SimpleAssembly):
                 if old_vertex in v_cluster:
                     self.vertex_clusters[go_c].remove(old_vertex)
                     self.vertex_clusters[go_c].add(new_vertex)
+        # if old_vertex in self.merging_history:
+        #     self.merging_history[new_vertex] = self.merging_history[old_vertex]
+        #     del self.merging_history[old_vertex]
 
     def detect_parallel_vertices(self, limited_vertices=None):
         if not limited_vertices:
@@ -748,16 +858,28 @@ class Assembly(SimpleAssembly):
                     if len(self.vertex_info[next_vertex].connections[next_end]) == 1 and this_vertex != next_vertex:
                         # reverse the names
                         merged = True
-                        if this_end:
-                            if next_end:
-                                new_vertex = this_vertex + "_" + "_".join(next_vertex.split("_")[::-1])
-                            else:
-                                new_vertex = this_vertex + "_" + next_vertex
-                        else:
-                            if next_end:
-                                new_vertex = next_vertex + "_" + this_vertex
-                            else:
-                                new_vertex = "_".join(next_vertex.split("_")[::-1]) + "_" + this_vertex
+                        self.vertex_info[this_vertex].merging_history.add((next_vertex, not next_end),
+                                                                          add_new_to_front=this_end,
+                                                                          reverse_the_latter=not next_end)
+                        new_vertex = str(self.vertex_info[this_vertex].merging_history)
+                        # if this_end:
+                        #     if next_end:
+                        #         new_vertex = this_vertex + "_" + "_".join(next_vertex.split("_")[::-1])
+                        #     else:
+                        #         new_vertex = this_vertex + "_" + next_vertex
+                        # else:
+                        #     if next_end:
+                        #         new_vertex = next_vertex + "_" + this_vertex
+                        #     else:
+                        #         new_vertex = "_".join(next_vertex.split("_")[::-1]) + "_" + this_vertex
+
+                        # record merging history
+                        # self.merging_history[new_vertex] = self.merging_history.get(this_vertex, {this_vertex}) | \
+                        #                                    self.merging_history.get(next_vertex, {next_vertex})
+                        # if this_vertex in self.merging_history:
+                        #     del self.merging_history[this_vertex]
+                        # if next_vertex in self.merging_history:
+                        #     del self.merging_history[next_vertex]
 
                         limited_vertices.remove(next_vertex)
                         limited_vertices.append(new_vertex)
@@ -1528,7 +1650,7 @@ class Assembly(SimpleAssembly):
                             self.tagged_vertices[next_t].remove(vertex_name)
 
         if database_name not in self.tagged_vertices or len(self.tagged_vertices[database_name]) == 0:
-            raise Exception("No available " + database_name + " information found in " + tab_file)
+            raise ProcessingGraphFailed("No available " + database_name + " information found in " + tab_file)
 
     def filter_by_coverage(self, drop_num=1, database_n="embplant_pt", log_hard_cov_threshold=10.,
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
@@ -1837,13 +1959,28 @@ class Assembly(SimpleAssembly):
                     connection_type = this_ends
 
         if len(vertices) > 1:
-            new_vertex = "(" + "|".join(vertices) + ")"
+            self.vertex_info[vertices[0]].merging_history = \
+                MergingHistory(
+                    [(ConsensusHistory([(v_n, v_e) for v_n, v_e in zip(vertices, directions)]), directions[0])])
+            new_vertex = str(self.vertex_info[vertices[0]].merging_history)
+            # new_vertex = "(" + "|".join(vertices) + ")"
             self.vertex_info[new_vertex] = deepcopy(self.vertex_info[vertices[0]])
             self.vertex_info[new_vertex].name = new_vertex
             self.vertex_info[new_vertex].cov = sum([self.vertex_info[v].cov for v in vertices])
             self.vertex_info[new_vertex].fastg_form_name = None
             # if "long" in self.vertex_info[new_vertex]:
             #     del self.vertex_info[new_vertex]["long"]
+
+            # self.merging_history[new_vertex] = set()
+            # for candidate_v in vertices:
+            #     if candidate_v in self.merging_history:
+            #         for sub_v_n in self.merging_history[candidate_v]:
+            #             self.merging_history[new_vertex].add(sub_v_n)
+            #     else:
+            #         self.merging_history[new_vertex].add(candidate_v)
+            # for candidate_v in vertices:
+            #     if candidate_v in self.merging_history:
+            #         del self.merging_history[candidate_v]
 
             for new_end in (True, False):
                 for n_n_v, n_n_e in self.vertex_info[new_vertex].connections[new_end]:
@@ -2067,7 +2204,7 @@ class Assembly(SimpleAssembly):
                           max_contig_multiplicity=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
                           log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
-                          min_single_copy_percent=50,
+                          min_single_copy_percent=50, meta=False,
                           broken_graph_allowed=False, temp_graph=None, verbose=True,
                           read_len_for_log=None, kmer_for_log=None,
                           log_handler=None, debug=False):
@@ -2174,10 +2311,17 @@ class Assembly(SimpleAssembly):
                 _assembly.write_out_tags([_database_name], tmp_csv_1)
                 count_all_temp[0] += 1
 
-        if broken_graph_allowed:
+        if broken_graph_allowed and not meta:
             weight_factor = 10000.
 
-        self.parse_tab_file(tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
+        if meta:
+            try:
+                self.parse_tab_file(
+                    tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
+            except ProcessingGraphFailed:
+                return []
+        else:
+            self.parse_tab_file(tab_file, database_name=database_name, type_factor=type_factor, log_handler=log_handler)
         new_assembly = deepcopy(self)
         is_reasonable_res = False
         data_contains_outlier = False
@@ -2636,6 +2780,62 @@ class Assembly(SimpleAssembly):
             else:
                 raise e
 
+    def peel_subgraph(self, subgraph, mode="", log_handler=None, verbose=False):
+        assert isinstance(subgraph, Assembly)
+        subgraph_vertices = set()
+        for sub_v in subgraph.vertex_info:
+            subgraph_vertices.update(subgraph.vertex_info[sub_v].merging_history.vertex_set())
+        limited_vertices = set(self.vertex_info) & set(subgraph_vertices)
+        if not limited_vertices:
+            if log_handler:
+                log_handler.warning("No overlapped vertices found for peeling!")
+            else:
+                sys.stdout.write("No overlapped vertices found for peeling!\n")
+            if verbose:
+                if log_handler:
+                    log_handler.warning("graph vertices: " + str(sorted(self.vertex_info)))
+                    log_handler.warning("subgraph vertices: " + str(sorted(subgraph.vertex_info)))
+                else:
+                    sys.stdout.write("graph vertices: " + str(sorted(self.vertex_info)))
+                    sys.stdout.write("subgraph vertices: " + str(sorted(subgraph.vertex_info)))
+        average_cov = self.estimate_copy_and_depth_by_cov(
+            limited_vertices, mode=mode, re_initialize=True, verbose=verbose)
+        vertices_peeling_ratios = {}
+        checked = set()
+        for peel_name in sorted(limited_vertices):
+            for peel_end, peel_connection_set in self.vertex_info[peel_name].connections.items():
+                if (peel_name, not peel_end) in checked:
+                    continue
+                else:
+                    checked.add((peel_name, not peel_end))
+                for (external_v_n, external_v_e) in sorted(peel_connection_set):
+                    if external_v_n in subgraph_vertices:
+                        continue
+                    if self.vertex_to_float_copy[peel_name] > self.vertex_to_copy[peel_name]:
+                        # only peel the average part
+                        vertices_peeling_ratios[peel_name] = \
+                            1 - self.vertex_to_copy[peel_name] / self.vertex_to_float_copy[peel_name]
+                        forward_peeling = [(next_n, not next_e)
+                                           for next_n, next_e in self.vertex_info[peel_name].connections[not peel_end]
+                                           if next_n in limited_vertices and (next_n, not next_e) not in checked]
+                        while forward_peeling:
+                            next_name, next_end = forward_peeling.pop(0)
+                            if self.vertex_to_float_copy[next_name] > self.vertex_to_copy[next_name]:
+                                vertices_peeling_ratios[next_name] = \
+                                    1 - self.vertex_to_copy[next_name] / self.vertex_to_float_copy[next_name]
+                                checked.add((next_name, next_end))
+                                forward_peeling.extend(
+                                    [(nx_nx_n, not nx_nx_e)
+                                     for nx_nx_n, nx_nx_e in self.vertex_info[next_name].connections[next_end]
+                                     if nx_nx_n in limited_vertices and (nx_nx_n, not nx_nx_e) not in checked])
+        remove_vertices = {del_v for del_v in limited_vertices if del_v not in vertices_peeling_ratios}
+        self.remove_vertex(remove_vertices)
+        for peel_this_n in sorted(vertices_peeling_ratios):
+            self.vertex_info[peel_this_n].cov *= vertices_peeling_ratios[peel_this_n]
+            if "weight" in self.vertex_info[peel_this_n].other_attr and \
+                    mode in self.vertex_info[peel_this_n].other_attr["weight"]:
+                self.vertex_info[peel_this_n].other_attr["weight"][mode] *= vertices_peeling_ratios[peel_this_n]
+
     def add_gap_nodes_with_spades_res(self, scaffold_fasta, scaffold_paths, min_cov=0., max_cov=inf, log_handler=None,
                                       update_cluster=True, min_identifier_ws=12):
         spades_scaffolds = SpadesScaffolds(scaffold_fasta, scaffold_paths, assembly_obj=self, log_handler=log_handler,
@@ -2855,6 +3055,7 @@ class Assembly(SimpleAssembly):
                     new_path = input_path
                 reseed_from = new_path.index(input_unique_vertex)
                 return new_path[reseed_from:] + new_path[:reseed_from]
+
             if 1 in self.copy_to_vertex:
                 branching_single_copy_vertices = set()
                 if mode == "embplant_pt" and 2 in self.copy_to_vertex:
@@ -2902,7 +3103,7 @@ class Assembly(SimpleAssembly):
                                              key=lambda x:
                                              (-sum([self.vertex_info[sub_v].len
                                                     for sub_v, sub_e in sub_paths_for_checking[x]]) +
-                                                  self.__overlap * (len(sub_paths_for_checking) - 1),
+                                              self.__overlap * (len(sub_paths_for_checking) - 1),
                                               sum([self.vertex_info[sub_v].other_attr["orf"][sub_e]["sum_len"]
                                                    for sub_v, sub_e in sub_paths_for_checking[x]]),
                                               x))[0]
@@ -3021,7 +3222,12 @@ class Assembly(SimpleAssembly):
                     for change_start in range(1, len(part_path)):
                         this_part_derived.append(part_path[change_start:] + part_path[:change_start])
                         this_part_derived.append(rev_part[change_start:] + rev_part[:change_start])
-                    standard_part = tuple(sorted(this_part_derived, key=lambda x: smart_trans_for_sort(x))[0])
+                    try:
+                        standard_part = tuple(sorted(this_part_derived, key=lambda x: smart_trans_for_sort(x))[0])
+                    except TypeError:
+                        for j in this_part_derived:
+                            print(j)
+                        exit()
                 else:
                     standard_part = tuple(sorted([part_path, rev_part], key=lambda x: smart_trans_for_sort(x))[0])
                 here_standardized_path.append(standard_part)
@@ -3105,7 +3311,7 @@ class Assembly(SimpleAssembly):
         for vertex_n in self.vertex_info:
             if self.vertex_info[vertex_n].seq[True] == self.vertex_info[vertex_n].seq[False]:
                 temp_f = self.vertex_info[vertex_n].connections[True]
-                temp_r = self.vertex_info[vertex_n].conncetions[False]
+                temp_r = self.vertex_info[vertex_n].connections[False]
                 if temp_f and temp_f == temp_r:
                     log_palindrome = True
                     if len(temp_f) == len(temp_r) == 2:  # simple palindromic repeats, prune repeated connections
@@ -3479,9 +3685,6 @@ class NaiveKmerNodeGraph(Assembly):
         return assembly_graph
 
 
-VERTEX_DIRECTION_STR_TO_BOOL = {"+": True, "-": False}
-
-
 class SpadesNodes(Vertex):
     def __init__(self, v_name, length=None, coverage=None, forward_seq=None, reverse_seq=None,
                  tail_connections=None, head_connections=None, path_str=None, assembly_obj=None):
@@ -3559,20 +3762,20 @@ class SpadesScaffolds(object):
                             if len_this_sub <= min_contig_len:
                                 break
                             check_ws = min(matching_ws, len_this_sub)
-                            if go_sub_path == 0:
-                                searching_min = 0
-                                searching_max = 0
-                            else:
-                                if arbitrary_break:
-                                    if last_matching_end_at_scaffold is None:
-                                        searching_min = None
-                                    else:
-                                        searching_min = last_matching_end_at_scaffold - check_ws
-                                    searching_max = None
-                                else:
-                                    # for speeding up
-                                    searching_min = last_matching_end_at_scaffold - check_ws
-                                    searching_max = last_matching_end_at_scaffold - check_ws + gap_len + len_this_sub
+                            # if go_sub_path == 0:
+                            #     searching_min = 0
+                            #     searching_max = 0
+                            # else:
+                            #     if arbitrary_break:
+                            #         if last_matching_end_at_scaffold is None:
+                            #             searching_min = None
+                            #         else:
+                            #             searching_min = last_matching_end_at_scaffold - check_ws
+                            #         searching_max = None
+                            #     else:
+                            #         # for speeding up
+                            #         searching_min = last_matching_end_at_scaffold - check_ws
+                            #         searching_max = last_matching_end_at_scaffold - check_ws + gap_len + len_this_sub
                             this_start_at_scaffold, matching_start_at_alm, matching_end_at_alm = \
                                 map_contigs_to_scaffolds(scaffold=full_path_seq, contig=this_sub_seq,
                                                          scaffold_start_searching_min=None,  # searching_min,
@@ -3634,9 +3837,9 @@ class SpadesScaffolds(object):
                                                     str(-gap_len) + "-bp overlap between " + last_v_name + " and " +
                                                     this_v_name + " indicated while conflicting connections existed!")
                                             else:
-                                                sys.stdout.write("Warning: " + str(-gap_len) + "-bp overlap "
-                                                                                               "between " + last_v_name + " and " + this_v_name + " indicated "
-                                                                                                                                                  "while conflicting connections existed!\n")
+                                                sys.stdout.write(
+                                                    "Warning: " + str(-gap_len) + "-bp overlap between " + last_v_name
+                                                    + " and " + this_v_name + " indicated while conflicting connections existed!\n")
                                         else:
                                             go_to_standard_jumping = True
                                     elif this_fix:

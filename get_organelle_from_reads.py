@@ -114,6 +114,8 @@ def get_options(description, version):
     group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
                            help="The maximum percent of bases to be ignore in extension, due to low quality. "
                                 "Default: %default")
+    group_inout.add_option("--phred-offset", dest="phred_offset", default=-1, type=int,
+                           help="Phred offset for spades-hammer. Default: GetOrganelle-autodetect")
     group_inout.add_option("--min-quality-score", dest="min_quality_score", type=int, default=1,
                            help="Minimum quality score in extension. This value would be automatically decreased "
                                 "to prevent ignoring too much raw data (see --max-ignore-percent)."
@@ -372,7 +374,7 @@ def get_options(description, version):
         parser.print_help()
         exit()
     elif "-h" in sys.argv:
-        for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage",
+        for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage", "--phred-offset"
                                "--min-quality-score", "--prefix", "--out-per-round", "--zip-files", "--keep-temp",
                                "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
                                "-J", "-M", "--bowtie2-options",
@@ -573,6 +575,7 @@ def get_options(description, version):
                 exit()
         assert options.echo_step > 0
         assert options.max_paths_num > 0
+        assert options.phred_offset in (-1, 64, 33)
         options.prefix = os.path.basename(options.prefix)
         if options.script_resume and os.path.isdir(options.output_base):
             previous_attributes = LogInfo(options.output_base, options.prefix).__dict__
@@ -2418,7 +2421,7 @@ def extending_no_lim(word_size, seed_file, original_fq_files, len_indices, pre_g
         reads_generator.close()
         if round_count <= min_rounds:
             log_handler.info("Hit the words limit and terminated ...")
-            log_handler.warning("Terminated at an insufficient number of rounds, see '--max-n-words' for more.")
+            log_handler.warning("Terminated at an insufficient number of rounds, see '--max-n-words'/'--max-extending-len' for more.")
         else:
             log_handler.info("Hit the words limit and terminated ...")
     except RoundLimitException as r_lim:
@@ -2823,7 +2826,7 @@ def extending_with_lim(word_size, seed_file, original_fq_files, len_indices, pre
         reads_generator.close()
         if round_count <= min_rounds:
             log_handler.info("Hit the words limit and terminated ...")
-            log_handler.warning("Terminated at an insufficient number of rounds, see '--max-n-words' for more.")
+            log_handler.warning("Terminated at an insufficient number of rounds, see '--max-n-words'/'--max-extending-len' for more.")
         else:
             log_handler.info("Hit the words limit and terminated ...")
     except RoundLimitException as r_lim:
@@ -3656,6 +3659,7 @@ def main():
     # max_extending_lens
     max_extending_lens = {inf}
     slim_extending_len = None
+    phred_offset = options.phred_offset
     try:
         if options.fq_file_1 and options.fq_file_2:
             reads_paired = {'input': True, 'pair_out': bool}
@@ -3674,6 +3678,10 @@ def main():
             del other_options[which_out: which_out + 2]
         else:
             spades_output = os.path.join(out_base, options.prefix + "filtered_spades")
+        if "--phred-offset" in other_options:
+            log_handler.warning("--spades-options '--phred-offset' was deprecated in GetOrganelle. ")
+            which_po = other_options.index("--phred-offset")
+            del other_options[which_po: which_po + 2]
         other_options = ' '.join(other_options)
 
         """ get reads """
@@ -3695,16 +3703,19 @@ def main():
                  for i in range(len(original_fq_files))]))
 
         if resume:
-            if "max_read_len" in previous_attributes and "mean_read_len" in previous_attributes:
+            if "max_read_len" in previous_attributes and "mean_read_len" in previous_attributes and \
+                    "phred_offset" in previous_attributes:
                 try:
                     max_read_len = int(previous_attributes["max_read_len"])
                     mean_read_len = float(previous_attributes["mean_read_len"])
+                    phred_offset = int(previous_attributes["phred_offset"])
                 except ValueError:
                     resume = False
             else:
                 resume = False
             if not resume and verb_log:
-                log_handler.info("Previous attributes: max/mean read lengths not found. Restart a new run.\n")
+                log_handler.info("Previous attributes: max/mean read lengths/phred offset not found. "
+                                 "Restart a new run.\n")
             try:
                 word_size = int(previous_attributes["w"])
             except (KeyError, ValueError):
@@ -3715,7 +3726,7 @@ def main():
                 else:
                     pass
 
-        if not (resume and (filtered_files_exist or filtered_fq_gz_exist)):
+        if not (resume and (filtered_files_exist or (filtered_fq_gz_exist and phred_offset != -1))):
             anti_seed = options.anti_seed
             pre_grp = options.pre_grouped
             in_memory = options.index_in_memory
@@ -3779,7 +3790,7 @@ def main():
                 sampling_reads_for_quality = 10000
                 # pre-reading fastq
                 log_handler.info("Counting read qualities ...")
-                low_quality_pattern, mean_error_rate = \
+                low_quality_pattern, mean_error_rate, phred_offset = \
                     get_read_quality_info(original_fq_files, sampling_reads_for_quality, options.min_quality_score,
                                           log_handler, maximum_ignore_percent=options.maximum_ignore_percent)
                 log_handler.info("Counting read lengths ...")
@@ -3947,6 +3958,8 @@ def main():
                     log_handler.warning("Compression after read correction will be skipped for lack of 'pigz'")
                     if "--disable-gzip-output" not in other_options:
                         other_options += " --disable-gzip-output"
+                if phred_offset in (33, 64):
+                    other_options += " --phred-offset %i" % phred_offset
                 is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
                                                     options.prefix, original_fq_files, reads_paired,
                                                     which_spades=options.which_spades, verbose_log=options.verbose_log,

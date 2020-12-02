@@ -306,8 +306,7 @@ def get_options(print_title):
 
                 def _check_default_db(this_sub_organelle, extra_type=""):
                     if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) and
-                             os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta"))) or
-                            (options.genes_fasta and options.seed_file)):
+                             os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta")))):
                         sys.stdout.write(
                             "\n############################################################################"
                             "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +

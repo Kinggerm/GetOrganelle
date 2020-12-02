@@ -38,8 +38,8 @@ DEAD_CODE = {"2.7+": 32512, "3.5+": 127}[python_version]
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
-
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+from GetOrganelleLib.seq_parser import phred_offset_table
 
 ORGANELLE_TYPE_SET = {"embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "animal_mt", "other_pt"}
 ORGANELLE_TYPE_LIST = ["embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "animal_mt", "other_pt"]
@@ -495,6 +495,9 @@ class LogInfo:
                                 this_record["fastq_format"] = detail_record.split(" = ")[-1]
                                 if "record_fq_beyond_limit" not in this_record:
                                     this_record["record_fq_beyond_limit"] = False
+                                this_record["phred_offset"] = phred_offset_table[this_record["fastq_format"]]
+                            if detail_record.startswith("Phred offset = "):
+                                this_record["phred_offset"] = int(detail_record.split(" = ")[-1].strip())
                             elif detail_record.startswith("Trimming bases with qualities"):
                                 context, trimmed = detail_record.split(":")
                                 this_record["trim_percent"] = context.split("(")[-1].split(")")[0]
@@ -845,11 +848,14 @@ def detect_spades_version(which_spades):
 
 def detect_blast_version(which_blast):
     if executable(os.path.join(which_blast, "blastn")):
-        output, err = subprocess.Popen(
-            os.path.join(which_blast, "blastn") + " -version", stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, shell=True).communicate()
-        this_lines = output.decode("utf8").split("\n")[:2]
-        return "Blast " + this_lines[1].strip().split()[2].replace(",", "").strip()
+        try:
+            output, err = subprocess.Popen(
+                os.path.join(which_blast, "blastn") + " -version", stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, shell=True).communicate()
+            this_lines = output.decode("utf8").split("\n")[:2]
+            return "Blast " + this_lines[1].strip().split()[2].replace(",", "").strip()
+        except IndexError:
+            return "Blast N/A"
     else:
         return "Blast N/A"
 

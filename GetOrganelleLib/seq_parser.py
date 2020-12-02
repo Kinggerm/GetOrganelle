@@ -1590,6 +1590,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_hand
                                 (max_quality - char_max) ** 2 + (min_quality - char_min) ** 2))
     the_form, the_c_min, the_c_max, the_s_min, the_s_max, deviation = sorted(decision_making, key=lambda x: x[-1])[0]
     log_handler.info("Identified quality encoding format = " + the_form)
+    log_handler.info("Phred offset = " + str(phred_offset_table[the_form]))
     if max_quality > the_c_max:
         log_handler.warning("Max quality score " + repr(chr(max_quality)) +
                             "(" + str(max_quality) + ":" + str(max_quality - the_c_min + the_s_min) +
@@ -1630,7 +1631,7 @@ def get_read_quality_info(fq_files, maximum_n_reads, min_quality_score, log_hand
                            for in_quality_char in all_quality_char_dict]) / len_quality_chars_total
     log_handler.info("Mean error rate = " + str(round(mean_error_rate, 4)))
 
-    return "[" + trimmed_quality_chars + "]", mean_error_rate  # , post_trimming_mean
+    return "[" + trimmed_quality_chars + "]", mean_error_rate, phred_offset_table[the_form]  # , post_trimming_mean
 
 
 def get_paired_and_unpaired_reads(input_fq_1, input_fq_2, output_p_1, output_p_2, output_u_1, output_u_2):
@@ -1756,3 +1757,10 @@ chose_error_prob_func = {"Sanger": sanger_error_prob,
                          "Illumina 1.3+": illumina_1_3_error_prob,
                          "Illumina 1.5+": illumina_1_5_error_prob,
                          "Illumina 1.8+": illumina_1_8_error_prob}
+
+
+phred_offset_table = {"Sanger": 33,
+                      "Solexa": 64,
+                      "Illumina 1.3+": 64,
+                      "Illumina 1.5+": 64,
+                      "Illumina 1.8+": 33}

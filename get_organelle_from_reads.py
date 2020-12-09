@@ -374,7 +374,7 @@ def get_options(description, version):
         parser.print_help()
         exit()
     elif "-h" in sys.argv:
-        for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage", "--phred-offset"
+        for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage", "--phred-offset",
                                "--min-quality-score", "--prefix", "--out-per-round", "--zip-files", "--keep-temp",
                                "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
                                "-J", "-M", "--bowtie2-options",

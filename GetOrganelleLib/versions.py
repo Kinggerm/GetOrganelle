@@ -6,6 +6,13 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.2beta2",
+     "features": [
+         "1. get_organelle_from_reads.py: fix a bug in parsing options",
+     ],
+     "time": "2020-07-28 01:30 UTC+8"
+    },
+    {
      "number": "1.7.2beta",
      "features": [
          "1. slim_graph.py: fix a bug in parsing options",

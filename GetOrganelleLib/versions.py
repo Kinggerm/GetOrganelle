@@ -26,8 +26,8 @@ versions = [
          "2. automatically adding --phred-offset to avoid hammer failures",
          "3. MergingHistory and ConsensusHistory added, in replace of using the names to detect merging history",
          "4. Compatible with flye gfa format",
-         "4. Scaffolding function bug fixed & improved",
-         "5. get_organelle_config.py: example typo fixed",
+         "5. Scaffolding function bug fixed & improved",
+         "6. get_organelle_config.py: example typo fixed",
      ],
      "time": "2020-12-03 UTC+8"
     },

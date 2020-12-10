@@ -3748,7 +3748,7 @@ class SpadesScaffolds(object):
                     if len(path_strings) != 1:
                         full_path_seq = sequence_matrix[long_name].seq
                         last_v_name, last_v_end = "", False
-                        arbitrary_break = False  # cannot find the position of this sub-seq in scaffolds.fasta
+                        # arbitrary_break = False  # cannot find the position of this sub-seq in scaffolds.fasta
                         gap_len = full_path_seq.count("N")
                         last_matching_end_at_scaffold = None
                         last_end_at_scaffold = None
@@ -3789,11 +3789,12 @@ class SpadesScaffolds(object):
                             # print(this_sub_seq[:20])
                             if this_start_at_scaffold is None or \
                                     (matching_end_at_alm - matching_start_at_alm + 1 < graph_overlap):
-                                arbitrary_break = True
+                                # arbitrary_break = True
                                 continue
                             else:
-                                arbitrary_break = False
-                                if go_sub_path == 0:
+                                # arbitrary_break = False
+                                if last_end_at_scaffold is None or last_matching_end_at_scaffold is None:
+                                    # if go_sub_path == 0:
                                     last_v_name, last_v_end = self.nodes[sub_name].vertices_path[-1]
                                     last_matching_end_at_scaffold = this_start_at_scaffold + matching_end_at_alm
                                     last_end_at_scaffold = this_start_at_scaffold + len_this_sub - 1

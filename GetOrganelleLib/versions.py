@@ -8,9 +8,9 @@ versions = [
     {
      "number": "1.7.2",
      "features": [
-         "1. assembly_parser.py: fix a bug in scaffolding",
+         "1. assembly_parser.py: fix bugs in scaffolding",
      ],
-     "time": "2020-12-10 23:15 UTC+8"
+     "time": "2020-12-10 23:50 UTC+8"
     },
     {
      "number": "1.7.2beta2",

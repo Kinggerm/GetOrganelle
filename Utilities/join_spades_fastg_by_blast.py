@@ -42,8 +42,8 @@ def require_commands():
     global options
     usage = 'python '+str(os.path.basename(__file__))+' -g input.fastg -f refernce.fasta'
     parser = OptionParser(usage=usage)
-    parser.add_option('-g', dest='in_fastg_file', help='followed by your input fastg file')
-    parser.add_option('-f', dest='reference_fa_base', help='followed by Fasta index format')
+    parser.add_option('-g', dest='in_fastg_file', type=str, help='followed by your input fastg file')
+    parser.add_option('-f', dest='reference_fa_base', type=str, help='followed by Fasta index format')
     parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true', help='Choose to disable deleting temp files produced by blast and this script')
     parser.add_option('--bt', dest='blast_hits_threshold', default=0.60, help='Default: 0.60', type=float)
     parser.add_option('--max-gap', dest='max_gap_to_add', default=1500, help='Default: 1500', type=int)
@@ -381,7 +381,7 @@ def main():
         " a new fastg file."
         "\n"
         "\nThis is a BETA version:"
-        "\nAlthough it will not produce error connections, it usually replicates the same right connection."
+        "\nAlthough it will not produce wrong connections, it usually replicates the same right connection."
         "\nDon't be surprised if you find any other bugs.\n")
     require_commands()
     global options

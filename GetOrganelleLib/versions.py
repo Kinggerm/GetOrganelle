@@ -6,11 +6,18 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.2",
+     "features": [
+         "1. assembly_parser.py: fix a bug in scaffolding",
+     ],
+     "time": "2020-12-10 23:15 UTC+8"
+    },
+    {
      "number": "1.7.2beta2",
      "features": [
          "1. get_organelle_from_reads.py: fix a bug in parsing options",
      ],
-     "time": "2020-07-28 01:30 UTC+8"
+     "time": "2020-12-09 UTC+8"
     },
     {
      "number": "1.7.2beta",
@@ -22,7 +29,7 @@ versions = [
          "4. Scaffolding function bug fixed & improved",
          "5. get_organelle_config.py: example typo fixed",
      ],
-     "time": "2020-07-28 01:30 UTC+8"
+     "time": "2020-12-03 UTC+8"
     },
     {
      "number": "1.7.1a",

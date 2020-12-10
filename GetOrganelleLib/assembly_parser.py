@@ -87,8 +87,10 @@ class Vertex(object):
             self.seq = {True: forward_seq, False: complementary_seq(forward_seq)}
         elif reverse_seq:
             self.seq = {True: complementary_seq(reverse_seq), False: reverse_seq}
-        else:
+        elif forward_seq is None:
             self.seq = {True: None, False: None}
+        else:
+            self.seq = {True: "", False: ""}
         """ True: tail, False: head """
         self.connections = {True: OrderedDict(), False: OrderedDict()}
         assert tail_connections is None or isinstance(tail_connections, OrderedDict), \

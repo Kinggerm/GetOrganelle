@@ -3607,7 +3607,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         log_handler.info("visualize and confirm the incomplete result in Bandage.")
                         # log.info("-------------------------------------------------------")
                         log_handler.info("If the result is nearly complete, ")
-                        log_handler.info("you can also adjust the arguments to try again.")
+                        log_handler.info("you can also adjust the arguments according to "
+                                         "https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph")
                         log_handler.info("If you have questions for us, "
                                          "please provide us with the get_org.log.txt file "
                                          "and the post-slimming graph in the format you like!")

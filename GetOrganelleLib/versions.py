@@ -10,6 +10,7 @@ versions = [
      "features": [
          "1. slim_graph.py: --evalue added",
          "2. trans_word_cov: using log() to avoid large int converting",
+         "3. get_organelle_from_reads.py: add url to FAQ for incomplete result",
      ],
      "time": "2020-12-10 23:50 UTC+8"
     },

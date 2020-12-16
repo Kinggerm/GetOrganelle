@@ -3,7 +3,7 @@
 import datetime
 import shutil
 from copy import deepcopy
-from math import log
+from math import log, exp
 try:
     from math import inf
 except ImportError:
@@ -1081,21 +1081,22 @@ def estimate_maximum_n_reads_using_mapping(
     return result_n_reads
 
 
-def combination_res(all_choices_num, chosen_num):
-    res = 1
+def combination_res_log(all_choices_num, chosen_num):
+    res = 0.
     for ch_n in range(chosen_num, 0, -1):
-        res *= all_choices_num - ch_n + 1
-        res /= ch_n
+        res += log(all_choices_num - ch_n + 1) - log(ch_n)
     return res
 
 
 def trans_word_cov(word_cov, base_cov, mean_base_error_rate, read_length):
+    if mean_base_error_rate == 0.:
+        return word_cov
     wrong_words_percent = 0
     for error_site_num in range(1, int(min(read_length * mean_base_error_rate * 10, read_length))):
-        prob_of_err_site_num = combination_res(read_length, error_site_num) \
-                               * (mean_base_error_rate ** error_site_num) \
-                               * ((1 - mean_base_error_rate) ** (read_length - error_site_num))
-        wrong_words_percent += (1 - 2 ** (-error_site_num)) * prob_of_err_site_num
+        prob_of_err_site_num = combination_res_log(read_length, error_site_num) \
+                               + error_site_num * log(mean_base_error_rate) \
+                               + (read_length - error_site_num) * log(1 - mean_base_error_rate)
+        wrong_words_percent += (1 - 2 ** (-error_site_num)) * exp(prob_of_err_site_num)
     # if word size < read_len/2, wrong words percent decreases
     increase_word_cov = word_cov / (1 - wrong_words_percent) - word_cov
     if word_cov > 0.5 * base_cov:

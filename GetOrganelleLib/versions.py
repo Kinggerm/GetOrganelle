@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+     "number": "1.7.2a",
+     "features": [
+         "1. slim_graph.py: --evalue added",
+         "2. trans_word_cov: using log() to avoid large int converting",
+     ],
+     "time": "2020-12-10 23:50 UTC+8"
+    },
+    {
      "number": "1.7.2",
      "features": [
          "1. assembly_parser.py: fix bugs in scaffolding",

@@ -3059,7 +3059,8 @@ class Assembly(SimpleAssembly):
                 return new_path[reseed_from:] + new_path[:reseed_from]
 
             if 1 in self.copy_to_vertex:
-                branching_single_copy_vertices = set()
+                branching_sc_pair_set = set()
+                branching_sc_pair_list = list()
                 if mode == "embplant_pt" and 2 in self.copy_to_vertex:
                     # find branching points
                     for candidate_name in self.copy_to_vertex[2]:
@@ -3068,17 +3069,21 @@ class Assembly(SimpleAssembly):
                                 if len(neighboring_vertices) == 2:
                                     (left_v, left_e), (right_v, right_e) = sorted(neighboring_vertices)
                                     if left_v in self.copy_to_vertex[1] and right_v in self.copy_to_vertex[1]:
-                                        branching_single_copy_vertices.add(((left_v, not left_e), (right_v, right_e)))
-                                        branching_single_copy_vertices.add(((right_v, not right_e), (left_v, left_e)))
-                if branching_single_copy_vertices:
+                                        if ((left_v, not left_e), (right_v, right_e)) not in branching_sc_pair_set:
+                                            # from v1_e1 to v2_e2;
+                                            # v1_e1 and v2_e2 must have the same direction in the path
+                                            branching_sc_pair_set.add(((left_v, not left_e), (right_v, right_e)))
+                                            branching_sc_pair_set.add(((right_v, not right_e), (left_v, left_e)))
+                                            branching_sc_pair_list.append(((left_v, not left_e), (right_v, right_e)))
+                                            branching_sc_pair_list.append(((right_v, not right_e), (left_v, left_e)))
+                if branching_sc_pair_set:
                     # more orfs found in the reverse direction of LSC of a typical plastome
                     # different paths may have different LSC
                     # picking the sub-path with the longest length with strand of least orfs as the new start point
-                    branching_single_copy_vertices = sorted(branching_single_copy_vertices)
                     for go_p, each_path in enumerate(paths):
                         reverse_path = [(element_v, not element_e) for (element_v, element_e) in each_path[::-1]]
                         sub_paths_for_checking = []
-                        for (left_v, left_e), (right_v, right_e) in branching_single_copy_vertices:
+                        for (left_v, left_e), (right_v, right_e) in branching_sc_pair_list:
                             if (left_v, left_e) in each_path:
                                 if (right_v, right_e) in each_path:
                                     left_id = each_path.index((left_v, left_e))
@@ -3105,11 +3110,17 @@ class Assembly(SimpleAssembly):
                                              key=lambda x:
                                              (-sum([self.vertex_info[sub_v].len
                                                     for sub_v, sub_e in sub_paths_for_checking[x]]) +
-                                              self.__overlap * (len(sub_paths_for_checking) - 1),
+                                              self.__overlap * (len(sub_paths_for_checking[x]) - 1),
                                               sum([self.vertex_info[sub_v].other_attr["orf"][sub_e]["sum_len"]
                                                    for sub_v, sub_e in sub_paths_for_checking[x]]),
                                               x))[0]
-                        paths[go_p] = reseed_a_path(each_path, branching_single_copy_vertices[lsc_pair_id][0])
+                        if reverse_start_direction_for_pt:
+                            if lsc_pair_id % 2 == 0:
+                                paths[go_p] = reseed_a_path(each_path, branching_sc_pair_list[lsc_pair_id + 1][0])
+                            else:
+                                paths[go_p] = reseed_a_path(each_path, branching_sc_pair_list[lsc_pair_id - 1][0])
+                        else:
+                            paths[go_p] = reseed_a_path(each_path, branching_sc_pair_list[lsc_pair_id][0])
                 else:
                     candidate_single_copy_vertices = set()
                     for single_v in self.copy_to_vertex[1]:

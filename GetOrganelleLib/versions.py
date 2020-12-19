@@ -6,13 +6,20 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.2b",
+        "features": [
+            "1. --reverse-lsc malfunction issue solved",
+        ],
+        "time": "2020-12-19 14:00 UTC+8"
+    },
+    {
      "number": "1.7.2a",
      "features": [
          "1. slim_graph.py: --evalue added",
          "2. trans_word_cov: using log() to avoid large int converting",
          "3. get_organelle_from_reads.py: add url to FAQ for incomplete result",
      ],
-     "time": "2020-12-10 23:50 UTC+8"
+     "time": "2020-12-16 23:50 UTC+8"
     },
     {
      "number": "1.7.2",

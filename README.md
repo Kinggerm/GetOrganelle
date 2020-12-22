@@ -5,7 +5,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/latest_release_date.svg)](https://anaconda.org/bioconda/getorganelle)
 
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
-[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.1.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
+[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.2.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
 
 This toolkit assemblies organelle genome from genomic skimming data. 
 
@@ -65,7 +65,7 @@ Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/
 
 ## Instruction
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#recipe">Recipes</a ></b>. But you are still recommended to read the following introductions:
+<b>What you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a ></b>. But you are still recommended to read the following introductions:
 
 <b>Preparing Data</b>
 

@@ -26,6 +26,7 @@ else:
     sys.exit(0)
 
 sys.stdout.write("Python " + str(sys.version).replace("\n", " ") + "\n")
+sys.stdout.write("PLATFORM: " + " ".join(platform.uname()) + "\n")
 sys.stdout.write("Using setuptools " + str(setuptools.__version__) + "\n")
 
 # python libs
@@ -176,14 +177,14 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes")):
 
 
 PACKAGES = [LIB_NAME]
-PACKAGE_DATA = {LIB_NAME: [os.path.join(LBL_NAME, "VERSION"),
-                           os.path.join(SEQ_NAME, "VERSION")]}
+# PACKAGE_DATA = {LIB_NAME: [os.path.join(LBL_NAME, "VERSION"),
+#                            os.path.join(SEQ_NAME, "VERSION")]}
 if os.path.isdir(DEP_DIR) and os.path.isfile(os.path.join(DEP_DIR, "__init__.py")):
     PACKAGES.append(DEP_NAME)
-    PACKAGE_DATA[DEP_NAME] = [this_file
-                              for this_file in
-                              get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
-                                                  start_from=DEP_DIR, exclude_files=EXCLUDE_SHARE_SPADES_PATHS)]
+    # PACKAGE_DATA[DEP_NAME] = [this_file
+    #                           for this_file in
+    #                           get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
+    #                                               start_from=DEP_DIR, exclude_files=EXCLUDE_SHARE_SPADES_PATHS)]
 
 
 if not in_situ:
@@ -199,7 +200,7 @@ if not in_situ:
         platforms="linux/MacOS",
         scripts=scripts_to_install,
         # relative path to each package
-        package_data=PACKAGE_DATA,
+        # package_data=PACKAGE_DATA,
         install_requires=install_dependencies,
         zip_safe=False
         )

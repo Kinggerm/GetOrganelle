@@ -30,9 +30,11 @@ else:
     exit()
 GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
 GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
-LBL_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "LabelDatabase"))
-SEQ_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "SeedDatabase"))
 VALID_PATH_CHARS = set("1234567890qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM,./ _-+")
+
+_GO_PATH = GO_PATH
+_LBL_DB_PATH = LBL_DB_PATH
+_SEQ_DB_PATH = SEQ_DB_PATH
 
 
 def check_path_chars(path_or_file_name):
@@ -47,9 +49,11 @@ def get_options(print_title):
     # parser.add_option("-o", dest="out_fastg_file", help="Output file")
     # filters
     parser.add_option("-F", dest="organelle_types",
-                      help="followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt "
+                      help="followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt, "
+                           "fungus_nr "
                            "(which means embryophyta plastome, non-embryophyta plastome, "
-                           "plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion separately), "
+                           "plant mitochondrion, plant nuclear ribosomal RNA, animal mitochondrion, "
+                           "fungus mitochondrion, fungus nuclear ribosomal RNA separately), "
                            "or a combination of above split by comma(s) "
                            "(corresponds to certain arguments as following listed). "
                            "\t"
@@ -66,6 +70,8 @@ def get_options(print_title):
                            " ------------------------------------------------------ "
                            "\nfungus_mt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "fungus_mt.fasta") + "\""
                            " ------------------------------------------------------ "
+                           "\nfungus_nr \t \" --include-priority " + os.path.join(LBL_DB_PATH, "fungus_nr.fasta") + "\""
+                           " ------------------------------------------------------ "
                            "\nother_pt,embplant_mt,fungus_mt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "other_pt.fasta") + "," + os.path.join(LBL_DB_PATH, "embplant_mt.fasta") + "," + os.path.join(LBL_DB_PATH, "fungus_mt.fasta") + "\""
                            " ------------------------------------------------------ "
                            "For easy usage and compatibility of old versions, following redirection "
@@ -74,9 +80,11 @@ def get_options(print_title):
                            "\nplant_mt->embplant_mt; plant_nr->embplant_nr"
                       )
     parser.add_option("-E", dest="exclude_organelle_types",
-                      help="followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt "
+                      help="followed with mode embplant_pt, other_pt, embplant_mt, embplant_nr, animal_mt, fungus_mt,"
+                           "fungus_nr "
                            "(which means embryophyta plastome, non-embryophyta plastome, "
-                           "plant mitochondrion, plant nrDNA, animal mitochondrion, fungus mitochondrion separately), "
+                           "plant mitochondrion, plant nuclear ribosomal RNA, animal mitochondrion, "
+                           "fungus mitochondrion, fungus nuclear ribosomal RNA separately), "
                            "or a combination of above split by comma(s) "
                            "(be similar to -F and corresponds to certain arguments as following listed). "
                            "\t"
@@ -90,6 +98,8 @@ def get_options(print_title):
                            "\nanimal_mt \t \" --exclude " + os.path.join(LBL_DB_PATH, "animal_mt.fasta") + "\""
                            " ------------------------------------------------------ "
                            "\nfungus_mt \t \" --exclude " + os.path.join(LBL_DB_PATH, "fungus_mt.fasta") + "\""
+                           " ------------------------------------------------------ "
+                           "\nfungus_nr \t \" --exclude " + os.path.join(LBL_DB_PATH, "fungus_nr.fasta") + "\""
                            " ------------------------------------------------------ "
                            "\nembplant_mt,embplant_nr \t \" --exclude " + os.path.join(LBL_DB_PATH, "embplant_mt.fasta") + "," + os.path.join(LBL_DB_PATH, "embplant_nr.fasta") + "\""
                            " ------------------------------------------------------ "
@@ -119,7 +129,7 @@ def get_options(print_title):
                            "Default: " +
                            str(MAX_SLIM_EXTENDING_LENS["embplant_pt"]) + " (-F embplant_pt), " +
                            str(MAX_SLIM_EXTENDING_LENS["embplant_mt"]) + " (-F embplant_mt/fungus_mt/other_pt), " +
-                           str(MAX_SLIM_EXTENDING_LENS["embplant_nr"]) + " (-F embplant_nr/animal_mt), "
+                           str(MAX_SLIM_EXTENDING_LENS["embplant_nr"]) + " (-F embplant_nr/fungus_nr/animal_mt), "
                            "maximum_of_type1_type2 (-F type1,type2), %default (cases without using -F)")
     parser.add_option("--significant", dest="significant", default=3.0, type=float,
                       help="Within a contig, if the query-score of hitting A is more than given times (Default: 3.0) "
@@ -171,6 +181,11 @@ def get_options(print_title):
                       help="Assign the path to BLAST binary files if not added to the path. "
                            "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
                            "/ncbi-blast\" first, then $PATH")
+    parser.add_option("--config-dir", dest="get_organelle_path", default=None,
+                      help="The directory where the default databases were placed. "
+                           "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                           "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                           "Default: " + GO_PATH)
     parser.add_option("-t", "--threads", dest="threads", default=4, type=int,
                       help="Threads for blastn.")
 
@@ -304,11 +319,23 @@ def get_options(print_title):
         #     options.include_priority = [os.path.join(LBL_DB_PATH, 'embplant_mt.fasta')]
         #     options.exclude = [os.path.join(LBL_DB_PATH, 'embplant_pt.fasta')]
         else:
+
+            global _GO_PATH, _LBL_DB_PATH, _SEQ_DB_PATH
+            if options.get_organelle_path:
+                _GO_PATH = os.path.expanduser(options.get_organelle_path)
+                if os.path.isdir(_GO_PATH):
+                    _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
+                    _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
+                else:
+                    sys.stdout.write(
+                        "\n############################################################################"
+                        "\nERROR: path " + _GO_PATH + " invalid!\n")
+
             if options.organelle_types:
 
                 def _check_default_db(this_sub_organelle, extra_type=""):
-                    if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) and
-                             os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta")))):
+                    if not ((os.path.isfile(os.path.join(_LBL_DB_PATH, this_sub_organelle + ".fasta")) and
+                             os.path.isfile(os.path.join(_SEQ_DB_PATH, this_sub_organelle + ".fasta")))):
                         sys.stdout.write(
                             "\n############################################################################"
                             "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
@@ -321,22 +348,23 @@ def get_options(print_title):
                 options.organelle_types = options.organelle_types.split(",")
                 for sub_organelle_t in options.organelle_types:
                     if sub_organelle_t not in \
-                            {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt", "fungus_mt"}:
+                            ("embplant_pt", "other_pt", "embplant_mt", "embplant_nr",
+                             "animal_mt", "fungus_mt", "fungus_nr"):
                         sys.stdout.write(
                             "\n############################################################################"
                             "\nERROR: \"-F\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', 'embplant_nr', "
-                            "'animal_mt', 'fungus_mt', or a combination of above split by comma(s)!\n\n")
+                            "'animal_mt', 'fungus_mt', 'fungus_nr', or a combination of above split by comma(s)!\n\n")
                         exit()
                     else:
-                        if not (os.path.isfile(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta")) and
-                                os.path.isfile(os.path.join(SEQ_DB_PATH, sub_organelle_t + ".fasta"))):
+                        if not (os.path.isfile(os.path.join(_LBL_DB_PATH, sub_organelle_t + ".fasta")) and
+                                os.path.isfile(os.path.join(_SEQ_DB_PATH, sub_organelle_t + ".fasta"))):
                             if sub_organelle_t in ("embplant_pt", "embplant_mt"):
                                 for go_t, check_sub in enumerate(["embplant_pt", "embplant_mt"]):
                                     _check_default_db(check_sub, ["embplant_pt", "embplant_mt"][not go_t])
                             else:
                                 _check_default_db(sub_organelle_t)
                         else:
-                            options.include_priority.append(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta"))
+                            options.include_priority.append(os.path.join(_LBL_DB_PATH, sub_organelle_t + ".fasta"))
             else:
                 options.organelle_types = []
             if options.exclude_organelle_types:
@@ -344,15 +372,16 @@ def get_options(print_title):
                 options.exclude_organelle_types = options.exclude_organelle_types.split(",")
                 for sub_organelle_t in options.exclude_organelle_types:
                     if sub_organelle_t not in \
-                            {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt", "fungus_mt"}:
+                            ("embplant_pt", "other_pt", "embplant_mt", "embplant_nr",
+                             "animal_mt", "fungus_mt", "fungus_nr"):
                         sys.stdout.write(
                             "\n############################################################################"
                             "\nERROR: \"-E\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', 'embplant_nr', "
-                            "'animal_mt', 'fungus_mt', or a combination of above split by comma(s)!\n\n")
+                            "'animal_mt', 'fungus_mt', 'fungus_nr', or a combination of above split by comma(s)!\n\n")
                         exit()
                     else:
-                        if not (os.path.isfile(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta")) and
-                                 os.path.isfile(os.path.join(SEQ_DB_PATH, sub_organelle_t + ".fasta"))):
+                        if not (os.path.isfile(os.path.join(_LBL_DB_PATH, sub_organelle_t + ".fasta")) and
+                                 os.path.isfile(os.path.join(_SEQ_DB_PATH, sub_organelle_t + ".fasta"))):
                             sys.stdout.write(
                                 "\n############################################################################"
                                 "\nERROR: default " + sub_organelle_t + " database has not been added yet!"
@@ -360,7 +389,7 @@ def get_options(print_title):
                                 "\nor install all types by: get_organelle_config.py -a all\n")
                             exit()
                         else:
-                            options.exclude.append(os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta"))
+                            options.exclude.append(os.path.join(_LBL_DB_PATH, sub_organelle_t + ".fasta"))
         if "--max-slim-extending-len" not in sys.argv:
             default = options.max_slim_extending_len
             if options.organelle_types:
@@ -370,7 +399,7 @@ def get_options(print_title):
                         options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_mt"], options.max_slim_extending_len)
                     elif sub_organelle_t == "embplant_pt":
                         options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_pt"], options.max_slim_extending_len)
-                    elif sub_organelle_t in ("embplant_nr", "animal_mt"):
+                    elif sub_organelle_t in ("embplant_nr", "fungus_nr", "animal_mt"):
                         options.max_slim_extending_len = max(MAX_SLIM_EXTENDING_LENS["embplant_nr"], options.max_slim_extending_len)
                     else:
                         options.max_slim_extending_len = default

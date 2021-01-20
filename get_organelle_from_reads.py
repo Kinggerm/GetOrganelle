@@ -29,10 +29,11 @@ else:
     exit()
 GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
 GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
-LBL_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "LabelDatabase"))
-SEQ_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "SeedDatabase"))
 UTILITY_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities")
 
+_GO_PATH = GO_PATH
+_LBL_DB_PATH = LBL_DB_PATH
+_SEQ_DB_PATH = SEQ_DB_PATH
 
 MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
 if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
@@ -54,10 +55,11 @@ BASE_COV_SAMPLING_PERCENT = 0.06
 GUESSING_FQ_GZIP_COMPRESSING_RATIO = 3.58
 GUESSING_FQ_SEQ_INFLATE_TO_FILE = 3.22
 
-SUPPORTED_ORGANELLE_TYPES = ["embplant_pt", "embplant_mt", "embplant_nr", "other_pt", "animal_mt", "fungus_mt"]
+SUPPORTED_ORGANELLE_TYPES = ["embplant_pt", "embplant_mt", "embplant_nr", "other_pt", "animal_mt", "fungus_mt", "fungus_nr"]
 ORGANELLE_EXPECTED_GRAPH_SIZES = {"embplant_pt": 130000,
                                   "embplant_mt": 390000,
                                   "embplant_nr": 13000,
+                                  "fungus_nr": 13000,
                                   "other_pt": 39000,
                                   "animal_mt": 13000,
                                   "fungus_mt": 65000}
@@ -99,7 +101,7 @@ def get_options(description, version):
                                 "from the same plant-species as seed and anti-seed.")
     group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
                            help="Hard bound for maximum number of reads to be used per file. "
-                                "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt); "
+                                "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
     group_inout.add_option("--reduce-reads-for-coverage", dest="reduce_reads_for_cov", type=float, default=500,
                            help="Soft bound for maximum number of reads to be used according to "
@@ -128,6 +130,11 @@ def get_options(description, version):
                            help="Choose to compress fq/sam files using gzip.")
     group_inout.add_option("--keep-temp", dest="keep_temp_files", action="store_true", default=False,
                            help="Choose to keep the running temp/index files.")
+    group_inout.add_option("--config-dir", dest="get_organelle_path", default=None,
+                           help="The directory where the configuration file and default databases were placed. "
+                                "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                                "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                                "Default: " + GO_PATH)
     # group 2
     group_scheme = OptionGroup(parser, "SCHEME OPTIONS", "Options on running schemes.")
     group_scheme.add_option("-F", dest="organelle_type",
@@ -135,12 +142,13 @@ def get_options(description, version):
                                  "other_pt (non-embryophyta plant plastome), embplant_mt "
                                  "(plant mitogenome), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
                                  "(animal mitogenome), fungus_mt (fungus mitogenome), "
+                                 "fungus_nr (fungus nuclear ribosomal RNA)"
                                  "or embplant_mt,other_pt,fungus_mt "
                                  "(the combination of any of above organelle genomes split by comma(s), "
                                  "which might be computationally more intensive than separate runs), "
                                  "or anonym (uncertain organelle genome type, with customized gene database "
                                  "('--genes'), which is suggested only when the above database is genetically distant "
-                                 "from your sample, generally only in some animal_mt and fungus_mt cases). "
+                                 "from your sample, generally only in some animal_mt/fungus_mt/fungus_nr cases). "
                                  "For easy usage and compatibility of old versions, following redirection "
                                  "would be automatically fulfilled without warning:\t"
                                  "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
@@ -180,10 +188,10 @@ def get_options(description, version):
     group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=inf,
                                help="Maximum number of extending rounds (suggested: >=2). "
                                     "Default: 15 (-F embplant_pt), 30 (-F embplant_mt/other_pt), "
-                                    "10 (-F embplant_nr/animal_mt/fungus_mt), inf (-P 0).")
+                                    "10 (-F embplant_nr/animal_mt/fungus_mt/fungus_nr), inf (-P 0).")
     group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
                                help="Maximum number of words to be used in total."
-                                    "Default: 4E8 (-F embplant_pt), 2E8 (-F embplant_nr/fungus_mt/animal_mt), "
+                                    "Default: 4E8 (-F embplant_pt), 2E8 (-F embplant_nr/fungus_mt/fungus_nr/animal_mt), "
                                     "2E9 (-F embplant_mt/other_pt)")
     group_extending.add_option("-J", dest="jump_step", type=int, default=3,
                                help="The length of step for checking words in reads during extending process "
@@ -294,7 +302,7 @@ def get_options(description, version):
                                    "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
                                    "with the same list length to organelle_type (followed by '-F'). "
                                    "Default: 250000 (-F embplant_pt/fungus_mt), "
-                                   "25000 (-F embplant_nr/animal_mt), 1000000 (-F embplant_mt/other_pt),"
+                                   "25000 (-F embplant_nr/animal_mt/fungus_nr), 1000000 (-F embplant_mt/other_pt),"
                                    "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
     group_assembly.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
                               help="Expected minimum target genome size(s) for disentangling. "
@@ -376,6 +384,7 @@ def get_options(description, version):
     elif "-h" in sys.argv:
         for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage", "--phred-offset",
                                "--min-quality-score", "--prefix", "--out-per-round", "--zip-files", "--keep-temp",
+                               "--config-dir",
                                "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
                                "-J", "-M", "--bowtie2-options",
                                "--larger-auto-ws", "--target-genome-size", "--spades-options", "--no-spades",
@@ -406,12 +415,12 @@ def get_options(description, version):
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type",
                           help="Target organelle genome type(s): "
-                               "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/anonym/"
+                               "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym/"
                                "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
         parser.remove_option("--max-reads")
         parser.add_option("--max-reads", type=float,
                           help="Maximum number of reads to be used per file. "
-                               "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt); "
+                               "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
@@ -480,10 +489,20 @@ def get_options(description, version):
                              "\nERROR: unbalanced paired reads!\n\n")
             exit()
 
+        global _GO_PATH, _LBL_DB_PATH, _SEQ_DB_PATH
+        if options.get_organelle_path:
+            _GO_PATH = os.path.expanduser(options.get_organelle_path)
+            if os.path.isdir(_GO_PATH):
+                _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
+                _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
+            else:
+                sys.stdout.write("\n############################################################################"
+                                 "\nERROR: path " + _GO_PATH + " invalid!\n")
+
         def _check_default_db(this_sub_organelle, extra_type=""):
-            if not ((os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta)
+            if not ((os.path.isfile(os.path.join(_LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta)
                     and
-                    (os.path.isfile(os.path.join(SEQ_DB_PATH, this_sub_organelle + ".fasta")) or options.seed_file)):
+                    (os.path.isfile(os.path.join(_SEQ_DB_PATH, this_sub_organelle + ".fasta")) or options.seed_file)):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
@@ -493,11 +512,11 @@ def get_options(description, version):
                 exit()
         for sub_organelle_t in options.organelle_type:
             if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt",
-                                       "fungus_mt", "anonym"}:
+                                       "fungus_mt", "fungus_nr", "anonym"}:
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: \"-F\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', "
-                                 "'embplant_nr', 'animal_mt', 'fungus_mt', 'anonym', or a combination of above "
-                                 "split by comma(s)!\n\n")
+                                 "'embplant_nr', 'animal_mt', 'fungus_mt', 'fungus_nr', 'anonym', "
+                                 "or a combination of above split by comma(s)!\n\n")
                 exit()
             elif sub_organelle_t == "anonym":
                 if "*" in options.seed_file or not options.genes_fasta:
@@ -589,6 +608,7 @@ def get_options(description, version):
         log_handler.info("")
         log_handler.info(description)
         log_handler.info("Python " + str(sys.version).replace("\n", " "))
+        log_handler.info("PLATFORM: " + " ".join(platform.uname()))
         # log versions of dependencies
         lib_versions_info = []
         lib_not_available = []
@@ -631,8 +651,9 @@ def get_options(description, version):
             dep_versions_info.append(detect_bandage_version(options.which_bandage))
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
         # log database
-        existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=SEQ_DB_PATH,
-                                                                   lbl_db_path=LBL_DB_PATH, silent=True)
+        log_handler.info("GETORG_PATH=" + GO_PATH)
+        existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
+                                                                   lbl_db_path=_LBL_DB_PATH, silent=True)
         if use_default_seed:
             log_seed_types = deepcopy(options.organelle_type)
             if "embplant_pt" in log_seed_types and "embplant_mt" not in log_seed_types:
@@ -711,7 +732,8 @@ def get_options(description, version):
         if "--max-n-words" not in sys.argv:
             if "embplant_mt" in options.organelle_type or "anonym" in options.organelle_type:
                 options.maximum_n_words *= 5
-            elif "embplant_nr" in options.organelle_type or "fungus_mt" in options.organelle_type:
+            elif "embplant_nr" in options.organelle_type or "fungus_mt" in options.organelle_type or\
+                    "fungus_nr" in options.organelle_type:
                 options.maximum_n_words /= 2
             elif "animal_mt" in options.organelle_type:
                 options.maximum_n_words /= 2
@@ -753,7 +775,7 @@ def get_options(description, version):
                     options.target_genome_size.append(int(raw_default_value * 3))
                 elif sub_organelle_t == "fungus_mt":
                     options.target_genome_size.append(int(raw_default_value / 2))
-                elif sub_organelle_t in ("embplant_nr", "animal_mt"):
+                elif sub_organelle_t in ("embplant_nr", "animal_mt", "fungus_nr"):
                     options.target_genome_size.append(int(raw_default_value / 10))
                 elif sub_organelle_t == "anonym":
                     ref_seqs = read_fasta(options.genes_fasta[go_t])[1]
@@ -785,7 +807,7 @@ def get_options(description, version):
                     options.expected_max_size.append(int(raw_default_value * 4))
                 elif sub_organelle_t == "fungus_mt":
                     options.expected_max_size.append(raw_default_value)
-                elif sub_organelle_t in ("embplant_nr", "animal_mt"):
+                elif sub_organelle_t in ("embplant_nr", "fungus_nr", "animal_mt"):
                     options.expected_max_size.append(int(raw_default_value / 10))
                 elif sub_organelle_t == "anonym":
                     ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
@@ -826,7 +848,7 @@ def get_options(description, version):
             options.max_extending_len = []  # -1 means auto
             for go_t, seed_f in enumerate(options.seed_file):
                 # using auto as the default when using default seed files
-                # if os.path.realpath(seed_f) == os.path.join(SEQ_DB_PATH, options.organelle_type[go_t] + ".fasta"):
+                # if os.path.realpath(seed_f) == os.path.join(_SEQ_DB_PATH, options.organelle_type[go_t] + ".fasta"):
                 #     options.max_extending_len.append(-1)
                 # else:
                 #     options.max_extending_len.append(inf)
@@ -907,7 +929,7 @@ def get_options(description, version):
             for sub_organelle_t in options.organelle_type:
                 if sub_organelle_t in {"embplant_mt", "other_pt"}:
                     options.max_rounds = max(options.max_rounds, 30)
-                elif sub_organelle_t in {"embplant_nr", "animal_mt", "fungus_mt"}:
+                elif sub_organelle_t in {"embplant_nr", "animal_mt", "fungus_mt", "fungus_nr"}:
                     options.max_rounds = max(options.max_rounds, 10)
                 elif sub_organelle_t == "embplant_pt":
                     options.max_rounds = max(options.max_rounds, 15)
@@ -3125,17 +3147,17 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
         exclude_db = ex_custom
     else:
         if organelle_types == ["embplant_pt"]:
-            include_priority_db = [os.path.join(LBL_DB_PATH, "embplant_pt.fasta"),
-                                   os.path.join(LBL_DB_PATH, "embplant_mt.fasta")]
+            include_priority_db = [os.path.join(_LBL_DB_PATH, "embplant_pt.fasta"),
+                                   os.path.join(_LBL_DB_PATH, "embplant_mt.fasta")]
             max_slim_extending_len = \
                 max_slim_extending_len if max_slim_extending_len else MAX_SLIM_EXTENDING_LENS[organelle_types[0]]
         elif organelle_types == ["embplant_mt"]:
-            include_priority_db = [os.path.join(LBL_DB_PATH, "embplant_mt.fasta"),
-                                   os.path.join(LBL_DB_PATH, "embplant_pt.fasta")]
+            include_priority_db = [os.path.join(_LBL_DB_PATH, "embplant_mt.fasta"),
+                                   os.path.join(_LBL_DB_PATH, "embplant_pt.fasta")]
             max_slim_extending_len = \
                 max_slim_extending_len if max_slim_extending_len else MAX_SLIM_EXTENDING_LENS[organelle_types[0]]
         else:
-            include_priority_db = [os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta")
+            include_priority_db = [os.path.join(_LBL_DB_PATH, sub_organelle_t + ".fasta")
                                    for sub_organelle_t in organelle_types]
             if max_slim_extending_len is None:
                 max_slim_extending_len = max([MAX_SLIM_EXTENDING_LENS[sub_organelle_t]

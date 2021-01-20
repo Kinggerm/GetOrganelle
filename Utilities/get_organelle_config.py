@@ -13,6 +13,7 @@ from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.seq_parser import check_fasta_seq_names
 from GetOrganelleLib.pipe_control_func \
     import \
+    GO_PATH, LBL_NAME, SEQ_NAME, LBL_DB_PATH, SEQ_DB_PATH, \
     remove_db_postfix, make_blast_db, build_bowtie2_db, executable, simple_log, \
     detect_bowtie2_path, detect_blast_path, detect_bowtie2_version, detect_blast_version, \
     cal_f_sha256, run_command, \
@@ -42,13 +43,13 @@ else:
 
 LIB_NAME = "GetOrganelleLib"
 DEP_NAME = "GetOrganelleDep"
-LBL_NAME = "LabelDatabase"
-SEQ_NAME = "SeedDatabase"
 GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
-LBL_DB_PATH = os.path.join(GO_LIB_PATH, LBL_NAME)
-SEQ_DB_PATH = os.path.join(GO_LIB_PATH, SEQ_NAME)
 GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", DEP_NAME, SYSTEM_NAME))
 UTILITY_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities")
+
+_GO_PATH = GO_PATH
+_LBL_DB_PATH = LBL_DB_PATH
+_SEQ_DB_PATH = SEQ_DB_PATH
 
 VERSION_URLS = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/master/VERSION",
                 "https://gitlab.com/Kinggerm/GetOrganelleDB/-/raw/master/VERSION",
@@ -77,6 +78,11 @@ def get_options(description):
     parser.add_option("--update", dest="update", default=False, action="store_true",
                       help="Update local databases to the latest online version, or the local version "
                            "if \"--use-local LOCAL_DB_PATH\" provided.")
+    parser.add_option("--config-dir", dest="get_organelle_path", default=None,
+                      help="The directory where the default databases were placed. "
+                           "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                           "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                           "Default: " + GO_PATH)
     parser.add_option("--use-local", dest="use_local",
                       help="Input a path. This local database path must include subdirectories "
                            "LabelDatabase and SeedDatabase, under which there is the fasta file(s) named by the "
@@ -101,23 +107,37 @@ def get_options(description):
                       help="verbose output to the screen. Default: %default")
     options, argv = parser.parse_args()
     assert options.db_type in ("seed", "label", "both")
+    global _GO_PATH, _LBL_DB_PATH, _SEQ_DB_PATH
+    if options.get_organelle_path:
+        _GO_PATH = os.path.expanduser(options.get_organelle_path)
+        if os.path.isdir(_GO_PATH):
+            _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
+            _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
+
+    # check directories
+    if not os.path.isdir(_GO_PATH):
+        os.mkdir(_GO_PATH)
+    if not os.path.isdir(_LBL_DB_PATH):
+        os.mkdir(_LBL_DB_PATH)
+    if not os.path.isdir(_SEQ_DB_PATH):
+        os.mkdir(_SEQ_DB_PATH)
 
     # only print
     if options.list_available:
         if options.db_type in ("seed", "both"):
-            version_file = os.path.join(SEQ_DB_PATH, "VERSION")
+            version_file = os.path.join(_SEQ_DB_PATH, "VERSION")
             if os.path.isfile(version_file):
                 with open(version_file) as open_version:
                     for line in open_version:
                         db_type, db_version, db_hash = line.strip().split("\t")
-                        sys.stdout.write(db_type + " Seed Database: " + db_version + " " + db_hash + "\n")
+                        sys.stdout.write(db_type + " Seed Database:\t" + db_version + "\t" + db_hash + "\n")
         if options.db_type in ("label", "both"):
-            version_file = os.path.join(LBL_DB_PATH, "VERSION")
+            version_file = os.path.join(_LBL_DB_PATH, "VERSION")
             if os.path.isfile(version_file):
                 with open(version_file) as open_version:
                     for line in open_version:
                         db_type, db_version, db_hash = line.strip().split("\t")
-                        sys.stdout.write(db_type + " Label Database: " + db_version + " " + db_hash + "\n")
+                        sys.stdout.write(db_type + " Label Database:\t" + db_version + "\t" + db_hash + "\n")
         sys.exit()
 
     # sys.stdout.write("\n" + description + "\n")
@@ -257,24 +277,25 @@ def main():
     time_start = time.time()
     description = "get_organelle_config.py " + get_versions() + " is used for setting up default GetOrganelle database."
     options, argv = get_options(description=description)
-    existing_seed_db, existing_label_db = get_current_versions(options.db_type, seq_db_path=SEQ_DB_PATH,
-                                                               lbl_db_path=LBL_DB_PATH,
+    existing_seed_db, existing_label_db = get_current_versions(options.db_type,
+                                                               seq_db_path=_SEQ_DB_PATH,
+                                                               lbl_db_path=_LBL_DB_PATH,
                                                                clean_mode=options.clean,
                                                                check_hash=options.check)
-    seed_version_f = os.path.join(SEQ_DB_PATH, "VERSION")
-    label_version_f = os.path.join(LBL_DB_PATH, "VERSION")
+    seed_version_f = os.path.join(_SEQ_DB_PATH, "VERSION")
+    label_version_f = os.path.join(_LBL_DB_PATH, "VERSION")
     time_out = 100000
 
     # Case 1
     if options.clean:
         if options.db_type in ("seed", "both"):
             for rm_o_type in sorted(existing_seed_db):
-                rm_files(SEQ_DB_PATH, file_name_prefix=rm_o_type)
+                rm_files(_SEQ_DB_PATH, file_name_prefix=rm_o_type)
             if os.path.isfile(seed_version_f):
                 os.remove(seed_version_f)
         if options.db_type in ("label", "both"):
             for rm_o_type in sorted(existing_label_db):
-                rm_files(LBL_DB_PATH, file_name_prefix=rm_o_type)
+                rm_files(_LBL_DB_PATH, file_name_prefix=rm_o_type)
             if os.path.isfile(label_version_f):
                 os.remove(label_version_f)
 
@@ -283,7 +304,7 @@ def main():
         if options.db_type in ("seed", "both"):
             for rm_o_type in options.rm_organelle_type:
                 if rm_o_type in existing_seed_db:
-                    rm_files(SEQ_DB_PATH, file_name_prefix=rm_o_type)
+                    rm_files(_SEQ_DB_PATH, file_name_prefix=rm_o_type)
                     del existing_seed_db[rm_o_type]
                 else:
                     sys.stdout.write("Warning: " + rm_o_type + " Seed Database not found!\n")
@@ -291,7 +312,7 @@ def main():
         if options.db_type in ("label", "both"):
             for rm_o_type in options.rm_organelle_type:
                 if rm_o_type in existing_label_db:
-                    rm_files(LBL_DB_PATH, file_name_prefix=rm_o_type)
+                    rm_files(_LBL_DB_PATH, file_name_prefix=rm_o_type)
                     del existing_label_db[rm_o_type]
                 else:
                     sys.stdout.write("Warning: " + rm_o_type + " Label Database not found!\n")
@@ -301,7 +322,7 @@ def main():
     if options.update:
         if options.db_type in ("seed", "both"):
             for sub_o_type in ORGANELLE_TYPE_LIST:
-                target_output = os.path.join(SEQ_DB_PATH, sub_o_type + ".fasta")
+                target_output = os.path.join(_SEQ_DB_PATH, sub_o_type + ".fasta")
                 if sub_o_type not in existing_seed_db:
                     pass
                 else:
@@ -317,8 +338,8 @@ def main():
                                         existing_seed_db[sub_o_type] = {"version": try_version, "sha256": new_hash_val}
                                 else:
                                     existing_seed_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
-                                if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(SEQ_DB_PATH):
-                                    copy(update_to_fa, SEQ_DB_PATH)
+                                if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_SEQ_DB_PATH):
+                                    copy(update_to_fa, _SEQ_DB_PATH)
                                 initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                          fasta_f=target_output, overwrite=True)
                             else:
@@ -347,7 +368,7 @@ def main():
 
         if options.db_type in ("label", "both"):
             for sub_o_type in ORGANELLE_TYPE_LIST:
-                target_output = os.path.join(LBL_DB_PATH, sub_o_type + ".fasta")
+                target_output = os.path.join(_LBL_DB_PATH, sub_o_type + ".fasta")
                 if sub_o_type not in existing_label_db:
                     pass
                 else:
@@ -361,22 +382,22 @@ def main():
                                 for try_version in sorted(LABEL_DB_HASH, reverse=True):
                                     if new_hash_val == LABEL_DB_HASH[try_version][sub_o_type]["sha256"]:
                                         existing_label_db[sub_o_type] = {"version": try_version,
-                                                                        "sha256": new_hash_val}
+                                                                         "sha256": new_hash_val}
                                 else:
                                     existing_label_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
-                                if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(LBL_DB_PATH):
-                                    copy(update_to_fa, LBL_DB_PATH)
+                                if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_LBL_DB_PATH):
+                                    copy(update_to_fa, _LBL_DB_PATH)
                                 initialize_notation_database(which_blast=options.which_blast,
-                                                         fasta_f=target_output, overwrite=True)
+                                                             fasta_f=target_output, overwrite=True)
                             else:
                                 # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                                 initialize_notation_database(which_blast=options.which_blast,
-                                                         fasta_f=target_output, overwrite=False)
+                                                             fasta_f=target_output, overwrite=False)
                     else:
                         if existing_seed_db[sub_o_type]["version"] == options.version:
                             # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                             initialize_notation_database(which_blast=options.which_blast,
-                                                     fasta_f=target_output, overwrite=False)
+                                                         fasta_f=target_output, overwrite=False)
                         else:
                             these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
                             check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
@@ -388,7 +409,7 @@ def main():
                                     "Installing %s Label Database failed: %s\n" % (sub_o_type, status["info"]))
                                 continue
                             initialize_notation_database(which_blast=options.which_blast,
-                                                     fasta_f=target_output, overwrite=True)
+                                                         fasta_f=target_output, overwrite=True)
                             existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
@@ -396,7 +417,7 @@ def main():
     if options.add_organelle_type:
         if options.db_type in ("seed", "both"):
             for sub_o_type in options.add_organelle_type:
-                target_output = os.path.join(SEQ_DB_PATH, sub_o_type + ".fasta")
+                target_output = os.path.join(_SEQ_DB_PATH, sub_o_type + ".fasta")
                 if options.use_local:
                     update_to_fa = os.path.join(options.use_local, SEQ_NAME, sub_o_type + ".fasta")
                     if not os.path.exists(update_to_fa):
@@ -408,8 +429,8 @@ def main():
                                 existing_seed_db[sub_o_type] = {"version": try_version, "sha256": new_hash_val}
                         else:
                             existing_seed_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
-                        if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(SEQ_DB_PATH):
-                            copy(update_to_fa, SEQ_DB_PATH)
+                        if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_SEQ_DB_PATH):
+                            copy(update_to_fa, _SEQ_DB_PATH)
                         initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                  fasta_f=target_output, overwrite=True)
                 else:
@@ -428,7 +449,7 @@ def main():
 
         if options.db_type in ("label", "both"):
             for sub_o_type in options.add_organelle_type:
-                target_output = os.path.join(LBL_DB_PATH, sub_o_type + ".fasta")
+                target_output = os.path.join(_LBL_DB_PATH, sub_o_type + ".fasta")
                 if options.use_local:
                     update_to_fa = os.path.join(options.use_local, LBL_NAME, sub_o_type + ".fasta")
                     if not os.path.exists(update_to_fa):
@@ -441,8 +462,8 @@ def main():
                                                                  "sha256": new_hash_val}
                         else:
                             existing_label_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
-                        if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(LBL_DB_PATH):
-                            copy(update_to_fa, LBL_DB_PATH)
+                        if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_LBL_DB_PATH):
+                            copy(update_to_fa, _LBL_DB_PATH)
                         initialize_notation_database(which_blast=options.which_blast,
                                                      fasta_f=target_output, overwrite=True)
                 else:

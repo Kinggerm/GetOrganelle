@@ -6,6 +6,15 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3",
+        "features": [
+            "1. fungus_nr added",
+            "2. relocate default GetOrganelle databases using GETORG_PATH",
+            "3. log platform info",
+        ],
+        "time": "2021-01-20 12:30 UTC+8"
+    },
+    {
         "number": "1.7.2b",
         "features": [
             "1. --reverse-lsc malfunction issue solved",

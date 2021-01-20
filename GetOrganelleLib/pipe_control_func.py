@@ -41,15 +41,26 @@ sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 from GetOrganelleLib.seq_parser import phred_offset_table
 
-ORGANELLE_TYPE_SET = {"embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "animal_mt", "other_pt"}
-ORGANELLE_TYPE_LIST = ["embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "animal_mt", "other_pt"]
+ORGANELLE_TYPE_SET = {"embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "fungus_nr", "animal_mt", "other_pt"}
+ORGANELLE_TYPE_LIST = ["embplant_pt", "embplant_mt", "embplant_nr", "fungus_mt", "fungus_nr", "animal_mt", "other_pt"]
 MAX_SLIM_EXTENDING_LENS = {"embplant_pt": 15000,
                            "embplant_mt": 50000,
                            "embplant_nr": 12500,
                            "fungus_mt": 50000,
+                           "fungus_nr": 12500,
                            "animal_mt": 12500,
                            "other_pt": 50000,
                            "anonym": float("inf")}
+
+
+if "GETORG_PATH" in os.environ:
+    GO_PATH = os.path.expanduser(os.environ["GETORG_PATH"])
+else:
+    GO_PATH = os.path.expanduser("~/.GetOrganelle")
+LBL_NAME = "LabelDatabase"
+SEQ_NAME = "SeedDatabase"
+LBL_DB_PATH = os.path.join(GO_PATH, LBL_NAME)
+SEQ_DB_PATH = os.path.join(GO_PATH, SEQ_NAME)
 
 
 def simple_log(log, output_base, prefix, log_level="NOTSET"):
@@ -1122,49 +1133,76 @@ def single_line_db_versions(existing_db, check_types, default_value="customized"
                       for check_type in check_types])
 
 
-# for f in os.listdir("GetOrganelleLib/LabelDatabase/"):
-#     h = hashlib.sha256()
-#     h.update(open("GetOrganelleLib/LabelDatabase/"+f).read().encode("utf8"))
-#     print("\""+f[:-6]+"\": {\"sha256\": \"" + str(h.hexdigest()) +
-#           "\", \"size\": " + str(os.path.getsize("GetOrganelleLib/LabelDatabase/"+f)) + "},")
-# for f in os.listdir("GetOrganelleLib/SeedDatabase/"):
-#     h = hashlib.sha256()
-#     h.update(open("GetOrganelleLib/SeedDatabase/"+f).read().encode("utf8"))
-#     print("\""+f[:-6]+"\": {\"sha256\": \"" + str(h.hexdigest()) +
-#           "\", \"size\": " + str(os.path.getsize("GetOrganelleLib/SeedDatabase/"+f)) + "},")
+
 LABEL_DB_HASH = \
     {
-     "0.0.0":
-         {"embplant_nr":
-              {"sha256": "603033541683b7c53fb63970c188eb2891844f6419eca342fa648f6ff5e29d71", "size": 16500},
-          "embplant_pt":
-              {"sha256": "cca977f68f5764bdd9e4b82e711adcfc12d752e78f088cea05c8283dea74fa7e", "size": 370580},
-          "animal_mt":
-              {"sha256": "af9541621107623ed13f668b4744ddbdcc1e6a8157aa53132717d90e7ac63c4e", "size": 6674918},
-          "fungus_mt":
-              {"sha256": "e0c6968372ba3fec892532a9231d1e8de789323156b3d23fb5216915a2811b27", "size": 659823},
-          "embplant_mt":
-              {"sha256": "f3621444441fbf4fa98835999b20e7ac1673a8866cb119707200412c46263570", "size": 148338},
-          "other_pt":
-              {"sha256": "84346c42ff7e85e5d0859ecdee1de4f06f45fd072851d57ba31c894bcbee3cd8", "size": 412866}
-          }
+    "0.0.0":
+        {
+        "embplant_nr":
+            {"sha256": "603033541683b7c53fb63970c188eb2891844f6419eca342fa648f6ff5e29d71", "size": 16500},
+        "embplant_pt":
+            {"sha256": "cca977f68f5764bdd9e4b82e711adcfc12d752e78f088cea05c8283dea74fa7e", "size": 370580},
+        "animal_mt":
+            {"sha256": "af9541621107623ed13f668b4744ddbdcc1e6a8157aa53132717d90e7ac63c4e", "size": 6674918},
+        "fungus_mt":
+            {"sha256": "e0c6968372ba3fec892532a9231d1e8de789323156b3d23fb5216915a2811b27", "size": 659823},
+        "embplant_mt":
+            {"sha256": "f3621444441fbf4fa98835999b20e7ac1673a8866cb119707200412c46263570", "size": 148338},
+        "other_pt":
+            {"sha256": "84346c42ff7e85e5d0859ecdee1de4f06f45fd072851d57ba31c894bcbee3cd8", "size": 412866}
+        },
+    "0.0.1":
+        {
+        "embplant_nr":
+            {"sha256": "603033541683b7c53fb63970c188eb2891844f6419eca342fa648f6ff5e29d71", "size": 16500},
+        "embplant_pt":
+            {"sha256": "cca977f68f5764bdd9e4b82e711adcfc12d752e78f088cea05c8283dea74fa7e", "size": 370580},
+        "animal_mt":
+            {"sha256": "af9541621107623ed13f668b4744ddbdcc1e6a8157aa53132717d90e7ac63c4e", "size": 6674918},
+        "fungus_mt":
+            {"sha256": "e0c6968372ba3fec892532a9231d1e8de789323156b3d23fb5216915a2811b27", "size": 659823},
+        "fungus_nr":
+            {"sha256": "c794d09fae34ebd10d97ee7d9075c3ba35c2560dae52786302e59081e2326aac", "size": 19786},
+        "embplant_mt":
+            {"sha256": "f3621444441fbf4fa98835999b20e7ac1673a8866cb119707200412c46263570", "size": 148338},
+        "other_pt":
+            {"sha256": "84346c42ff7e85e5d0859ecdee1de4f06f45fd072851d57ba31c894bcbee3cd8", "size": 412866}
+        }
      }
 
 SEED_DB_HASH = \
     {
-     "0.0.0":
-         {"embplant_nr":
-              {"sha256": "e19365f85b3bda29aabb5cf1ceb5c814e667ba251b08388d805b52b1f1fe1445", "size": 18309},
-          "embplant_pt":
-              {"sha256": "e8e5f461d6e5fe67c5314e46c61265e6ff1079886af3b959609dde2be97d870d", "size": 15342405},
-          "animal_mt":
-              {"sha256": "a293c02e0c0496beb29383927cc7c643b13e09f8cfa03f7688b352315a43f898", "size": 30285897},
-          "fungus_mt":
-              {"sha256": "abbc7658c9431d11454f2fec75b7b5f4deeb12bc3590351dc93883655c7c194e", "size": 7977301},
-          "embplant_mt":
-              {"sha256": "2f28612e7c2280a7273738eded0dd2fcfb59c6153c1cf3bac15e4e7ed1bf4e89", "size": 407052},
-          "other_pt":
-              {"sha256": "a548538ef6560ededefb7e0d9c41f1dcb8585dccb1d06124ffb95e6770df2c6b", "size": 14667508}
+    "0.0.0":
+        {
+        "embplant_nr":
+            {"sha256": "e19365f85b3bda29aabb5cf1ceb5c814e667ba251b08388d805b52b1f1fe1445", "size": 18309},
+        "embplant_pt":
+            {"sha256": "e8e5f461d6e5fe67c5314e46c61265e6ff1079886af3b959609dde2be97d870d", "size": 15342405},
+        "animal_mt":
+            {"sha256": "a293c02e0c0496beb29383927cc7c643b13e09f8cfa03f7688b352315a43f898", "size": 30285897},
+        "fungus_mt":
+            {"sha256": "abbc7658c9431d11454f2fec75b7b5f4deeb12bc3590351dc93883655c7c194e", "size": 7977301},
+        "embplant_mt":
+            {"sha256": "2f28612e7c2280a7273738eded0dd2fcfb59c6153c1cf3bac15e4e7ed1bf4e89", "size": 407052},
+        "other_pt":
+            {"sha256": "a548538ef6560ededefb7e0d9c41f1dcb8585dccb1d06124ffb95e6770df2c6b", "size": 14667508}
+        },
+    "0.0.1":
+        {
+        "embplant_nr":
+            {"sha256": "e19365f85b3bda29aabb5cf1ceb5c814e667ba251b08388d805b52b1f1fe1445", "size": 18309},
+        "embplant_pt":
+            {"sha256": "e8e5f461d6e5fe67c5314e46c61265e6ff1079886af3b959609dde2be97d870d", "size": 15342405},
+        "animal_mt":
+            {"sha256": "a293c02e0c0496beb29383927cc7c643b13e09f8cfa03f7688b352315a43f898", "size": 30285897},
+        "fungus_mt":
+            {"sha256": "abbc7658c9431d11454f2fec75b7b5f4deeb12bc3590351dc93883655c7c194e", "size": 7977301},
+        "fungus_nr":
+            {"sha256": "73bec014ebbbd88f7e51aa5575ea0cd05b8336a2b41808ff6c7cfb825271e5a9", "size": 375273},
+        "embplant_mt":
+            {"sha256": "2f28612e7c2280a7273738eded0dd2fcfb59c6153c1cf3bac15e4e7ed1bf4e89", "size": 407052},
+        "other_pt":
+            {"sha256": "a548538ef6560ededefb7e0d9c41f1dcb8585dccb1d06124ffb95e6770df2c6b", "size": 14667508}
         }
     }
 

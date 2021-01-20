@@ -113,6 +113,7 @@ def get_options():
     log_handler = simple_log(logging.getLogger(), options.output_base, "", log_level=log_level)
     log_handler.info("")
     log_handler.info("Python " + str(sys.version).replace("\n", " "))
+    log_handler.info("PLATFORM: " + " ".join(platform.uname()))
     # log versions of python libs
     lib_versions_info = []
     if options.draw_plot:

@@ -24,7 +24,7 @@ def get_options(print_title):
     parser.add_option("-o", dest="output_directory",
                       help="output directory.")
     parser.add_option("-F", dest="mode",
-                      help="organelle type: embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/anonym.")
+                      help="organelle type: embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym.")
     parser.add_option("--linear", dest="acyclic_allowed", default=False, action="store_true",
                       help="By default, this script would only disentangle the circular graph (the complete circular "
                            "organelle genome), and would directly give up linear/broken graphs). Choose this option "
@@ -47,7 +47,7 @@ def get_options(print_title):
                       help="Similarity threshold for confirming parallel contigs. Default:%default")
     parser.add_option("--expected-max-size", dest="expected_max_size", default=200000, type=int,
                       help="Expected maximum target genome size. Default: 200000 (-F embplant_pt/fungus_mt), "
-                           "25000 (-F embplant_nr/animal_mt/fungus_mt), 600000 (-F embplant_mt/other_pt)")
+                           "25000 (-F embplant_nr/animal_mt/fungus_nr), 600000 (-F embplant_mt/other_pt)")
     parser.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
                       help="Expected mininum target genome size. Default: %default")
     parser.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
@@ -111,11 +111,11 @@ def get_options(print_title):
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
         log_handler = timed_log(log_handler, options.output_directory, options.prefix + ".disentangle.")
         if "--expected-max-size" not in sys.argv:
-            if options.mode == "embplant_mt":
+            if options.mode in ("embplant_mt", "other_pt"):
                 options.expected_max_size *= 3
-            elif options.mode == "fungus_mt":
-                options.expected_max_size /= 2
-            elif options.mode in ("embplant_nr", "animal_mt"):
+            # elif options.mode == "fungus_mt":
+            #     options.expected_max_size /= 2
+            elif options.mode in ("embplant_nr", "animal_mt", "fungus_nr"):
                 options.expected_max_size /= 8
         random.seed(options.random_seed)
         np.random.seed(options.random_seed)

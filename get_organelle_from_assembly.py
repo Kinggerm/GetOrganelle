@@ -29,9 +29,11 @@ else:
     exit()
 GO_LIB_PATH = os.path.split(GetOrganelleLib.__file__)[0]
 GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep", SYSTEM_NAME))
-LBL_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "LabelDatabase"))
-SEQ_DB_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "SeedDatabase"))
 UTILITY_PATH = os.path.join(PATH_OF_THIS_SCRIPT, "Utilities")
+
+_GO_PATH = GO_PATH
+_LBL_DB_PATH = LBL_DB_PATH
+_SEQ_DB_PATH = SEQ_DB_PATH
 
 MAJOR_VERSION, MINOR_VERSION = sys.version_info[:2]
 if MAJOR_VERSION == 2 and MINOR_VERSION >= 7:
@@ -51,6 +53,7 @@ def get_options(description, version):
                            "other_pt (non-embryophyta plant plastome), embplant_mt "
                            "(plant mitochondrion), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
                            "(animal mitochondrion), fungus_mt (fungus mitochondrion), "
+                           "fungus_nr (fungus nuclear ribosomal RNA), "
                            "or embplant_mt,other_pt,fungus_mt "
                            "(the combination of any of above organelle genomes split by comma(s), "
                            "which might be computationally more intensive than separate runs), "
@@ -64,6 +67,11 @@ def get_options(description, version):
                       help='Input a float or integer number. Filter graph file by a minimum depth. Default: %default.')
     parser.add_option('--max-depth', dest='max_depth', default=inf, type=float,
                       help='Input a float or integer number. filter graph file by a maximum depth. Default: %default.')
+    parser.add_option("--config-dir", dest="get_organelle_path", default=None,
+                      help="The directory where the configuration file and default databases were placed. "
+                           "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                           "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                           "Default: " + GO_PATH)
     parser.add_option("--genes", dest="genes_fasta",
                       help="Followed with a customized database (a fasta file or the base name of a "
                            "blast database) containing or made of ONE set of protein coding genes "
@@ -95,7 +103,7 @@ def get_options(description, version):
                            "Default: " +
                            str(MAX_SLIM_EXTENDING_LENS["embplant_pt"]) + " (-F embplant_pt), " +
                            str(MAX_SLIM_EXTENDING_LENS["embplant_mt"]) + " (-F embplant_mt/fungus_mt/other_pt), " +
-                           str(MAX_SLIM_EXTENDING_LENS["embplant_nr"]) + " (-F embplant_nr/animal_mt), "
+                           str(MAX_SLIM_EXTENDING_LENS["embplant_nr"]) + " (-F embplant_nr/fungus_nr/animal_mt), "
                            "maximum_of_type1_type2 (-F type1,type2), inf (-F anonym)")
     parser.add_option("--spades-out-dir", dest="spades_scaffolds_path",
                       help="Input spades output directory with 'scaffolds.fasta' and 'scaffolds.paths', which are "
@@ -124,7 +132,7 @@ def get_options(description, version):
                       help="Expected maximum target genome size(s) for disentangling. "
                            "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
                            "with the same list length to organelle_type (followed by '-F'). "
-                           "Default: 250000 (-F embplant_pt/fungus_mt), 25000 (-F embplant_nr/animal_mt), "
+                           "Default: 250000 (-F embplant_pt/fungus_mt), 25000 (-F embplant_nr/fungus_nr/animal_mt), "
                            "1000000 (-F embplant_mt/other_pt), "
                            "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
     parser.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
@@ -181,7 +189,7 @@ def get_options(description, version):
         parser.print_help()
         exit()
     elif "-h" in sys.argv:
-        for not_often_used in ("--genes", "--ex-genes", "--slim-options", "--max-slim-extending-len",
+        for not_often_used in ("--config-dir", "--genes", "--ex-genes", "--slim-options", "--max-slim-extending-len",
                                "--depth-factor", "--spades-out-dir", "--type-f",
                                "--contamination-depth", "--contamination-similarity", "--no-degenerate",
                                "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
@@ -193,7 +201,7 @@ def get_options(description, version):
         parser.remove_option("-F")
         parser.add_option("-F", dest="organelle_type",
                           help="Target organelle genome type(s): "
-                               "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/anonym/"
+                               "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym/"
                                "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
         parser.remove_option("-g")
         parser.add_option("-g", dest="input_graph", help="Input assembly graph (fastg/gfa) file.")
@@ -269,8 +277,18 @@ def get_options(description, version):
         else:
             options.organelle_type = options.organelle_type.split(",")
 
+        global _GO_PATH, _LBL_DB_PATH, _SEQ_DB_PATH
+        if options.get_organelle_path:
+            _GO_PATH = os.path.expanduser(options.get_organelle_path)
+            if os.path.isdir(_GO_PATH):
+                _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
+                _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
+            else:
+                sys.stdout.write("\n############################################################################"
+                                 "\nERROR: path " + _GO_PATH + " invalid!\n")
+
         def _check_default_db(this_sub_organelle, extra_type=""):
-            if not (os.path.isfile(os.path.join(LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta):
+            if not (os.path.isfile(os.path.join(_LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
@@ -280,10 +298,10 @@ def get_options(description, version):
                 exit()
         for sub_organelle_t in options.organelle_type:
             if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt",
-                                       "fungus_mt", "anonym"}:
+                                       "fungus_mt", "fungus_nr", "anonym"}:
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: \"-F\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', "
-                                 "'embplant_nr', 'animal_mt', 'fungus_mt', 'anonym', or a "
+                                 "'embplant_nr', 'animal_mt', 'fungus_mt', 'fungus_nr', 'anonym', or a "
                                  "combination of above split by comma(s)!\n\n")
                 exit()
             elif sub_organelle_t == "anonym":
@@ -319,6 +337,7 @@ def get_options(description, version):
         log_handler.info("")
         log_handler.info(description)
         log_handler.info("Python " + str(sys.version).replace("\n", " "))
+        log_handler.info("PLATFORM: " + " ".join(platform.uname()))
         # log versions of dependencies
         lib_versions_info = list()
         lib_versions_info.append("GetOrganelleLib " + GetOrganelleLib.__version__)
@@ -360,8 +379,8 @@ def get_options(description, version):
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
         # existing default database
         if not options.no_slim:
-            existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=SEQ_DB_PATH,
-                                                                       lbl_db_path=LBL_DB_PATH, silent=True)
+            existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
+                                                                       lbl_db_path=_LBL_DB_PATH, silent=True)
             log_types = ["" if options.genes_fasta else this_type for this_type in options.organelle_type]
             if "embplant_pt" in log_types and "embplant_mt" not in log_types:
                 log_types.append("embplant_mt")
@@ -415,7 +434,7 @@ def get_options(description, version):
                     options.expected_max_size.append(int(raw_default_value * 4))
                 elif sub_organelle_t == "fungus_mt":
                     options.expected_max_size.append(raw_default_value)
-                elif sub_organelle_t in ("embplant_nr", "animal_mt"):
+                elif sub_organelle_t in ("embplant_nr", "fungus_nr", "animal_mt"):
                     options.expected_max_size.append(int(raw_default_value / 10))
                 elif sub_organelle_t == "anonym":
                     ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
@@ -490,15 +509,15 @@ def slim_assembly_graph(organelle_types, in_custom, ex_custom, graph_in, graph_o
         exclude_db = ex_custom
     else:
         if organelle_types == ["embplant_pt"]:
-            include_priority_db = [os.path.join(LBL_DB_PATH, "embplant_pt.fasta"),
-                                   os.path.join(LBL_DB_PATH, "embplant_mt.fasta")]
+            include_priority_db = [os.path.join(_LBL_DB_PATH, "embplant_pt.fasta"),
+                                   os.path.join(_LBL_DB_PATH, "embplant_mt.fasta")]
             max_slim_extending_len = max_slim_extending_len if max_slim_extending_len else MAX_SLIM_EXTENDING_LENS[organelle_types[0]]
         elif organelle_types == ["embplant_mt"]:
-            include_priority_db = [os.path.join(LBL_DB_PATH, "embplant_mt.fasta"),
-                                   os.path.join(LBL_DB_PATH, "embplant_pt.fasta")]
+            include_priority_db = [os.path.join(_LBL_DB_PATH, "embplant_mt.fasta"),
+                                   os.path.join(_LBL_DB_PATH, "embplant_pt.fasta")]
             max_slim_extending_len = max_slim_extending_len if max_slim_extending_len else MAX_SLIM_EXTENDING_LENS[organelle_types[0]]
         else:
-            include_priority_db = [os.path.join(LBL_DB_PATH, sub_organelle_t + ".fasta")
+            include_priority_db = [os.path.join(_LBL_DB_PATH, sub_organelle_t + ".fasta")
                                    for sub_organelle_t in organelle_types]
             if max_slim_extending_len is None:
                 max_slim_extending_len = max([MAX_SLIM_EXTENDING_LENS[sub_organelle_t]

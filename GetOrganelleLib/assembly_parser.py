@@ -966,6 +966,8 @@ class Assembly(SimpleAssembly):
             max_majority_copy = 4
         elif mode == "fungus_mt":
             max_majority_copy = 8
+        elif mode == "fungus_nr":
+            max_majority_copy = 4
         elif mode == "all":
             max_majority_copy = 100
         else:

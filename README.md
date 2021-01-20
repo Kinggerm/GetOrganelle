@@ -111,11 +111,15 @@ To assembly Embryophyta plant mitochondria (usually you need more than 5G raw da
     
 To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o nr_output -R 7 -k 35,85,115 -F embplant_nr
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o nr_output -R 10 -k 35,85,115 -F embplant_nr
 
 To assembly fungus mitochondria:
 
     get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out  # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
+
+To assembly fungus nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-28S):
+
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_nr -o fungus_nr_out  # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
 
 To assembly animal mitochondria:
 

@@ -46,7 +46,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
     
   If connection keeps failing, please manually download the latest database from [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB) and [initialization from local files](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization#option-2-initialization-from-local-files).
   
-  The database will be located at `~/.GetOrganelle` by default, which can be changed via shell environment variable `GETORG_PATH` or via command line parameter `--config-dir` (see more [here](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization)).
+  The database will be located at `~/.GetOrganelle` by default, which can be changed via the command line parameter `--config-dir`, or via the shell environment variable `GETORG_PATH` (see more [here](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization)).
     
 
 ## Test

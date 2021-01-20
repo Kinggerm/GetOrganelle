@@ -39,12 +39,14 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 
   You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. If you don't like conda, or want to follow the latest versions, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 
-* Since v1.7.0, the default databases are isolated as a new repository [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB). After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
+* After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
 
     
       get_organelle_config.py --add embplant_pt,embplant_mt
     
-  Check [Initialization from local files](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization#initialization-from-local-files) if connection keeps failing.
+  If connection keeps failing, please manually download the latest database from [GetOrganelleDB](https://github.com/Kinggerm/GetOrganelleDB) and [initialization from local files](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization#option-2-initialization-from-local-files).
+  
+  The database will be located at `~/.GetOrganelle` by default, which can be changed via shell environment variable `GETORG_PATH` or via command line parameter `--config-dir` (see more [here](https://github.com/Kinggerm/GetOrganelle/wiki/Initialization)).
     
 
 ## Test

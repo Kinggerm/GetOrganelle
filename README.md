@@ -5,7 +5,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/latest_release_date.svg)](https://anaconda.org/bioconda/getorganelle)
 
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
-[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.2.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
+[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.3.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
 
 This toolkit assemblies organelle genome from genomic skimming data. 
 
@@ -30,7 +30,7 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation & Initialization
 
-GetOrganelle is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. It was built for Linux and macOS.
+GetOrganelle is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. It was built for Linux and macOS. Windows Subsystem Linux is currently not supported, we are working on this.
 
 * The easiest way to install GetOrganelle and its [dependencies](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#requirement--dependencies) is using conda:
        

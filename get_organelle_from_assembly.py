@@ -286,6 +286,7 @@ def get_options(description, version):
             else:
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: path " + _GO_PATH + " invalid!\n")
+                exit()
 
         def _check_default_db(this_sub_organelle, extra_type=""):
             if not (os.path.isfile(os.path.join(_LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta):

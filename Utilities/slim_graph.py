@@ -330,6 +330,7 @@ def get_options(print_title):
                     sys.stdout.write(
                         "\n############################################################################"
                         "\nERROR: path " + _GO_PATH + " invalid!\n")
+                    exit()
 
             if options.organelle_types:
 

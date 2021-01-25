@@ -11,7 +11,7 @@ versions = [
             "1. bug fixed: a bug of sorting consensus vertex names using smart_trans_for_sort",
             "2. option --max-reads inf configured",
         ],
-        "time": "2021-01-25 11:30 UTC+8"
+        "time": "2021-01-25 13:00 UTC+8"
     },
     {
         "number": "1.7.3",

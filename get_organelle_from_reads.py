@@ -64,6 +64,8 @@ ORGANELLE_EXPECTED_GRAPH_SIZES = {"embplant_pt": 130000,
                                   "animal_mt": 13000,
                                   "fungus_mt": 65000}
 
+READ_LINE_TO_INF = int(HEAD_MAXIMUM_LINES/4)
+
 
 def get_options(description, version):
     version = version
@@ -101,6 +103,7 @@ def get_options(description, version):
                                 "from the same plant-species as seed and anti-seed.")
     group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
                            help="Hard bound for maximum number of reads to be used per file. "
+                                "A input larger than " + str(READ_LINE_TO_INF) + " will be treated as infinity (INF). "
                                 "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
     group_inout.add_option("--reduce-reads-for-coverage", dest="reduce_reads_for_cov", type=float, default=500,
@@ -422,6 +425,7 @@ def get_options(description, version):
                           help="Maximum number of reads to be used per file. "
                                "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
+        # head -n:0~2147483647
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
                           help="=\"-R 10 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
@@ -730,6 +734,11 @@ def get_options(description, version):
                 options.maximum_n_reads *= 5
             elif "animal_mt" in options.organelle_type:
                 options.maximum_n_reads *= 20
+        if options.maximum_n_reads > READ_LINE_TO_INF:
+            options.maximum_n_reads = inf
+        else:
+            options.maximum_n_reads = int(options.maximum_n_reads)
+
         if "--max-n-words" not in sys.argv:
             if "embplant_mt" in options.organelle_type or "anonym" in options.organelle_type:
                 options.maximum_n_words *= 5
@@ -946,7 +955,7 @@ def get_options(description, version):
 
 def estimate_maximum_n_reads_using_mapping(
         twice_max_coverage, check_dir, original_fq_list, reads_paired,
-        designed_maximum_n_reads, seed_files, organelle_types, target_genome_sizes,
+        maximum_n_reads_hard_bound, seed_files, organelle_types, target_genome_sizes,
         keep_temp, resume, which_blast, which_spades, which_bowtie2, threads, random_seed, verbose_log, log_handler):
     from GetOrganelleLib.sam_parser import MapRecords, get_cover_range
     if executable(os.path.join(UTILITY_PATH, "slim_graph.py -h")):
@@ -957,7 +966,7 @@ def estimate_maximum_n_reads_using_mapping(
         which_slim = ""
     else:
         which_slim = None
-    result_n_reads = [designed_maximum_n_reads] * len(original_fq_list)
+    result_n_reads = [maximum_n_reads_hard_bound] * len(original_fq_list)
     data_maximum_n_reads = inf
     if not os.path.exists(check_dir):
         os.mkdir(check_dir)
@@ -991,7 +1000,9 @@ def estimate_maximum_n_reads_using_mapping(
             return result_n_reads
     #
     count_round = 1
-    while count_round == 1 or check_num_line < min(designed_maximum_n_reads, data_maximum_n_reads):
+    while count_round == 1 or check_num_line < min(maximum_n_reads_hard_bound, data_maximum_n_reads):
+        if check_num_line > READ_LINE_TO_INF:
+            return [inf] * len(original_fq_list)
         log_handler.info("Tasting " + "+".join([str(check_num_line)] * len(original_fq_list)) + " reads ...")
         this_check_dir = os.path.join(check_dir, str(count_round))
         if not os.path.exists(this_check_dir):
@@ -1008,11 +1019,16 @@ def estimate_maximum_n_reads_using_mapping(
                     os.rename(check_fq + ".temp", check_fq)
             check_f_size = os.path.getsize(check_fq)
             if check_f_size == 0:
-                raise ValueError("Empty file" + check_fq)
+                raise ValueError("Empty file" + check_fq + "\n"
+                                 "Please check the legality and integrity of your input reads!\n")
             if check_f_size == previous_file_sizes[f_id]:
                 no_more_new_reads[f_id] = True
                 check_percents.append(1)
-                estimated_maximum_n_reads_list[f_id] = int(len(open(check_fq).readlines()) / 4)
+                tmp_line = 0
+                with open(check_fq) as counter:
+                    for foo in counter:
+                        tmp_line += 1
+                estimated_maximum_n_reads_list[f_id] = int(tmp_line / 4)
             else:
                 check_percents.append(min(float(check_f_size) / original_fq_sizes[f_id], 1))
                 estimated_maximum_n_reads_list[f_id] = int(check_num_line / check_percents[-1])
@@ -1060,7 +1076,8 @@ def estimate_maximum_n_reads_using_mapping(
             coverage_info = mapping_records.coverages
             coverages_2 = [pos for ref in coverage_info for pos in coverage_info[ref] if pos > 0]
             base_cov_values = get_cover_range(coverages_2, guessing_percent=BASE_COV_SAMPLING_PERCENT)
-            mean_read_len, max_read_len, all_read_nums = get_read_len_mean_max_count(mapped_fq, inf)
+            mean_read_len, max_read_len, all_read_nums = \
+                get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound)
             if executable(os.path.join(which_spades, "spades.py -h")) and \
                     executable(os.path.join(which_bowtie2, "bowtie2")):
                 try:
@@ -1094,10 +1111,11 @@ def estimate_maximum_n_reads_using_mapping(
         the_real_base_cov = the_check_base_cov / data_checked_percent
         if the_real_base_cov > twice_max_coverage:
             reduce_ratio = twice_max_coverage / the_real_base_cov
-            result_n_reads = [min(designed_maximum_n_reads, math.ceil(real_num * reduce_ratio))
+            result_n_reads = [min(maximum_n_reads_hard_bound, math.ceil(real_num * reduce_ratio))
+                              if real_num * reduce_ratio <= READ_LINE_TO_INF else inf
                               for real_num in estimated_maximum_n_reads_list]
         else:
-            result_n_reads = [designed_maximum_n_reads] * len(original_fq_list)
+            result_n_reads = [maximum_n_reads_hard_bound] * len(original_fq_list)
         break
     if not keep_temp:
         shutil.rmtree(check_dir)
@@ -3774,11 +3792,12 @@ def main():
             if all_read_nums is None:
                 if options.reduce_reads_for_cov != inf:
                     log_handler.info(
-                        "Estimating reads to use ... (to use all reads, set '--reduce-reads-for-coverage inf')")
+                        "Estimating reads to use ... "
+                        "(to use all reads, set '--reduce-reads-for-coverage inf --max-reads inf')")
                     all_read_nums = estimate_maximum_n_reads_using_mapping(
                         twice_max_coverage=options.reduce_reads_for_cov * 2, check_dir=os.path.join(out_base, "check"),
                         original_fq_list=original_fq_files, reads_paired=reads_paired["input"],
-                        designed_maximum_n_reads=options.maximum_n_reads,
+                        maximum_n_reads_hard_bound=options.maximum_n_reads,
                         seed_files=options.seed_file, organelle_types=options.organelle_type,
                         target_genome_sizes=options.target_genome_size,
                         keep_temp=options.keep_temp_files, resume=options.script_resume,
@@ -3805,8 +3824,13 @@ def main():
                             log_handler.error("Do not put original reads file(s) in the output directory!")
                             exit()
                         if not (os.path.exists(target_fq) and resume):
-                            os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +
-                                      read_file + " > " + target_fq)
+                            if all_read_nums[file_id] > READ_LINE_TO_INF:
+                                os.system("cp " + read_file + " " + target_fq + ".Temp")
+                                os.system("mv " + target_fq + ".Temp " + target_fq)
+                            else:
+                                os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +
+                                          read_file + " > " + target_fq + ".Temp")
+                                os.system("mv " + target_fq + ".Temp " + target_fq)
                     if os.path.getsize(target_fq) == 0:
                         raise ValueError("Empty file " + target_fq)
                     original_fq_files[file_id] = target_fq

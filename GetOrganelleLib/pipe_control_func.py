@@ -62,6 +62,8 @@ SEQ_NAME = "SeedDatabase"
 LBL_DB_PATH = os.path.join(GO_PATH, LBL_NAME)
 SEQ_DB_PATH = os.path.join(GO_PATH, SEQ_NAME)
 
+HEAD_MAXIMUM_LINES = 2147483647
+
 
 def simple_log(log, output_base, prefix, log_level="NOTSET"):
     log_simple = log
@@ -770,11 +772,16 @@ def zip_file(source, target, verbose_log=False, log_handler=None, remove_source=
             pass
 
 
-def unzip(source, target, line_limit=1000000000000000, verbose_log=False, log_handler=None):
+def unzip(source, target, line_limit=HEAD_MAXIMUM_LINES, verbose_log=False, log_handler=None):
     target_temp = target + ".Temp"
-    try_commands = [
-        "tar -x -f " + source + " -O | head -n " + str(line_limit) + " > " + target_temp,
-        "gunzip -c " + source + " | head -n " + str(line_limit) + " > " + target_temp]
+    if HEAD_MAXIMUM_LINES == float("inf"):
+        try_commands = [
+            "tar -x -f " + source + " -O > " + target_temp,
+            "gunzip -c " + source + " > " + target_temp]
+    else:
+        try_commands = [
+            "tar -x -f " + source + " -O | head -n " + str(line_limit) + " > " + target_temp,
+            "gunzip -c " + source + " | head -n " + str(line_limit) + " > " + target_temp]
     # re-order try commands
     if "tar." not in source:
         try_commands = try_commands[1], try_commands[0]

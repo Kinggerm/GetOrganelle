@@ -3916,7 +3916,7 @@ def smart_trans_for_sort(candidate_item):
                 try:
                     all_e[go_e] = float(this_ele)
                 except ValueError:
-                    pass
+                    all_e[go_e] = hash(all_e[go_e])
         return all_e
 
 

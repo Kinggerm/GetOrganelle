@@ -425,7 +425,6 @@ def get_options(description, version):
                           help="Maximum number of reads to be used per file. "
                                "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
-        # head -n:0~2147483647
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
                           help="=\"-R 10 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "

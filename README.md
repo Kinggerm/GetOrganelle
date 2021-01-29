@@ -7,7 +7,9 @@
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
 [![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.3.1.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
 
-This toolkit assemblies organelle genome from genomic skimming data. It achieved the best performance overall both on simulated and real data and was recommended as the default for chloroplast assemblies in a third-party comparison paper ([Freudenthal et al. 2020. Genome Biology](https://doi.org/10.1186/s13059-020-02153-6)).
+This toolkit assemblies organelle genome from genomic skimming data. 
+
+It achieved the best performance overall both on simulated and real data and was recommended as the default for chloroplast assemblies in a third-party comparison paper ([Freudenthal et al. 2020. Genome Biology](https://doi.org/10.1186/s13059-020-02153-6)).
 
 <div id="citation"></div>
 

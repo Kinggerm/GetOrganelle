@@ -289,7 +289,7 @@ class SimpleAssembly(object):
                 for line in gfa_open:
                     if line.startswith("S\t"):
                         elements = line.strip().split("\t")
-                        record_type = elements.pop(0)  # not used
+                        elements.pop(0)  # record_type
                         vertex_name = elements.pop(0)  # segment name
                         sequence = elements.pop(0)
                         seq_len_tag = None
@@ -341,7 +341,13 @@ class SimpleAssembly(object):
                 gfa_open.seek(0)
                 for line in gfa_open:
                     if line.startswith("L\t"):
-                        flag, vertex_1, end_1, vertex_2, end_2, alignment_cigar = line.strip().split("\t")
+                        elements = line.strip().split("\t")
+                        elements.pop(0)  # flag
+                        vertex_1 = elements.pop(0)
+                        end_1 = elements.pop(0)
+                        vertex_2 = elements.pop(0)
+                        end_2 = elements.pop(0)
+                        alignment_cigar = elements.pop(0)
                         # "head"~False, "tail"~True
                         if vertex_1 in self.vertex_info and vertex_2 in self.vertex_info:
                             # different notation as to our Assembly system
@@ -354,9 +360,9 @@ class SimpleAssembly(object):
                 for line in gfa_open:
                     if line.startswith("S\t"):
                         elements = line.strip().split("\t")
-                        record_type = elements.pop(0)  # not used
+                        elements.pop(0)  # record_type
                         vertex_name = elements.pop(0)  # segment name
-                        seq_len_tag = int(elements.pop(0))
+                        int(elements.pop(0))  # seq_len_tag
                         sequence = elements.pop(0)
                         seq_len_tag = None
                         kmer_count = None
@@ -405,7 +411,13 @@ class SimpleAssembly(object):
                 gfa_open.seek(0)
                 for line in gfa_open:
                     if line.startswith("E\t"):  # gfa2 uses E
-                        flag, vertex_1, end_1, vertex_2, end_2, alignment_cigar = line.strip().split("\t")
+                        elements = line.strip().split("\t")
+                        elements.pop(0)  # flag
+                        vertex_1 = elements.pop(0)
+                        end_1 = elements.pop(0)
+                        vertex_2 = elements.pop(0)
+                        end_2 = elements.pop(0)
+                        alignment_cigar = elements.pop(0)
                         # "head"~False, "tail"~True
                         if vertex_1 in self.vertex_info and vertex_2 in self.vertex_info:
                             end_1 = {"+": True, "-": False}[end_1]

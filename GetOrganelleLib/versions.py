@@ -6,6 +6,13 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.2",
+        "features": [
+            "1. improve support for standard gfa format: E/L with optional fields",
+        ],
+        "time": "2021-02-03 13:30 UTC+8"
+    },
+    {
         "number": "1.7.3.1",
         "features": [
             "1. bug fixed: a bug of sorting consensus vertex names using smart_trans_for_sort",

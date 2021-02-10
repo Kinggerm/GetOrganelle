@@ -130,6 +130,7 @@ def get_options(description):
                 with open(version_file) as open_version:
                     for line in open_version:
                         db_type, db_version, db_hash = line.strip().split("\t")
+                        db_version = find_version(db_type, db_hash, SEED_DB_HASH, db_version)
                         sys.stdout.write(db_type + " Seed Database:\t" + db_version + "\t" + db_hash + "\n")
         if options.db_type in ("label", "both"):
             version_file = os.path.join(_LBL_DB_PATH, "VERSION")
@@ -137,6 +138,7 @@ def get_options(description):
                 with open(version_file) as open_version:
                     for line in open_version:
                         db_type, db_version, db_hash = line.strip().split("\t")
+                        db_version = find_version(db_type, db_hash, LABEL_DB_HASH, db_version)
                         sys.stdout.write(db_type + " Label Database:\t" + db_version + "\t" + db_hash + "\n")
         sys.exit()
 
@@ -204,7 +206,7 @@ def get_options(description):
                     sys.stdout.write("File " + this_fas_f + " not available!\n")
                     sys.exit()
         options.version = "customized"
-        sys.stdout.write("Use local database: " + options.use_local)
+        sys.stdout.write("Use local database: " + options.use_local + "\n")
     else:
         if options.update:
             options.version = "latest"
@@ -236,6 +238,14 @@ def rm_files(path_to, file_name_prefix="", file_name_postfix=""):
     for file_to_del in os.listdir(path_to):
         if file_to_del.startswith(file_name_prefix) and file_to_del.endswith(file_name_postfix):
             os.remove(os.path.join(path_to, file_to_del))
+
+
+def find_version(organelle_type, hash_val, DB_dict, default_version_val="customized"):
+    for try_version in sorted(DB_dict, reverse=True):
+        if organelle_type in DB_dict[try_version] and hash_val == DB_dict[try_version][organelle_type]["sha256"]:
+            return try_version
+    else:
+        return default_version_val
 
 
 def initialize_notation_database(which_blast, fasta_f, overwrite=False):
@@ -332,17 +342,21 @@ def main():
                             sys.stdout.write("Warning: " + update_to_fa + " not available!\n")
                         else:
                             new_hash_val = cal_f_sha256(update_to_fa)
-                            if new_hash_val != existing_seed_db[sub_o_type]["sha256"]:  # match existed
-                                for try_version in sorted(SEED_DB_HASH, reverse=True):
-                                    if new_hash_val == SEED_DB_HASH[try_version][sub_o_type]["sha256"]:
-                                        existing_seed_db[sub_o_type] = {"version": try_version, "sha256": new_hash_val}
-                                else:
-                                    existing_seed_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                            if new_hash_val != existing_seed_db[sub_o_type]["sha256"]:
+                                # for try_version in sorted(SEED_DB_HASH, reverse=True):
+                                #     if sub_o_type in SEED_DB_HASH[try_version] and \
+                                #             new_hash_val == SEED_DB_HASH[try_version][sub_o_type]["sha256"]:
+                                #         existing_seed_db[sub_o_type] = {"version": try_version, "sha256": new_hash_val}
+                                # else:
+                                #     existing_seed_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                                existing_seed_db[sub_o_type] = \
+                                    {"version": find_version(sub_o_type, new_hash_val, SEED_DB_HASH),
+                                     "sha256": new_hash_val}
                                 if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_SEQ_DB_PATH):
                                     copy(update_to_fa, _SEQ_DB_PATH)
                                 initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                          fasta_f=target_output, overwrite=True)
-                            else:
+                            else:  # match existed
                                 # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                                 initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                          fasta_f=target_output, overwrite=False)
@@ -379,12 +393,16 @@ def main():
                         else:
                             new_hash_val = cal_f_sha256(update_to_fa)
                             if new_hash_val != existing_label_db[sub_o_type]["sha256"]:  # match existed
-                                for try_version in sorted(LABEL_DB_HASH, reverse=True):
-                                    if new_hash_val == LABEL_DB_HASH[try_version][sub_o_type]["sha256"]:
-                                        existing_label_db[sub_o_type] = {"version": try_version,
-                                                                         "sha256": new_hash_val}
-                                else:
-                                    existing_label_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                                # for try_version in sorted(LABEL_DB_HASH, reverse=True):
+                                #     if sub_o_type in LABEL_DB_HASH[try_version] and \
+                                #             new_hash_val == LABEL_DB_HASH[try_version][sub_o_type]["sha256"]:
+                                #         existing_label_db[sub_o_type] = {"version": try_version,
+                                #                                          "sha256": new_hash_val}
+                                # else:
+                                #     existing_label_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                                existing_label_db[sub_o_type] = \
+                                    {"version": find_version(sub_o_type, new_hash_val, LABEL_DB_HASH),
+                                     "sha256": new_hash_val}
                                 if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_LBL_DB_PATH):
                                     copy(update_to_fa, _LBL_DB_PATH)
                                 initialize_notation_database(which_blast=options.which_blast,
@@ -424,11 +442,14 @@ def main():
                         sys.stdout.write("Warning: " + update_to_fa + " not available!\n")
                     else:
                         new_hash_val = cal_f_sha256(update_to_fa)
-                        for try_version in sorted(SEED_DB_HASH, reverse=True):
-                            if new_hash_val == SEED_DB_HASH[try_version][sub_o_type]["sha256"]:
-                                existing_seed_db[sub_o_type] = {"version": try_version, "sha256": new_hash_val}
-                        else:
-                            existing_seed_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                        # for try_version in sorted(SEED_DB_HASH, reverse=True):
+                        #     if sub_o_type in SEED_DB_HASH[try_version] and \
+                        #             new_hash_val == SEED_DB_HASH[try_version][sub_o_type]["sha256"]:
+                        #         existing_seed_db[sub_o_type] = {"version": try_version, "sha256": new_hash_val}
+                        # else:
+                        #     existing_seed_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                        existing_seed_db[sub_o_type] = \
+                            {"version": find_version(sub_o_type, new_hash_val, SEED_DB_HASH), "sha256": new_hash_val}
                         if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_SEQ_DB_PATH):
                             copy(update_to_fa, _SEQ_DB_PATH)
                         initialize_seed_database(which_bowtie2=options.which_bowtie2,
@@ -456,12 +477,15 @@ def main():
                         sys.stdout.write("Warning: " + update_to_fa + " not available!\n")
                     else:
                         new_hash_val = cal_f_sha256(update_to_fa)
-                        for try_version in sorted(LABEL_DB_HASH, reverse=True):
-                            if new_hash_val == LABEL_DB_HASH[try_version][sub_o_type]["sha256"]:
-                                existing_label_db[sub_o_type] = {"version": try_version,
-                                                                 "sha256": new_hash_val}
-                        else:
-                            existing_label_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                        # for try_version in sorted(LABEL_DB_HASH, reverse=True):
+                        #     if sub_o_type in LABEL_DB_HASH[try_version] and \
+                        #             new_hash_val == LABEL_DB_HASH[try_version][sub_o_type]["sha256"]:
+                        #         existing_label_db[sub_o_type] = {"version": try_version,
+                        #                                          "sha256": new_hash_val}
+                        # else:
+                        #     existing_label_db[sub_o_type] = {"version": "customized", "sha256": new_hash_val}
+                        existing_label_db[sub_o_type] = \
+                            {"version": find_version(sub_o_type, new_hash_val, LABEL_DB_HASH), "sha256": new_hash_val}
                         if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_LBL_DB_PATH):
                             copy(update_to_fa, _LBL_DB_PATH)
                         initialize_notation_database(which_blast=options.which_blast,

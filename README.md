@@ -5,11 +5,11 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/latest_release_date.svg)](https://anaconda.org/bioconda/getorganelle)
 
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
-[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.3.1.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
+[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.3.3.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
 
 This toolkit assemblies organelle genome from genomic skimming data. 
 
-It achieved the best performance overall both on simulated and real data and was recommended as the default for chloroplast assemblies in a third-party comparison paper ([Freudenthal et al. 2020. Genome Biology](https://doi.org/10.1186/s13059-020-02153-6)).
+It achieved the best performance overall both on simulated and real data and was recommended as the default for chloroplast genome assemblies in a third-party comparison paper ([Freudenthal et al. 2020. Genome Biology](https://doi.org/10.1186/s13059-020-02153-6)).
 
 <div id="citation"></div>
 
@@ -57,6 +57,13 @@ Download [a simulated _Arabidopsis thaliana_ WGS dataset](https://github.com/Kin
 
     wget https://github.com/Kinggerm/GetOrganelleGallery/raw/master/Test/reads/Arabidopsis_simulated.1.fq.gz
     wget https://github.com/Kinggerm/GetOrganelleGallery/raw/master/Test/reads/Arabidopsis_simulated.2.fq.gz
+
+then verify the integrity of downloaded files using `md5sum`:
+
+    md5sum Arabidopsis_simulated.*.fq.gz
+    # 935589bc609397f1bfc9c40f571f0f19  Arabidopsis_simulated.1.fq.gz
+    # d0f62eed78d2d2c6bed5f5aeaf4a2c11  Arabidopsis_simulated.2.fq.gz
+    # Please re-download the reads if your md5 values unmatched above
 
 then do the fast plastome assembly (memory: ~600MB, CPU time: ~60s):
 
@@ -135,7 +142,7 @@ or see the detailed illustrations:
     
     get_organelle_from_reads.py --help
     
-To extract the plastome from an existing assembly graph (`*.fastg`/`*.gfa`):
+To extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`; e.g. from long-read sequencing assemblies):
 
     get_organelle_from_assembly.py -F embplant_pt -g ONT_assembly_graph.gfa
 

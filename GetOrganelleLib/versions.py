@@ -6,6 +6,15 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.3",
+        "features": [
+            "1. early termination on invalid path characters for spades",
+            "2. fix a bug introduced by '--max-reads inf'",
+            "3. get_organelle_config.py: fix a bug if a new organelle types was added and '--use-local' was used",
+        ],
+        "time": "2021-02-11 01:00 UTC+8"
+    },
+    {
         "number": "1.7.3.2",
         "features": [
             "1. improve support for standard gfa format: E/L with optional fields",

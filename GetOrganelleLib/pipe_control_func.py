@@ -64,6 +64,10 @@ SEQ_DB_PATH = os.path.join(GO_PATH, SEQ_NAME)
 
 HEAD_MAXIMUM_LINES = 2147483647
 
+INVALID_PATH_CHAR_RANGES = [
+    [u'\u4e00', u'\u9fff']  # chinese characters are not accepted by SPAdes
+]
+
 
 def simple_log(log, output_base, prefix, log_level="NOTSET"):
     log_simple = log
@@ -166,6 +170,14 @@ def pool_multiprocessing(target, iter_args, constant_args, num_process):
 # test whether an external binary is executable
 def executable(test_this):
     return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != DEAD_CODE else False
+
+
+def is_valid_path(path_str):
+    for char in path_str:
+        for down_str, up_str in INVALID_PATH_CHAR_RANGES:
+            if down_str <= char <= up_str:
+                return False
+    return True
 
 
 def run_command(command, print_command=False, check_echo_error=True):
@@ -774,14 +786,14 @@ def zip_file(source, target, verbose_log=False, log_handler=None, remove_source=
 
 def unzip(source, target, line_limit=HEAD_MAXIMUM_LINES, verbose_log=False, log_handler=None):
     target_temp = target + ".Temp"
-    if HEAD_MAXIMUM_LINES == float("inf"):
+    if line_limit == float("inf"):
         try_commands = [
             "tar -x -f " + source + " -O > " + target_temp,
             "gunzip -c " + source + " > " + target_temp]
     else:
         try_commands = [
-            "tar -x -f " + source + " -O | head -n " + str(line_limit) + " > " + target_temp,
-            "gunzip -c " + source + " | head -n " + str(line_limit) + " > " + target_temp]
+            "tar -x -f " + source + " -O | head -n " + str(int(line_limit)) + " > " + target_temp,
+            "gunzip -c " + source + " | head -n " + str(int(line_limit)) + " > " + target_temp]
     # re-order try commands
     if "tar." not in source:
         try_commands = try_commands[1], try_commands[0]

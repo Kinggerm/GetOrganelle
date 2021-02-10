@@ -427,7 +427,7 @@ def get_options(description, version):
                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
         parser.remove_option("--fast")
         parser.add_option("--fast", dest="fast_strategy",
-                          help="=\"-R 10 -t 4 -J 5 -M 7 --max-words 3E7 --larger-auto-ws "
+                          help="=\"-R 10 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws "
                                "--disentangle-time-limit 360\"")
         parser.remove_option("-k")
         parser.add_option("-k", dest="spades_kmer", default="21,55,85,115",
@@ -675,6 +675,14 @@ def get_options(description, version):
         # working directory
         log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
+
+        if options.run_spades:
+            for fq_file in [options.fq_file_1, options.fq_file_2] + options.unpaired_fq_files:
+                assert is_valid_path(os.path.basename(fq_file)), \
+                    "Invalid characters for SPAdes in file name: " + os.path.basename(fq_file)
+            for fq_file in [options.output_base, options.prefix]:
+                assert is_valid_path(os.path.realpath(fq_file)), \
+                    "Invalid characters for SPAdes in path: " + os.path.realpath(fq_file)
 
         log_handler = timed_log(log_handler, options.output_base, options.prefix + "get_org.")
         if options.word_size is None:
@@ -1012,7 +1020,7 @@ def estimate_maximum_n_reads_using_mapping(
             check_fq = os.path.join(this_check_dir, "check_" + str(f_id + 1))
             if not (os.path.exists(check_fq) and resume):
                 if r_file.endswith(".gz"):
-                    unzip(r_file, check_fq, int(4 * check_num_line), verbose_log, log_handler if verbose_log else None)
+                    unzip(r_file, check_fq, 4 * check_num_line, verbose_log, log_handler if verbose_log else None)
                 else:
                     os.system("head -n " + str(int(4 * check_num_line)) + " " + r_file + " > " + check_fq + ".temp")
                     os.rename(check_fq + ".temp", check_fq)
@@ -3814,7 +3822,7 @@ def main():
                         target_fq = os.path.join(out_base, str(file_id + 1) + "-" +
                                                  os.path.basename(read_file)) + ".fastq"
                         if not (os.path.exists(target_fq) and resume):
-                            unzip(read_file, target_fq, int(4 * all_read_nums[file_id]),
+                            unzip(read_file, target_fq, 4 * all_read_nums[file_id],
                                   options.verbose_log, log_handler)
                     else:
                         target_fq = os.path.join(out_base, str(file_id + 1) + "-" +
@@ -3999,7 +4007,7 @@ def main():
                     files_to_unzip = [os.path.join(out_base, candidate)
                                       for candidate in os.listdir(out_base) if candidate.endswith(".fq.tar.gz")]
                     for file_to_u in files_to_unzip:
-                        unzip(source=file_to_u, target=file_to_u[:-7])
+                        unzip(source=file_to_u, target=file_to_u[:-7], line_limit=inf)
                 options.spades_kmer = check_kmers(options.spades_kmer, word_size, max_read_len, log_handler)
                 log_handler.info("Assembling using SPAdes ...")
                 if not executable("pigz -h"):

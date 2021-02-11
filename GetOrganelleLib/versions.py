@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.4-pre",
+        "features": [
+            "1. fix bugs with '--config-dir'",
+            "2. customized databases (--genes/--ex-genes) passed to slim during pre-assembly & depth estimation",
+        ],
+        "time": "2021-02-11 01:00 UTC+8"
+    },
+    {
         "number": "1.7.3.3",
         "features": [
             "1. early termination on invalid path characters for spades",

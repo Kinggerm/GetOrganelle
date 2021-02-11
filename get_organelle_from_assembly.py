@@ -378,6 +378,7 @@ def get_options(description, version):
         if executable(os.path.join(options.which_bandage, "Bandage -v")):
             dep_versions_info.append(detect_bandage_version(options.which_bandage))
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
+        log_handler.info("GETORG_PATH=" + _GO_PATH)
         # existing default database
         if not options.no_slim:
             existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,

@@ -86,13 +86,14 @@ def get_options(description, version):
                            help="Input file(s) with unpaired (single-end) reads (format: fastq/fastq.gz/fastq.tar.gz). "
                                 "files could be comma-separated lists such as 'seq1.fq,seq2.fq'.")
     group_inout.add_option("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
-    group_inout.add_option("-s", dest="seed_file", default=os.path.join(SEQ_DB_PATH, "*.fasta"),
+    group_inout.add_option("-s", dest="seed_file", default=None,
                            help="Seed sequence(s). Input fasta format file as initial seed. "
                                 "A seed sequence in GetOrganelle is only used for identifying initial "
                                 "organelle reads. The assembly process is purely de novo. "
                                 "Should be a list of files split by comma(s) on a multi-organelle mode, "
                                 "with the same list length to organelle_type (followed by '-F'). "
-                                "Default: '%default' (* depends on the value followed with flag '-F')")
+                                "Default: '" + os.path.join(SEQ_DB_PATH, "*.fasta") + "' "
+                                "(* depends on the value followed with flag '-F')")
     group_inout.add_option("-a", dest="anti_seed",
                            help="Anti-seed(s). Not suggested unless what you really know what you are doing. "
                                 "Input fasta format file as anti-seed, where the extension process "
@@ -523,7 +524,7 @@ def get_options(description, version):
                                  "or a combination of above split by comma(s)!\n\n")
                 exit()
             elif sub_organelle_t == "anonym":
-                if "*" in options.seed_file or not options.genes_fasta:
+                if not options.seed_file or not options.genes_fasta:
                     sys.stdout.write("\n############################################################################"
                                      "\nERROR: \"-s\" and \"--genes\" must be specified when \"-F anonym\"!\n\n")
                     exit()
@@ -535,11 +536,12 @@ def get_options(description, version):
                     _check_default_db(sub_organelle_t)
 
         organelle_type_len = len(options.organelle_type)
-        use_default_seed = False
-        if "*" in options.seed_file:
-            options.seed_file = [str(options.seed_file).replace("*", sub_o) for sub_o in options.organelle_type]
+
+        if not options.seed_file:
             use_default_seed = True
+            options.seed_file = [os.path.join(_SEQ_DB_PATH, sub_o + ".fasta") for sub_o in options.organelle_type]
         else:
+            use_default_seed = False
             options.seed_file = str(options.seed_file).split(",")
             if len(options.seed_file) != organelle_type_len:
                 sys.stdout.write("\n############################################################################"
@@ -655,7 +657,7 @@ def get_options(description, version):
             dep_versions_info.append(detect_bandage_version(options.which_bandage))
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
         # log database
-        log_handler.info("GETORG_PATH=" + GO_PATH)
+        log_handler.info("GETORG_PATH=" + _GO_PATH)
         existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
                                                                    lbl_db_path=_LBL_DB_PATH, silent=True)
         if use_default_seed:
@@ -766,7 +768,7 @@ def get_options(description, version):
             for sub_genes in str(options.genes_fasta).split(","):
                 # if sub_genes == "":
                 #     temp_vals.append(sub_genes)
-                if not (os.path.exists(sub_genes) or os.path.exists(remove_db_postfix(sub_genes) + ".nhr")):
+                if not (os.path.exists(sub_genes) and os.path.exists(remove_db_postfix(sub_genes) + ".nhr")):
                     log_handler.error(sub_genes + " not found!")
                     exit()
                 else:
@@ -962,7 +964,7 @@ def get_options(description, version):
 
 def estimate_maximum_n_reads_using_mapping(
         twice_max_coverage, check_dir, original_fq_list, reads_paired,
-        maximum_n_reads_hard_bound, seed_files, organelle_types, target_genome_sizes,
+        maximum_n_reads_hard_bound, seed_files, organelle_types, in_customs, ex_customs, target_genome_sizes,
         keep_temp, resume, which_blast, which_spades, which_bowtie2, threads, random_seed, verbose_log, log_handler):
     from GetOrganelleLib.sam_parser import MapRecords, get_cover_range
     if executable(os.path.join(UTILITY_PATH, "slim_graph.py -h")):
@@ -1088,9 +1090,12 @@ def estimate_maximum_n_reads_using_mapping(
             if executable(os.path.join(which_spades, "spades.py -h")) and \
                     executable(os.path.join(which_bowtie2, "bowtie2")):
                 try:
+                    this_in = "" if not in_customs else in_customs[go_t]
+                    this_ex = "" if not ex_customs else ex_customs[go_t]
                     base_cov_values = pre_assembly_mapped_reads_for_base_cov(
                         original_fq_files=check_fq_files, mapped_fq_file=mapped_fq, seed_fs_file=seed_f,
-                        mean_read_len=mean_read_len, organelle_type=organelle_type, threads=threads, resume=resume,
+                        mean_read_len=mean_read_len, organelle_type=organelle_type,
+                        in_custom=this_in, ex_custom=this_ex, threads=threads, resume=resume,
                         which_spades=which_spades, which_slim=which_slim, which_blast=which_blast,
                         log_handler=log_handler if verbose_log else None, verbose_log=verbose_log)
                 except NotImplementedError:
@@ -1246,8 +1251,9 @@ def extend_with_constant_words(baits_pool, raw_fq_files, word_size, output, jump
 
 
 def pre_assembly_mapped_reads_for_base_cov(
-        original_fq_files, mapped_fq_file, seed_fs_file, mean_read_len, organelle_type,
-        threads, resume, which_spades, which_slim, which_blast, log_handler=None, verbose_log=False, keep_temp=False):
+        original_fq_files, mapped_fq_file, seed_fs_file, mean_read_len, organelle_type, in_custom, ex_custom,
+        threads, resume, which_spades, which_slim, which_blast,
+        log_handler=None, verbose_log=False, keep_temp=False):
     from GetOrganelleLib.assembly_parser import get_graph_coverages_range_simple
     draft_kmer = min(45, int(mean_read_len / 2) * 2 - 3)
     this_modified_dir = os.path.realpath(mapped_fq_file) + ".spades"
@@ -1259,6 +1265,19 @@ def pre_assembly_mapped_reads_for_base_cov(
     more_original_graph = os.path.join(more_modified_dir, "assembly_graph.fastg")
     more_modified_base = "assembly_graph.fastg.modified"
     more_modified_graph = more_original_graph + ".modified.fastg"
+
+    if in_custom or ex_custom:
+        include_priority_db = in_custom
+        exclude_db = ex_custom
+    else:
+        include_priority_db = os.path.join(_LBL_DB_PATH, organelle_type + ".fasta")
+        exclude_db = ""
+    db_command = ""
+    if include_priority_db:
+        db_command += " --include-priority " + include_priority_db
+    if exclude_db:
+        db_command += " --exclude " + exclude_db
+
     if resume and (os.path.exists(this_modified_graph) or os.path.exists(more_modified_graph)):
         if os.path.exists(more_modified_graph) and os.path.getsize(more_modified_graph) > 0:
             kmer_cov_values = get_graph_coverages_range_simple(read_fasta(more_modified_graph))
@@ -1294,7 +1313,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                                " --verbose " * int(bool(verbose_log)) + which_bl_str + \
                                " --log -t " + str(threads) + " --wrapper " + this_original_graph + \
                                " -o " + this_modified_dir + " --out-base " + this_modified_base + \
-                               " -F " + organelle_type + " --keep-temp " * int(bool(keep_temp))
+                               " " + db_command + " --keep-temp " * int(bool(keep_temp))
                 do_slim = subprocess.Popen(slim_command,
                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                 if verbose_log and log_handler:
@@ -1350,7 +1369,7 @@ def pre_assembly_mapped_reads_for_base_cov(
                                    " --verbose " * int(bool(verbose_log)) + which_bl_str + \
                                    " --log -t " + str(threads) + " --wrapper " + more_original_graph + \
                                    " -o " + more_modified_dir + " --out-base " + more_modified_base + \
-                                   " -F " + organelle_type + " --keep-temp " * int(bool(keep_temp))
+                                   " " + db_command + " --keep-temp " * int(bool(keep_temp))
                     do_slim = subprocess.Popen(slim_command,
                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
                     if verbose_log and log_handler:
@@ -1376,7 +1395,7 @@ def pre_assembly_mapped_reads_for_base_cov(
 
 
 def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files, seed_sam_files,
-                     organelle_types, mean_error_rate, target_genome_sizes,
+                     organelle_types, in_custom_list, ex_custom_list, mean_error_rate, target_genome_sizes,
                      max_extending_len, mean_read_len, max_read_len, low_quality_pattern,
                      all_read_nums, reduce_reads_for_cov,
                      log_handler, which_spades, which_blast, which_bowtie2,
@@ -1439,10 +1458,13 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
                     executable(os.path.join(which_bowtie2, "bowtie2")):
                 log_handler.info("Pre-assembling mapped reads ...")
                 try:
+                    this_in = "" if not in_custom_list else in_custom_list[go_t]
+                    this_ex = "" if not ex_custom_list else ex_custom_list[go_t]
                     base_cov_values = pre_assembly_mapped_reads_for_base_cov(
                         original_fq_files=original_fq_files, mapped_fq_file=seed_fq_files[go_t],
                         seed_fs_file=seed_fs_files[go_t], mean_read_len=mean_read_len,
-                        organelle_type=organelle_types[go_t],
+                        # TODO check in_customs lengths
+                        organelle_type=organelle_types[go_t], in_custom=this_in, ex_custom=this_ex,
                         threads=threads, resume=resume, log_handler=log_handler, verbose_log=verbose_log,
                         which_spades=which_spades, which_slim=which_slim, which_blast=which_blast)
                 except NotImplementedError:
@@ -3806,6 +3828,7 @@ def main():
                         original_fq_list=original_fq_files, reads_paired=reads_paired["input"],
                         maximum_n_reads_hard_bound=options.maximum_n_reads,
                         seed_files=options.seed_file, organelle_types=options.organelle_type,
+                        in_customs=options.genes_fasta, ex_customs=options.exclude_genes,
                         target_genome_sizes=options.target_genome_size,
                         keep_temp=options.keep_temp_files, resume=options.script_resume,
                         which_blast=options.which_blast, which_spades=options.which_spades,
@@ -3894,6 +3917,8 @@ def main():
                                  seed_fs_files=seed_fs_files,
                                  seed_fq_files=seed_fq_files, seed_sam_files=seed_sam_files,
                                  organelle_types=options.organelle_type,
+                                 in_custom_list=options.genes_fasta,
+                                 ex_custom_list=options.exclude_genes,
                                  mean_error_rate=mean_error_rate,
                                  target_genome_sizes=options.target_genome_size,
                                  max_extending_len=options.max_extending_len, mean_read_len=mean_read_len,

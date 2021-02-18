@@ -3985,4 +3985,5 @@ def get_graph_coverages_range_simple(fasta_matrix, drop_low_percent=0.10, drop_h
         cov_mean, cov_std = weighted_mean_and_std_np_free(coverages, lengths)
     except ZeroDivisionError:
         cov_mean, cov_std = 0., 0.
+        coverages = [0.]
     return max(cov_mean - cov_std, min(coverages)), cov_mean, min(cov_mean + cov_std, max(coverages))

@@ -6,12 +6,21 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.4",
+        "features": [
+            "1. fix bugs with '--config-dir'",
+            "2. customized databases (--genes/--ex-genes) passed to slim during pre-assembly & depth estimation",
+            "3. fix a bug with get_graph_coverages_range_simple() when no contigs received"
+        ],
+        "time": "2021-02-18 19:00 UTC+8"
+    },
+    {
         "number": "1.7.3.4-pre",
         "features": [
             "1. fix bugs with '--config-dir'",
             "2. customized databases (--genes/--ex-genes) passed to slim during pre-assembly & depth estimation",
         ],
-        "time": "2021-02-11 01:00 UTC+8"
+        "time": "2021-02-12 02:00 UTC+8"
     },
     {
         "number": "1.7.3.3",

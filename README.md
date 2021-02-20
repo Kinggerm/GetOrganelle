@@ -117,6 +117,8 @@ or in a slow and memory-economic way:
 To assembly Embryophyta plant mitochondria (usually you need more than 5G raw data):
 
     get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt
+    # 1. embplant_mt mode was not tested in the GetOrganelle paper
+    # 2. until further updates, the FASTA output of plant mitochondria genome of numerous repeats may be error-prone, please use the FASTG file for downstream manual processing.
     
 To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
@@ -124,15 +126,18 @@ To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 
 To assembly fungus mitochondria:
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out  # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out
+    # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
 
 To assembly fungus nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-28S):
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_nr -o fungus_nr_out  # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_nr -o fungus_nr_out  
+    # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
 
 To assembly animal mitochondria:
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   # if you fails with the default database, use your own seed database and label database with "-s" and "--genes"
+    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   
+    # if you fails with the default database, rerun it using your own seed database (or the output of a first GetOrganelle run) and label database with "-s" and "--genes"
 
 See a brief illustrations of those arguments by typing in:
 

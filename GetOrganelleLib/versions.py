@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.5",
+        "features": [
+            "1. README.md updated with embplant_mt notes",
+            "2. remove invalid --genes file check",
+        ],
+        "time": "2021-02-23 01:11 UTC+8"
+    },
+    {
         "number": "1.7.3.4",
         "features": [
             "1. fix bugs with '--config-dir'",

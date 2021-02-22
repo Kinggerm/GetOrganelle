@@ -768,7 +768,7 @@ def get_options(description, version):
             for sub_genes in str(options.genes_fasta).split(","):
                 # if sub_genes == "":
                 #     temp_vals.append(sub_genes)
-                if not (os.path.exists(sub_genes) and os.path.exists(remove_db_postfix(sub_genes) + ".nhr")):
+                if not os.path.exists(sub_genes):
                     log_handler.error(sub_genes + " not found!")
                     exit()
                 else:

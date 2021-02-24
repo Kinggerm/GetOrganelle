@@ -92,15 +92,15 @@ else:
     keep_temp = False
 
 
-def get_recursive_files(target_dir, start_from="", exclude_files=None):
-    if exclude_files is None:
-        exclude_files = set()
-    assert target_dir.startswith(start_from), "target_dir should be starting with start_from!"
-    omit_len = len(start_from.rstrip("/") + "/") if start_from else 0
-    for f_dir, sub_dirs, files in os.walk(target_dir):
-        for i_file in files:
-            if not i_file.startswith(".") and os.path.join(f_dir, i_file)[omit_len:] not in exclude_files:
-                yield os.path.join(f_dir, i_file)[omit_len:]
+# def get_recursive_files(target_dir, start_from="", exclude_files=None):
+#     if exclude_files is None:
+#         exclude_files = set()
+#     assert target_dir.startswith(start_from), "target_dir should be starting with start_from!"
+#     omit_len = len(start_from.rstrip("/") + "/") if start_from else 0
+#     for f_dir, sub_dirs, files in os.walk(target_dir):
+#         for i_file in files:
+#             if not i_file.startswith(".") and os.path.join(f_dir, i_file)[omit_len:] not in exclude_files:
+#                 yield os.path.join(f_dir, i_file)[omit_len:]
 
 
 EXCLUDE_SHARE_SPADES_PATHS = set()
@@ -129,7 +129,7 @@ scripts_to_install = ["get_organelle_from_reads.py",
 dep_scripts_to_change = []
 if os.path.isdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
     for spades_script in os.listdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
-        if spades_script.endswith(".py"):
+        if spades_script.endswith(".py") and not spades_script.startswith("."):
             dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin", spades_script))
 if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build")):
     dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build"))

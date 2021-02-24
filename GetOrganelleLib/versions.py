@@ -9,6 +9,7 @@ versions = [
         "number": "1.7.3.5a",
         "features": [
             "1. setup.py: fix a bug of codec for in-situ installation: invalid attempt to modify ._*py files",
+            "2. setup.py: fix a bug introduced by 1.7.3 while relocating GetOrganelle databases",
         ],
         "time": "2021-02-23 01:11 UTC+8"
     },

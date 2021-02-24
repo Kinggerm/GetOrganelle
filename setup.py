@@ -92,15 +92,15 @@ else:
     keep_temp = False
 
 
-# def get_recursive_files(target_dir, start_from="", exclude_files=None):
-#     if exclude_files is None:
-#         exclude_files = set()
-#     assert target_dir.startswith(start_from), "target_dir should be starting with start_from!"
-#     omit_len = len(start_from.rstrip("/") + "/") if start_from else 0
-#     for f_dir, sub_dirs, files in os.walk(target_dir):
-#         for i_file in files:
-#             if not i_file.startswith(".") and os.path.join(f_dir, i_file)[omit_len:] not in exclude_files:
-#                 yield os.path.join(f_dir, i_file)[omit_len:]
+def get_recursive_files(target_dir, start_from="", exclude_files=None):
+    if exclude_files is None:
+        exclude_files = set()
+    assert target_dir.startswith(start_from), "target_dir should be starting with start_from!"
+    omit_len = len(start_from.rstrip("/") + "/") if start_from else 0
+    for f_dir, sub_dirs, files in os.walk(target_dir):
+        for i_file in files:
+            if not i_file.startswith(".") and os.path.join(f_dir, i_file)[omit_len:] not in exclude_files:
+                yield os.path.join(f_dir, i_file)[omit_len:]
 
 
 EXCLUDE_SHARE_SPADES_PATHS = set()
@@ -177,14 +177,15 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes")):
 
 
 PACKAGES = [LIB_NAME]
+PACKAGE_DATA = {}
 # PACKAGE_DATA = {LIB_NAME: [os.path.join(LBL_NAME, "VERSION"),
 #                            os.path.join(SEQ_NAME, "VERSION")]}
 if os.path.isdir(DEP_DIR) and os.path.isfile(os.path.join(DEP_DIR, "__init__.py")):
     PACKAGES.append(DEP_NAME)
-    # PACKAGE_DATA[DEP_NAME] = [this_file
-    #                           for this_file in
-    #                           get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
-    #                                               start_from=DEP_DIR, exclude_files=EXCLUDE_SHARE_SPADES_PATHS)]
+    PACKAGE_DATA[DEP_NAME] = [this_file
+                              for this_file in
+                              get_recursive_files(target_dir=os.path.join(DEP_DIR, SYSTEM_NAME),
+                                                  start_from=DEP_DIR, exclude_files=EXCLUDE_SHARE_SPADES_PATHS)]
 
 
 if not in_situ:
@@ -200,7 +201,7 @@ if not in_situ:
         platforms="linux/MacOS",
         scripts=scripts_to_install,
         # relative path to each package
-        # package_data=PACKAGE_DATA,
+        package_data=PACKAGE_DATA,
         install_requires=install_dependencies,
         zip_safe=False
         )

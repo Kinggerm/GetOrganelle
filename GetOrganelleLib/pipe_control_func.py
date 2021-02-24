@@ -34,7 +34,7 @@ if python_version == "2.7+":
 else:
     from subprocess import getstatusoutput
 import subprocess
-DEAD_CODE = {"2.7+": 32512, "3.5+": 127}[python_version]
+DEAD_CODES = {"2.7+": (32512, 32256), "3.5+": (126, 127)}[python_version]
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
@@ -167,9 +167,11 @@ def pool_multiprocessing(target, iter_args, constant_args, num_process):
         raise KeyboardInterrupt
 
 
-# test whether an external binary is executable
+# test whether an full-path-to binary (os.access & os.path.isfile) is executable:
+#      or (os.access(test_this, os.X_OK) and os.path.isfile(test_this.split(" ")[0]))
+# test whether a variable with argv (getstatusoutput) is executable
 def executable(test_this):
-    return True if os.access(test_this, os.X_OK) or getstatusoutput(test_this)[0] != DEAD_CODE else False
+    return True if getstatusoutput(test_this)[0] not in DEAD_CODES else False
 
 
 def is_valid_path(path_str):
@@ -898,6 +900,30 @@ def detect_bandage_version(which_bandage):
         return "Bandage " + output.decode("utf8").strip().split()[-1]
     else:
         return "Bandage N/A"
+
+
+def monitor_spades_log(spades_running, log_handler, sensitively_stop=False, silent=False):
+    output = []
+    for log_block in spades_running.stdout:
+        log_block = log_block.decode("utf8")
+        output.append(log_block)
+        if "not recognized" in log_block:
+            if not silent:
+                log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+            spades_running.terminate()
+            break
+        elif "terminated by segmentation fault" in log_block:
+            if not silent:
+                log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+            spades_running.terminate()
+            break
+        elif "== Error ==" in log_block:
+            if not silent:
+                log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+            if sensitively_stop:
+                spades_running.terminate()
+                break
+    return "".join(output)
 
 
 def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, log_handler=None,

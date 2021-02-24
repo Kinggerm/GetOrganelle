@@ -1295,15 +1295,15 @@ def pre_assembly_mapped_reads_for_base_cov(
             this_command = os.path.join(which_spades, "spades.py") + " -t " + str(threads) + \
                            " -s " + mapped_fq_file + \
                            " -k " + str(draft_kmer) + " --only-assembler -o " + this_modified_dir
-            pre_assembly = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            pre_assembly = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             if verbose_log and log_handler:
                 log_handler.info(this_command)
-            output, err = pre_assembly.communicate()
+            output = monitor_spades_log(pre_assembly, log_handler, sensitively_stop=True, silent=True)
             if not os.path.exists(this_original_graph) or os.path.getsize(this_original_graph) == 0:
                 raise OSError("original graph")
-            if "== Error ==" in output.decode("utf8"):
+            if "== Error ==" in output:
                 if verbose_log and log_handler:
-                    log_handler.error('\n' + output.decode("utf8").strip())
+                    log_handler.error('\n' + output.strip())
                 raise NotImplementedError
             if which_slim is None:
                 shutil.copy(this_original_graph, this_modified_graph)
@@ -1335,6 +1335,7 @@ def pre_assembly_mapped_reads_for_base_cov(
             #     shutil.rmtree(mapped_fq_file + ".spades")
             # using words to recruit more reads for word size estimation
             # gathering_word_size = min(auto_min_word_size, 2 * int(mean_read_len * auto_min_word_size/100.) - 1)
+            log_handler.info("Retrying with more reads ..")
             gathering_word_size = 25
             if resume and os.path.exists(more_fq_file):
                 pass
@@ -1351,14 +1352,14 @@ def pre_assembly_mapped_reads_for_base_cov(
                 more_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log and log_handler:
                 log_handler.info(more_command)
-            output, err = pre_assembly.communicate()
+            output = monitor_spades_log(pre_assembly, log_handler, sensitively_stop=True)
             if not os.path.exists(more_original_graph) or os.path.getsize(more_original_graph) == 0:
                 if verbose_log and log_handler:
                     log_handler.error(more_original_graph + " not found/valid!")
                 raise NotImplementedError
-            elif "== Error ==" in output.decode("utf8"):
+            elif "== Error ==" in output:
                 if verbose_log and log_handler:
-                    log_handler.error('\n' + output.decode("utf8").strip())
+                    log_handler.error('\n' + output.strip())
                 raise NotImplementedError
             else:
                 if which_slim is None or not executable(os.path.join(which_blast, "blastn")):
@@ -3087,16 +3088,13 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                 ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                 [kmer, spades_out_command]).strip()
     log_handler.info(spades_command)
-    spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    output, err = spades_running.communicate()
-    if "not recognized" in output.decode("utf8") or not os.path.exists(spades_out_put):
-        if verbose_log:
-            log_handler.error('Problem with running SPAdes:')
-            log_handler.error(output.decode("utf8"))
-        log_handler.error("WAINING in SPAdes: unrecognized option in " + parameters)
-        log_handler.error('Assembling failed.')
+    spades_running = subprocess.Popen(spades_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    # output, err = spades_running.communicate()
+    output = monitor_spades_log(spades_running, log_handler)
+    if not os.path.exists(spades_out_put):
+        log_handler.error("Assembling failed.")
         return False
-    elif "== Error ==" in output.decode("utf8"):
+    elif "== Error ==" in output or "terminated by segmentation fault" in output:
         # check when other kmer assembly results were produced
         real_kmer_values = sorted([int(kmer_d[1:])
                                    for kmer_d in os.listdir(spades_out_put)
@@ -3118,7 +3116,7 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                     "please check " + os.path.join(spades_out_put, "spades.log"))
                 del real_kmer_values[real_kmer_values.index(failed_at_k)]
                 log_handler.warning("GetOrganelle would continue to process results based on "
-                            "kmer=" + ",".join(real_kmer_values) + ".")
+                                    "kmer=" + ",".join(real_kmer_values) + ".")
                 # os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
                 #           + " " + spades_out_put)
                 log_handler.info('Assembling finished with warnings.\n')
@@ -3128,31 +3126,28 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
                 log_handler.warning("If you need to know more details, please check " +
                                     os.path.join(spades_out_put, "spades.log") + " and contact SPAdes developers.")
                 log_handler.warning("GetOrganelle would continue to process results based on "
-                            "kmer=" + ",".join(real_kmer_values) + ".")
+                                    "kmer=" + ",".join(real_kmer_values) + ".")
                 # os.system("cp " + os.path.join(spades_out_put, "K" + real_kmer_values[-1], "assembly_graph.fastg")
                 #           + " " + spades_out_put)
-                log_handler.info('Assembling finished with warnings.\n')
+                log_handler.info("Assembling finished with warnings.\n")
                 return True
         else:
-            if "mmap(2) failed" in output.decode("utf8"):
+            if "mmap(2) failed" in output:
                 # https://github.com/ablab/spades/issues/91
                 log_handler.error("Guessing your output directory is inside a VirtualBox shared folder!")
                 log_handler.error("Assembling failed.")
             else:
-                log_handler.error(
-                    "Error in SPAdes: \n== Error ==" + output.decode("utf8").split("== Error ==")[-1].split(
-                        "In case you")[ 0])
-                log_handler.error('Assembling failed.')
+                log_handler.error("Assembling failed.")
             return False
     elif not os.path.exists(os.path.join(spades_out_put, "assembly_graph.fastg")):
         if verbose_log:
-            log_handler.info(output.decode("utf8"))
+            log_handler.info(output)
         log_handler.warning("Assembling exited halfway.\n")
         return True
     else:
-        spades_log = output.decode("utf8").split("\n")
+        spades_log = output.split("\n")
         if verbose_log:
-            log_handler.info(output.decode("utf8"))
+            log_handler.info(output)
         for line in spades_log:
             line = line.strip()
             if line.count(":") > 2 and "Insert size = " in line and \

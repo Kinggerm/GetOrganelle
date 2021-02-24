@@ -6,12 +6,20 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.5b",
+        "features": [
+            "1. pipe_control_func: executable modified",
+            "2. realtime monitoring SPAdes log (solving the stuck in the segmentation fault)",
+        ],
+        "time": "2021-02-23 01:11 UTC+8"
+    },
+    {
         "number": "1.7.3.5a",
         "features": [
             "1. setup.py: fix a bug of codec for in-situ installation: invalid attempt to modify ._*py files",
             "2. setup.py: fix a bug introduced by 1.7.3 while relocating GetOrganelle databases",
         ],
-        "time": "2021-02-23 01:11 UTC+8"
+        "time": "2021-02-24 12:30 UTC+8"
     },
     {
         "number": "1.7.3.5",

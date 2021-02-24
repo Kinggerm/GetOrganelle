@@ -6,6 +6,13 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.3.5a",
+        "features": [
+            "1. setup.py: fix a bug of codec for in-situ installation: invalid attempt to modify ._*py files",
+        ],
+        "time": "2021-02-23 01:11 UTC+8"
+    },
+    {
         "number": "1.7.3.5",
         "features": [
             "1. README.md updated with embplant_mt notes",

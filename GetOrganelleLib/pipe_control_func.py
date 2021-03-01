@@ -34,7 +34,11 @@ if python_version == "2.7+":
 else:
     from subprocess import getstatusoutput
 import subprocess
-DEAD_CODES = {"2.7+": (32512, 32256), "3.5+": (126, 127)}[python_version]
+# aborted
+# directory
+# command not found
+DEAD_CODES = {"2.7+": (512, 32256, 32512),
+              "3.5+": (2, 126, 127)}[python_version]
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
@@ -719,8 +723,8 @@ class LogInfo:
                             this_record["time"] += float(line.split("Total cost ")[-1].split(" ")[0])
         else:
             sys.stdout.write(os.path.join(sample_out_dir, prefix + "get_org.log.txt") + " not found!\n")
-        if os.path.exists(os.path.join(sample_out_dir, prefix + "filtered_spades", "spades.log")):
-            with open(os.path.join(sample_out_dir, prefix + "filtered_spades", "spades.log"), "r") as spades_log:
+        if os.path.exists(os.path.join(sample_out_dir, prefix + "extended_spades", "spades.log")):
+            with open(os.path.join(sample_out_dir, prefix + "extended_spades", "spades.log"), "r") as spades_log:
                 for line in spades_log:
                     line = line.strip()
                     if line.count(":") > 2:

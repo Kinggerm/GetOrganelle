@@ -6,6 +6,16 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.4-pre",
+        "features": [
+            "1. setup.py: modify scripts with utf-8",
+            "2. filtered -> extended, to clarify the process",
+            "3. get_organelle_from_reads.py: fix illustration of --which-blast, --which-bowtie2, --which-spades",
+            "4. fix a bug of pre_assembly_mapped_reads_for_base_cov introduced in 1.7.3.5b",
+        ],
+        "time": "2021-02-26 11:30 UTC+8"
+    },
+    {
         "number": "1.7.3.5b",
         "features": [
             "1. pipe_control_func: executable modified",

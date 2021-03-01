@@ -88,7 +88,7 @@ Take your input seed (fasta format; if `-s` was not provided, the default is `Ge
 
 <b>Producing Result</b>
 
-By default, `SPAdes` is automatically called to produce the assembly graph file `filtered_spades/assembly_graph.fastg`. Then, `Utilities/slim_graph.py` is called to modify the `filtered_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` if "-F embplant_pt" been used by `get_organelle_from_reads.py`) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`). 
+By default, `SPAdes` is automatically called to produce the assembly graph file `extended_spades/assembly_graph.fastg`. Then, `Utilities/slim_graph.py` is called to modify the `extended_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` if "-F embplant_pt" been used by `get_organelle_from_reads.py`) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`). 
 
 The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` file would be further parsed by `disentangle_organelle_assembly.py`, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the graph disentanglement. 
 

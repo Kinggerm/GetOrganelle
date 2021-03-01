@@ -166,7 +166,7 @@ def get_options(description, version):
                       help="Add extra prefix to resulting files under the output directory.")
     parser.add_option("--which-blast", dest="which_blast", default="",
                       help="Assign the path to BLAST binary files if not added to the path. "
-                           "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
+                           "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
                            "/ncbi-blast\" first, then $PATH")
     parser.add_option("--which-bandage", dest="which_bandage", default="",
                       help="Assign the path to bandage binary file if not added to the path. Default: try $PATH")

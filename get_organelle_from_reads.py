@@ -338,15 +338,15 @@ def get_options(description, version):
                                         "in the first few minutes. Choose 0 to disable this process.")
     group_computational.add_option("--which-blast", dest="which_blast", default="",
                                    help="Assign the path to BLAST binary files if not added to the path. "
-                                        "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
+                                        "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
                                         "/ncbi-blast\" first, then $PATH")
     group_computational.add_option("--which-bowtie2", dest="which_bowtie2", default="",
                                    help="Assign the path to Bowtie2 binary files if not added to the path. "
-                                        "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
+                                        "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
                                         "/bowtie2\" first, then $PATH")
     group_computational.add_option("--which-spades", dest="which_spades", default="",
                                    help="Assign the path to SPAdes binary files if not added to the path. "
-                                        "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
+                                        "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
                                         "/SPAdes\" first, then $PATH")
     group_computational.add_option("--which-bandage", dest="which_bandage", default="",
                                    help="Assign the path to bandage binary file if not added to the path. "
@@ -1335,7 +1335,8 @@ def pre_assembly_mapped_reads_for_base_cov(
             #     shutil.rmtree(mapped_fq_file + ".spades")
             # using words to recruit more reads for word size estimation
             # gathering_word_size = min(auto_min_word_size, 2 * int(mean_read_len * auto_min_word_size/100.) - 1)
-            log_handler.info("Retrying with more reads ..")
+            if log_handler:
+                log_handler.info("Retrying with more reads ..")
             gathering_word_size = 25
             if resume and os.path.exists(more_fq_file):
                 pass
@@ -3056,19 +3057,19 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         if reads_paired['input'] and reads_paired['pair_out']:
             all_unpaired = []
             # spades does not accept empty files
-            if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_unpaired.fq")):
-                all_unpaired.append(os.path.join(out_base, prefix + "filtered_1_unpaired.fq"))
-            if os.path.getsize(os.path.join(out_base, prefix + "filtered_2_unpaired.fq")):
-                all_unpaired.append(os.path.join(out_base, prefix + "filtered_2_unpaired.fq"))
+            if os.path.getsize(os.path.join(out_base, prefix + "extended_1_unpaired.fq")):
+                all_unpaired.append(os.path.join(out_base, prefix + "extended_1_unpaired.fq"))
+            if os.path.getsize(os.path.join(out_base, prefix + "extended_2_unpaired.fq")):
+                all_unpaired.append(os.path.join(out_base, prefix + "extended_2_unpaired.fq"))
             for iter_unpaired in range(len(original_fq_files) - 2):
-                if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq"))):
+                if os.path.getsize(str(os.path.join(out_base, prefix + "extended_" + str(iter_unpaired + 3) + ".fq"))):
                     all_unpaired.append(
-                        str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 3) + ".fq")))
-            if os.path.getsize(os.path.join(out_base, prefix + "filtered_1_paired.fq")):
+                        str(os.path.join(out_base, prefix + "extended_" + str(iter_unpaired + 3) + ".fq")))
+            if os.path.getsize(os.path.join(out_base, prefix + "extended_1_paired.fq")):
                 spades_command = ' '.join(
                     [os.path.join(which_spades, "spades.py"), '-t', str(threads), parameters, '-1',
-                     os.path.join(out_base, prefix + "filtered_1_paired.fq"), '-2',
-                     os.path.join(out_base, prefix + "filtered_2_paired.fq")] +
+                     os.path.join(out_base, prefix + "extended_1_paired.fq"), '-2',
+                     os.path.join(out_base, prefix + "extended_2_paired.fq")] +
                     ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
                     [kmer, spades_out_command]).strip()
             else:
@@ -3080,9 +3081,9 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
         else:
             all_unpaired = []
             for iter_unpaired in range(len(original_fq_files)):
-                if os.path.getsize(str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq"))):
+                if os.path.getsize(str(os.path.join(out_base, prefix + "extended_" + str(iter_unpaired + 1) + ".fq"))):
                     all_unpaired.append(
-                        str(os.path.join(out_base, prefix + "filtered_" + str(iter_unpaired + 1) + ".fq")))
+                        str(os.path.join(out_base, prefix + "extended_" + str(iter_unpaired + 1) + ".fq")))
             spades_command = ' '.join(
                 [os.path.join(which_spades, "spades.py"), '-t', str(threads), parameters] +
                 ['--s' + str(i + 1) + ' ' + out_f for i, out_f in enumerate(all_unpaired)] +
@@ -3265,13 +3266,13 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
 
 
 def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
-    log_handler.info("Separating filtered fastq file ... ")
-    out_paired_1 = os.path.join(out_base, prefix + "filtered_1_paired.fq")
-    out_paired_2 = os.path.join(out_base, prefix + "filtered_2_paired.fq")
-    out_unpaired_1 = os.path.join(out_base, prefix + "filtered_1_unpaired.fq")
-    out_unpaired_2 = os.path.join(out_base, prefix + "filtered_2_unpaired.fq")
-    get_paired_and_unpaired_reads(input_fq_1=os.path.join(out_base, prefix + "filtered_1.fq"),
-                                  input_fq_2=os.path.join(out_base, prefix + "filtered_2.fq"),
+    log_handler.info("Separating extended fastq file ... ")
+    out_paired_1 = os.path.join(out_base, prefix + "extended_1_paired.fq")
+    out_paired_2 = os.path.join(out_base, prefix + "extended_2_paired.fq")
+    out_unpaired_1 = os.path.join(out_base, prefix + "extended_1_unpaired.fq")
+    out_unpaired_2 = os.path.join(out_base, prefix + "extended_2_unpaired.fq")
+    get_paired_and_unpaired_reads(input_fq_1=os.path.join(out_base, prefix + "extended_1.fq"),
+                                  input_fq_2=os.path.join(out_base, prefix + "extended_2.fq"),
                                   output_p_1=out_paired_1,
                                   output_p_2=out_paired_2,
                                   output_u_1=out_unpaired_1,
@@ -3494,18 +3495,18 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     log_in.info("Result status of " + mode_in + ": circular genome")
             if ambiguous_base_used:
                 log_in.warning("Ambiguous base(s) used!")
-            o_p_filtered = os.path.join(os.path.split(o_p)[0], basic_prefix + "filtered_" + this_K + ".")
+            o_p_extended = os.path.join(os.path.split(o_p)[0], basic_prefix + "extended_" + this_K + ".")
             os.system("cp " + os.path.join(os.path.split(fastg_f)[0], "assembly_graph.fastg") + " " +
-                      o_p_filtered + "assembly_graph.fastg")
-            os.system("cp " + fastg_f + " " + o_p_filtered + os.path.basename(fastg_f))
-            os.system("cp " + tab_f + " " + o_p_filtered + os.path.basename(tab_f))
+                      o_p_extended + "assembly_graph.fastg")
+            os.system("cp " + fastg_f + " " + o_p_extended + os.path.basename(fastg_f))
+            os.system("cp " + tab_f + " " + o_p_extended + os.path.basename(tab_f))
             if not acyclic_allowed_in:
                 if image_produced:
                     log_in.info("Please check the produced assembly image"
-                                " or manually visualize " + o_p_filtered + os.path.basename(fastg_f) +
+                                " or manually visualize " + o_p_extended + os.path.basename(fastg_f) +
                                 " using Bandage to confirm the final result.")
                 else:
-                    log_in.info("Please visualize " + o_p_filtered + os.path.basename(fastg_f) +
+                    log_in.info("Please visualize " + o_p_extended + os.path.basename(fastg_f) +
                                 " using Bandage to confirm the final result.")
             log_in.info("Writing output finished.")
 
@@ -3744,7 +3745,7 @@ def main():
             spades_output = other_options[which_out + 1]
             del other_options[which_out: which_out + 2]
         else:
-            spades_output = os.path.join(out_base, options.prefix + "filtered_spades")
+            spades_output = os.path.join(out_base, options.prefix + "extended_spades")
         if "--phred-offset" in other_options:
             log_handler.warning("--spades-options '--phred-offset' was deprecated in GetOrganelle. ")
             which_po = other_options.index("--phred-offset")
@@ -3752,21 +3753,21 @@ def main():
         other_options = ' '.join(other_options)
 
         """ get reads """
-        filtered_files_exist = max(
+        extended_files_exist = max(
             min([os.path.exists(
-                str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '_unpaired.fq')
+                str(os.path.join(out_base, options.prefix + "extended")) + '_' + str(i + 1) + '_unpaired.fq')
                  for i in range(2)] +
-                [os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq')
+                [os.path.exists(str(os.path.join(out_base, options.prefix + "extended")) + '_' + str(i + 1) + '.fq')
                  for i in range(2, len(original_fq_files))]),
-            min([os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq')
+            min([os.path.exists(str(os.path.join(out_base, options.prefix + "extended")) + '_' + str(i + 1) + '.fq')
                  for i in range(len(original_fq_files))]))
-        filtered_fq_gz_exist = max(
+        extended_fq_gz_exist = max(
             min([os.path.exists(
-                str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '_unpaired.fq.tar.gz')
+                str(os.path.join(out_base, options.prefix + "extended")) + '_' + str(i + 1) + '_unpaired.fq.tar.gz')
                  for i in range(2)] +
-                [os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq.tar.gz')
+                [os.path.exists(str(os.path.join(out_base, options.prefix + "extended")) + '_' + str(i + 1) + '.fq.tar.gz')
                  for i in range(2, len(original_fq_files))]),
-            min([os.path.exists(str(os.path.join(out_base, options.prefix + "filtered")) + '_' + str(i + 1) + '.fq.tar.gz')
+            min([os.path.exists(str(os.path.join(out_base, options.prefix + "extended")) + '_' + str(i + 1) + '.fq.tar.gz')
                  for i in range(len(original_fq_files))]))
 
         if resume:
@@ -3786,14 +3787,14 @@ def main():
             try:
                 word_size = int(previous_attributes["w"])
             except (KeyError, ValueError):
-                if filtered_files_exist or filtered_fq_gz_exist:
+                if extended_files_exist or extended_fq_gz_exist:
                     if verb_log:
                         log_handler.info("Previous attributes: word size not found. Restart a new run.\n")
                     resume = False
                 else:
                     pass
 
-        if not (resume and (filtered_files_exist or (filtered_fq_gz_exist and phred_offset != -1))):
+        if not (resume and (extended_files_exist or (extended_fq_gz_exist and phred_offset != -1))):
             anti_seed = options.anti_seed
             pre_grp = options.pre_grouped
             in_memory = options.index_in_memory
@@ -3986,7 +3987,7 @@ def main():
                                                     echo_step=echo_step, log_handler=log_handler)
             mapped_read_ids = set()
             write_fq_results(original_fq_files, accepted_rd_id,
-                             os.path.join(out_base, options.prefix + "filtered"),
+                             os.path.join(out_base, options.prefix + "extended"),
                              os.path.join(out_base, 'temp.indices.2'),
                              fq_info_in_memory, all_read_limits,
                              echo_step, verb_log, in_memory, log_handler, mapped_read_ids)
@@ -4009,21 +4010,21 @@ def main():
 
         if reads_paired['input']:
             if not (resume and (min([os.path.exists(x) for x in
-                                     (os.path.join(out_base, options.prefix + "filtered_" + y + "_" + z + "paired.fq")
-                                      for y in ('1', '2') for z in ('', 'un'))]) or filtered_fq_gz_exist)):
+                                     (os.path.join(out_base, options.prefix + "extended_" + y + "_" + z + "paired.fq")
+                                      for y in ('1', '2') for z in ('', 'un'))]) or extended_fq_gz_exist)):
                 resume = False
                 reads_paired['pair_out'] = separate_fq_by_pair(out_base, options.prefix, verb_log, log_handler)
                 if reads_paired['pair_out'] and not options.keep_temp_files:
-                    os.remove(os.path.join(out_base, options.prefix + "filtered_1.fq"))
-                    os.remove(os.path.join(out_base, options.prefix + "filtered_2.fq"))
+                    os.remove(os.path.join(out_base, options.prefix + "extended_1.fq"))
+                    os.remove(os.path.join(out_base, options.prefix + "extended_2.fq"))
             else:
-                log_handler.info("Separating filtered fastq file ... skipped.\n")
+                log_handler.info("Separating extended fastq file ... skipped.\n")
 
         """ assembly """
         is_assembled = False
         if options.run_spades:
             if not (resume and os.path.exists(os.path.join(spades_output, 'assembly_graph.fastg'))):
-                if filtered_fq_gz_exist and not filtered_files_exist:
+                if extended_fq_gz_exist and not extended_files_exist:
                     files_to_unzip = [os.path.join(out_base, candidate)
                                       for candidate in os.listdir(out_base) if candidate.endswith(".fq.tar.gz")]
                     for file_to_u in files_to_unzip:

@@ -1,3 +1,4 @@
+# coding utf8
 import setuptools
 from setuptools import setup
 from GetOrganelleLib.versions import get_versions
@@ -135,9 +136,9 @@ if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build")
     dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build"))
 if os.path.basename(sys.executable) != "python":
     for rename_py_script in scripts_to_install + dep_scripts_to_change:
-        original_lines = open(rename_py_script).readlines()
+        original_lines = open(rename_py_script, encoding="utf-8").readlines()
         original_lines[0] = "#!" + sys.executable + "\n"
-        open(rename_py_script, "w").writelines(original_lines)
+        open(rename_py_script, "w", encoding="utf-8").writelines(original_lines)
 
 
 # check local BLAST

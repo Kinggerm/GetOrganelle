@@ -12,7 +12,7 @@ versions = [
             "2. partial fix: subprocess may 'fail' if error was in the directory name due to detecting error from log",
             "3. scaffolding failures: try except AssertError to skip abnormal SPAdes paths (reported by Jinjing Jian@FDU)",
         ],
-        "time": "2021-02-26 11:30 UTC+8"
+        "time": "2021-03-04 23:55 UTC+8"
     },
     {
         "number": "1.7.4-pre",

@@ -14,9 +14,9 @@ from GetOrganelleLib.seq_parser import check_fasta_seq_names
 from GetOrganelleLib.pipe_control_func \
     import \
     GO_PATH, LBL_NAME, SEQ_NAME, LBL_DB_PATH, SEQ_DB_PATH, \
-    remove_db_postfix, make_blast_db, build_bowtie2_db, executable, simple_log, \
+    remove_db_postfix, make_blast_db, build_bowtie2_db, simple_log, \
     detect_bowtie2_path, detect_blast_path, detect_bowtie2_version, detect_blast_version, \
-    cal_f_sha256, run_command, \
+    cal_f_sha256, \
     ORGANELLE_TYPE_LIST, ORGANELLE_TYPE_SET, SEED_DB_HASH, LABEL_DB_HASH, \
     get_static_html_context, download_file_with_progress, get_current_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]

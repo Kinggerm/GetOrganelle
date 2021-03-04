@@ -1022,7 +1022,7 @@ def map_contigs_to_scaffolds(scaffold, contig, scaffold_start_searching_min=None
     # find aligned location
     len_scaffold = len(scaffold)
     len_contig = len(contig)
-    assert len_scaffold >= len_contig >= word_size
+    assert len_scaffold >= len_contig >= word_size, "%i, %i, %i" % (len_scaffold, len_contig, word_size)
     scaffold_start_max = len_scaffold - len_contig
     if scaffold_start_searching_min is None:
         scaffold_start_searching_min = 0

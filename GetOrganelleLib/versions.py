@@ -6,6 +6,15 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.4-pre2",
+        "features": [
+            "1. README.md: updated",
+            "2. partial fix: subprocess may 'fail' if error was in the directory name due to detecting error from log",
+            "3. scaffolding failures: try except AssertError to skip abnormal SPAdes paths (reported by Jinjing Jian@FDU)",
+        ],
+        "time": "2021-02-26 11:30 UTC+8"
+    },
+    {
         "number": "1.7.4-pre",
         "features": [
             "1. setup.py: modify scripts with utf-8",
@@ -122,7 +131,7 @@ versions = [
     {
      "number": "1.7.2beta",
      "features": [
-         "1. slim_graph.py: fix a bug in parsing options",
+         "1. slim_graph.py: fix a bug in parsing options (reported by Fei Zhao @ KIB)",
          "2. automatically adding --phred-offset to avoid hammer failures",
          "3. MergingHistory and ConsensusHistory added, in replace of using the names to detect merging history",
          "4. Compatible with flye gfa format",

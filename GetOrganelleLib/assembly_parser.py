@@ -3803,11 +3803,14 @@ class SpadesScaffolds(object):
                             #         # for speeding up
                             #         searching_min = last_matching_end_at_scaffold - check_ws
                             #         searching_max = last_matching_end_at_scaffold - check_ws + gap_len + len_this_sub
-                            this_start_at_scaffold, matching_start_at_alm, matching_end_at_alm = \
-                                map_contigs_to_scaffolds(scaffold=full_path_seq, contig=this_sub_seq,
-                                                         scaffold_start_searching_min=None,  # searching_min,
-                                                         scaffold_start_searching_max=None,  # searching_max,
-                                                         word_size=check_ws)
+                            try:
+                                this_start_at_scaffold, matching_start_at_alm, matching_end_at_alm = \
+                                    map_contigs_to_scaffolds(scaffold=full_path_seq, contig=this_sub_seq,
+                                                             scaffold_start_searching_min=None,  # searching_min,
+                                                             scaffold_start_searching_max=None,  # searching_max,
+                                                             word_size=check_ws)
+                            except AssertionError:  # skip pass with abnormal path_seq_len
+                                break
                             # check matching location
                             # print((last_v_name, last_v_end), self.nodes[sub_name].vertices_path[0],
                             #       this_start_at_scaffold, matching_start_at_alm, matching_end_at_alm)

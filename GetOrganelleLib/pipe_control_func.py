@@ -186,15 +186,6 @@ def is_valid_path(path_str):
     return True
 
 
-def run_command(command, print_command=False, check_echo_error=True):
-    if print_command:
-        print(command)
-    this_pip = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    output, err = this_pip.communicate()
-    if check_echo_error and "error" in output.decode("utf-8").lower():
-        raise Exception("Error in running "+command.split()[0]+"\n"+output.decode("utf-8"))
-
-
 def draw_assembly_graph_using_bandage(input_graph_file, output_image_file, assembly_graph_ob,
                                       resume=False, log_handler=None, verbose_log=False, which_bandage=""):
     if resume and os.path.exists(output_image_file):

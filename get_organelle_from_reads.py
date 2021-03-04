@@ -3243,7 +3243,7 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
             log_handler.info(run_command)
         output, err = slim_spades.communicate()
         output_file_list = [os.path.join(kmer_dir, x) for x in os.listdir(kmer_dir) if x.count(".fastg") == 2]
-        if "failed" in output.decode("utf8") or "error" in output.decode("utf8").lower():
+        if " failed" in output.decode("utf8") or "- ERROR:" in output.decode("utf8"):
             if log_handler:
                 if verbose_log:
                     log_handler.error(output.decode("utf8"))

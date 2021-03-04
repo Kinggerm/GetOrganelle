@@ -3,6 +3,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/version.svg)](https://anaconda.org/bioconda/getorganelle)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/latest_release_date.svg)](https://anaconda.org/bioconda/getorganelle)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/downloads.svg)](https://anaconda.org/bioconda/getorganelle)
 
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
 [![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.3.5.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
@@ -155,6 +156,8 @@ To extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`
 ## Contact
 
 If your question is running specific, please attach the `get_org.log.txt` file and the post-slimming assembly graph (`assembly_graph.fastg.extend_*.fastg`, could be Bandage-visualized *.png format to protect your data privacy).
+
+Although older versions like 1.6.3/1.7.1 will be more stable, but we encourage you to keep updated. GetOrganelle was actively updated with new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
 
 * Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues).
 

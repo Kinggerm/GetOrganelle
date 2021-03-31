@@ -305,6 +305,8 @@ class SimpleAssembly(object):
                                 kmer_count = int(element[-1])
                             elif element[0].upper() == "RC":  # took read counts as kmer counts
                                 kmer_count = int(element[-1])
+                            elif element[0].upper() == "RD":  # took read counts as kmer counts
+                                kmer_count = int(element[-1])
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])
                             elif element[0].upper() == "SH":
@@ -379,6 +381,8 @@ class SimpleAssembly(object):
                             if element[0].upper() == "KC":
                                 kmer_count = int(element[-1])
                             elif element[0].upper() == "RC":  # took read counts as kmer counts
+                                kmer_count = int(element[-1])
+                            elif element[0].upper() == "RD":  # took read counts as kmer counts
                                 kmer_count = int(element[-1])
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])

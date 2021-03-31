@@ -531,7 +531,7 @@ def slim_assembly_graph(organelle_types, in_custom, ex_custom, graph_in, graph_o
                 max_slim_extending_len = max([MAX_SLIM_EXTENDING_LENS[sub_organelle_t]
                                          for sub_organelle_t in organelle_types])
     if resume:
-        if os.path.exists(graph_out_base + ".fastg") and os.path.exists(graph_out_base + ".csv"):
+        if os.path.exists(graph_out_base + "." + graph_in.split(".")[-1]) and os.path.exists(graph_out_base + ".csv"):
             if log_handler:
                 log_handler.info("Slimming " + graph_in + " ... skipped.")
             return 0

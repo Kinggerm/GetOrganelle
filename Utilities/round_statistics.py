@@ -1,17 +1,18 @@
 #! /usr/bin/env python
 
-from optparse import OptionParser
+from argparse import ArgumentParser
 import os
 import sys
 from math import ceil
 from shutil import copyfile
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.pipe_control_func import *
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.sam_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+from GetOrganelleLib.versions import get_versions
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
 SYSTEM_NAME = ""
 if platform.system() == "Linux":
@@ -26,36 +27,38 @@ GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep"
 
 
 def get_options():
-    parser = OptionParser("round_statistics.py -f fasta_file -d output_per_round_folder -i Initial_mapped.fq -o output")
-    parser.add_option("-f", dest="fasta",
+    parser = ArgumentParser("round_statistics.py -f fasta_file -d output_per_round_folder -i Initial_mapped.fq -o output")
+    parser.add_argument("-f", dest="fasta",
                       help="input fasta file.")
-    parser.add_option("-d", dest="output_per_round_dir",
+    parser.add_argument("-d", dest="output_per_round_dir",
                       help="output per round directory.")
-    parser.add_option("-i", dest="initial_mapped",
+    parser.add_argument("-i", dest="initial_mapped",
                       help="seed fastq.")
-    parser.add_option("-o", dest="output_base",
+    parser.add_argument("-o", dest="output_base",
                       help="output folder.")
-    parser.add_option("-R", dest="round", type=int,
+    parser.add_argument("-R", dest="round", type=int,
                       help="rounds to check. default:automatic stop!")
-    parser.add_option("-t", dest="threads", type=int, default=2,
+    parser.add_argument("-t", dest="threads", type=int, default=2,
                       help="threads.")
-    parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
+    parser.add_argument("--which-bowtie2", dest="which_bowtie2", default="",
                       help="Assign the path to Bowtie2 binary files if not added to the path. "
                            "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/bowtie2 first, then $PATH")
-    parser.add_option('--random-seed', dest="random_seed", type=int, default=12345,
-                      help="seed for random generator for bowtie2. Default: %default")
-    parser.add_option("--threshold", dest="threshold", default="0,10",
-                      help="sites with coverage above the threshold would be marked as covered. default: %default")
-    parser.add_option("--continue", dest="resume", default=False, action="store_true")
-    parser.add_option("--keep-temp", dest="keep_temp", default=False, action="store_true")
-    parser.add_option("--draw", dest="draw_plot", default=False, action="store_true",
+    parser.add_argument('--random-seed', dest="random_seed", type=int, default=12345,
+                      help="seed for random generator for bowtie2. Default: %(default)s")
+    parser.add_argument("--threshold", dest="threshold", default="0,10",
+                      help="sites with coverage above the threshold would be marked as covered. default: %(default)s")
+    parser.add_argument("--continue", dest="resume", default=False, action="store_true")
+    parser.add_argument("--keep-temp", dest="keep_temp", default=False, action="store_true")
+    parser.add_argument("--draw", dest="draw_plot", default=False, action="store_true",
                       help="Draw density plot using matplotlib, which should be installed.")
-    parser.add_option("--max-coverage-tick", dest="max_cov_tick")
-    # parser.add_option("--average", default=False, action="store_true",
+    parser.add_argument("--max-coverage-tick", dest="max_cov_tick")
+    # parser.add_argument("--average", default=False, action="store_true",
     #                   help="output average coverage.")
-    parser.add_option("--debug", dest="debug",
+    parser.add_argument("--debug", dest="debug",
                       help="Debug mode.")
-    options, argv = parser.parse_args()
+    parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+    options = parser.parse_args()
     if not (options.fasta and options.initial_mapped and options.output_base and options.output_per_round_dir):
         sys.stderr.write("Insufficient arguments!\n")
         sys.exit()

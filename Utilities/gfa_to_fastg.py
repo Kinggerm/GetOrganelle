@@ -12,8 +12,8 @@ def main():
                 print("Usage: gfa2fastg.py *.gfa")
                 break
         else:
-            path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-            sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+            PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+            sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
             from GetOrganelleLib.assembly_parser import Assembly
             for gfa_file in sys.argv[1:]:
                 Assembly(gfa_file).write_to_fastg(gfa_file + '.fastg', rename_if_needed=True, echo_rename_warning=True)
@@ -22,8 +22,8 @@ def main():
             gfa_file = input('Please input gfa file:').strip()
         else:
             gfa_file = raw_input('Please input gfa file:').strip()
-        path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-        sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+        PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+        sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
         from GetOrganelleLib.assembly_parser import Assembly
         if gfa_file.strip():
             Assembly(gfa_file).write_to_fastg(gfa_file + '.fastg', rename_if_needed=True, echo_rename_warning=True)

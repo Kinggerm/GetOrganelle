@@ -387,20 +387,20 @@ def map_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, 
                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         output, err = make_seed_bowtie2.communicate()
         if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
-            if not silent:
-                if log_handler:
-                    log_handler.error("\n" + output.decode("utf8"))
-                else:
-                    sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
+            # if not silent:
+            if log_handler:
+                log_handler.error("\n" + output.decode("utf8"))
+            else:
+                sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
             raise Exception("")
         elif "No such file" in output.decode("utf8") or "not found" in output.decode("utf8"):
-            if not silent:
-                if log_handler:
-                    log_handler.error("\n" + output.decode("utf8"))
-                else:
-                    sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
-                if "perl" in output.decode("utf8"):
-                    raise Exception("perl is required for the wrapper of bowtie2!")
+            # if not silent:
+            if log_handler:
+                log_handler.error("\n" + output.decode("utf8"))
+            else:
+                sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
+            if "perl" in output.decode("utf8"):
+                raise Exception("perl is required for the wrapper of bowtie2!")
         if not silent and verbose_log:
             if log_handler:
                 log_handler.info("\n" + output.decode("utf8").strip())
@@ -939,6 +939,7 @@ def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, 
             response = requests.get(remote_urls[count % len(remote_urls)], timeout=timeout)
         except (requests.exceptions.ConnectTimeout,
                 requests.exceptions.ConnectionError,
+                requests.exceptions.ReadTimeout,
                 ConnectionRefusedError) as e:
             if count + 1 == try_times:
                 return {"status": False, "info": "timeout", "content": ""}
@@ -1053,8 +1054,8 @@ def cal_f_sha256(file_name):
     return hash_class.hexdigest()
 
 
-def get_current_versions(db_type, seq_db_path, lbl_db_path, clean_mode=True,
-                         check_hash=False, silent=False, log_handler=None):
+def get_current_db_versions(db_type, seq_db_path, lbl_db_path, clean_mode=True,
+                            check_hash=False, silent=False, log_handler=None):
     """
     :param db_type: seed, label, both
     :param seq_db_path:

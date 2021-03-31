@@ -1,48 +1,52 @@
 #!/usr/bin/env python
 import sys
 import os
-from optparse import OptionParser
+from argparse import ArgumentParser
 import time
 # from https://github.com/Kinggerm/PersonalUtilities
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from GetOrganelleLib.seq_parser import read_fasta, detect_plastome_architecture
+from GetOrganelleLib.versions import get_versions
 # from GetOrganelleLib.sam_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 
 
-def get_options():
-    parser = OptionParser(usage="plastome_arch_info.py fasta_format_sequence_file(s)")
-    parser.add_option("-o", dest="output",
-                      help="output file.")
-    parser.add_option("-r", dest="min_ir_length", default=5000, type=int,
-                      help="The minimum repeat length treated as the IR region of plastome. Default: [%default]")
-    parser.add_option("-v", dest="valid_bases", default="ATGCRMYKHBDVatgcrmykhbdv",
-                      help="Valid bases. Default: ATGCRMYKHBDVatgcrmykhbdv")
-    options, argv = parser.parse_args()
-    if not len(argv):
+def get_options(description):
+    parser = ArgumentParser(description=description, usage="plastome_arch_info.py fasta_format_sequence_file(s)")
+    parser.add_argument("sequences", metavar="sequences", type=str, nargs="+",
+                        help="Input fasta format sequences (split the files by spaces).")
+    parser.add_argument("-o", dest="output",
+                        help="output file.")
+    parser.add_argument("-r", dest="min_ir_length", default=5000, type=int,
+                        help="The minimum repeat length treated as the IR region of plastome. Default: [%(default)s]")
+    parser.add_argument("-v", dest="valid_bases", default="ATGCRMYKHBDVatgcrmykhbdv",
+                        help="Valid bases. Default: ATGCRMYKHBDVatgcrmykhbdv")
+    parser.add_argument("--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+    options = parser.parse_args()
+    if not len(options.sequences):
         parser.print_help()
         sys.exit()
     else:
-        for f in argv:
+        for f in options.sequences:
             if not os.path.isfile(f):
                 raise IOError(f + " not found/valid!")
         options.valid_bases = set(list(options.valid_bases))
-        return options, argv
+        return options, options.sequences
 
 
 def main():
     time0 = time.time()
-    sys.stdout.write("\n"
-                     "## This script helps you count the LSC/SSC/IR-DR lengths from a batch of plastome sequences.\n"
-                     "## by jinjianjun@mail.kib.ac.cn\n\n")
-    options, argv = get_options()
+    description = """\n## This script helps you count the LSC/SSC/IR-DR lengths from a batch of plastome sequences.\n
+                  ## by jinjianjun@mail.kib.ac.cn\n\n"""
+    options, sequence_files = get_options(description=description)
     sys.stdout.write(
         "file_name\tsequence_name\ttotal_length\tLSC_length\tSSC_length\tIR/DR_length\tarch_Notes\tGC_content\n")
     if options.output:
         out_handler = open(options.output, "w")
         out_handler.close()
-    for this_f in argv:
+    for this_f in sequence_files:
         this_matrix = read_fasta(this_f)
         for i in range(len(this_matrix[0])):
             arch = detect_plastome_architecture(this_matrix[1][i], options.min_ir_length, options.valid_bases)

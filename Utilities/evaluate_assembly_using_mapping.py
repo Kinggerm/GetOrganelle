@@ -1,17 +1,18 @@
 #! /usr/bin/env python
 # coding:utf8
 
-from optparse import OptionParser
+from argparse import ArgumentParser
 import os
 import sys
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.pipe_control_func import *
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.sam_parser import *
 from GetOrganelleLib.statistical_func import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+from GetOrganelleLib.versions import get_versions
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 from sympy import Interval
 import sys
 import platform
@@ -35,69 +36,71 @@ except NameError:
 
 
 def get_options():
-    parser = OptionParser("evaluate_assembly_using_mapping.py -f fasta_file -1 RAW_1.fq -2 RAW_2.fq -o output")
-    parser.add_option("-f", dest="fasta",
+    parser = ArgumentParser("evaluate_assembly_using_mapping.py -f fasta_file -1 RAW_1.fq -2 RAW_2.fq -o output")
+    parser.add_argument("-f", dest="fasta",
                       help="input assembly fasta file.")
-    parser.add_option("-1", dest="original_fq_1")
-    parser.add_option("-2", dest="original_fq_2")
-    parser.add_option("-u", dest="unpaired_fq_files", default="",
+    parser.add_argument("-1", dest="original_fq_1")
+    parser.add_argument("-2", dest="original_fq_2")
+    parser.add_argument("-u", dest="unpaired_fq_files", default="",
                       help="Input file(s) with unpaired (single-end) reads to be added to the pool. "
                            "files could be comma-separated lists such as 'seq1,seq2'.")
-    parser.add_option("-X", "--max-lib-len", dest="max_lib_len", type=int, default=1200,
-                      help="Corresponding to '-X' option in Bowtie2. Default: %default.")
-    parser.add_option("-c", dest="is_circular", default="auto",
+    parser.add_argument("-X", "--max-lib-len", dest="max_lib_len", type=int, default=1200,
+                      help="Corresponding to '-X' option in Bowtie2. Default: %(default)s.")
+    parser.add_argument("-c", dest="is_circular", default="auto",
                       help="(yes/no/auto) input fasta is circular. "
                            "If auto was chosen, the input fasta would be treated as circular when the sequence name "
                            "ends with '(circular)'. "
                            "Default: auto")
-    parser.add_option("-o", dest="output_base",
+    parser.add_argument("-o", dest="output_base",
                       help="output folder.")
-    parser.add_option("-t", dest="threads", type=int, default=2,
+    parser.add_argument("-t", dest="threads", type=int, default=2,
                       help="threads.")
-    parser.add_option("--continue", dest="resume", default=False, action="store_true")
-    parser.add_option("--seed", dest="random_seed", default=12345, type=int,
-                      help="Seed for random number generator. Default: %default")
-    parser.add_option("--draw", dest="draw_plot", default=False, action="store_true",
+    parser.add_argument("--continue", dest="resume", default=False, action="store_true")
+    parser.add_argument("--seed", dest="random_seed", default=12345, type=int,
+                      help="Seed for random number generator. Default: %(default)s")
+    parser.add_argument("--draw", dest="draw_plot", default=False, action="store_true",
                       help="Draw density plot using matplotlib, which should be installed.")
-    parser.add_option("--plot-format", dest="plot_format", default="pdf,png",
+    parser.add_argument("--plot-format", dest="plot_format", default="pdf,png",
                       help='Default: pdf,png')
-    parser.add_option("--plot-title", dest="plot_title",
+    parser.add_argument("--plot-title", dest="plot_title",
                       help="Default: `the file name of the input fasta`")
-    parser.add_option("--plot-subtitle", dest="plot_subtitle", default="",
+    parser.add_argument("--plot-subtitle", dest="plot_subtitle", default="",
                       help="A 4-space indicates a line break. Default: None")
-    parser.add_option("--plot-transparent", dest="plot_transparent", default=False, action="store_true",
+    parser.add_argument("--plot-transparent", dest="plot_transparent", default=False, action="store_true",
                       help="Default: False")
-    parser.add_option("--plot-x-density", dest="plot_x_density", default=12000., type=float,
-                      help="Default: %default")
-    # parser.add_option("--plot-x-sliding-window", dest="sliding_window_size", default=1, type=int,
-    #                   help="Default: %default")
-    parser.add_option("--plot-x-gap-dots", dest="gap_len", default=3000, type=int,
-                      help="Number of sites added in-between isolated contigs. Default: %default")
-    parser.add_option("--plot-figure-height", dest="figure_height", default=5., type=float,
-                      help="Default: %default")
-    parser.add_option("--plot-y-lim", dest="y_lim", type=float,
+    parser.add_argument("--plot-x-density", dest="plot_x_density", default=12000., type=float,
+                      help="Default: %(default)s")
+    # parser.add_argument("--plot-x-sliding-window", dest="sliding_window_size", default=1, type=int,
+    #                   help="Default: %(default)s")
+    parser.add_argument("--plot-x-gap-dots", dest="gap_len", default=3000, type=int,
+                      help="Number of sites added in-between isolated contigs. Default: %(default)s")
+    parser.add_argument("--plot-figure-height", dest="figure_height", default=5., type=float,
+                      help="Default: %(default)s")
+    parser.add_argument("--plot-y-lim", dest="y_lim", type=float,
                       help="Y axis value limit. ")
-    # parser.add_option("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
-    #                   help="Default: %default")
-    parser.add_option("--plot-font", dest="plot_font", default=None,
+    # parser.add_argument("--plot-figure-extra-width", dest="extra_width", default=3., type=float,
+    #                   help="Default: %(default)s")
+    parser.add_argument("--plot-font", dest="plot_font", default=None,
                       help="For plot of unicode characters in some environments. Use 'Times New Roman','Arial' etc. "
-                           "Default: %default.")
-    parser.add_option("--disable-customized-error-rate", dest="customized_error_rate", default=True,
+                           "Default: %(default)s.")
+    parser.add_argument("--disable-customized-error-rate", dest="customized_error_rate", default=True,
                       action="store_true")
-    parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
+    parser.add_argument("--which-bowtie2", dest="which_bowtie2", default="",
                       help="Assign the path to Bowtie2 binary files if not added to the path. "
                       "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/bowtie2 first, then $PATH")
-    parser.add_option("--bowtie2-mode", dest="bowtie2_mode", default="--sensitive",
-                      help="Default: %default")
-    parser.add_option("--bowtie2-options", dest="other_bowtie2_options", default="--no-discordant --dovetail",
-                      help="Default: %default")
-    parser.add_option("--stat-mode", dest="stat_mode", default="best",
+    parser.add_argument("--bowtie2-mode", dest="bowtie2_mode", default="--sensitive",
+                      help="Default: %(default)s")
+    parser.add_argument("--bowtie2-options", dest="other_bowtie2_options", default="--no-discordant --dovetail",
+                      help="Default: %(default)s")
+    parser.add_argument("--stat-mode", dest="stat_mode", default="best",
                       help="Statistical mode for counting multiple hits of a single read: best/all. "
                            "The all mode is meaningful only when '-k <INT>' was included in '--bowtie2-options'. "
-                           "Default: %default")
-    parser.add_option("--debug", dest="debug_mode", default=False, action="store_true",
+                           "Default: %(default)s")
+    parser.add_argument("--debug", dest="debug_mode", default=False, action="store_true",
                       help="Turn on debug mode.")
-    options, argv = parser.parse_args()
+    parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+    options = parser.parse_args()
     if not (options.fasta and
             ((options.original_fq_1 and options.original_fq_2) or options.unpaired_fq_files)
             and options.output_base):

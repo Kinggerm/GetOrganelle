@@ -6,6 +6,18 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.4",
+        "features": [
+            "1. SequenceList: self.__indexed updated",
+            "2. get_static_html_context: requests.exceptions.ReadTimeout added"
+            "3. get_organelle_from_reads.py: '--overwrite' added; catch shutil.rmtree() errors; no python-lib -> error."
+            "4. get_organelle_from_*.py: turning off bandage if the result is not circular",
+            "5. assembly_parser.py: recording every overlap value rather than using a universal value for hifiasm (in response to Christopher Benson@PSU)",
+            "6. optparse -> argparse (in response to Matthias Bernt@UFZ)",
+        ],
+        "time": "2021-03-31 17:00 UTC+8"
+    },
+    {
         "number": "1.7.4-pre2",
         "features": [
             "1. README.md: updated",

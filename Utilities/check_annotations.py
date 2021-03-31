@@ -5,11 +5,12 @@ __author__ = 'Kinggerm'
 import time
 import os
 import sys
-from optparse import OptionParser, OptionGroup
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+from argparse import ArgumentParser
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from GetOrganelleLib.seq_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+from GetOrganelleLib.versions import get_versions
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 
 # Local version 3.4
 
@@ -294,25 +295,29 @@ def require_commands():
     usage = "python this_script.py Query.gb -r Reference.gb" \
             "\n\nThis script only checks the mainly check the reliability of automatically annotated tRNA and CDS." \
             "\nBy jinjianjun@mail.kib.ac.cn"
-    parser = OptionParser(usage=usage)
-    group_need = OptionGroup(parser, "NECESSARY OPTIONS")
-    group_need.add_option('-r', dest='reference_gb', help='input reference *.gb file')
-    group_alternation = OptionGroup(parser, "ALTERNATION of NECESSARY OPTIONS")
-    group_alternation.add_option('-d', dest='reference_fasta', help='input reference fasta file exported exported by "Extract Annotations"-"Export"-"Selected Documents"-fasta in Geneious, remember to choose "Replace spaces in sequence name with underscores"')
-    group_optional = OptionGroup(parser, "OPTIONAL OPTIONS")
-    group_optional.add_option('--t-ends', dest='ends_trna', help='Default=10. The length to check at the both ends of tRNA.', type=int, default=10)
-    group_optional.add_option('--c-ends', dest='ends_cds', help='Default:not activated. Activate this calculation and assign the length to check at the both ends of CDS.', type=int)
-    group_optional.add_option('--a-ends', dest='ends_all', help='Default:not activated. Activate this calculation and assign the length to check at the both ends of annotated all regions.', type=int)
-    group_optional.add_option('--l-threshold', dest='length', help='Default=0.9. Length threshold to report warning.', type=float, default=0.9)
-    group_optional.add_option('--similarity', dest='enable_similarity', help='Default=False. Choose to enable similarity calculation.', default=False, action='store_true')
-    group_optional.add_option('--s-threshold', dest='similarity', help='Default=0.9. Similarity threshold to report warning. Should be < length threshold.', type=float, default=0.9)
-    parser.add_option_group(group_need)
-    parser.add_option_group(group_alternation)
-    parser.add_option_group(group_optional)
-    options, args = parser.parse_args()
-    if not (len(args) and options.reference_gb or options.reference_fasta):
+    parser = ArgumentParser(usage=usage)
+    group_need = parser.add_argument_group("NECESSARY OPTIONS")
+    group_need.add_argument('query_gb', metavar='query', type=str, nargs='+',
+                            help='Input a list of *.gb files as the query (split the files by spaces).')
+    group_need.add_argument('-r', dest='reference_gb', help='input reference *.gb file')
+    group_alternation = parser.add_argument_group("ALTERNATION of NECESSARY OPTIONS")
+    group_alternation.add_argument('-d', dest='reference_fasta', help='input reference fasta file exported exported by "Extract Annotations"-"Export"-"Selected Documents"-fasta in Geneious, remember to choose "Replace spaces in sequence name with underscores"')
+    group_optional = parser.add_argument_group("OPTIONAL OPTIONS")
+    group_optional.add_argument('--t-ends', dest='ends_trna', help='Default=10. The length to check at the both ends of tRNA.', type=int, default=10)
+    group_optional.add_argument('--c-ends', dest='ends_cds', help='Default:not activated. Activate this calculation and assign the length to check at the both ends of CDS.', type=int)
+    group_optional.add_argument('--a-ends', dest='ends_all', help='Default:not activated. Activate this calculation and assign the length to check at the both ends of annotated all regions.', type=int)
+    group_optional.add_argument('--l-threshold', dest='length', help='Default=0.9. Length threshold to report warning.', type=float, default=0.9)
+    group_optional.add_argument('--similarity', dest='enable_similarity', help='Default=False. Choose to enable similarity calculation.', default=False, action='store_true')
+    group_optional.add_argument('--s-threshold', dest='similarity', help='Default=0.9. Similarity threshold to report warning. Should be < length threshold.', type=float, default=0.9)
+    parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+    # parser.add_option_group(group_need)
+    # parser.add_option_group(group_alternation)
+    # parser.add_option_group(group_optional)
+    options = parser.parse_args()
+    if not (len(options.query_gb) and options.reference_gb or options.reference_fasta):
         parser.print_help()
-    return options, args
+    return options, options.query_gb
 
 
 def check_stop(sequences):
@@ -399,8 +404,8 @@ def length_similarity(query_seqs, refer_seqs):
 
 
 def main():
-    options, args = require_commands()
-    for query_gb in args:
+    options, query_gbs = require_commands()
+    for query_gb in query_gbs:
         time0 = time.time()
         time_tag = '='*35+'\nKinggerm @ '+time.asctime(time.localtime(time.time()))+'\n'+'='*35
         print(time_tag)

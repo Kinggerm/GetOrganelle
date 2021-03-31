@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 import sys
-from optparse import OptionParser
+from argparse import ArgumentParser
 import subprocess
 try:
     import commands
 except:
     pass
 import os
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.pipe_control_func import executable, make_blast_db, execute_blast
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+from GetOrganelleLib.versions import get_versions
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
 SYSTEM_NAME = ""
 if platform.system() == "Linux":
@@ -42,25 +43,29 @@ def check_db(reference_fa_base, which_blast=""):
 
 def require_options():
     usage = "Usage: rm_low_coverage_duplicated_contigs.py *.fastg"
-    parser = OptionParser(usage=usage)
-    parser.add_option('--cov-t', dest='coverage_threshold', default=0.12,
-                      help='With ratio (coverage of query/coverage of subject) below which, '
-                           'the query would be exposed to discarded. Default: 0.12')
-    parser.add_option('--len-t', dest='length_threshold', default=0.9,
-                      help='With overlap (length of hit of query/ length of query) above which, '
-                           'the query would be exposed to discarded. Default: 0.9')
-    parser.add_option('--blur', dest='blur_bases', default=False, action='store_true',
-                      help='Replace hit low-coverage bases with N.')
-    parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true',
-                      help='Keep temp blast files.')
-    parser.add_option("--which-blast", dest="which_blast", default="",
-                      help="Assign the path to BLAST binary files if not added to the path.")
-    parser.add_option('-o', dest='output_dir',
-                      help='Output directory. Default: along with the original file')
-    parser.add_option('-t', '--threads', dest="threads", default=4, type=int,
-                      help="Threads of blastn.")
-    options, args = parser.parse_args()
-    if not args:
+    parser = ArgumentParser(usage=usage)
+    parser.add_argument('assemblies', metavar='assemblies', type=str, nargs='+',
+                        help="Input FASTG format assembly graph files (split the files by spaces).")
+    parser.add_argument('--cov-t', dest='coverage_threshold', default=0.12,
+                        help='With ratio (coverage of query/coverage of subject) below which, '
+                             'the query would be exposed to discarded. Default: 0.12')
+    parser.add_argument('--len-t', dest='length_threshold', default=0.9,
+                        help='With overlap (length of hit of query/ length of query) above which, '
+                             'the query would be exposed to discarded. Default: 0.9')
+    parser.add_argument('--blur', dest='blur_bases', default=False, action='store_true',
+                        help='Replace hit low-coverage bases with N.')
+    parser.add_argument('--keep-temp', dest='keep_temp', default=False, action='store_true',
+                        help='Keep temp blast files.')
+    parser.add_argument("--which-blast", dest="which_blast", default="",
+                        help="Assign the path to BLAST binary files if not added to the path.")
+    parser.add_argument('-o', dest='output_dir',
+                        help='Output directory. Default: along with the original file')
+    parser.add_argument('-t', '--threads', dest="threads", default=4, type=int,
+                        help="Threads of blastn.")
+    parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+    options = parser.parse_args()
+    if not options.assemblies:
         parser.print_help()
         sys.stdout.write('\n######################################\nERROR: Insufficient REQUIRED arguments!\n\n')
         exit()
@@ -84,7 +89,7 @@ def require_options():
         sys.stdout.write('\n\nOption Error: you should choose assign one of "ex_no_con", "ex_no_hit"'
                          ' and "keep_all" to variable treat_no_hits\n')
         exit()
-    return options, args
+    return options, options.assemblies
 
 
 def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, output, threads, which_blast):
@@ -134,8 +139,8 @@ def purify_fastg(fastg_file, cov_threshold, len_threshold, blur, keep_temp, outp
 
 
 def main():
-    options, args = require_options()
-    for fastg_file in args:
+    options, assemblies = require_options()
+    for fastg_file in assemblies:
         purify_fastg(fastg_file, options.coverage_threshold, options.length_threshold,
                      options.blur_bases, options.keep_temp, options.output, options.threads, options.which_blast)
 

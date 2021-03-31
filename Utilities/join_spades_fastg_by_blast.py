@@ -10,12 +10,13 @@ try:
     import commands
 except:
     pass
-from optparse import OptionParser
+from argparse import ArgumentParser
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.pipe_control_func import executable, make_blast_db, execute_blast
+from GetOrganelleLib.versions import get_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
 SYSTEM_NAME = ""
@@ -41,22 +42,24 @@ short_candidates = {}
 def require_commands():
     global options
     usage = 'python '+str(os.path.basename(__file__))+' -g input.fastg -f refernce.fasta'
-    parser = OptionParser(usage=usage)
-    parser.add_option('-g', dest='in_fastg_file', type=str, help='followed by your input fastg file')
-    parser.add_option('-f', dest='reference_fa_base', type=str, help='followed by Fasta index format')
-    parser.add_option('--keep-temp', dest='keep_temp', default=False, action='store_true', help='Choose to disable deleting temp files produced by blast and this script')
-    parser.add_option('--bt', dest='blast_hits_threshold', default=0.60, help='Default: 0.60', type=float)
-    parser.add_option('--max-gap', dest='max_gap_to_add', default=1500, help='Default: 1500', type=int)
-    parser.add_option('--con-all', dest='connect_inner_contig', default=False, action='store_true', help='Choose to activate connecting all possible contigs. Default: False')
-    parser.add_option('--depth', dest='depth_to_connect', default=1.0, help='Default: 1.0', type=float)
-    parser.add_option("--which-blast", dest="which_blast", default="",
+    parser = ArgumentParser(usage=usage)
+    parser.add_argument('-g', dest='in_fastg_file', type=str, help='followed by your input fastg file')
+    parser.add_argument('-f', dest='reference_fa_base', type=str, help='followed by Fasta index format')
+    parser.add_argument('--keep-temp', dest='keep_temp', default=False, action='store_true', help='Choose to disable deleting temp files produced by blast and this script')
+    parser.add_argument('--bt', dest='blast_hits_threshold', default=0.60, help='Default: 0.60', type=float)
+    parser.add_argument('--max-gap', dest='max_gap_to_add', default=1500, help='Default: 1500', type=int)
+    parser.add_argument('--con-all', dest='connect_inner_contig', default=False, action='store_true', help='Choose to activate connecting all possible contigs. Default: False')
+    parser.add_argument('--depth', dest='depth_to_connect', default=1.0, help='Default: 1.0', type=float)
+    parser.add_argument("--which-blast", dest="which_blast", default="",
                       help="Assign the path to BLAST binary files if not added to the path. "
                            "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/ncbi-blast first, then $PATH")
-    # parser.add_option('--merge-overlaps', default=False, action='store_true', help='Choose to activate automatically merging overlapping contigs')
-    # parser.add_option('--min-os', dest='min_overlap_similarity', default=0.9, help='The similarity threshold to merge overlapping contigs. Default: 0.9', type=float)
-    # parser.add_option('--min-ol', dest='min_overlap_length', default=15, help='The length threshold to merge overlapping contigs. Default: 15', type=int)
+    # parser.add_argument('--merge-overlaps', default=False, action='store_true', help='Choose to activate automatically merging overlapping contigs')
+    # parser.add_argument('--min-os', dest='min_overlap_similarity', default=0.9, help='The similarity threshold to merge overlapping contigs. Default: 0.9', type=float)
+    # parser.add_argument('--min-ol', dest='min_overlap_length', default=15, help='The length threshold to merge overlapping contigs. Default: 15', type=int)
+    parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
     try:
-        options, args = parser.parse_args()
+        options = parser.parse_args()
     except Exception as e:
         sys.stdout.write('\n######################################'+str(e))
         sys.stdout.write('\n"-h" for more usage')

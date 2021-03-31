@@ -1,33 +1,36 @@
 #!/usr/bin/env python
 
 import os
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 usage = "mk_get_organelle.py -o basename -p \"\" " \
         "[a_list_of_directories_containing_balanced_fastq_file, default='./*']"
-parser = OptionParser(usage=usage)
-parser.add_option('-o', dest='output_base',
-                  help='output base name for each sample')
-parser.add_option('-p', dest='other_arguments',
-                  help='Other arguments that get_organelle_from_reads.py would take.'
-                       'Use double quotation marks to include all the arguments'
-                       'Example: "-s plastome.fasta -a mitochondrial.fasta -F embplant_pt -w 105"')
-parser.add_option('--all', dest='skip_done', default=True, action='store_false',
-                  help='Choose to make command for all samples including samples with results.'
-                       'Default: skip those with results.')
-parser.add_option('--annotated', dest='ano_skip', default=False, action='store_true',
-                  help='Choose to make annotated command for skipped commands.'
-                       'Default: False.')
-parser.add_option('--strict', dest='strict_name', default=False, action='store_true',
-                  help='Choose to only search for the fastq with the same base name with the directory '
-                       '(*/*_1.fq). Default: relaxed searching.')
-options, args = parser.parse_args()
+parser = ArgumentParser(usage=usage)
+parser.add_argument('sample_dirs', metavar='sample_dirs', type=str, nargs="+",
+                        help="Input a list of folders (split the files by spaces). "
+                             "Each folder should include a/several pair(s) of fastq files.")
+parser.add_argument('-o', dest='output_base',
+                    help='output base name for each sample')
+parser.add_argument('-p', dest='other_arguments',
+                    help='Other arguments that get_organelle_from_reads.py would take.'
+                         'Use double quotation marks to include all the arguments'
+                         'Example: "-s plastome.fasta -a mitochondrial.fasta -F embplant_pt -w 105"')
+parser.add_argument('--all', dest='skip_done', default=True, action='store_false',
+                    help='Choose to make command for all samples including samples with results.'
+                         'Default: skip those with results.')
+parser.add_argument('--annotated', dest='ano_skip', default=False, action='store_true',
+                    help='Choose to make annotated command for skipped commands.'
+                         'Default: False.')
+parser.add_argument('--strict', dest='strict_name', default=False, action='store_true',
+                    help='Choose to only search for the fastq with the same base name with the directory '
+                         '(*/*_1.fq). Default: relaxed searching.')
+options = parser.parse_args()
 if not (options.output_base and options.other_arguments):
     print("\nUsage: "+usage+'\n')
     exit()
 
-if args:
-    dirs = args
+if options.sample_dirs:
+    dirs = options.sample_dirs
 else:
     dirs = [x for x in os.listdir(os.getcwd()) if os.path.isdir(os.path.join(os.getcwd(), x))]
 

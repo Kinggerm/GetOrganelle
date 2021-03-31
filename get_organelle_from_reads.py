@@ -8,7 +8,7 @@ try:
     from math import inf
 except ImportError:
     inf = float("inf")
-from optparse import OptionParser, OptionGroup
+from argparse import ArgumentParser
 import GetOrganelleLib
 from GetOrganelleLib.seq_parser import *
 from GetOrganelleLib.pipe_control_func import *
@@ -75,377 +75,390 @@ def get_options(description, version):
             "###  Embryophyta plant mitogenome\n" + str(os.path.basename(__file__)) + \
             " -1 sample_1.fq -2 sample_2.fq -s mt_seed.fasta -o mitogenome_output " \
             " -R 30 -k 21,45,65,85,105 -F embplant_mt"
-    parser = OptionParser(usage=usage, version=version, description=description, add_help_option=False)
-    # group 1
-    group_inout = OptionGroup(parser, "IN-OUT OPTIONS", "Options on inputs and outputs")
-    group_inout.add_option("-1", dest="fq_file_1",
-                           help="Input file with forward paired-end reads (format: fastq/fastq.gz/fastq.tar.gz).")
-    group_inout.add_option("-2", dest="fq_file_2",
-                           help="Input file with reverse paired-end reads (format: fastq/fastq.gz/fastq.tar.gz).")
-    group_inout.add_option("-u", dest="unpaired_fq_files",
-                           help="Input file(s) with unpaired (single-end) reads (format: fastq/fastq.gz/fastq.tar.gz). "
-                                "files could be comma-separated lists such as 'seq1.fq,seq2.fq'.")
-    group_inout.add_option("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
-    group_inout.add_option("-s", dest="seed_file", default=None,
-                           help="Seed sequence(s). Input fasta format file as initial seed. "
-                                "A seed sequence in GetOrganelle is only used for identifying initial "
-                                "organelle reads. The assembly process is purely de novo. "
-                                "Should be a list of files split by comma(s) on a multi-organelle mode, "
-                                "with the same list length to organelle_type (followed by '-F'). "
-                                "Default: '" + os.path.join(SEQ_DB_PATH, "*.fasta") + "' "
-                                "(* depends on the value followed with flag '-F')")
-    group_inout.add_option("-a", dest="anti_seed",
-                           help="Anti-seed(s). Not suggested unless what you really know what you are doing. "
-                                "Input fasta format file as anti-seed, where the extension process "
-                                "stop. Typically serves as excluding plastid reads when extending mitochondrial "
-                                "reads, or the other way around. You should be cautious about using this option, "
-                                "because if the anti-seed includes some word in the target but not in the seed, "
-                                "the result would have gaps. For example, use the embplant_mt and embplant_pt "
-                                "from the same plant-species as seed and anti-seed.")
-    group_inout.add_option("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
-                           help="Hard bound for maximum number of reads to be used per file. "
-                                "A input larger than " + str(READ_LINE_TO_INF) + " will be treated as infinity (INF). "
-                                "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
-                                "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
-    group_inout.add_option("--reduce-reads-for-coverage", dest="reduce_reads_for_cov", type=float, default=500,
-                           help="Soft bound for maximum number of reads to be used according to "
-                                "target-hitting base coverage. "
-                                "If the estimated target-hitting base coverage is too high and "
-                                "over this VALUE, GetOrganelle automatically reduce the number of reads to "
-                                "generate a final assembly with base coverage close to this VALUE. "
-                                "This design could greatly save computational resources in many situations. "
-                                "A mean base coverage over 500 is extremely sufficient for most cases. "
-                                "This VALUE must be larger than 10. Set this VALUE to inf to disable reducing. "
-                                "Default: %default.")
-    group_inout.add_option("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
-                           help="The maximum percent of bases to be ignore in extension, due to low quality. "
-                                "Default: %default")
-    group_inout.add_option("--phred-offset", dest="phred_offset", default=-1, type=int,
-                           help="Phred offset for spades-hammer. Default: GetOrganelle-autodetect")
-    group_inout.add_option("--min-quality-score", dest="min_quality_score", type=int, default=1,
-                           help="Minimum quality score in extension. This value would be automatically decreased "
-                                "to prevent ignoring too much raw data (see --max-ignore-percent)."
-                                "Default: %default ('\"' in Phred+33; 'A' in Phred+64/Solexa+64)")
-    group_inout.add_option("--prefix", dest="prefix", default="",
-                           help="Add extra prefix to resulting files under the output directory.")
-    group_inout.add_option("--out-per-round", dest="fg_out_per_round", action="store_true", default=False,
-                           help="Enable output per round. Choose to save memory but cost more time per round.")
-    group_inout.add_option("--zip-files", dest="zip_files", action="store_true", default=False,
-                           help="Choose to compress fq/sam files using gzip.")
-    group_inout.add_option("--keep-temp", dest="keep_temp_files", action="store_true", default=False,
-                           help="Choose to keep the running temp/index files.")
-    group_inout.add_option("--config-dir", dest="get_organelle_path", default=None,
-                           help="The directory where the configuration file and default databases were placed. "
-                                "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
-                                "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
-                                "Default: " + GO_PATH)
-    # group 2
-    group_scheme = OptionGroup(parser, "SCHEME OPTIONS", "Options on running schemes.")
-    group_scheme.add_option("-F", dest="organelle_type",
-                            help="This flag should be followed with embplant_pt (embryophyta plant plastome), "
-                                 "other_pt (non-embryophyta plant plastome), embplant_mt "
-                                 "(plant mitogenome), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
-                                 "(animal mitogenome), fungus_mt (fungus mitogenome), "
-                                 "fungus_nr (fungus nuclear ribosomal RNA)"
-                                 "or embplant_mt,other_pt,fungus_mt "
-                                 "(the combination of any of above organelle genomes split by comma(s), "
-                                 "which might be computationally more intensive than separate runs), "
-                                 "or anonym (uncertain organelle genome type, with customized gene database "
-                                 "('--genes'), which is suggested only when the above database is genetically distant "
-                                 "from your sample, generally only in some animal_mt/fungus_mt/fungus_nr cases). "
-                                 "For easy usage and compatibility of old versions, following redirection "
-                                 "would be automatically fulfilled without warning:\t"
-                                 "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
-                                 "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
-    group_scheme.add_option("--fast", dest="fast_strategy", default=False, action="store_true",
+    parser = ArgumentParser(usage=usage, description=description, add_help=False)
+    # simple help mode
+    if "-h" in sys.argv:
+        parser.add_argument("-1", dest="fq_file_1", help="Input file with forward paired-end reads (*.fq/.gz/.tar.gz).")
+        parser.add_argument("-2", dest="fq_file_2", help="Input file with reverse paired-end reads (*.fq/.gz/.tar.gz).")
+        parser.add_argument("-u", dest="unpaired_fq_files", help="Input file(s) with unpaired (single-end) reads. ")
+        parser.add_argument("-o", dest="output_base", help="Output directory.")
+        parser.add_argument("-s", dest="seed_file", help="Input fasta format file as initial seed. "
+                                                         "Default: " + os.path.join(SEQ_DB_PATH, "*.fasta"))
+        parser.add_argument("-w", dest="word_size", help="Word size (W) for extension. Default: auto-estimated")
+        parser.add_argument("-R", dest="max_rounds", help="Maximum extension rounds (suggested: >=2). "
+                                                          "Default: 15 (embplant_pt)")
+        parser.add_argument("-F", dest="organelle_type",
+                            help="Target organelle genome type(s): "
+                                 "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym/"
+                                 "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
+        parser.add_argument("--max-reads", type=float,
+                            help="Maximum number of reads to be used per file. "
+                                 "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
+                                 "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
+        parser.add_argument("--fast", dest="fast_strategy",
                             help="=\"-R 10 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws "
-                                 "--disentangle-time-limit 360\" "
-                                 "This option is suggested for homogeneously and highly covered data (very fine data). "
-                                 "You can overwrite the value of a specific option listed above by adding "
-                                 "that option along with the \"--fast\" flag. "
-                                 "You could try GetOrganelle with this option for a list of samples and run a second "
-                                 "time without this option for the rest with incomplete results. ")
-    group_scheme.add_option("--memory-save", dest="memory_save", default=False, action="store_true",
-                            help="=\"--out-per-round -P 0 --remove-duplicates 0\" "
-                                 "You can overwrite the value of a specific option listed above by adding "
-                                 "that option along with the \"--memory-save\" flag. A larger '-R' value is suggested "
-                                 "when \"--memory-save\" is chosen.")
-    group_scheme.add_option("--memory-unlimited", dest="memory_unlimited", default=False, action="store_true",
-                            help="=\"-P 1E7 --index-in-memory --remove-duplicates 2E8 "
-                                 "--min-quality-score -5 --max-ignore-percent 0\" "
-                                 "You can overwrite the value of a specific option listed above by adding "
-                                 "that option along with the \"--memory-unlimited\" flag. ")
-    # group 3
-    group_extending = OptionGroup(parser, "EXTENDING OPTIONS", "Options on the performance of extending process")
-    group_extending.add_option("-w", dest="word_size", type=float,
-                               help="Word size (W) for pre-grouping (if not assigned by '--pre-w') and extending "
-                                    "process. This script would try to guess (auto-estimate) a proper W "
-                                    "using an empirical function based on average read length, reads quality, "
-                                    "target genome coverage, and other variables that might influence the extending "
-                                    "process. You could assign the ratio (1>input>0) of W to "
-                                    "read_length, based on which this script would estimate the W for you; "
-                                    "or assign an absolute W value (read length>input>=35). Default: auto-estimated.")
-    group_extending.add_option("--pre-w", dest="pregroup_word_size", type=float,
-                               help="Word size (W) for pre-grouping. Used to reproduce result when word size is "
-                                    "a certain value during pregrouping process and later changed during reads "
-                                    "extending process. Similar to word size. Default: the same to word size.")
-    group_extending.add_option("-R", "--max-rounds", dest="max_rounds", type=int, default=inf,
-                               help="Maximum number of extending rounds (suggested: >=2). "
-                                    "Default: 15 (-F embplant_pt), 30 (-F embplant_mt/other_pt), "
-                                    "10 (-F embplant_nr/animal_mt/fungus_mt/fungus_nr), inf (-P 0).")
-    group_extending.add_option("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
-                               help="Maximum number of words to be used in total."
-                                    "Default: 4E8 (-F embplant_pt), 2E8 (-F embplant_nr/fungus_mt/fungus_nr/animal_mt), "
-                                    "2E9 (-F embplant_mt/other_pt)")
-    group_extending.add_option("-J", dest="jump_step", type=int, default=3,
-                               help="The length of step for checking words in reads during extending process "
-                                    "(integer >= 1). When you have reads of high quality, the larger the number is, "
-                                    "the faster the extension will be, "
-                                    "the more risk of missing reads in low coverage area. "
-                                    "Choose 1 to choose the slowest but safest extension strategy. Default: %default")
-    group_extending.add_option("-M", dest="mesh_size", type=int, default=2,
-                               help="(Beta parameter) "
-                                    "The length of step for building words from seeds during extending process "
-                                    "(integer >= 1). When you have reads of high quality, the larger the number is, "
-                                    "the faster the extension will be, "
-                                    "the more risk of missing reads in low coverage area. "
-                                    "Another usage of this mesh size is to choose a larger mesh size coupled with a "
-                                    "smaller word size, which makes smaller word size feasible when memory is limited."
-                                    "Choose 1 to choose the slowest but safest extension strategy. Default: %default")
-    group_extending.add_option("--bowtie2-options", dest="bowtie2_options", default="--very-fast -t",
-                               help="Bowtie2 options, such as '--ma 3 --mp 5,2 --very-fast -t'. Default: %default.")
-    group_extending.add_option("--larger-auto-ws", dest="larger_auto_ws", default=False, action="store_true",
-                               help="By using this flag, the empirical function for estimating W would tend to "
-                                    "produce a relative larger W, which would speed up the matching in extending, "
-                                    "reduce the memory cost in extending, but increase the risk of broken final "
-                                    "graph. Suggested when the data is good with high and homogenous coverage.")
-    mixed_organelles = ("other_pt", "embplant_mt", "fungus_mt")
-    group_extending.add_option("--target-genome-size", dest="target_genome_size", default='130000', type=str,
-                               help="Hypothetical value(s) of target genome size. This is only used for estimating "
-                                    "word size when no '-w word_size' is given. "
-                                    "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
-                                    "with the same list length to organelle_type (followed by '-F'). "
-                                    "Default: " +
-                                    " or ".join(
-                                        [str(ORGANELLE_EXPECTED_GRAPH_SIZES[this_type]) + " (-F " + this_type + ")"
-                                         for this_type in SUPPORTED_ORGANELLE_TYPES]) + " or " +
-                                    ",".join([str(ORGANELLE_EXPECTED_GRAPH_SIZES[this_type])
-                                              for this_type in mixed_organelles]) +
-                                    " (-F " + ",".join(mixed_organelles) + ")")
-    group_extending.add_option("--max-extending-len", dest="max_extending_len", type=str,
-                               help="Maximum extending length(s) derived from the seed(s). "
-                                    "A single value could be a non-negative number, or inf (infinite) "
-                                    "or auto (automatic estimation). "
-                                    "This is designed for properly stopping the extending from getting too long and "
-                                    "saving computational resources. However, empirically, a maximum extending length "
-                                    "value larger than 6000 would not be helpful for saving computational resources. "
-                                    "This value would not be precise in controlling output size, especially "
-                                    "when pre-group (followed by '-P') is turn on."
-                                    "In the auto mode, the maximum extending length is estimated based on the sizes of "
-                                    "the gap regions that not covered in the seed sequences. A sequence of a closely "
-                                    "related species would be preferred for estimating a better maximum extending "
-                                    "length value. If you are using limited loci, e.g. rbcL gene as the seed for "
-                                    "assembling the whole plastome (with extending length ca. 75000 >> 6000), "
-                                    "you should set maximum extending length to inf. "
-                                    "Should be a list of numbers/auto/no split by comma(s) on a multi-organelle mode, "
-                                    "with the same list length to organelle_type (followed by '-F'). "
-                                    "Default: no. ")
-    # group 4
-    group_assembly = OptionGroup(parser, "ASSEMBLY OPTIONS", "These options are about the assembly and "
-                                                             "graph disentangling")
-    group_assembly.add_option("-k", dest="spades_kmer", default="21,55,85,115",
-                              help="SPAdes kmer settings. Use the same format as in SPAdes. illegal kmer values "
-                                   "would be automatically discarded by GetOrganelle. "
-                                   "Default: %default")
-    group_assembly.add_option("--spades-options", dest="other_spades_options", default="",
-                              help="Other SPAdes options. Use double quotation marks to include all the arguments "
-                                   "and parameters.")
-    group_assembly.add_option("--no-spades", dest="run_spades", action="store_false", default=True,
-                              help="Disable SPAdes.")
-    group_assembly.add_option("--ignore-k", dest="ignore_kmer_res", default=40, type=int,
-                              help="A kmer threshold below which, no slimming/disentangling would be executed"
-                                   " on the result. Default: %default")
-    group_assembly.add_option("--genes", dest="genes_fasta",
-                              help="Followed with a customized database (a fasta file or the base name of a "
-                                   "blast database) containing or made of ONE set of protein coding genes "
-                                   "and ribosomal RNAs extracted from ONE reference genome that you want to assemble. "
-                                   "Should be a list of databases split by comma(s) on a multi-organelle mode, "
-                                   "with the same list length to organelle_type (followed by '-F'). "
-                                   "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
-                                   "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
-                                   "contingent on the organelle types chosen (-F). "
-                                   "The default value no longer holds when '--genes' or '--ex-genes' is used.")
-    group_assembly.add_option("--ex-genes", dest="exclude_genes",
-                              help="This is optional and Not suggested, since non-target contigs could contribute "
-                                   "information for better downstream coverage-based clustering. "
-                                   "Followed with a customized database (a fasta file or the base name of a "
-                                   "blast database) containing or made of protein coding genes "
-                                   "and ribosomal RNAs extracted from reference genome(s) that you want to exclude. "
-                                   "Could be a list of databases split by comma(s) but "
-                                   "NOT required to have the same list length to organelle_type (followed by '-F'). "
-                                   "The default value no longer holds when '--genes' or '--ex-genes' is used.")
-    group_assembly.add_option("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
-                              help="Depth factor for differentiate genome type of contigs. "
-                                   "The genome type of contigs are determined by blast. "
-                                   "Default: %default")
-    group_assembly.add_option("--contamination-depth", dest="contamination_depth", default=3., type=float,
-                              help="Depth factor for confirming contamination in parallel contigs. Default: %default")
-    group_assembly.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
-                              help="Similarity threshold for confirming contaminating contigs. Default: %default")
-    group_assembly.add_option("--no-degenerate", dest="degenerate", default=True, action="store_false",
-                              help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
-    group_assembly.add_option("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
-                              help="Depth factor for confirming parallel contigs. Default: %default")
-    group_assembly.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
-                              help="Similarity threshold for confirming parallel contigs. Default: %default")
-    group_assembly.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=1800, type=int,
-                              help="Time limit (second) for each try of disentangling a graph file as a circular "
-                                   "genome. Disentangling a graph as contigs is not limited. Default: %default")
-    group_assembly.add_option("--expected-max-size", dest="expected_max_size", default='250000', type=str,
-                              help="Expected maximum target genome size(s) for disentangling. "
-                                   "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
-                                   "with the same list length to organelle_type (followed by '-F'). "
-                                   "Default: 250000 (-F embplant_pt/fungus_mt), "
-                                   "25000 (-F embplant_nr/animal_mt/fungus_nr), 1000000 (-F embplant_mt/other_pt),"
-                                   "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
-    group_assembly.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
-                              help="Expected minimum target genome size(s) for disentangling. "
-                                   "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
-                                   "with the same list length to organelle_type (followed by '-F'). "
-                                   "Default: %default for all.")
-    group_assembly.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
-                              help="For '-F embplant_pt' with complete circular result, "
-                                   "by default, the direction of the starting contig (usually "
-                                   "the LSC region) is determined as the direction with less ORFs. Choose this option "
-                                   "to reverse the direction of the starting contig when result is circular. "
-                                   "Actually, both directions are biologically equivalent to each other. The "
-                                   "reordering of the direction is only for easier downstream analysis.")
-    group_assembly.add_option("--max-paths-num", dest="max_paths_num", default=1000, type=int,
-                              help="Repeats would dramatically increase the number of potential isomers (paths). "
-                                   "This option was used to export a certain amount of paths out of all possible paths "
-                                   "per assembly graph. Default: %default")
-    # group 5
-    group_computational = OptionGroup(parser, "ADDITIONAL OPTIONS", "")
-    group_computational.add_option("-t", dest="threads", type=int, default=1,
-                                   help="Maximum threads to use.")
-    group_computational.add_option("-P", dest="pre_grouped", type=float, default=2E5,
-                                   help="The maximum number (integer) of high-covered reads to be pre-grouped "
-                                        "before extending process. pre_grouping is suggested when the whole genome "
-                                        "coverage is shallow but the organ genome coverage is deep. "
-                                        "The default value is 2E5. "
-                                        "For personal computer with 8G memory, we suggest no more than 3E5. "
-                                        "A larger number (ex. 6E5) would run faster but exhaust memory "
-                                        "in the first few minutes. Choose 0 to disable this process.")
-    group_computational.add_option("--which-blast", dest="which_blast", default="",
-                                   help="Assign the path to BLAST binary files if not added to the path. "
-                                        "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
-                                        "/ncbi-blast\" first, then $PATH")
-    group_computational.add_option("--which-bowtie2", dest="which_bowtie2", default="",
-                                   help="Assign the path to Bowtie2 binary files if not added to the path. "
-                                        "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
-                                        "/bowtie2\" first, then $PATH")
-    group_computational.add_option("--which-spades", dest="which_spades", default="",
-                                   help="Assign the path to SPAdes binary files if not added to the path. "
-                                        "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
-                                        "/SPAdes\" first, then $PATH")
-    group_computational.add_option("--which-bandage", dest="which_bandage", default="",
-                                   help="Assign the path to bandage binary file if not added to the path. "
-                                        "Default: try $PATH")
-    group_computational.add_option("--continue", dest="script_resume", default=False, action="store_true",
-                                   help="Several check points based on files produced, rather than on the log file, "
-                                        "so keep in mind that this script will not detect the difference "
-                                        "between this input parameters and the previous ones.")
-    group_computational.add_option("--index-in-memory", dest="index_in_memory", action="store_true", default=False,
-                                   help="Keep index in memory. Choose save index in memory than in disk.")
-    group_computational.add_option("--remove-duplicates", dest="rm_duplicates", default=1E7, type=float,
-                                   help="By default this script use unique reads to extend. Choose the number of "
-                                        "duplicates (integer) to be saved in memory. A larger number (ex. 2E7) would "
-                                        "run faster but exhaust memory in the first few minutes. "
-                                        "Choose 0 to disable this process. "
-                                        "Note that whether choose or not will not disable "
-                                        "the calling of replicate reads. Default: %default.")
-    group_computational.add_option("--flush-step", dest="echo_step", default=54321,
-                                   help="Flush step (INTEGER OR INF) for presenting progress. "
-                                        "For running in the background, you could set this to inf, "
-                                        "which would disable this. Default: %default")
-    group_computational.add_option("--random-seed", dest="random_seed", default=12345, type=int,
-                                   help="Default: %default")
-    group_computational.add_option("--verbose", dest="verbose_log", action="store_true", default=False,
-                                   help="Verbose output. Choose to enable verbose running log_handler.")
-
-    parser.add_option("-h", dest="simple_help", default=False, action="store_true",
-                      help="print brief introduction for frequently-used options.")
-    parser.add_option("--help", dest="verbose_help", default=False, action="store_true",
-                      help="print verbose introduction for all options.")
-    if "--help" in sys.argv:
-        parser.add_option_group(group_inout)
-        parser.add_option_group(group_scheme)
-        parser.add_option_group(group_extending)
-        parser.add_option_group(group_assembly)
-        parser.add_option_group(group_computational)
-        parser.print_help()
-        exit()
-    elif "-h" in sys.argv:
-        for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage", "--phred-offset",
-                               "--min-quality-score", "--prefix", "--out-per-round", "--zip-files", "--keep-temp",
-                               "--config-dir",
-                               "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
-                               "-J", "-M", "--bowtie2-options",
-                               "--larger-auto-ws", "--target-genome-size", "--spades-options", "--no-spades",
-                               "--ignore-k", "--genes", "--ex-genes", "--disentangle-df",
-                               "--contamination-depth", "--contamination-similarity", "--no-degenerate",
-                               "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--expected-max-size", "--expected-min-size", "--reverse-lsc", "--max-paths-num",
-                               "--which-blast", "--which-bowtie2", "--which-spades", "--which-bandage",
-                               "--continue", "--index-in-memory",
-                               "--remove-duplicates", "--flush-step", "--verbose"):
-            parser.remove_option(not_often_used)
-        parser.remove_option("-1")
-        parser.add_option("-1", dest="fq_file_1", help="Input file with forward paired-end reads (*.fq/.gz/.tar.gz).")
-        parser.remove_option("-2")
-        parser.add_option("-2", dest="fq_file_2", help="Input file with reverse paired-end reads (*.fq/.gz/.tar.gz).")
-        parser.remove_option("-u")
-        parser.add_option("-u", dest="unpaired_fq_files", help="Input file(s) with unpaired (single-end) reads. ")
-        parser.remove_option("-o")
-        parser.add_option("-o", dest="output_base", help="Output directory.")
-        parser.remove_option("-s")
-        parser.add_option("-s", dest="seed_file", help="Input fasta format file as initial seed. "
-                                                       "Default: " + os.path.join(SEQ_DB_PATH, "*.fasta"))
-        parser.remove_option("-w")
-        parser.add_option("-w", dest="word_size", help="Word size (W) for extension. Default: auto-estimated")
-        parser.remove_option("-R")
-        parser.add_option("-R", dest="max_rounds", help="Maximum extension rounds (suggested: >=2). "
-                                                        "Default: 15 (embplant_pt)")
-        parser.remove_option("-F")
-        parser.add_option("-F", dest="organelle_type",
-                          help="Target organelle genome type(s): "
-                               "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym/"
-                               "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
-        parser.remove_option("--max-reads")
-        parser.add_option("--max-reads", type=float,
-                          help="Maximum number of reads to be used per file. "
-                               "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
-                                "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
-        parser.remove_option("--fast")
-        parser.add_option("--fast", dest="fast_strategy",
-                          help="=\"-R 10 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws "
-                               "--disentangle-time-limit 360\"")
-        parser.remove_option("-k")
-        parser.add_option("-k", dest="spades_kmer", default="21,55,85,115",
-                          help="SPAdes kmer settings. Default: %default")
-        parser.remove_option("-t")
-        parser.add_option("-t", dest="threads", type=int, default=1, help="Maximum threads to use. Default: %default")
-        parser.remove_option("-P")
-        parser.add_option("-P", dest="pre_grouped", default=int(2E5), help="Pre-grouping value. Default: %default")
+                                 "--disentangle-time-limit 360\"")
+        parser.add_argument("-k", dest="spades_kmer", default="21,55,85,115",
+                            help="SPAdes kmer settings. Default: %(default)s")
+        parser.add_argument("-t", dest="threads", type=int, default=1,
+                            help="Maximum threads to use. Default: %(default)s")
+        parser.add_argument("-P", dest="pre_grouped", default=int(2E5), help="Pre-grouping value. Default: %(default)s")
+        parser.add_argument("-v", "--version", action="version",
+                            version="GetOrganelle v{version}".format(version=version))
+        parser.add_argument("-h", dest="simple_help", default=False, action="store_true",
+                            help="print brief introduction for frequently-used options.")
+        parser.add_argument("--help", dest="verbose_help", default=False, action="store_true",
+                            help="print verbose introduction for all options.")
         parser.print_help()
         sys.stdout.write("\n")
         exit()
     else:
-        parser.add_option_group(group_inout)
-        parser.add_option_group(group_scheme)
-        parser.add_option_group(group_extending)
-        parser.add_option_group(group_assembly)
-        parser.add_option_group(group_computational)
+        # verbose help mode
+        # group 1
+        group_inout = parser.add_argument_group("IN-OUT OPTIONS", "Options on inputs and outputs")
+        # group_inout = OptionGroup(parser, "IN-OUT OPTIONS", "Options on inputs and outputs")
+        group_inout.add_argument("-1", dest="fq_file_1",
+                                 help="Input file with forward paired-end reads (format: fastq/fastq.gz/fastq.tar.gz).")
+        group_inout.add_argument("-2", dest="fq_file_2",
+                                 help="Input file with reverse paired-end reads (format: fastq/fastq.gz/fastq.tar.gz).")
+        group_inout.add_argument("-u", dest="unpaired_fq_files",
+                                 help="Input file(s) with unpaired (single-end) reads (format: fastq/fastq.gz/fastq.tar.gz). "
+                                      "files could be comma-separated lists such as 'seq1.fq,seq2.fq'.")
+        group_inout.add_argument("-o", dest="output_base",
+                                 help="Output directory. Overwriting files if directory exists.")
+        group_inout.add_argument("-s", dest="seed_file", default=None,
+                                 help="Seed sequence(s). Input fasta format file as initial seed. "
+                                      "A seed sequence in GetOrganelle is only used for identifying initial "
+                                      "organelle reads. The assembly process is purely de novo. "
+                                      "Should be a list of files split by comma(s) on a multi-organelle mode, "
+                                      "with the same list length to organelle_type (followed by '-F'). "
+                                      "Default: '" + os.path.join(SEQ_DB_PATH, "*.fasta") + "' "
+                                                                                            "(* depends on the value followed with flag '-F')")
+        group_inout.add_argument("-a", dest="anti_seed",
+                                 help="Anti-seed(s). Not suggested unless what you really know what you are doing. "
+                                      "Input fasta format file as anti-seed, where the extension process "
+                                      "stop. Typically serves as excluding plastid reads when extending mitochondrial "
+                                      "reads, or the other way around. You should be cautious about using this option, "
+                                      "because if the anti-seed includes some word in the target but not in the seed, "
+                                      "the result would have gaps. For example, use the embplant_mt and embplant_pt "
+                                      "from the same plant-species as seed and anti-seed.")
+        group_inout.add_argument("--max-reads", dest="maximum_n_reads", type=float, default=1.5E7,
+                                 help="Hard bound for maximum number of reads to be used per file. "
+                                      "A input larger than " + str(
+                                     READ_LINE_TO_INF) + " will be treated as infinity (INF). "
+                                                         "Default: 1.5E7 (-F embplant_pt/embplant_nr/fungus_mt/fungus_nr); "
+                                                         "7.5E7 (-F embplant_mt/other_pt/anonym); 3E8 (-F animal_mt)")
+        group_inout.add_argument("--reduce-reads-for-coverage", dest="reduce_reads_for_cov", type=float, default=500,
+                                 help="Soft bound for maximum number of reads to be used according to "
+                                      "target-hitting base coverage. "
+                                      "If the estimated target-hitting base coverage is too high and "
+                                      "over this VALUE, GetOrganelle automatically reduce the number of reads to "
+                                      "generate a final assembly with base coverage close to this VALUE. "
+                                      "This design could greatly save computational resources in many situations. "
+                                      "A mean base coverage over 500 is extremely sufficient for most cases. "
+                                      "This VALUE must be larger than 10. Set this VALUE to inf to disable reducing. "
+                                      "Default: %(default)s.")
+        group_inout.add_argument("--max-ignore-percent", dest="maximum_ignore_percent", type=float, default=0.01,
+                                 help="The maximum percent of bases to be ignore in extension, due to low quality. "
+                                      "Default: %(default)s")
+        group_inout.add_argument("--phred-offset", dest="phred_offset", default=-1, type=int,
+                                 help="Phred offset for spades-hammer. Default: GetOrganelle-autodetect")
+        group_inout.add_argument("--min-quality-score", dest="min_quality_score", type=int, default=1,
+                                 help="Minimum quality score in extension. This value would be automatically decreased "
+                                      "to prevent ignoring too much raw data (see --max-ignore-percent)."
+                                      "Default: %(default)s ('\"' in Phred+33; 'A' in Phred+64/Solexa+64)")
+        group_inout.add_argument("--prefix", dest="prefix", default="",
+                                 help="Add extra prefix to resulting files under the output directory.")
+        group_inout.add_argument("--out-per-round", dest="fg_out_per_round", action="store_true", default=False,
+                                 help="Enable output per round. Choose to save memory but cost more time per round.")
+        group_inout.add_argument("--zip-files", dest="zip_files", action="store_true", default=False,
+                                 help="Choose to compress fq/sam files using gzip.")
+        group_inout.add_argument("--keep-temp", dest="keep_temp_files", action="store_true", default=False,
+                                 help="Choose to keep the running temp/index files.")
+        group_inout.add_argument("--config-dir", dest="get_organelle_path", default=None,
+                                 help="The directory where the configuration file and default databases were placed. "
+                                      "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                                      "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                                      "Default: " + GO_PATH)
+        # group 2
+        group_scheme = parser.add_argument_group("SCHEME OPTIONS", "Options on running schemes.")
+        group_scheme.add_argument("-F", dest="organelle_type",
+                                  help="This flag should be followed with embplant_pt (embryophyta plant plastome), "
+                                       "other_pt (non-embryophyta plant plastome), embplant_mt "
+                                       "(plant mitogenome), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
+                                       "(animal mitogenome), fungus_mt (fungus mitogenome), "
+                                       "fungus_nr (fungus nuclear ribosomal RNA)"
+                                       "or embplant_mt,other_pt,fungus_mt "
+                                       "(the combination of any of above organelle genomes split by comma(s), "
+                                       "which might be computationally more intensive than separate runs), "
+                                       "or anonym (uncertain organelle genome type, with customized gene database "
+                                       "('--genes'), which is suggested only when the above database is genetically distant "
+                                       "from your sample, generally only in some animal_mt/fungus_mt/fungus_nr cases). "
+                                       "For easy usage and compatibility of old versions, following redirection "
+                                       "would be automatically fulfilled without warning:\t"
+                                       "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
+                                       "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
+        group_scheme.add_argument("--fast", dest="fast_strategy", default=False, action="store_true",
+                                  help="=\"-R 10 -t 4 -J 5 -M 7 --max-n-words 3E7 --larger-auto-ws "
+                                       "--disentangle-time-limit 360\" "
+                                       "This option is suggested for homogeneously and highly covered data (very fine data). "
+                                       "You can overwrite the value of a specific option listed above by adding "
+                                       "that option along with the \"--fast\" flag. "
+                                       "You could try GetOrganelle with this option for a list of samples and run a second "
+                                       "time without this option for the rest with incomplete results. ")
+        group_scheme.add_argument("--memory-save", dest="memory_save", default=False, action="store_true",
+                                  help="=\"--out-per-round -P 0 --remove-duplicates 0\" "
+                                       "You can overwrite the value of a specific option listed above by adding "
+                                       "that option along with the \"--memory-save\" flag. A larger '-R' value is suggested "
+                                       "when \"--memory-save\" is chosen.")
+        group_scheme.add_argument("--memory-unlimited", dest="memory_unlimited", default=False, action="store_true",
+                                  help="=\"-P 1E7 --index-in-memory --remove-duplicates 2E8 "
+                                       "--min-quality-score -5 --max-ignore-percent 0\" "
+                                       "You can overwrite the value of a specific option listed above by adding "
+                                       "that option along with the \"--memory-unlimited\" flag. ")
+        # group 3
+        group_extending = parser.add_argument_group("EXTENDING OPTIONS",
+                                                    "Options on the performance of extending process")
+        group_extending.add_argument("-w", dest="word_size", type=float,
+                                     help="Word size (W) for pre-grouping (if not assigned by '--pre-w') and extending "
+                                          "process. This script would try to guess (auto-estimate) a proper W "
+                                          "using an empirical function based on average read length, reads quality, "
+                                          "target genome coverage, and other variables that might influence the extending "
+                                          "process. You could assign the ratio (1>input>0) of W to "
+                                          "read_length, based on which this script would estimate the W for you; "
+                                          "or assign an absolute W value (read length>input>=35). Default: auto-estimated.")
+        group_extending.add_argument("--pre-w", dest="pregroup_word_size", type=float,
+                                     help="Word size (W) for pre-grouping. Used to reproduce result when word size is "
+                                          "a certain value during pregrouping process and later changed during reads "
+                                          "extending process. Similar to word size. Default: the same to word size.")
+        group_extending.add_argument("-R", "--max-rounds", dest="max_rounds", type=int, default=inf,
+                                     help="Maximum number of extending rounds (suggested: >=2). "
+                                          "Default: 15 (-F embplant_pt), 30 (-F embplant_mt/other_pt), "
+                                          "10 (-F embplant_nr/animal_mt/fungus_mt/fungus_nr), inf (-P 0).")
+        group_extending.add_argument("--max-n-words", dest="maximum_n_words", type=float, default=4E8,
+                                     help="Maximum number of words to be used in total."
+                                          "Default: 4E8 (-F embplant_pt), 2E8 (-F embplant_nr/fungus_mt/fungus_nr/animal_mt), "
+                                          "2E9 (-F embplant_mt/other_pt)")
+        group_extending.add_argument("-J", dest="jump_step", type=int, default=3,
+                                     help="The length of step for checking words in reads during extending process "
+                                          "(integer >= 1). When you have reads of high quality, the larger the number is, "
+                                          "the faster the extension will be, "
+                                          "the more risk of missing reads in low coverage area. "
+                                          "Choose 1 to choose the slowest but safest extension strategy. Default: %(default)s")
+        group_extending.add_argument("-M", dest="mesh_size", type=int, default=2,
+                                     help="(Beta parameter) "
+                                          "The length of step for building words from seeds during extending process "
+                                          "(integer >= 1). When you have reads of high quality, the larger the number is, "
+                                          "the faster the extension will be, "
+                                          "the more risk of missing reads in low coverage area. "
+                                          "Another usage of this mesh size is to choose a larger mesh size coupled with a "
+                                          "smaller word size, which makes smaller word size feasible when memory is limited."
+                                          "Choose 1 to choose the slowest but safest extension strategy. Default: %(default)s")
+        group_extending.add_argument("--bowtie2-options", dest="bowtie2_options", default="--very-fast -t",
+                                     help="Bowtie2 options, such as '--ma 3 --mp 5,2 --very-fast -t'. Default: %(default)s.")
+        group_extending.add_argument("--larger-auto-ws", dest="larger_auto_ws", default=False, action="store_true",
+                                     help="By using this flag, the empirical function for estimating W would tend to "
+                                          "produce a relative larger W, which would speed up the matching in extending, "
+                                          "reduce the memory cost in extending, but increase the risk of broken final "
+                                          "graph. Suggested when the data is good with high and homogenous coverage.")
+        mixed_organelles = ("other_pt", "embplant_mt", "fungus_mt")
+        group_extending.add_argument("--target-genome-size", dest="target_genome_size", default='130000', type=str,
+                                     help="Hypothetical value(s) of target genome size. This is only used for estimating "
+                                          "word size when no '-w word_size' is given. "
+                                          "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
+                                          "with the same list length to organelle_type (followed by '-F'). "
+                                          "Default: " +
+                                          " or ".join(
+                                              [str(
+                                                  ORGANELLE_EXPECTED_GRAPH_SIZES[this_type]) + " (-F " + this_type + ")"
+                                               for this_type in SUPPORTED_ORGANELLE_TYPES]) + " or " +
+                                          ",".join([str(ORGANELLE_EXPECTED_GRAPH_SIZES[this_type])
+                                                    for this_type in mixed_organelles]) +
+                                          " (-F " + ",".join(mixed_organelles) + ")")
+        group_extending.add_argument("--max-extending-len", dest="max_extending_len", type=str,
+                                     help="Maximum extending length(s) derived from the seed(s). "
+                                          "A single value could be a non-negative number, or inf (infinite) "
+                                          "or auto (automatic estimation). "
+                                          "This is designed for properly stopping the extending from getting too long and "
+                                          "saving computational resources. However, empirically, a maximum extending length "
+                                          "value larger than 6000 would not be helpful for saving computational resources. "
+                                          "This value would not be precise in controlling output size, especially "
+                                          "when pre-group (followed by '-P') is turn on."
+                                          "In the auto mode, the maximum extending length is estimated based on the sizes of "
+                                          "the gap regions that not covered in the seed sequences. A sequence of a closely "
+                                          "related species would be preferred for estimating a better maximum extending "
+                                          "length value. If you are using limited loci, e.g. rbcL gene as the seed for "
+                                          "assembling the whole plastome (with extending length ca. 75000 >> 6000), "
+                                          "you should set maximum extending length to inf. "
+                                          "Should be a list of numbers/auto/no split by comma(s) on a multi-organelle mode, "
+                                          "with the same list length to organelle_type (followed by '-F'). "
+                                          "Default: no. ")
+        # group 4
+        group_assembly = parser.add_argument_group("ASSEMBLY OPTIONS", "These options are about the assembly and "
+                                                                       "graph disentangling")
+        group_assembly.add_argument("-k", dest="spades_kmer", default="21,55,85,115",
+                                    help="SPAdes kmer settings. Use the same format as in SPAdes. illegal kmer values "
+                                         "would be automatically discarded by GetOrganelle. "
+                                         "Default: %(default)s")
+        group_assembly.add_argument("--spades-options", dest="other_spades_options", default="",
+                                    help="Other SPAdes options. Use double quotation marks to include all the arguments "
+                                         "and parameters.")
+        group_assembly.add_argument("--no-spades", dest="run_spades", action="store_false", default=True,
+                                    help="Disable SPAdes.")
+        group_assembly.add_argument("--ignore-k", dest="ignore_kmer_res", default=40, type=int,
+                                    help="A kmer threshold below which, no slimming/disentangling would be executed"
+                                         " on the result. Default: %(default)s")
+        group_assembly.add_argument("--genes", dest="genes_fasta",
+                                    help="Followed with a customized database (a fasta file or the base name of a "
+                                         "blast database) containing or made of ONE set of protein coding genes "
+                                         "and ribosomal RNAs extracted from ONE reference genome that you want to assemble. "
+                                         "Should be a list of databases split by comma(s) on a multi-organelle mode, "
+                                         "with the same list length to organelle_type (followed by '-F'). "
+                                         "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
+                                         "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
+                                                                                                    "contingent on the organelle types chosen (-F). "
+                                                                                                    "The default value no longer holds when '--genes' or '--ex-genes' is used.")
+        group_assembly.add_argument("--ex-genes", dest="exclude_genes",
+                                    help="This is optional and Not suggested, since non-target contigs could contribute "
+                                         "information for better downstream coverage-based clustering. "
+                                         "Followed with a customized database (a fasta file or the base name of a "
+                                         "blast database) containing or made of protein coding genes "
+                                         "and ribosomal RNAs extracted from reference genome(s) that you want to exclude. "
+                                         "Could be a list of databases split by comma(s) but "
+                                         "NOT required to have the same list length to organelle_type (followed by '-F'). "
+                                         "The default value no longer holds when '--genes' or '--ex-genes' is used.")
+        group_assembly.add_argument("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
+                                    help="Depth factor for differentiate genome type of contigs. "
+                                         "The genome type of contigs are determined by blast. "
+                                         "Default: %(default)s")
+        group_assembly.add_argument("--contamination-depth", dest="contamination_depth", default=3., type=float,
+                                    help="Depth factor for confirming contamination in parallel contigs. Default: %(default)s")
+        group_assembly.add_argument("--contamination-similarity", dest="contamination_similarity", default=0.9,
+                                    type=float,
+                                    help="Similarity threshold for confirming contaminating contigs. Default: %(default)s")
+        group_assembly.add_argument("--no-degenerate", dest="degenerate", default=True, action="store_false",
+                                    help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
+        group_assembly.add_argument("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
+                                    help="Depth factor for confirming parallel contigs. Default: %(default)s")
+        group_assembly.add_argument("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
+                                    help="Similarity threshold for confirming parallel contigs. Default: %(default)s")
+        group_assembly.add_argument("--disentangle-time-limit", dest="disentangle_time_limit", default=1800, type=int,
+                                    help="Time limit (second) for each try of disentangling a graph file as a circular "
+                                         "genome. Disentangling a graph as contigs is not limited. Default: %(default)s")
+        group_assembly.add_argument("--expected-max-size", dest="expected_max_size", default='250000', type=str,
+                                    help="Expected maximum target genome size(s) for disentangling. "
+                                         "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
+                                         "with the same list length to organelle_type (followed by '-F'). "
+                                         "Default: 250000 (-F embplant_pt/fungus_mt), "
+                                         "25000 (-F embplant_nr/animal_mt/fungus_nr), 1000000 (-F embplant_mt/other_pt),"
+                                         "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
+        group_assembly.add_argument("--expected-min-size", dest="expected_min_size", default=10000, type=int,
+                                    help="Expected minimum target genome size(s) for disentangling. "
+                                         "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
+                                         "with the same list length to organelle_type (followed by '-F'). "
+                                         "Default: %(default)s for all.")
+        group_assembly.add_argument("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
+                                    help="For '-F embplant_pt' with complete circular result, "
+                                         "by default, the direction of the starting contig (usually "
+                                         "the LSC region) is determined as the direction with less ORFs. Choose this option "
+                                         "to reverse the direction of the starting contig when result is circular. "
+                                         "Actually, both directions are biologically equivalent to each other. The "
+                                         "reordering of the direction is only for easier downstream analysis.")
+        group_assembly.add_argument("--max-paths-num", dest="max_paths_num", default=1000, type=int,
+                                    help="Repeats would dramatically increase the number of potential isomers (paths). "
+                                         "This option was used to export a certain amount of paths out of all possible paths "
+                                         "per assembly graph. Default: %(default)s")
+        # group 5
+        group_computational = parser.add_argument_group("ADDITIONAL OPTIONS", "")
+        group_computational.add_argument("-t", dest="threads", type=int, default=1,
+                                         help="Maximum threads to use.")
+        group_computational.add_argument("-P", dest="pre_grouped", type=float, default=2E5,
+                                         help="The maximum number (integer) of high-covered reads to be pre-grouped "
+                                              "before extending process. pre_grouping is suggested when the whole genome "
+                                              "coverage is shallow but the organ genome coverage is deep. "
+                                              "The default value is 2E5. "
+                                              "For personal computer with 8G memory, we suggest no more than 3E5. "
+                                              "A larger number (ex. 6E5) would run faster but exhaust memory "
+                                              "in the first few minutes. Choose 0 to disable this process.")
+        group_computational.add_argument("--which-blast", dest="which_blast", default="",
+                                         help="Assign the path to BLAST binary files if not added to the path. "
+                                              "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
+                                              "/ncbi-blast\" first, then $PATH")
+        group_computational.add_argument("--which-bowtie2", dest="which_bowtie2", default="",
+                                         help="Assign the path to Bowtie2 binary files if not added to the path. "
+                                              "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
+                                              "/bowtie2\" first, then $PATH")
+        group_computational.add_argument("--which-spades", dest="which_spades", default="",
+                                         help="Assign the path to SPAdes binary files if not added to the path. "
+                                              "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
+                                              "/SPAdes\" first, then $PATH")
+        group_computational.add_argument("--which-bandage", dest="which_bandage", default="",
+                                         help="Assign the path to bandage binary file if not added to the path. "
+                                              "Default: try $PATH")
+        group_computational.add_argument("--continue", dest="script_resume", default=False, action="store_true",
+                                         help="Several check points based on files produced, rather than on the log file, "
+                                              "so keep in mind that this script will NOT detect the difference "
+                                              "between this input parameters and the previous ones.")
+        group_computational.add_argument("--overwrite", dest="script_overwrite", default=False, action="store_true",
+                                         help="Overwrite previous file if existed. ")
+        group_computational.add_argument("--index-in-memory", dest="index_in_memory", action="store_true",
+                                         default=False,
+                                         help="Keep index in memory. Choose save index in memory than in disk.")
+        group_computational.add_argument("--remove-duplicates", dest="rm_duplicates", default=1E7, type=float,
+                                         help="By default this script use unique reads to extend. Choose the number of "
+                                              "duplicates (integer) to be saved in memory. A larger number (ex. 2E7) would "
+                                              "run faster but exhaust memory in the first few minutes. "
+                                              "Choose 0 to disable this process. "
+                                              "Note that whether choose or not will not disable "
+                                              "the calling of replicate reads. Default: %(default)s.")
+        group_computational.add_argument("--flush-step", dest="echo_step", default=54321,
+                                         help="Flush step (INTEGER OR INF) for presenting progress. "
+                                              "For running in the background, you could set this to inf, "
+                                              "which would disable this. Default: %(default)s")
+        group_computational.add_argument("--random-seed", dest="random_seed", default=12345, type=int,
+                                         help="Default: %(default)s")
+        group_computational.add_argument("--verbose", dest="verbose_log", action="store_true", default=False,
+                                         help="Verbose output. Choose to enable verbose running log_handler.")
+
+        parser.add_argument("-v", "--version", action="version",
+                            version="GetOrganelle v{version}".format(version=version))
+        parser.add_argument("-h", dest="simple_help", default=False, action="store_true",
+                            help="print brief introduction for frequently-used options.")
+        parser.add_argument("--help", dest="verbose_help", default=False, action="store_true",
+                            help="print verbose introduction for all options.")
+        if "--help" in sys.argv:
+            parser.print_help()
+            exit()
+
+    # if "--help" in sys.argv:
+    #     parser.add_option_group(group_inout)
+    #     parser.add_option_group(group_scheme)
+    #     parser.add_option_group(group_extending)
+    #     parser.add_option_group(group_assembly)
+    #     parser.add_option_group(group_computational)
+    #
+    # elif "-h" in sys.argv:
+    #     for not_often_used in ("-a", "--max-ignore-percent", "--reduce-reads-for-coverage", "--phred-offset",
+    #                            "--min-quality-score", "--prefix", "--out-per-round", "--zip-files", "--keep-temp",
+    #                            "--config-dir",
+    #                            "--memory-save", "--memory-unlimited", "--pre-w", "--max-n-words",
+    #                            "-J", "-M", "--bowtie2-options",
+    #                            "--larger-auto-ws", "--target-genome-size", "--spades-options", "--no-spades",
+    #                            "--ignore-k", "--genes", "--ex-genes", "--disentangle-df",
+    #                            "--contamination-depth", "--contamination-similarity", "--no-degenerate",
+    #                            "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
+    #                            "--expected-max-size", "--expected-min-size", "--reverse-lsc", "--max-paths-num",
+    #                            "--which-blast", "--which-bowtie2", "--which-spades", "--which-bandage",
+    #                            "--continue", "--overwrite", "--index-in-memory",
+    #                            "--remove-duplicates", "--flush-step", "--verbose"):
+    #         parser.remove_option(not_often_used)
+    #
+    # else:
+    #     parser.add_option_group(group_inout)
+    #     parser.add_option_group(group_scheme)
+    #     parser.add_option_group(group_extending)
+    #     parser.add_option_group(group_assembly)
+    #     parser.add_option_group(group_computational)
     # redirect organelle types before parsing arguments
     redirect_organelle_types = {"plant_cp": "embplant_pt",
                                 "plant_pt": "embplant_pt",
@@ -465,31 +478,35 @@ def get_options(description, version):
                 sys.argv[go_arg] = ",".join(new_arg)
     #
     try:
-        (options, args) = parser.parse_args()
+        options = parser.parse_args()
     except Exception as e:
-        sys.stdout.write("\n############################################################################" + str(e))
-        sys.stdout.write("\n\"-h\" for more usage")
+        sys.stderr.write("\n############################################################################\n" + str(e))
+        sys.stderr.write("\n\"-h\" for more usage\n")
         exit()
     else:
+        # if pos_args:
+        #     sys.stderr.write("\n############################################################################"
+        #                      "\nUnrecognized options: " + "\", \"".join(pos_args) + "\n")
+        #     exit()
         if not ((options.fq_file_1 and options.fq_file_2) or options.unpaired_fq_files):
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: Insufficient arguments!\n")
-            sys.stdout.write("Missing/Illegal input reads file(s) (followed after '-1&-2' and/or '-u')!\n")
+            sys.stderr.write("Missing/Illegal input reads file(s) (followed after '-1&-2' and/or '-u')!\n")
             exit()
         if not options.output_base:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: Insufficient arguments!\n")
-            sys.stdout.write("Missing option: output directory (followed after '-o')!\n")
+            sys.stderr.write("Missing option: output directory (followed after '-o')!\n")
             exit()
         if not options.organelle_type:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: Insufficient arguments!\n")
-            sys.stdout.write("Missing option: organelle type (followed after '-F')!\n")
+            sys.stderr.write("Missing option: organelle type (followed after '-F')!\n")
             exit()
         else:
             options.organelle_type = options.organelle_type.split(",")
         if int(bool(options.fq_file_1)) + int(bool(options.fq_file_2)) == 1:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: unbalanced paired reads!\n\n")
             exit()
 
@@ -500,7 +517,7 @@ def get_options(description, version):
                 _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
                 _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
             else:
-                sys.stdout.write("\n############################################################################"
+                sys.stderr.write("\n############################################################################"
                                  "\nERROR: path " + _GO_PATH + " invalid!\n")
                 exit()
 
@@ -508,7 +525,7 @@ def get_options(description, version):
             if not ((os.path.isfile(os.path.join(_LBL_DB_PATH, this_sub_organelle + ".fasta")) or options.genes_fasta)
                     and
                     (os.path.isfile(os.path.join(_SEQ_DB_PATH, this_sub_organelle + ".fasta")) or options.seed_file)):
-                sys.stdout.write("\n############################################################################"
+                sys.stderr.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
                                  "\nInstall it by: get_organelle_config.py -a " + this_sub_organelle +
@@ -518,14 +535,14 @@ def get_options(description, version):
         for sub_organelle_t in options.organelle_type:
             if sub_organelle_t not in {"embplant_pt", "other_pt", "embplant_mt", "embplant_nr", "animal_mt",
                                        "fungus_mt", "fungus_nr", "anonym"}:
-                sys.stdout.write("\n############################################################################"
+                sys.stderr.write("\n############################################################################"
                                  "\nERROR: \"-F\" MUST be one of 'embplant_pt', 'other_pt', 'embplant_mt', "
                                  "'embplant_nr', 'animal_mt', 'fungus_mt', 'fungus_nr', 'anonym', "
                                  "or a combination of above split by comma(s)!\n\n")
                 exit()
             elif sub_organelle_t == "anonym":
                 if not options.seed_file or not options.genes_fasta:
-                    sys.stdout.write("\n############################################################################"
+                    sys.stderr.write("\n############################################################################"
                                      "\nERROR: \"-s\" and \"--genes\" must be specified when \"-F anonym\"!\n\n")
                     exit()
             else:
@@ -544,47 +561,47 @@ def get_options(description, version):
             use_default_seed = False
             options.seed_file = str(options.seed_file).split(",")
             if len(options.seed_file) != organelle_type_len:
-                sys.stdout.write("\n############################################################################"
+                sys.stderr.write("\n############################################################################"
                                  "\nERROR: -F is followed with " + str(organelle_type_len) + " organelle types, " +
                                  "while -s is followed with " + str(len(options.seed_file)) + " file(s)!\n")
                 exit()
         for check_file in [options.fq_file_1, options.fq_file_2, options.anti_seed] + options.seed_file:
             if check_file:
                 if not os.path.exists(check_file):
-                    sys.stdout.write("\n############################################################################"
+                    sys.stderr.write("\n############################################################################"
                                      "\nERROR: " + check_file + " not found!\n\n")
                     exit()
                 if os.path.getsize(check_file) == 0:
-                    sys.stdout.write("\n############################################################################"
+                    sys.stderr.write("\n############################################################################"
                                      "\nERROR: " + check_file + " is empty!\n\n")
                     exit()
         if options.unpaired_fq_files:
             options.unpaired_fq_files = options.unpaired_fq_files.split(",")
             for fastq_file in options.unpaired_fq_files:
                 if not os.path.exists(fastq_file):
-                    sys.stdout.write("\n############################################################################"
+                    sys.stderr.write("\n############################################################################"
                                      "\nERROR: " + fastq_file + " not found!\n\n")
                     exit()
         else:
             options.unpaired_fq_files = []
         if options.jump_step < 1:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: Jump step MUST be an integer that >= 1\n")
             exit()
         if options.mesh_size < 1:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: Mesh size MUST be an integer that >= 1\n")
             exit()
         if options.fq_file_1 == options.fq_file_2 and options.fq_file_1:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: 1st fastq file is the same with 2nd fastq file!\n")
             exit()
         if options.memory_save and options.memory_unlimited:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: \"--memory-save\" and \"--memory-unlimited\" are not compatible!\n")
         assert options.threads > 0
         if options.reduce_reads_for_cov < 10:
-            sys.stdout.write("\n############################################################################"
+            sys.stderr.write("\n############################################################################"
                              "\nERROR: value after \"--reduce-reads-for-coverage\" must be larger than 10!\n")
             exit()
         if options.echo_step == "inf":
@@ -595,21 +612,45 @@ def get_options(description, version):
             try:
                 options.echo_step = int(float(options.echo_step))
             except ValueError:
-                sys.stdout.write("\n############################################################################"
+                sys.stderr.write("\n############################################################################"
                                  "\n--flush-step should be followed by positive integer or inf!\n")
                 exit()
         assert options.echo_step > 0
         assert options.max_paths_num > 0
         assert options.phred_offset in (-1, 64, 33)
+        assert options.script_resume + options.script_overwrite < 2, "'--overwrite' conflicts with '--continue'"
         options.prefix = os.path.basename(options.prefix)
-        if options.script_resume and os.path.isdir(options.output_base):
-            previous_attributes = LogInfo(options.output_base, options.prefix).__dict__
+        if os.path.isdir(options.output_base):
+            if options.script_resume:
+                previous_attributes = LogInfo(options.output_base, options.prefix).__dict__
+            else:
+                if options.script_overwrite:
+                    try:
+                        shutil.rmtree(options.output_base)
+                    except OSError as e:
+                        sys.stderr.write(
+                            "\n############################################################################"
+                            "\nRemoving existed " + options.output_base + " failed! "
+                            "\nPlease manually remove it or use a new output directory!\n")
+                    os.mkdir(options.output_base)
+                else:
+                    sys.stderr.write("\n############################################################################"
+                                     "\n" + options.output_base + " existed! "
+                                     "\nPlease use a new output directory, or use '--continue'/'--overwrite'\n")
+                    exit()
+                previous_attributes = {}
         else:
-            previous_attributes = {}
             options.script_resume = False
-        if not os.path.isdir(options.output_base):
             os.mkdir(options.output_base)
-            options.script_resume = False
+            previous_attributes = {}
+        # if options.script_resume and os.path.isdir(options.output_base):
+        #     previous_attributes = LogInfo(options.output_base, options.prefix).__dict__
+        # else:
+        #     previous_attributes = {}
+        #     options.script_resume = False
+        # if not os.path.isdir(options.output_base):
+        #     os.mkdir(options.output_base)
+        #     options.script_resume = False
         log_handler = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
         log_handler.info("")
         log_handler.info(description)
@@ -658,8 +699,8 @@ def get_options(description, version):
         log_handler.info("DEPENDENCIES: " + "; ".join(dep_versions_info))
         # log database
         log_handler.info("GETORG_PATH=" + _GO_PATH)
-        existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
-                                                                   lbl_db_path=_LBL_DB_PATH, silent=True)
+        existing_seed_db, existing_label_db = get_current_db_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
+                                                                      lbl_db_path=_LBL_DB_PATH, silent=True)
         if use_default_seed:
             log_seed_types = deepcopy(options.organelle_type)
             if "embplant_pt" in log_seed_types and "embplant_mt" not in log_seed_types:
@@ -912,7 +953,7 @@ def get_options(description, version):
             else:
                 options.which_spades = ""
                 if not executable("spades.py -h"):
-                    log_handler.warning("spades.py not found in the PATH. "
+                    log_handler.error("spades.py not found in the PATH. "
                                         "Adding SPAdes binary dir to the PATH or using \"--which-spades\" to fix this. "
                                         "Now only get the reads and skip assembly.")
                     options.run_spades = False
@@ -920,17 +961,17 @@ def get_options(description, version):
                     run_slim = True
                     run_disentangle = True
             if not executable(os.path.join(options.which_blast, "blastn")):
-                log_handler.warning(os.path.join(options.which_blast, "blastn") +
+                log_handler.error(os.path.join(options.which_blast, "blastn") +
                                     " not accessible! Slimming/Disentangling disabled!!\n")
                 run_slim = False
                 run_disentangle = False
             if options.genes_fasta and not executable(os.path.join(options.which_blast, "makeblastdb")):
-                log_handler.warning(os.path.join(options.which_blast, "makeblastdb") +
+                log_handler.error(os.path.join(options.which_blast, "makeblastdb") +
                                     " not accessible! Slimming/Disentangling disabled!!\n")
                 run_slim = False
                 run_disentangle = False
             if lib_not_available:
-                log_handler.warning("/".join(lib_not_available) + " not available! Disentangling disabled!!\n")
+                log_handler.error("/".join(lib_not_available) + " not available! Disentangling disabled!!\n")
                 run_disentangle = False
         options.rm_duplicates = int(options.rm_duplicates)
         options.pre_grouped = int(options.pre_grouped)
@@ -1005,7 +1046,10 @@ def estimate_maximum_n_reads_using_mapping(
                             / max_organelle_base_percent * GUESSING_FQ_SEQ_INFLATE_TO_FILE
         if sum(original_fq_sizes) < min_file_size:
             if not keep_temp:
-                shutil.rmtree(check_dir)
+                try:
+                    shutil.rmtree(check_dir)
+                except OSError:
+                    log_handler.warning("Removing temporary directory " + check_dir + " failed.")
             return result_n_reads
     #
     count_round = 1
@@ -1130,7 +1174,10 @@ def estimate_maximum_n_reads_using_mapping(
             result_n_reads = [maximum_n_reads_hard_bound] * len(original_fq_list)
         break
     if not keep_temp:
-        shutil.rmtree(check_dir)
+        try:
+            shutil.rmtree(check_dir)
+        except OSError:
+            log_handler.warning("Removing temporary directory " + check_dir + " failed.")
     return result_n_reads
 
 
@@ -3163,11 +3210,11 @@ def assembly_with_spades(spades_kmer, spades_out_put, parameters, out_base, pref
 
 def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ignore_kmer_res, max_slim_extending_len,
                        verbose_log, log_handler, threads, which_blast="", resume=False, keep_temp=False):
-    if executable(os.path.join(UTILITY_PATH, "slim_graph.py")):
+    if executable(os.path.join(UTILITY_PATH, "slim_graph.py -h")):
         which_slim = UTILITY_PATH
-    elif executable(os.path.join(PATH_OF_THIS_SCRIPT, "slim_graph.py")):
+    elif executable(os.path.join(PATH_OF_THIS_SCRIPT, "slim_graph.py -h")):
         which_slim = PATH_OF_THIS_SCRIPT
-    elif executable("slim_graph.py"):
+    elif executable("slim_graph.py -h"):
         which_slim = ""
     else:
         raise Exception("slim_graph.py not found!")
@@ -3435,11 +3482,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         this_out_base = o_p + ".contigs.graph" + str(go_res) + ".selected_graph."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
-                        image_produced = draw_assembly_graph_using_bandage(
-                            input_graph_file=this_out_base + "gfa",
-                            output_image_file=this_out_base + "png",
-                            assembly_graph_ob=broken_graph,
-                            log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
+                        # image_produced = draw_assembly_graph_using_bandage(
+                        #     input_graph_file=this_out_base + "gfa",
+                        #     output_image_file=this_out_base + "png",
+                        #     assembly_graph_ob=broken_graph,
+                        #     log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                 if set(still_complete) == {"complete"}:
                     log_in.info("Result status of " + mode_in + ": circular genome")
                 elif set(still_complete) == {"nearly-complete"}:

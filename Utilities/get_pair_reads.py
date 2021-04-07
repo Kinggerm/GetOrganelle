@@ -2,10 +2,10 @@
 import sys
 import time
 import os
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from GetOrganelleLib.seq_parser import get_paired_and_unpaired_reads
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 time0 = time.time()
 if len(sys.argv) == 3:
     try:

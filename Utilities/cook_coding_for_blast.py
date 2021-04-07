@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import sys
 import os
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
-sys.path.insert(0, os.path.join(path_of_this_script, ".."))
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 from GetOrganelleLib.seq_parser import *
-path_of_this_script = os.path.split(os.path.realpath(__file__))[0]
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 
 if len(sys.argv) < 2 or "-h" in sys.argv or "--help" in sys.argv:
     sys.stdout.write("usage: python cook_coding_for_blast.py fasta_files\n")

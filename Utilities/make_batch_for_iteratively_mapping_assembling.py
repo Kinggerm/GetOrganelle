@@ -2,11 +2,13 @@
 import os
 import sys
 import platform
-from optparse import OptionParser as Option
+from argparse import ArgumentParser as Option
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.pipe_control_func import executable
+from GetOrganelleLib.versions import get_versions
+PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 SYSTEM_NAME = ""
 if platform.system() == "Linux":
     SYSTEM_NAME = "linux"
@@ -25,28 +27,30 @@ sys.stdout.flush()
 usage = "\n" + str(os.path.basename(__file__)) + \
         " -1 original_1.fq -2 original_2.fq -s seed.fasta -R 5 -k 21,45,65,85,105 -o output_base"
 parser = Option(usage=usage)
-parser.add_option('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
-parser.add_option('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
-parser.add_option('-s', dest='seed_dir', help='Input fasta format file as initial seed')
-parser.add_option('-R', dest='rounds', default=3, type=int,
+parser.add_argument('-1', dest='fastq_file_1', help='Input 1st fastq format file as pool')
+parser.add_argument('-2', dest='fastq_file_2', help='Input 2nd fastq format file as pool')
+parser.add_argument('-s', dest='seed_dir', help='Input fasta format file as initial seed')
+parser.add_argument('-R', dest='rounds', default=3, type=int,
                   help='How many iterations would you like to have? Default=3')
-parser.add_option('-t', dest="threads", default=1, type=int,
+parser.add_argument('-t', dest="threads", default=1, type=int,
                   help="theads used for bowtie2 and SPAdes. Default=1")
-parser.add_option('-k', dest='spades_kmer', default='21,45,65,85,105',
+parser.add_argument('-k', dest='spades_kmer', default='21,45,65,85,105',
                   help='SPAdes k-mer settings. Use the same format as in SPAdes. Default=21,45,65,85,105')
-parser.add_option('-o', dest='output_sh_file',
+parser.add_argument('-o', dest='output_sh_file',
                   help='Executable output batch file.')
-parser.add_option('--un', dest='unpaired', default=False, action='store_true',
+parser.add_argument('--un', dest='unpaired', default=False, action='store_true',
                   help='Try to map and assembly without paired information.')
-parser.add_option('--random-seed', dest="random_seed", type=int, default=12345,
-                  help="seed for random generator for bowtie2. Default: %default")
-parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
+parser.add_argument('--random-seed', dest="random_seed", type=int, default=12345,
+                  help="seed for random generator for bowtie2. Default: %(default)s")
+parser.add_argument("--which-bowtie2", dest="which_bowtie2", default="",
                   help="Assign the path to Bowtie2 binary files if not added to the path. "
                        "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/bowtie2 first, then $PATH")
-parser.add_option("--which-spades", dest="which_spades", default="",
+parser.add_argument("--which-spades", dest="which_spades", default="",
                   help="Assign the path to SPAdes binary files if not added to the path. "
                        "Default: try GetOrganelleDep/" + SYSTEM_NAME + "/SPAdes first, then $PATH")
-options, args = parser.parse_args()
+parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+options = parser.parse_args()
 if not (options.seed_dir and options.fastq_file_1 and options.fastq_file_2 and options.output_sh_file):
     parser.print_help()
     sys.stdout.write('\nERROR: Insufficient arguments!\n')

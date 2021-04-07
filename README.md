@@ -155,7 +155,7 @@ To extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`
 
 ## Contact
 
-If your question is running specific, please attach the `get_org.log.txt` file and the post-slimming assembly graph (`assembly_graph.fastg.extend_*.fastg`, could be Bandage-visualized *.png format to protect your data privacy).
+Please check [GetOrganelle wiki page](https://github.com/Kinggerm/GetOrganelle/wiki) first. If your question is running specific, please attach the `get_org.log.txt` file and the post-slimming assembly graph (`assembly_graph.fastg.extend_*.fastg`, could be Bandage-visualized *.png format to protect your data privacy).
 
 Although older versions like 1.6.3/1.7.1 will be more stable, but we encourage you to keep updated. GetOrganelle was actively updated with new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
 

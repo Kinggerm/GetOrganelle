@@ -69,6 +69,7 @@ class SequenceList(object):
         self.sequences = []
         self.interleaved = False
         self.__dict = {}
+        self.__indexed = indexed
         if input_fasta_file:
             self.read_fasta(input_fasta_file)
             if indexed:
@@ -83,13 +84,21 @@ class SequenceList(object):
             yield seq
 
     def __getitem__(self, item):
-        if isinstance(item, str):
+        if isinstance(item, str) and self.__indexed:
             return self.sequences[self.__dict[item]]
         else:
             return self.sequences[item]
 
+    def __contains__(self, item):
+        if isinstance(item, str) and self.__indexed:
+            return item in self.__dict
+        else:
+            return item in self.sequences
+
     def append(self, sequence):
         self.sequences.append(sequence)
+        if self.__indexed:
+            self.__dict[sequence.label] = len(self.sequences) - 1
 
     def remove(self, names):
         del_names = set(names)
@@ -101,6 +110,8 @@ class SequenceList(object):
             else:
                 go_to += 1
         if del_names:
+            for go_s, seq in enumerate(self.sequences):
+                self.__dict[seq.label] = go_s
             sys.stdout.write("Warning: sequence(s) " + ",".join(sorted(del_names)) + " not found!\n")
 
     def read_fasta(self, fasta_file):

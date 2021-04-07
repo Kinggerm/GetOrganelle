@@ -6,6 +6,20 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.4",
+        "features": [
+            "1. SequenceList: self.__indexed updated",
+            "2. get_static_html_context: requests.exceptions.ReadTimeout added"
+            "3. get_organelle_from_reads.py: '--overwrite' added; catch shutil.rmtree() errors; no python-lib -> error."
+            "4. get_organelle_from_*.py: turning off bandage if the result is not circular",
+            "5. assembly_parser.py: recording every overlap value rather than using a universal value for hifiasm (in response to Christopher Benson@PSU)",
+            "6. optparse -> argparse (in response to Matthias Bernt@UFZ)",
+            "7. get_organelle_from_assembly.py: fix a bug with the malfunction of --continue when the input is gfa ",
+            "8. get_organelle_from_reads.py/disentangle_organelle_assembly.py: correct typos",
+        ],
+        "time": "2021-03-31 17:00 UTC+8"
+    },
+    {
         "number": "1.7.4-pre2",
         "features": [
             "1. README.md: updated",
@@ -160,7 +174,7 @@ versions = [
     {
      "number": "1.7.0c",
      "features": [
-         "Utilities/slim_fastg.py: fix a bug with anonym mode",
+         "Utilities/slim_graph.py: fix a bug with anonym mode",
          "README.md: updated"
      ],
      "time": "2020-07-21 10:55 UTC+8"
@@ -214,7 +228,7 @@ versions = [
      "time": "2020-05-28 18:40 GMT-6"},
     {"number": "1.7.0-beta4",
      "features": [
-         "1. Utilities/slim_fastg -> Utilities/slim_fastg: 1) reorganized; 2) added support for gfa format graph file;"
+         "1. Utilities/slim_fastg -> Utilities/slim_graph: 1) reorganized; 2) added support for gfa format graph file;"
              "3) --max-slim-extending-len added",
          "2. get_organelle_config.py added with *Database removed",
          "3. get_organelle_from_reads.py: "

@@ -5,7 +5,7 @@ try:
     from math import inf
 except ImportError:
     inf = float("inf")
-from optparse import OptionParser
+from argparse import ArgumentParser
 import GetOrganelleLib
 from GetOrganelleLib.pipe_control_func import *
 from GetOrganelleLib.seq_parser import read_fasta, detect_plastome_architecture, DEGENERATE_BASES
@@ -14,7 +14,7 @@ import random
 import subprocess
 import sys
 import os
-from shutil import copyfile
+from shutil import copyfile, rmtree
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
@@ -47,185 +47,170 @@ else:
 
 def get_options(description, version):
     usage = str(os.path.basename(__file__) + " -g assembly_graph_file -F embplant_pt -o output --min-depth 10")
-    parser = OptionParser(usage=usage, version=version, description=description, add_help_option=False)
-    parser.add_option("-F", dest="organelle_type",
-                      help="This flag should be followed with embplant_pt (embryophyta plant plastome), "
-                           "other_pt (non-embryophyta plant plastome), embplant_mt "
-                           "(plant mitochondrion), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
-                           "(animal mitochondrion), fungus_mt (fungus mitochondrion), "
-                           "fungus_nr (fungus nuclear ribosomal RNA), "
-                           "or embplant_mt,other_pt,fungus_mt "
-                           "(the combination of any of above organelle genomes split by comma(s), "
-                           "which might be computationally more intensive than separate runs), "
-                           "or anonym (uncertain organelle genome type, with customized gene database "
-                           "('--genes'), which is suggested only when the above database is genetically distant "
-                           "from your sample) or raw (disentangle the raw graph directly without tagging).")
-    parser.add_option("-g", dest="input_graph", help="Input assembly graph (fastg/gfa) file. "
-                                                     "The format will be recognized by the file name suffix.")
-    parser.add_option("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
-    parser.add_option('--min-depth', dest='min_depth', default=0., type=float,
-                      help='Input a float or integer number. Filter graph file by a minimum depth. Default: %default.')
-    parser.add_option('--max-depth', dest='max_depth', default=inf, type=float,
-                      help='Input a float or integer number. filter graph file by a maximum depth. Default: %default.')
-    parser.add_option("--config-dir", dest="get_organelle_path", default=None,
-                      help="The directory where the configuration file and default databases were placed. "
-                           "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
-                           "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
-                           "Default: " + GO_PATH)
-    parser.add_option("--genes", dest="genes_fasta",
-                      help="Followed with a customized database (a fasta file or the base name of a "
-                           "blast database) containing or made of ONE set of protein coding genes "
-                           "and ribosomal RNAs extracted from ONE reference genome that you want to assemble. "
-                           "Should be a list of databases split by comma(s) on a multi-organelle mode, "
-                           "with the same list length to organelle_type (followed by '-F'). "
-                           "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
-                           "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
-                           "contingent on the organelle types chosen (-F). "
-                           "The default value no longer holds when '--genes' or '--ex-genes' is used.")
-    parser.add_option("--ex-genes", dest="exclude_genes",
-                      help="This is optional and Not suggested, since non-target contigs could contribute "
-                           "information for better downstream coverage-based clustering. "
-                           "Followed with a customized database (a fasta file or the base name of a "
-                           "blast database) containing or made of protein coding genes "
-                           "and ribosomal RNAs extracted from reference genome(s) that you want to exclude. "
-                           "Could be a list of databases split by comma(s) but "
-                           "NOT required to have the same list length to organelle_type (followed by '-F'). "
-                           "The default value no longer holds when '--genes' or '--ex-genes' is used.")
-    parser.add_option("--no-slim", dest="no_slim", default=False, action="store_true",
-                      help="Disable slimming process and directly disentangle the original assembly graph. "
-                           "Default: %default")
-    parser.add_option("--slim-options", dest="slim_options", default="",
-                      help="Other options for calling slim_graph.py")
-    parser.add_option("--max-slim-extending-len", dest="max_slim_extending_len", default=None, type=float,
-                      help="This is used to limit the extending length, below which a \"non-hit contig\" is allowed "
-                           "to be distant from a \"hit contig\" to be kept. "
-                           "See more under slim_graph.py:--max-slim-extending-len. "
-                           "Default: " +
-                           str(MAX_SLIM_EXTENDING_LENS["embplant_pt"]) + " (-F embplant_pt), " +
-                           str(MAX_SLIM_EXTENDING_LENS["embplant_mt"]) + " (-F embplant_mt/fungus_mt/other_pt), " +
-                           str(MAX_SLIM_EXTENDING_LENS["embplant_nr"]) + " (-F embplant_nr/fungus_nr/animal_mt), "
-                           "maximum_of_type1_type2 (-F type1,type2), inf (-F anonym)")
-    parser.add_option("--spades-out-dir", dest="spades_scaffolds_path",
-                      help="Input spades output directory with 'scaffolds.fasta' and 'scaffolds.paths', which are "
-                           "used for scaffolding disconnected contigs with GAPs. Default: disabled")
-    parser.add_option("--depth-factor", dest="depth_factor", default=10.0, type=float,
-                      help="Depth factor for differentiate genome type of contigs. "
-                           "The genome type of contigs are determined by blast. "
-                           "Default: %default")
-    parser.add_option("--type-f", dest="type_factor", type=float, default=3.,
-                      help="Type factor for identifying contig type tag when multiple tags exist in one contig. "
-                           "Default:%default")
-    parser.add_option("--contamination-depth", dest="contamination_depth", default=3., type=float,
-                      help="Depth factor for confirming contamination in parallel contigs. Default: %default")
-    parser.add_option("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
-                      help="Similarity threshold for confirming contaminating contigs. Default: %default")
-    parser.add_option("--no-degenerate", dest="degenerate", default=True, action="store_false",
-                      help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
-    parser.add_option("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
-                      help="Depth factor for confirming parallel contigs. Default: %default")
-    parser.add_option("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
-                      help="Similarity threshold for confirming parallel contigs. Default: %default")
-    parser.add_option("--disentangle-time-limit", dest="disentangle_time_limit", default=3600, type=int,
-                      help="Time limit (second) for each try of disentangling a graph file as a circular "
-                           "genome. Disentangling a graph as contigs is not limited. Default: %default")
-    parser.add_option("--expected-max-size", dest="expected_max_size", default='200000', type=str,
-                      help="Expected maximum target genome size(s) for disentangling. "
-                           "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
-                           "with the same list length to organelle_type (followed by '-F'). "
-                           "Default: 250000 (-F embplant_pt/fungus_mt), 25000 (-F embplant_nr/fungus_nr/animal_mt), "
-                           "1000000 (-F embplant_mt/other_pt), "
-                           "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
-    parser.add_option("--expected-min-size", dest="expected_min_size", default=10000, type=int,
-                      help="Expected minimum target genome size(s) for disentangling. "
-                           "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
-                           "with the same list length to organelle_type (followed by '-F'). "
-                           "Default: %default for all.")
-    parser.add_option("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
-                      help="For '-F embplant_pt' with complete circular result, "
-                           "by default, the direction of the starting contig (usually "
-                           "the LSC contig) is determined as the direction with less ORFs. Choose this option "
-                           "to reverse the direction of the starting contig when result is circular. "
-                           "Actually, both directions are biologically equivalent to each other. The "
-                           "reordering of the direction is only for easier downstream analysis.")
-    parser.add_option("--max-paths-num", dest="max_paths_num", default=1000, type=int,
-                      help="Repeats would dramatically increase the number of potential isomers (paths). "
-                           "This option was used to export a certain amount of paths out of all possible paths "
-                           "per assembly graph. Default: %default")
-    parser.add_option("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
-                      help="By default, this script would pick the contig with highest coverage among all parallel "
-                           "(polymorphic) contigs when degenerating was not applicable. "
-                           "Choose this flag to export all combinations.")
-    parser.add_option("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
-                      help="Minimum deviation factor for excluding non-target contigs. Default:%default")
-    parser.add_option("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
-                      help="Maximum multiplicity of contigs for disentangling genome paths. "
-                           "Should be 1~12. Default:%default")
-    parser.add_option("-t", dest="threads", type=int, default=1,
-                      help="Maximum threads to use.")
-    parser.add_option("--prefix", dest="prefix", default="",
-                      help="Add extra prefix to resulting files under the output directory.")
-    parser.add_option("--which-blast", dest="which_blast", default="",
-                      help="Assign the path to BLAST binary files if not added to the path. "
-                           "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
-                           "/ncbi-blast\" first, then $PATH")
-    parser.add_option("--which-bandage", dest="which_bandage", default="",
-                      help="Assign the path to bandage binary file if not added to the path. Default: try $PATH")
-    parser.add_option("--keep-temp", dest="keep_temp_files", action="store_true", default=False,
-                      help="Choose to keep the running temp/index files.")
-    parser.add_option("--continue", dest="script_resume", default=False, action="store_true",
-                      help="Several check points based on files produced, rather than on the log file, "
-                           "so keep in mind that this script will not detect the difference "
-                           "between this input parameters and the previous ones.")
-    parser.add_option("--random-seed", dest="random_seed", default=12345, type=int,
-                      help="Default: %default")
-    parser.add_option("--verbose", dest="verbose_log", action="store_true", default=False,
-                      help="Verbose output. Choose to enable verbose running log_handler.")
-    parser.add_option("-h", dest="simple_help", default=False, action="store_true",
-                      help="print brief introduction for frequently-used options.")
-    parser.add_option("--help", dest="verbose_help", default=False, action="store_true",
-                      help="print verbose introduction for all options.")
-
-    if "--help" in sys.argv:
-        parser.print_help()
-        exit()
-    elif "-h" in sys.argv:
-        for not_often_used in ("--config-dir", "--genes", "--ex-genes", "--slim-options", "--max-slim-extending-len",
-                               "--depth-factor", "--spades-out-dir", "--type-f",
-                               "--contamination-depth", "--contamination-similarity", "--no-degenerate",
-                               "--degenerate-depth", "--degenerate-similarity", "--disentangle-time-limit",
-                               "--expected-max-size", "--expected-min-size", "--reverse-lsc", "--max-paths-num",
-                               "--keep-all-polymorphic", "--min-sigma", "--max-multiplicity",
-                               "--prefix", "--which-blast", "--which-bandage",
-                               "--keep-temp", "--random-seed", "--verbose"):
-            parser.remove_option(not_often_used)
-        parser.remove_option("-F")
-        parser.add_option("-F", dest="organelle_type",
-                          help="Target organelle genome type(s): "
-                               "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym/"
-                               "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
-        parser.remove_option("-g")
-        parser.add_option("-g", dest="input_graph", help="Input assembly graph (fastg/gfa) file.")
-        parser.remove_option("-o")
-        parser.add_option("-o", dest="output_base", help="Output directory.")
-        parser.remove_option("--min-depth")
-        parser.add_option("--min-depth", dest="min_depth", default=0., type=float,
-                          help="Minimum depth threshold of contigs. Default: %default.")
-        parser.remove_option("--max-depth")
-        parser.add_option("--max-depth", dest="max_depth", default=inf, type=float,
-                          help="Maximum depth threshold of contigs. Default: %default.")
-        parser.remove_option("--no-slim")
-        parser.add_option("--no-slim", dest="no_slim",
-                          help="Disable the slimming process and directly disentangle the assembly graph.")
-        parser.remove_option("-t")
-        parser.add_option("-t", dest="threads", type=int, default=1, help="Maximum threads to use. Default: %default.")
-        parser.remove_option("--continue")
-        parser.add_option("--continue", dest="script_resume", default=False, action="store_true",
-                          help="Resume a previous run. Default: %default.")
+    parser = ArgumentParser(usage=usage, description=description, add_help=False)
+    if "-h" in sys.argv:
+        parser.add_argument("-F", dest="organelle_type",
+                            help="Target organelle genome type(s): "
+                                 "embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym/"
+                                 "embplant_pt,embplant_mt/other_pt,embplant_mt,fungus_mt")
+        parser.add_argument("-g", dest="input_graph", help="Input assembly graph (fastg/gfa) file.")
+        parser.add_argument("-o", dest="output_base", help="Output directory.")
+        parser.add_argument("--min-depth", dest="min_depth", default=0., type=float,
+                            help="Minimum depth threshold of contigs. Default: %(default)s.")
+        parser.add_argument("--max-depth", dest="max_depth", default=inf, type=float,
+                            help="Maximum depth threshold of contigs. Default: %(default)s.")
+        parser.add_argument("--no-slim", dest="no_slim",
+                            help="Disable the slimming process and directly disentangle the assembly graph.")
+        parser.add_argument("-t", dest="threads", type=int, default=1,
+                            help="Maximum threads to use. Default: %(default)s.")
+        parser.add_argument("--continue", dest="script_resume", default=False, action="store_true",
+                            help="Resume a previous run. Default: %(default)s.")
         parser.print_help()
         sys.stdout.write("\n")
         exit()
     else:
-        pass
+        parser.add_argument("-F", dest="organelle_type",
+                            help="This flag should be followed with embplant_pt (embryophyta plant plastome), "
+                                 "other_pt (non-embryophyta plant plastome), embplant_mt "
+                                 "(plant mitochondrion), embplant_nr (plant nuclear ribosomal RNA), animal_mt "
+                                 "(animal mitochondrion), fungus_mt (fungus mitochondrion), "
+                                 "fungus_nr (fungus nuclear ribosomal RNA), "
+                                 "or embplant_mt,other_pt,fungus_mt "
+                                 "(the combination of any of above organelle genomes split by comma(s), "
+                                 "which might be computationally more intensive than separate runs), "
+                                 "or anonym (uncertain organelle genome type, with customized gene database "
+                                 "('--genes'), which is suggested only when the above database is genetically distant "
+                                 "from your sample) or raw (disentangle the raw graph directly without tagging).")
+        parser.add_argument("-g", dest="input_graph", help="Input assembly graph (fastg/gfa) file. "
+                                                         "The format will be recognized by the file name suffix.")
+        parser.add_argument("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")
+        parser.add_argument('--min-depth', dest='min_depth', default=0., type=float,
+                            help='Input a float or integer number. Filter graph file by a minimum depth. Default: %(default)s.')
+        parser.add_argument('--max-depth', dest='max_depth', default=inf, type=float,
+                            help='Input a float or integer number. filter graph file by a maximum depth. Default: %(default)s.')
+        parser.add_argument("--config-dir", dest="get_organelle_path", default=None,
+                            help="The directory where the configuration file and default databases were placed. "
+                                 "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                                 "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                                 "Default: " + GO_PATH)
+        parser.add_argument("--genes", dest="genes_fasta",
+                            help="Followed with a customized database (a fasta file or the base name of a "
+                                 "blast database) containing or made of ONE set of protein coding genes "
+                                 "and ribosomal RNAs extracted from ONE reference genome that you want to assemble. "
+                                 "Should be a list of databases split by comma(s) on a multi-organelle mode, "
+                                 "with the same list length to organelle_type (followed by '-F'). "
+                                 "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
+                                 "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
+                                 "contingent on the organelle types chosen (-F). "
+                                 "The default value no longer holds when '--genes' or '--ex-genes' is used.")
+        parser.add_argument("--ex-genes", dest="exclude_genes",
+                            help="This is optional and Not suggested, since non-target contigs could contribute "
+                                 "information for better downstream coverage-based clustering. "
+                                 "Followed with a customized database (a fasta file or the base name of a "
+                                 "blast database) containing or made of protein coding genes "
+                                 "and ribosomal RNAs extracted from reference genome(s) that you want to exclude. "
+                                 "Could be a list of databases split by comma(s) but "
+                                 "NOT required to have the same list length to organelle_type (followed by '-F'). "
+                                 "The default value no longer holds when '--genes' or '--ex-genes' is used.")
+        parser.add_argument("--no-slim", dest="no_slim", default=False, action="store_true",
+                            help="Disable slimming process and directly disentangle the original assembly graph. "
+                                 "Default: %(default)s")
+        parser.add_argument("--slim-options", dest="slim_options", default="",
+                            help="Other options for calling slim_graph.py")
+        parser.add_argument("--max-slim-extending-len", dest="max_slim_extending_len", default=None, type=float,
+                            help="This is used to limit the extending length, below which a \"non-hit contig\" is allowed "
+                                 "to be distant from a \"hit contig\" to be kept. "
+                                 "See more under slim_graph.py:--max-slim-extending-len. "
+                                 "Default: " +
+                                 str(MAX_SLIM_EXTENDING_LENS["embplant_pt"]) + " (-F embplant_pt), " +
+                                 str(MAX_SLIM_EXTENDING_LENS["embplant_mt"]) + " (-F embplant_mt/fungus_mt/other_pt), " +
+                                 str(MAX_SLIM_EXTENDING_LENS["embplant_nr"]) + " (-F embplant_nr/fungus_nr/animal_mt), "
+                                 "maximum_of_type1_type2 (-F type1,type2), inf (-F anonym)")
+        parser.add_argument("--spades-out-dir", dest="spades_scaffolds_path",
+                            help="Input spades output directory with 'scaffolds.fasta' and 'scaffolds.paths', which are "
+                                 "used for scaffolding disconnected contigs with GAPs. Default: disabled")
+        parser.add_argument("--depth-factor", dest="depth_factor", default=10.0, type=float,
+                            help="Depth factor for differentiate genome type of contigs. "
+                                 "The genome type of contigs are determined by blast. "
+                                 "Default: %(default)s")
+        parser.add_argument("--type-f", dest="type_factor", type=float, default=3.,
+                            help="Type factor for identifying contig type tag when multiple tags exist in one contig. "
+                                 "Default:%(default)s")
+        parser.add_argument("--contamination-depth", dest="contamination_depth", default=3., type=float,
+                            help="Depth factor for confirming contamination in parallel contigs. Default: %(default)s")
+        parser.add_argument("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
+                            help="Similarity threshold for confirming contaminating contigs. Default: %(default)s")
+        parser.add_argument("--no-degenerate", dest="degenerate", default=True, action="store_false",
+                            help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
+        parser.add_argument("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
+                            help="Depth factor for confirming parallel contigs. Default: %(default)s")
+        parser.add_argument("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
+                            help="Similarity threshold for confirming parallel contigs. Default: %(default)s")
+        parser.add_argument("--disentangle-time-limit", dest="disentangle_time_limit", default=3600, type=int,
+                            help="Time limit (second) for each try of disentangling a graph file as a circular "
+                                 "genome. Disentangling a graph as contigs is not limited. Default: %(default)s")
+        parser.add_argument("--expected-max-size", dest="expected_max_size", default='200000', type=str,
+                            help="Expected maximum target genome size(s) for disentangling. "
+                                 "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
+                                 "with the same list length to organelle_type (followed by '-F'). "
+                                 "Default: 250000 (-F embplant_pt/fungus_mt), 25000 (-F embplant_nr/fungus_nr/animal_mt), "
+                                 "1000000 (-F embplant_mt/other_pt), "
+                                 "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
+        parser.add_argument("--expected-min-size", dest="expected_min_size", default=10000, type=int,
+                            help="Expected minimum target genome size(s) for disentangling. "
+                                 "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
+                                 "with the same list length to organelle_type (followed by '-F'). "
+                                 "Default: %(default)s for all.")
+        parser.add_argument("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
+                            help="For '-F embplant_pt' with complete circular result, "
+                                 "by default, the direction of the starting contig (usually "
+                                 "the LSC contig) is determined as the direction with less ORFs. Choose this option "
+                                 "to reverse the direction of the starting contig when result is circular. "
+                                 "Actually, both directions are biologically equivalent to each other. The "
+                                 "reordering of the direction is only for easier downstream analysis.")
+        parser.add_argument("--max-paths-num", dest="max_paths_num", default=1000, type=int,
+                            help="Repeats would dramatically increase the number of potential isomers (paths). "
+                                 "This option was used to export a certain amount of paths out of all possible paths "
+                                 "per assembly graph. Default: %(default)s")
+        parser.add_argument("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
+                            help="By default, this script would pick the contig with highest coverage among all parallel "
+                                 "(polymorphic) contigs when degenerating was not applicable. "
+                                 "Choose this flag to export all combinations.")
+        parser.add_argument("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
+                            help="Minimum deviation factor for excluding non-target contigs. Default:%(default)s")
+        parser.add_argument("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
+                            help="Maximum multiplicity of contigs for disentangling genome paths. "
+                                 "Should be 1~12. Default:%(default)s")
+        parser.add_argument("-t", dest="threads", type=int, default=1,
+                            help="Maximum threads to use.")
+        parser.add_argument("--prefix", dest="prefix", default="",
+                            help="Add extra prefix to resulting files under the output directory.")
+        parser.add_argument("--which-blast", dest="which_blast", default="",
+                            help="Assign the path to BLAST binary files if not added to the path. "
+                                 "Default: try \"" + os.path.realpath(GO_DEP_PATH) +
+                                 "/ncbi-blast\" first, then $PATH")
+        parser.add_argument("--which-bandage", dest="which_bandage", default="",
+                            help="Assign the path to bandage binary file if not added to the path. Default: try $PATH")
+        parser.add_argument("--keep-temp", dest="keep_temp_files", action="store_true", default=False,
+                            help="Choose to keep the running temp/index files.")
+        parser.add_argument("--continue", dest="script_resume", default=False, action="store_true",
+                            help="Several check points based on files produced, rather than on the log file, "
+                                 "so keep in mind that this script will not detect the difference "
+                                 "between this input parameters and the previous ones.")
+        parser.add_argument("--overwrite", dest="script_overwrite", default=False, action="store_true",
+                            help="Overwrite previous file if existed. ")
+        parser.add_argument("--random-seed", dest="random_seed", default=12345, type=int,
+                            help="Default: %(default)s")
+        parser.add_argument("-v", "--version", action="version", version="GetOrganelle v{version}".format(version=version))
+        parser.add_argument("--verbose", dest="verbose_log", action="store_true", default=False,
+                            help="Verbose output. Choose to enable verbose running log_handler.")
+        parser.add_argument("-h", dest="simple_help", default=False, action="store_true",
+                            help="print brief introduction for frequently-used options.")
+        parser.add_argument("--help", dest="verbose_help", default=False, action="store_true",
+                            help="print verbose introduction for all options.")
+        if "--help" in sys.argv:
+            parser.print_help()
+            exit()
 
     # redirect organelle types before parsing arguments
     redirect_organelle_types = {"plant_cp": "embplant_pt",
@@ -246,9 +231,9 @@ def get_options(description, version):
                 sys.argv[go_arg] = ",".join(new_arg)
     #
     try:
-        (options, args) = parser.parse_args()
+        options = parser.parse_args()
     except Exception as e:
-        sys.stdout.write("\n############################################################################" + str(e))
+        sys.stdout.write("\n############################################################################\n" + str(e))
         sys.stdout.write("\n\"-h\" for more usage")
         exit()
     else:
@@ -329,11 +314,32 @@ def get_options(description, version):
         assert options.threads > 0
         assert 12 >= options.max_multiplicity >= 1
         assert options.max_paths_num > 0
+        assert options.script_resume + options.script_overwrite < 2, "'--overwrite' conflicts with '--continue'"
         organelle_type_len = len(options.organelle_type)
         options.prefix = os.path.basename(options.prefix)
-        if not os.path.isdir(options.output_base):
-            os.mkdir(options.output_base)
+
+        if os.path.isdir(options.output_base):
+            if options.script_resume:
+                pass
+            else:
+                if options.script_overwrite:
+                    try:
+                        rmtree(options.output_base)
+                    except OSError as e:
+                        sys.stderr.write(
+                            "\n############################################################################"
+                            "\nRemoving existed " + options.output_base + " failed! "
+                            "\nPlease manually remove it or use a new output directory!\n")
+                    os.mkdir(options.output_base)
+                else:
+                    sys.stderr.write("\n############################################################################"
+                                     "\n" + options.output_base + " existed! "
+                                     "\nPlease use a new output directory, or use '--continue'/'--overwrite'\n")
+                    exit()
+        else:
             options.script_resume = False
+            os.mkdir(options.output_base)
+
         log_handler = simple_log(logging.getLogger(), options.output_base, options.prefix + "get_org.")
         log_handler.info("")
         log_handler.info(description)
@@ -381,8 +387,8 @@ def get_options(description, version):
         log_handler.info("GETORG_PATH=" + _GO_PATH)
         # existing default database
         if not options.no_slim:
-            existing_seed_db, existing_label_db = get_current_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
-                                                                       lbl_db_path=_LBL_DB_PATH, silent=True)
+            existing_seed_db, existing_label_db = get_current_db_versions(db_type="both", seq_db_path=_SEQ_DB_PATH,
+                                                                          lbl_db_path=_LBL_DB_PATH, silent=True)
             log_types = ["" if options.genes_fasta else this_type for this_type in options.organelle_type]
             if "embplant_pt" in log_types and "embplant_mt" not in log_types:
                 log_types.append("embplant_mt")
@@ -525,7 +531,7 @@ def slim_assembly_graph(organelle_types, in_custom, ex_custom, graph_in, graph_o
                 max_slim_extending_len = max([MAX_SLIM_EXTENDING_LENS[sub_organelle_t]
                                          for sub_organelle_t in organelle_types])
     if resume:
-        if os.path.exists(graph_out_base + ".fastg") and os.path.exists(graph_out_base + ".csv"):
+        if os.path.exists(graph_out_base + "." + graph_in.split(".")[-1]) and os.path.exists(graph_out_base + ".csv"):
             if log_handler:
                 log_handler.info("Slimming " + graph_in + " ... skipped.")
             return 0
@@ -718,10 +724,10 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                         this_out_base = o_p + ".contigs.graph" + str(go_res) + ".selected_graph."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
-                        image_produced = draw_assembly_graph_using_bandage(
-                            input_graph_file=this_out_base + "gfa", output_image_file=this_out_base + "png",
-                            assembly_graph_ob=broken_graph, log_handler=log_handler, verbose_log=verbose_in,
-                            which_bandage=options.which_bandage)
+                        # image_produced = draw_assembly_graph_using_bandage(
+                        #     input_graph_file=this_out_base + "gfa", output_image_file=this_out_base + "png",
+                        #     assembly_graph_ob=broken_graph, log_handler=log_handler, verbose_log=verbose_in,
+                        #     which_bandage=options.which_bandage)
                 if set(still_complete) == {"complete"}:
                     log_in.info("Result status of " + mode_in + ": circular genome")
                 elif set(still_complete) == {"nearly-complete"}:
@@ -946,11 +952,11 @@ def main():
     options, log_handler = get_options(description=title, version=get_versions())
     from GetOrganelleLib.assembly_parser import Assembly
     try:
-        if executable(os.path.join(UTILITY_PATH, "slim_graph.py")):
+        if executable(os.path.join(UTILITY_PATH, "slim_graph.py -h")):
             which_slim = UTILITY_PATH
-        elif executable(os.path.join(PATH_OF_THIS_SCRIPT, "slim_graph.py")):
+        elif executable(os.path.join(PATH_OF_THIS_SCRIPT, "slim_graph.py -h")):
             which_slim = PATH_OF_THIS_SCRIPT
-        elif executable("slim_graph.py"):
+        elif executable("slim_graph.py -h"):
             which_slim = ""
         else:
             raise Exception("slim_graph.py not found!")

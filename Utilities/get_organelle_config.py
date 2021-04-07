@@ -5,7 +5,7 @@ import os
 import platform
 import time
 from shutil import copy
-from optparse import OptionParser
+from argparse import ArgumentParser
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
@@ -18,7 +18,7 @@ from GetOrganelleLib.pipe_control_func \
     detect_bowtie2_path, detect_blast_path, detect_bowtie2_version, detect_blast_version, \
     cal_f_sha256, \
     ORGANELLE_TYPE_LIST, ORGANELLE_TYPE_SET, SEED_DB_HASH, LABEL_DB_HASH, \
-    get_static_html_context, download_file_with_progress, get_current_versions
+    get_static_html_context, download_file_with_progress, get_current_db_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 
 # system info
@@ -63,49 +63,51 @@ label_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/mas
 
 
 def get_options(description):
-    parser = OptionParser(description=description, usage="get_organelle_config.py -a embplant_pt,embplant_mt")
-    parser.add_option("-a", "--add", dest="add_organelle_type",
+    parser = ArgumentParser(description=description, usage="get_organelle_config.py -a embplant_pt,embplant_mt")
+    parser.add_argument("-a", "--add", dest="add_organelle_type",
                       help="Add database for organelle type(s). Followed by any of all/" +
                            "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma such as "
                            "embplant_pt,embplant_mt,fungus_mt.")
-    parser.add_option("--use-version", dest="version", default="latest",
+    parser.add_argument("--use-version", dest="version", default="latest",
                       help="The version of database to add. Find more versions at github.com/Kinggerm/GetOrganelleDB. "
-                           "Default: %default")
-    parser.add_option("-r", "--rm", dest="rm_organelle_type",
+                           "Default: %(default)s")
+    parser.add_argument("-r", "--rm", dest="rm_organelle_type",
                       help="Remove local database(s) for organelle type(s). Followed by any of all/" +
                            "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma "
                            "such as embplant_pt,embplant_mt.")
-    parser.add_option("--update", dest="update", default=False, action="store_true",
+    parser.add_argument("--update", dest="update", default=False, action="store_true",
                       help="Update local databases to the latest online version, or the local version "
                            "if \"--use-local LOCAL_DB_PATH\" provided.")
-    parser.add_option("--config-dir", dest="get_organelle_path", default=None,
+    parser.add_argument("--config-dir", dest="get_organelle_path", default=None,
                       help="The directory where the default databases were placed. "
                            "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
                            "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
                            "Default: " + GO_PATH)
-    parser.add_option("--use-local", dest="use_local",
+    parser.add_argument("--use-local", dest="use_local",
                       help="Input a path. This local database path must include subdirectories "
                            "LabelDatabase and SeedDatabase, under which there is the fasta file(s) named by the "
                            "organelle type you want add, such as fungus_mt.fasta. ")
-    parser.add_option("--clean", dest="clean", default=False, action="store_true",
+    parser.add_argument("--clean", dest="clean", default=False, action="store_true",
                       help="Remove all configured database files (==\"--rm all\").")
-    parser.add_option("--list", dest="list_available", default=False, action="store_true",
+    parser.add_argument("--list", dest="list_available", default=False, action="store_true",
                       help="List configured databases checking and exit. ")
-    parser.add_option("--check", dest="check", default=False, action="store_true",
+    parser.add_argument("--check", dest="check", default=False, action="store_true",
                       help="Check configured database files and exit. ")
-    parser.add_option("--db-type", dest="db_type", default="both",
-                      help="The database type (seed/label/both). Default: %default")
-    parser.add_option("--which-blast", dest="which_blast", default="",
+    parser.add_argument("--db-type", dest="db_type", default="both",
+                      help="The database type (seed/label/both). Default: %(default)s")
+    parser.add_argument("--which-blast", dest="which_blast", default="",
                       help="Assign the path to BLAST binary files if not added to the path. "
                            "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
                            "/ncbi-blast\" first, then $PATH")
-    parser.add_option("--which-bowtie2", dest="which_bowtie2", default="",
+    parser.add_argument("--which-bowtie2", dest="which_bowtie2", default="",
                       help="Assign the path to Bowtie2 binary files if not added to the path. "
                            "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
                            "/bowtie2\" first, then $PATH")
-    parser.add_option("--verbose", dest="verbose", default=False, action="store_true",
-                      help="verbose output to the screen. Default: %default")
-    options, argv = parser.parse_args()
+    parser.add_argument("--verbose", dest="verbose", default=False, action="store_true",
+                      help="verbose output to the screen. Default: %(default)s")
+    parser.add_argument("-v", "--version", action="version",
+                        version="GetOrganelle v{version}".format(version=get_versions()))
+    options = parser.parse_args()
     assert options.db_type in ("seed", "label", "both")
     global _GO_PATH, _LBL_DB_PATH, _SEQ_DB_PATH
     if options.get_organelle_path:
@@ -222,7 +224,7 @@ def get_options(description):
                                  "and install it from from local (flag --use-local)\n")
                 sys.exit()
 
-    return options, argv
+    return options
 
 
 def write_version_file(version_dict, output_to_file):
@@ -286,12 +288,12 @@ def initialize_seed_database(which_bowtie2, fasta_f, overwrite=False):
 def main():
     time_start = time.time()
     description = "get_organelle_config.py " + get_versions() + " is used for setting up default GetOrganelle database."
-    options, argv = get_options(description=description)
-    existing_seed_db, existing_label_db = get_current_versions(options.db_type,
-                                                               seq_db_path=_SEQ_DB_PATH,
-                                                               lbl_db_path=_LBL_DB_PATH,
-                                                               clean_mode=options.clean,
-                                                               check_hash=options.check)
+    options = get_options(description=description)
+    existing_seed_db, existing_label_db = get_current_db_versions(options.db_type,
+                                                                  seq_db_path=_SEQ_DB_PATH,
+                                                                  lbl_db_path=_LBL_DB_PATH,
+                                                                  clean_mode=options.clean,
+                                                                  check_hash=options.check)
     seed_version_f = os.path.join(_SEQ_DB_PATH, "VERSION")
     label_version_f = os.path.join(_LBL_DB_PATH, "VERSION")
     time_out = 100000

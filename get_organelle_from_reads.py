@@ -133,7 +133,7 @@ def get_options(description, version):
                                       "Should be a list of files split by comma(s) on a multi-organelle mode, "
                                       "with the same list length to organelle_type (followed by '-F'). "
                                       "Default: '" + os.path.join(SEQ_DB_PATH, "*.fasta") + "' "
-                                                                                            "(* depends on the value followed with flag '-F')")
+                                      "(* depends on the value followed with flag '-F')")
         group_inout.add_argument("-a", dest="anti_seed",
                                  help="Anti-seed(s). Not suggested unless what you really know what you are doing. "
                                       "Input fasta format file as anti-seed, where the extension process "
@@ -352,7 +352,7 @@ def get_options(description, version):
                                          "Default: 250000 (-F embplant_pt/fungus_mt), "
                                          "25000 (-F embplant_nr/animal_mt/fungus_nr), 1000000 (-F embplant_mt/other_pt),"
                                          "1000000,1000000,250000 (-F other_pt,embplant_mt,fungus_mt)")
-        group_assembly.add_argument("--expected-min-size", dest="expected_min_size", default=10000, type=int,
+        group_assembly.add_argument("--expected-min-size", dest="expected_min_size", default=10000, type=str,
                                     help="Expected minimum target genome size(s) for disentangling. "
                                          "Should be a list of INTEGER numbers split by comma(s) on a multi-organelle mode, "
                                          "with the same list length to organelle_type (followed by '-F'). "
@@ -720,7 +720,8 @@ def get_options(description, version):
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 
         if options.run_spades:
-            for fq_file in [options.fq_file_1, options.fq_file_2] + options.unpaired_fq_files:
+            for fq_file in [options.fq_file_1, options.fq_file_2] * int(bool(options.fq_file_1 and options.fq_file_2))\
+                           + options.unpaired_fq_files:
                 assert is_valid_path(os.path.basename(fq_file)), \
                     "Invalid characters for SPAdes in file name: " + os.path.basename(fq_file)
             for fq_file in [options.output_base, options.prefix]:

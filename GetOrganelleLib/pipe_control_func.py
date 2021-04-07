@@ -904,17 +904,26 @@ def monitor_spades_log(spades_running, log_handler, sensitively_stop=False, sile
         output.append(log_block)
         if "not recognized" in log_block:
             if not silent:
-                log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+                if log_handler:
+                    log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+                else:
+                    sys.stdout.write("Error with running SPAdes: " + log_block.strip("\n") + "\n")
             spades_running.terminate()
             break
         elif "terminated by segmentation fault" in log_block:
             if not silent:
-                log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+                if log_handler:
+                    log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+                else:
+                    sys.stdout.write("Error with running SPAdes: " + log_block.strip("\n") + "\n")
             spades_running.terminate()
             break
         elif "== Error ==" in log_block:
             if not silent:
-                log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+                if log_handler:
+                    log_handler.error("Error with running SPAdes: " + log_block.strip("\n"))
+                else:
+                    sys.stdout.write("Error with running SPAdes: " + log_block.strip("\n") + "\n")
             if sensitively_stop:
                 spades_running.terminate()
                 break

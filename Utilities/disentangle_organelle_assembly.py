@@ -17,79 +17,79 @@ import random
 def get_options(print_title):
     parser = ArgumentParser("disentangle_organelle_assembly.py -F embplant_pt -g input.fastg -t input.tab -o output_dir")
     parser.add_argument("-g", dest="fastg_file",
-                      help="input fastg format file.")
+                        help="input fastg format file.")
     parser.add_argument("-t", dest="tab_file",
-                      help="input tab format file (*.csv; the postfix 'csv' was in conformity with Bandage) "
-                           "produced by slim_graph.py.")
+                        help="input tab format file (*.csv; the postfix 'csv' was in conformity with Bandage) "
+                             "produced by slim_graph.py.")
     parser.add_argument("-o", dest="output_directory",
-                      help="output directory.")
+                        help="output directory.")
     parser.add_argument("-F", dest="mode",
-                      help="organelle type: embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym.")
+                        help="organelle type: embplant_pt/other_pt/embplant_mt/embplant_nr/animal_mt/fungus_mt/fungus_nr/anonym.")
     parser.add_argument("--linear", dest="acyclic_allowed", default=False, action="store_true",
-                      help="By default, this script would only disentangle the circular graph (the complete circular "
-                           "organelle genome), and would directly give up linear/broken graphs. Choose this option "
-                           "to try for linear/broken cases.")
+                        help="By default, this script would only disentangle the circular graph (the complete circular "
+                             "organelle genome), and would directly give up linear/broken graphs. Choose this option "
+                             "to try for linear/broken cases.")
     parser.add_argument("--weight-f", dest="weight_factor", type=float, default=100.0,
-                      help="weight factor for excluding non-target contigs. Default:%(default)s")
+                        help="weight factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--depth-f", dest="depth_factor", type=float, default=10.,
-                      help="Depth factor for excluding non-target contigs. Default:%(default)s")
+                        help="Depth factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--type-f", dest="type_factor", type=float, default=3.,
-                      help="Type factor for identifying genome type tag. Default:%(default)s")
+                        help="Type factor for identifying genome type tag. Default:%(default)s")
     parser.add_argument("--contamination-depth", dest="contamination_depth", default=3., type=float,
-                      help="Depth factor for confirming contaminating contigs. Default:%(default)s")
+                        help="Depth factor for confirming contaminating contigs. Default:%(default)s")
     parser.add_argument("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
-                      help="Similarity threshold for confirming contaminating contigs. Default:%(default)s")
+                        help="Similarity threshold for confirming contaminating contigs. Default:%(default)s")
     parser.add_argument("--no-degenerate", dest="degenerate", default=True, action="store_false",
-                      help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
+                        help="Disable making consensus from parallel contig based on nucleotide degenerate table.")
     parser.add_argument("--degenerate-depth", dest="degenerate_depth", default=1.5, type=float,
-                      help="Depth factor for confirming parallel contigs. Default:%(default)s")
+                        help="Depth factor for confirming parallel contigs. Default:%(default)s")
     parser.add_argument("--degenerate-similarity", dest="degenerate_similarity", default=0.98, type=float,
-                      help="Similarity threshold for confirming parallel contigs. Default:%(default)s")
+                        help="Similarity threshold for confirming parallel contigs. Default:%(default)s")
     parser.add_argument("--expected-max-size", dest="expected_max_size", default=200000, type=int,
-                      help="Expected maximum target genome size. Default: 200000 (-F embplant_pt/fungus_mt), "
-                           "25000 (-F embplant_nr/animal_mt/fungus_nr), 600000 (-F embplant_mt/other_pt)")
+                        help="Expected maximum target genome size. Default: 200000 (-F embplant_pt/fungus_mt), "
+                             "25000 (-F embplant_nr/animal_mt/fungus_nr), 600000 (-F embplant_mt/other_pt)")
     parser.add_argument("--expected-min-size", dest="expected_min_size", default=10000, type=int,
-                      help="Expected mininum target genome size. Default: %(default)s")
+                        help="Expected mininum target genome size. Default: %(default)s")
     parser.add_argument("--reverse-lsc", dest="reverse_lsc", default=False, action="store_true",
-                      help="For '-F embplant_pt' with complete circular result, "
-                           "by default, the direction of the starting contig (usually "
-                           "the LSC contig) is determined as the direction with less ORFs. Choose this option "
-                           "to reverse the direction of the starting contig when result is circular. "
-                           "Actually, both directions are biologically equivalent to each other. The "
-                           "reordering of the direction is only for easier downstream analysis.")
+                        help="For '-F embplant_pt' with complete circular result, "
+                             "by default, the direction of the starting contig (usually "
+                             "the LSC contig) is determined as the direction with less ORFs. Choose this option "
+                             "to reverse the direction of the starting contig when result is circular. "
+                             "Actually, both directions are biologically equivalent to each other. The "
+                             "reordering of the direction is only for easier downstream analysis.")
     parser.add_argument("--max-paths-num", dest="max_paths_num", default=1000, type=int,
-                      help="Repeats would dramatically increase the number of potential isomers (paths). "
-                           "This option was used to export a certain amount of paths out of all possible paths "
-                           "per assembly graph. Default: %(default)s")
+                        help="Repeats would dramatically increase the number of potential isomers (paths). "
+                             "This option was used to export a certain amount of paths out of all possible paths "
+                             "per assembly graph. Default: %(default)s")
     parser.add_argument("--keep-all-polymorphic", dest="only_keep_max_cov", default=True, action="store_false",
-                      help="By default, this script would pick the contig with highest coverage among all parallel "
-                           "(polymorphic) contigs when degenerating was not applicable. "
-                           "Choose this flag to export all combinations.")
+                        help="By default, this script would pick the contig with highest coverage among all parallel "
+                             "(polymorphic) contigs when degenerating was not applicable. "
+                             "Choose this flag to export all combinations.")
     parser.add_argument("--min-sigma", dest="min_sigma_factor", type=float, default=0.1,
-                      help="Minimum deviation factor for excluding non-target contigs. Default:%(default)s")
+                        help="Minimum deviation factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--min-depth", dest="min_cov", type=float, default=0.,
-                      help="Minimum coverage for a contig to be included in disentangling. Default:%(default)s")
+                        help="Minimum coverage for a contig to be included in disentangling. Default:%(default)s")
     parser.add_argument("--max-depth", dest="max_cov", type=float, default=inf,
-                      help="Minimum coverage for a contig to be included in disentangling. Default:%(default)s")
+                        help="Minimum coverage for a contig to be included in disentangling. Default:%(default)s")
     parser.add_argument("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
-                      help="Maximum multiplicity of contigs for disentangling genome paths. "
-                           "Should be 1~12. Default:%(default)s")
+                        help="Maximum multiplicity of contigs for disentangling genome paths. "
+                             "Should be 1~12. Default:%(default)s")
     parser.add_argument("--prefix", dest="prefix", default="target",
-                      help="Prefix of output files inside output directory. Default:%(default)s")
+                        help="Prefix of output files inside output directory. Default:%(default)s")
     parser.add_argument("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
-                      help="export intermediate graph file.")
+                        help="export intermediate graph file.")
     parser.add_argument("--time-limit", dest="time_limit", default=3600, type=int,
-                      help="time limit for the disentangling process. Default:%(default)s")
+                        help="time limit for the disentangling process. Default:%(default)s")
     parser.add_argument("--random-seed", dest="random_seed", default=12345, type=int,
-                      help="Random seed (only for disentangling at this moment). Default: %(default)s")
+                        help="Random seed (only for disentangling at this moment). Default: %(default)s")
     parser.add_argument("--continue", dest="resume", default=False, action="store_true",
-                      help="continue mode.")
+                        help="continue mode.")
     parser.add_argument("-v", "--version", action="version",
                         version="GetOrganelle v{version}".format(version=get_versions()))
     parser.add_argument("--verbose", dest="verbose", default=False, action="store_true",
-                      help="verbose logging.")
+                        help="verbose logging.")
     parser.add_argument("--debug", dest="debug", default=False, action="store_true",
-                      help="for debug.")
+                        help="for debug.")
     options = parser.parse_args()
     if (options.fastg_file is None) or (options.tab_file is None) or (options.output_directory is None) \
             or (options.mode is None):

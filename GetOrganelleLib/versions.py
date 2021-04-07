@@ -15,7 +15,7 @@ versions = [
             "5. assembly_parser.py: recording every overlap value rather than using a universal value for hifiasm (in response to Christopher Benson@PSU)",
             "6. optparse -> argparse (in response to Matthias Bernt@UFZ)",
             "7. get_organelle_from_assembly.py: fix a bug with the malfunction of --continue when the input is gfa ",
-            "8. disentangle_organelle_assembly.py: correct a typo ",
+            "8. disentangle_organelle_assembly.py: correct a typo",
         ],
         "time": "2021-03-31 17:00 UTC+8"
     },

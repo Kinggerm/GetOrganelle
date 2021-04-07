@@ -28,7 +28,7 @@ def get_options(print_title):
     parser.add_argument("--linear", dest="acyclic_allowed", default=False, action="store_true",
                       help="By default, this script would only disentangle the circular graph (the complete circular "
                            "organelle genome), and would directly give up linear/broken graphs. Choose this option "
-                           "to try for linear/broken cases.")
+                           "to try for linear/broken cases. ")
     parser.add_argument("--weight-f", dest="weight_factor", type=float, default=100.0,
                       help="weight factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--depth-f", dest="depth_factor", type=float, default=10.,

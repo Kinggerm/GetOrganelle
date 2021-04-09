@@ -81,22 +81,64 @@ Find more real data examples at [GetOrganelle/wiki/Examples](https://github.com/
 
 <b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a >. But you are still highly recommended to read the following minimal introductions</b>:
 
-<b>Preparing Data</b>
+<b>Starting from Reads</b>
+  
+  The green workflow in the chat below shows the processes of `get_organelle_from_reads.py`.
 
-Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). Usually, >1G per end is enough for plastome for most normal angiosperm samples, and >5G per end is enough for mitochondria genome assembly. Since v1.6.2, `get_organelle_from_reads.py` will automatically estimate the read data it needs, without user assignment nor data reducing (see flags `--reduce-reads-for-coverage` and `--max-reads` for more options). 
+  * <b>Input data</b>
 
-<b>Filtering and Assembly</b>
+  Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). Usually, >1G per end is enough for plastome for most normal angiosperm samples, and >5G per end is enough for mitochondria genome assembly. Since v1.6.2, `get_organelle_from_reads.py` will automatically estimate the read data it needs, without user assignment nor data reducing (see flags `--reduce-reads-for-coverage` and `--max-reads`). 
+  
+  * <b>Main Options</b>
+  
+  Take your input seed (fasta format; if `-s` was not provided, the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, the script would recruit target reads in successive rounds (extending process). The default seed works for most samples, but using a complete organelle genome sequence of a related species as the seed would help the assembly in many cases (e.g. degraded DNA samples, fastly-evolving in animal/fungal samples). 
+  
+  The value word size (followed with `-w`), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes upon data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. By default, GetOrganelle would automatically estimate a proper word size based on the data characters. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust this value (`-w`) if a complete/circular organelle genome assembly is produced, because the circular result by GetOrganelle is highly consistent under different options and seeds. The automatically estimated word size may be screwy in some animal mitogenome data due to inaccurate coverage estimation, for which you fine-tune it instead. 
+  
+  The best kmer(s) depend on a wide variety of factors too. Although more kmer values add the time consuming, you are recommended to use a wide range of kmers to benefit from the power of SPAdes. Empirically, you should include at least including one small kmer (e.g. `21`) and one large kmer (`105`) for a successful organelle genome assembly.
+  
+  * <b>Key Results</b>
+  
+  The key output files include
+  
+   * `*.path_sequence.fasta`, one fasta file represents one type of genome structure
+   * `*.selected_graph.gfa`, the equivalent
+   * `get_org.log.txt`, the log file
+   * `extended_K*.assembly_graph.fastg`, the raw assembly graph
+   * `extended_K*.assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg`, a simplified assembly graph 
+   * `extended_K*.assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`, a tab-format contig label file for bandage visualization
+  
+  You may delete the files other than above if the resulting genome is complete (indicated in the log file and the name of the `*.fasta`). 
+  You are expected to obtain the complete organelle genome assembly for most animal/fungal mitogenomes and plant chloroplast genomes 
+  (see [here for nuclear ribosomal DNAs](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#why-does-getorganelle-generate-a-circular-genome-for-embplant_nrfungus_nr)) with the recommended recipes. 
+  
+  If GetOrganelle failed to generate the complete circular genome (produce `*scaffolds*path_sequence.fasta`), 
+  please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run. 
+  You could also use the incomplete sequence to conduct downstream analysis.
 
-Take your input seed (fasta format; if `-s` was not provided, the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, the script would recruit target reads in successive rounds (extending process). The default seed works for most samples, but using a complete organelle genome sequence of a related species as the seed would help the assembly in many cases (e.g. degraded DNA samples, fastly-evolving in animal/fungal samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes upon data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. By default, GetOrganelle would automatically estimate a proper word size based on the data characters. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust this value ("-w") if a complete/circular organelle genome assembly is produced, because the circular result by GetOrganelle is highly consistent under different options and seeds. The automatically estimated word size may be screwy in some animal mitogenome data due to inaccurate coverage estimation, for which you fine-tune it instead. After extending, this script will automatically call SPAdes to assemble the target-associated reads produced by the former step. The best kmer(s) depend on a wide variety of factors too.
+<b>Starting from Assembly</b>
 
-<b>Producing Result</b>
+  The blue workflow in the chat below shows the processes of `get_organelle_from_assembly.py`.
 
-By default, `SPAdes` is automatically called to produce the assembly graph file `extended_spades/assembly_graph.fastg`. Then, `Utilities/slim_graph.py` is called to modify the `extended_spades/assembly_graph.fastg` file and produce a new fastg file (would be `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` if "-F embplant_pt" been used by `get_organelle_from_reads.py`) along with a tab-format annotation file (`assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`). 
-
-The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with the `assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv` file would be further parsed by `disentangle_organelle_assembly.py`, and your target sequence file(s) `*complete*path_sequence.fasta` would be produced as the <b>final result</b>, if disentangle_organelle_assembly.py successfully solve the graph disentanglement. 
-
-Otherwise, if GetOrganelle failed to generate the path (produce `*scaffolds*path_sequence.fasta`), please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run.
-You could also use the incomplete sequence to conduct downstream analysis.
+  * <b>Input data & Main Options</b>
+  
+  The input must be a FASTG or GFA formatted assembly graph file. 
+  
+  If you input an assembly graph assembled from total DNA sequencing using third-party a de novo assembler (e.g. Velvet), 
+  the assembly graph may includes a great amount of non-target contigs. 
+  You may want to use `--min-depth` and `--max-depth` to greatly reduce the computational burden for target extraction.
+  
+  If you input an [organelle-equivalent assembly graph](https://github.com/Kinggerm/GetOrganelle/wiki/Terminology) 
+  (e.g. manually curated and exported using Bandage), you may use `--no-slim`.
+  
+  * <b>Key Results</b>
+  
+  The key output files include
+  
+   * `*.path_sequence.fasta`, one fasta file represents one type of genome structure
+   * `*.selected_graph.gfa`, the equivalent
+   * `get_org.log.txt`, the log file
+  
 
 <b>GetOrganelle flowchart</b>
 

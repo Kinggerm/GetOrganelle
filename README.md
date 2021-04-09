@@ -82,7 +82,7 @@ Find more real data examples at [GetOrganelle/wiki/Examples](https://github.com/
 <b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a >. 
 But you are still highly recommended to read the following minimal introductions</b>:
 
-* <b>Starting from Reads</b>
+### Starting from Reads
   
   The green workflow in the chat below shows the processes of `get_organelle_from_reads.py`.
 
@@ -133,7 +133,7 @@ But you are still highly recommended to read the following minimal introductions
   please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run. 
   You could also use the incomplete sequence to conduct downstream analysis.
 
-* <b>Starting from Assembly</b>
+### Starting from Assembly
 
   The blue workflow in the chat below shows the processes of `get_organelle_from_assembly.py`.
 

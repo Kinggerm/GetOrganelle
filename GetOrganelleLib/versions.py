@@ -17,7 +17,7 @@ versions = [
             "7. get_organelle_from_assembly.py: fix a bug with the malfunction of --continue when the input is gfa ",
             "8. get_organelle_from_reads.py/disentangle_organelle_assembly.py: correct typos",
         ],
-        "time": "2021-03-31 17:00 UTC+8"
+        "time": "2021-04-09 14:00 UTC+8"
     },
     {
         "number": "1.7.4-pre2",

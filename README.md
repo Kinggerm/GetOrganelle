@@ -157,7 +157,7 @@ But you are still highly recommended to read the following minimal introductions
    * `get_org.log.txt`, the log file
   
 
-<b>GetOrganelle flowchart</b>
+### GetOrganelle flowchart
 
 ![flowchart](https://user-images.githubusercontent.com/8598031/83836465-85afa080-a6c1-11ea-8b08-b08623d974f4.png)
 

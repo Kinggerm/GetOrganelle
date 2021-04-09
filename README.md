@@ -72,12 +72,12 @@ then do the fast plastome assembly (memory: ~600MB, CPU time: ~60s):
 
 You are going to get a similar running log as [here](https://github.com/Kinggerm/GetOrganelle/wiki/Example-1#running-log) and the same result as [here](https://github.com/Kinggerm/GetOrganelleGallery/tree/master/Test/results/Arabidopsis_simulated.plastome).
 
-Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/GetOrganelle/wiki/Examples), [GetOrganelleGallery](https://github.com/Kinggerm/GetOrganelleGallery) and [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison).
+Find more real data examples at [GetOrganelle/wiki/Examples](https://github.com/Kinggerm/GetOrganelle/wiki/Examples), [GetOrganelleGallery](https://github.com/Kinggerm/GetOrganelleGallery) and [GetOrganelleComparison](https://github.com/Kinggerm/GetOrganelleComparison).
 
 
 ## Instruction
 
-<b>Find more organelle genome assembly instruction at [GetOrganelle.wiki](https://github.com/Kinggerm/GetOrganelle/wiki).</b>
+<b>Find more organelle genome assembly instruction at [GetOrganelle/wiki](https://github.com/Kinggerm/GetOrganelle/wiki).</b>
 
 <b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a >. But you are still highly recommended to read the following minimal introductions</b>:
 

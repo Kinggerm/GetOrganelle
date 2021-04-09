@@ -77,7 +77,9 @@ Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/
 
 ## Instruction
 
-<b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a ></b>. But you are still highly recommended to read the following minimal introductions:
+<b>Find more organelle genome assembly instruction at [GetOrganelle.wiki](https://github.com/Kinggerm/GetOrganelle/wiki).</b>
+
+<b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a >. But you are still highly recommended to read the following minimal introductions</b>:
 
 <b>Preparing Data</b>
 
@@ -95,8 +97,6 @@ The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with 
 
 Otherwise, if GetOrganelle failed to generate the path (produce `*scaffolds*path_sequence.fasta`), please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run.
 You could also use the incomplete sequence to conduct downstream analysis.
-
-Find more organelle genome assembly instruction at [GetOrganelle.wiki](https://github.com/Kinggerm/GetOrganelle/wiki).
 
 <b>GetOrganelle flowchart</b>
 

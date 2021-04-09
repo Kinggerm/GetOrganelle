@@ -86,14 +86,14 @@ But you are still highly recommended to read the following minimal introductions
   
   The green workflow in the chat below shows the processes of `get_organelle_from_reads.py`.
 
-  * <b>Input data</b>
+  <b>Input data</b>
 
   Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). 
   Usually, >1G per end is enough for plastome for most normal angiosperm samples, 
   and >5G per end is enough for mitochondria genome assembly. 
   Since v1.6.2, `get_organelle_from_reads.py` will automatically estimate the read data it needs, without user assignment nor data reducing (see flags `--reduce-reads-for-coverage` and `--max-reads`). 
   
-  * <b>Main Options</b>
+  <b>Main Options</b>
   
   Take your input seed (fasta format; if `-s` was not provided, 
   the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, 
@@ -114,12 +114,12 @@ But you are still highly recommended to read the following minimal introductions
   Although more kmer values add the time consuming, you are recommended to use a wide range of kmers to benefit from the power of SPAdes. 
   Empirically, you should include at least including one small kmer (e.g. `21`) and one large kmer (`105`) for a successful organelle genome assembly.
   
-  * <b>Key Results</b>
+  <b>Key Results</b>
   
   The key output files include
   
-   * `*.path_sequence.fasta`, one fasta file represents one type of genome structure
-   * `*.selected_graph.gfa`, the equivalent
+   * `*.path_sequence.fasta`, each fasta file represents one type of genome structure
+   * `*.selected_graph.gfa`, the [organelle-only assembly graph](https://github.com/Kinggerm/GetOrganelle/wiki/Terminology)
    * `get_org.log.txt`, the log file
    * `extended_K*.assembly_graph.fastg`, the raw assembly graph
    * `extended_K*.assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg`, a simplified assembly graph 
@@ -137,7 +137,7 @@ But you are still highly recommended to read the following minimal introductions
 
   The blue workflow in the chat below shows the processes of `get_organelle_from_assembly.py`.
 
-  * <b>Input data & Main Options</b>
+  <b>Input data & Main Options</b>
   
   The input must be a FASTG or GFA formatted assembly graph file. 
   
@@ -148,12 +148,12 @@ But you are still highly recommended to read the following minimal introductions
   If you input an [organelle-equivalent assembly graph](https://github.com/Kinggerm/GetOrganelle/wiki/Terminology) 
   (e.g. manually curated and exported using Bandage), you may use `--no-slim`.
   
-  * <b>Key Results</b>
+  <b>Key Results</b>
   
   The key output files include
   
    * `*.path_sequence.fasta`, one fasta file represents one type of genome structure
-   * `*.selected_graph.gfa`, the equivalent
+   * `*.selected_graph.gfa`, the [organelle-only assembly graph](https://github.com/Kinggerm/GetOrganelle/wiki/Terminology)
    * `get_org.log.txt`, the log file
   
 

@@ -42,7 +42,7 @@ GetOrganelle is currently maintained under Python 3.7.0, but designed to be comp
 
   You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. If you don't like conda, or want to follow the latest versions, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
 
-* After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, fungus_nr, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
+* After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle genome type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, fungus_nr, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
 
     
       get_organelle_config.py --add embplant_pt,embplant_mt
@@ -77,7 +77,7 @@ Find more real data examples at [GetOrganelle wiki](https://github.com/Kinggerm/
 
 ## Instruction
 
-<b>What you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a ></b>. But you are still recommended to read the following introductions:
+<b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a ></b>. But you are still highly recommended to read the following minimal introductions:
 
 <b>Preparing Data</b>
 
@@ -85,7 +85,7 @@ Currently, `get_organelle_from_reads.py` was written for illumina pair-end/singl
 
 <b>Filtering and Assembly</b>
 
-Take your input seed (fasta format; if `-s` was not provided, the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, the script would recruit target reads in successive rounds (extending process). The default seed works for most samples, but using a complete organelle genome sequence of a related species as the seed would help cp DNA assembly from bad sequence quality (e.g. degraded DNA samples) and fastly-evolving organelle genome (e.g. animal/fungal mitogenome) assembly. The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes upon data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. Since version 1.4.0, if there is no user assigned word size value, GetOrganelle would automatically estimate a proper word size based on the data characters. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust the value if a complete/circular organelle result is produced, because the circular result by GetOrganelle is highly consistent under different options and seeds. The automatically estimated word size may be screwy in some animal mitogenome data due to inaccurate coverage estimation, for which you could input an empirical value (e.g. `-w 0.65`) instead. After extending, this script will automatically call SPAdes to assemble the target-associated reads produced by the former step. The best kmer depends on a wide variety of factors too.
+Take your input seed (fasta format; if `-s` was not provided, the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, the script would recruit target reads in successive rounds (extending process). The default seed works for most samples, but using a complete organelle genome sequence of a related species as the seed would help the assembly in many cases (e.g. degraded DNA samples, fastly-evolving in animal/fungal samples). The value word size (followed with "-w"), like the kmer in assembly, is crucial to the feasibility and efficiency of this process. The best word size changes upon data and will be affected by read length, read quality, base coverage, organ DNA percent and other factors. By default, GetOrganelle would automatically estimate a proper word size based on the data characters. Although the automatically-estimated word size value does not ensure the best performance nor the best result, you do not need to adjust this value ("-w") if a complete/circular organelle genome assembly is produced, because the circular result by GetOrganelle is highly consistent under different options and seeds. The automatically estimated word size may be screwy in some animal mitogenome data due to inaccurate coverage estimation, for which you fine-tune it instead. After extending, this script will automatically call SPAdes to assemble the target-associated reads produced by the former step. The best kmer(s) depend on a wide variety of factors too.
 
 <b>Producing Result</b>
 
@@ -96,6 +96,7 @@ The `assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg` file along with 
 Otherwise, if GetOrganelle failed to generate the path (produce `*scaffolds*path_sequence.fasta`), please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run.
 You could also use the incomplete sequence to conduct downstream analysis.
 
+Find more organelle genome assembly instruction at [GetOrganelle.wiki](https://github.com/Kinggerm/GetOrganelle/wiki).
 
 <b>GetOrganelle flowchart</b>
 

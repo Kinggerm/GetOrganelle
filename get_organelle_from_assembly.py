@@ -78,9 +78,9 @@ def get_options(description, version):
                                  "or embplant_mt,other_pt,fungus_mt "
                                  "(the combination of any of above organelle genomes split by comma(s), "
                                  "which might be computationally more intensive than separate runs), "
-                                 "or anonym (uncertain organelle genome type, with customized gene database "
-                                 "('--genes'), which is suggested only when the above database is genetically distant "
-                                 "from your sample) or raw (disentangle the raw graph directly without tagging).")
+                                 "or anonym (uncertain organelle genome type). "
+                                 "The anonym should be used with customized seed and label databases "
+                                 "('-s' and '--genes').")
         parser.add_argument("-g", dest="input_graph", help="Input assembly graph (fastg/gfa) file. "
                                                          "The format will be recognized by the file name suffix.")
         parser.add_argument("-o", dest="output_base", help="Output directory. Overwriting files if directory exists.")

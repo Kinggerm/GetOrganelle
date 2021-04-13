@@ -317,7 +317,7 @@ def get_options(description, version):
                                          "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
                                          "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
                                                                                                     "contingent on the organelle types chosen (-F). "
-                                                                                                    "The default value no longer holds when '--genes' or '--ex-genes' is used.")
+                                                                                                    "The default value become invalid when '--genes' or '--ex-genes' is used.")
         group_assembly.add_argument("--ex-genes", dest="exclude_genes",
                                     help="This is optional and Not suggested, since non-target contigs could contribute "
                                          "information for better downstream coverage-based clustering. "

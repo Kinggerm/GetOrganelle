@@ -292,7 +292,7 @@ def get_options(description, version):
                                           "you should set maximum extending length to inf. "
                                           "Should be a list of numbers/auto/no split by comma(s) on a multi-organelle mode, "
                                           "with the same list length to organelle_type (followed by '-F'). "
-                                          "Default: no. ")
+                                          "Default: inf. ")
         # group 4
         group_assembly = parser.add_argument_group("ASSEMBLY OPTIONS", "These options are about the assembly and "
                                                                        "graph disentangling")

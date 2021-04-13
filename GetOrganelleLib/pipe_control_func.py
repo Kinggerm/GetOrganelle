@@ -392,7 +392,10 @@ def map_with_bowtie2(seed_file, original_fq_files, bowtie_out, resume, threads, 
                 log_handler.error("\n" + output.decode("utf8"))
             else:
                 sys.stdout.write("\nError: " + output.decode("utf8") + "\n")
-            raise Exception("")
+            if "has more quality values than read characters" in output.decode("utf8"):
+                raise Exception("Please check the integrity of your input reads!!")
+            else:
+                raise Exception("")
         elif "No such file" in output.decode("utf8") or "not found" in output.decode("utf8"):
             # if not silent:
             if log_handler:

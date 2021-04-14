@@ -16,10 +16,10 @@ versions = [
             "6. optparse -> argparse (in response to Matthias Bernt@UFZ)",
             "7. get_organelle_from_assembly.py: fix a bug with the malfunction of --continue when the input is gfa ",
             "8. get_organelle_from_reads.py/disentangle_organelle_assembly.py: correct typos",
-            "9. pipe_control_func.py: map_with_bowtie2: warn reads integrity",
+            "9. pipe_control_func.py: map_with_bowtie2: warn reads integrity; build_bowtie2_db: rm small index",
             "10. get_organelle_config.py: verbose log for bowtie2 and blast",
         ],
-        "time": "2021-04-09 14:00 UTC+8"
+        "time": "2021-04-14 17:52 UTC+8"
     },
     {
         "number": "1.7.4-pre2",

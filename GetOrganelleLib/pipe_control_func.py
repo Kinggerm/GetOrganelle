@@ -316,16 +316,16 @@ def build_bowtie2_db(seed_file, seed_index_base, which_bowtie2, target_echo_name
             else:
                 sys.stdout.write(this_command + "\n")
         output, err = building.communicate()
-        if "unrecognized option" in output.decode("utf8"):
-            this_command = os.path.join(which_bowtie2, "bowtie2-build") + " --seed " + str(random_seed) + \
-                           " " + seed_file + " " + seed_index_base
-            building = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            if not silent and verbose_log:
-                if log_handler:
-                    log_handler.info(this_command)
-                else:
-                    sys.stdout.write(this_command + "\n")
-            output, err = building.communicate()
+        # if "unrecognized option" in output.decode("utf8"):
+        #     this_command = os.path.join(which_bowtie2, "bowtie2-build") + " --seed " + str(random_seed) + \
+        #                    " " + seed_file + " " + seed_index_base
+        #     building = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        #     if not silent and verbose_log:
+        #         if log_handler:
+        #             log_handler.info(this_command)
+        #         else:
+        #             sys.stdout.write(this_command + "\n")
+        #     output, err = building.communicate()
         if "(ERR)" in output.decode("utf8") or "Error:" in output.decode("utf8"):
             if log_handler:
                 log_handler.error('\n' + output.decode("utf8"))

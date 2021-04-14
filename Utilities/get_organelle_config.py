@@ -250,19 +250,19 @@ def find_version(organelle_type, hash_val, DB_dict, default_version_val="customi
         return default_version_val
 
 
-def initialize_notation_database(which_blast, fasta_f, overwrite=False):
+def initialize_notation_database(which_blast, fasta_f, overwrite=False, verbose=False):
     # blast index
     output_base = remove_db_postfix(fasta_f)
     sys.stdout.write("makeblastdb " + os.path.basename(fasta_f)  + " ... ")
     sys.stdout.flush()
     if overwrite or sum([os.path.exists(output_base + postfix) for postfix in (".nhr", ".nin", ".nsq")]) != 3:
-        make_blast_db(input_file=fasta_f, output_base=output_base, which_blast=which_blast)
+        make_blast_db(input_file=fasta_f, output_base=output_base, which_blast=which_blast, verbose_log=verbose)
         sys.stdout.write("finished\n")
     else:
         sys.stdout.write("skipped\n")
 
 
-def initialize_seed_database(which_bowtie2, fasta_f, overwrite=False):
+def initialize_seed_database(which_bowtie2, fasta_f, overwrite=False, verbose=False):
     # bowtie index
     new_seed_file = fasta_f + ".modified"
     changed = check_fasta_seq_names(fasta_f, new_seed_file)
@@ -277,7 +277,7 @@ def initialize_seed_database(which_bowtie2, fasta_f, overwrite=False):
                          for postfix in
                          (".1.bt2l", ".2.bt2l", ".3.bt2l", ".4.bt2l", ".rev.1.bt2l", ".rev.2.bt2l")]) != 6:
         build_bowtie2_db(seed_file=seed_file, seed_index_base=output_base, which_bowtie2=which_bowtie2,
-                         overwrite=overwrite, random_seed=12345, silent=True)
+                         overwrite=overwrite, random_seed=12345, silent=verbose, verbose_log=verbose)
         sys.stdout.write("finished\n")
     else:
         sys.stdout.write("skipped\n")
@@ -357,16 +357,19 @@ def main():
                                 if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_SEQ_DB_PATH):
                                     copy(update_to_fa, _SEQ_DB_PATH)
                                 initialize_seed_database(which_bowtie2=options.which_bowtie2,
-                                                         fasta_f=target_output, overwrite=True)
+                                                         fasta_f=target_output, overwrite=True,
+                                                         verbose=options.verbose)
                             else:  # match existed
                                 # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                                 initialize_seed_database(which_bowtie2=options.which_bowtie2,
-                                                         fasta_f=target_output, overwrite=False)
+                                                         fasta_f=target_output, overwrite=False,
+                                                         verbose=options.verbose)
                     else:
                         if existing_seed_db[sub_o_type]["version"] == options.version:
                             # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                             initialize_seed_database(which_bowtie2=options.which_bowtie2,
-                                                     fasta_f=target_output, overwrite=False)
+                                                     fasta_f=target_output, overwrite=False,
+                                                     verbose=options.verbose)
                         else:
                             these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in seed_url_temp]
                             check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
@@ -378,7 +381,8 @@ def main():
                                     "Installing %s Seed Database failed: %s\n" % (sub_o_type, status["info"]))
                                 continue
                             initialize_seed_database(which_bowtie2=options.which_bowtie2,
-                                                     fasta_f=target_output, overwrite=True)
+                                                     fasta_f=target_output, overwrite=True,
+                                                     verbose=options.verbose)
                             existing_seed_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
 
@@ -408,16 +412,19 @@ def main():
                                 if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_LBL_DB_PATH):
                                     copy(update_to_fa, _LBL_DB_PATH)
                                 initialize_notation_database(which_blast=options.which_blast,
-                                                             fasta_f=target_output, overwrite=True)
+                                                             fasta_f=target_output, overwrite=True,
+                                                             verbose=options.verbose)
                             else:
                                 # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                                 initialize_notation_database(which_blast=options.which_blast,
-                                                             fasta_f=target_output, overwrite=False)
+                                                             fasta_f=target_output, overwrite=False,
+                                                             verbose=options.verbose)
                     else:
                         if existing_seed_db[sub_o_type]["version"] == options.version:
                             # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                             initialize_notation_database(which_blast=options.which_blast,
-                                                         fasta_f=target_output, overwrite=False)
+                                                         fasta_f=target_output, overwrite=False,
+                                                         verbose=options.verbose)
                         else:
                             these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
                             check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
@@ -429,7 +436,7 @@ def main():
                                     "Installing %s Label Database failed: %s\n" % (sub_o_type, status["info"]))
                                 continue
                             initialize_notation_database(which_blast=options.which_blast,
-                                                         fasta_f=target_output, overwrite=True)
+                                                         fasta_f=target_output, overwrite=True, verbose=options.verbose)
                             existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
@@ -455,7 +462,8 @@ def main():
                         if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_SEQ_DB_PATH):
                             copy(update_to_fa, _SEQ_DB_PATH)
                         initialize_seed_database(which_bowtie2=options.which_bowtie2,
-                                                 fasta_f=target_output, overwrite=True)
+                                                 fasta_f=target_output, overwrite=True,
+                                                 verbose=options.verbose)
                 else:
                     these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in seed_url_temp]
                     check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
@@ -466,7 +474,8 @@ def main():
                         sys.stdout.write("Installing %s Seed Database failed: %s\n" % (sub_o_type, status["info"]))
                         continue
                     initialize_seed_database(which_bowtie2=options.which_bowtie2,
-                                             fasta_f=target_output, overwrite=True)
+                                             fasta_f=target_output, overwrite=True,
+                                             verbose=options.verbose)
                     existing_seed_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
 
@@ -491,7 +500,7 @@ def main():
                         if os.path.realpath(os.path.split(update_to_fa)[0]) != os.path.realpath(_LBL_DB_PATH):
                             copy(update_to_fa, _LBL_DB_PATH)
                         initialize_notation_database(which_blast=options.which_blast,
-                                                     fasta_f=target_output, overwrite=True)
+                                                     fasta_f=target_output, overwrite=True, verbose=options.verbose)
                 else:
                     these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
                     check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
@@ -502,7 +511,7 @@ def main():
                         sys.stdout.write("Installing %s Label Database failed: %s\n" % (sub_o_type, status["info"]))
                         continue
                     initialize_notation_database(which_blast=options.which_blast,
-                                                 fasta_f=target_output, overwrite=True)
+                                                 fasta_f=target_output, overwrite=True, verbose=options.verbose)
                     existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 

@@ -6,6 +6,15 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.4.1",
+        "features": [
+            "1. get_organelle_config.py: provide guidance for old code and new database incompatibility (reported by Wenxiang Liu@SWFU)",
+            "2. assembly_parser.py: fix a bug after scaffolding with SPAdes path (introduced in 1.7.4 feature 5; reported by Robin van Velzen@WUR)",
+            "3. update README.md with improved instruction",
+        ],
+        "time": "2021-04-16 14:46 UTC+8"
+    },
+    {
         "number": "1.7.4",
         "features": [
             "1. SequenceList: self.__indexed updated",
@@ -18,6 +27,7 @@ versions = [
             "8. get_organelle_from_reads.py/disentangle_organelle_assembly.py: correct typos",
             "9. pipe_control_func.py: map_with_bowtie2: warn reads integrity; build_bowtie2_db: rm small index",
             "10. get_organelle_config.py: verbose log for bowtie2 and blast",
+            "11. update README.md with a reframed instruction",
         ],
         "time": "2021-04-14 17:52 UTC+8"
     },

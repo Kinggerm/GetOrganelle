@@ -65,46 +65,47 @@ label_url_temp = ["https://raw.githubusercontent.com/Kinggerm/GetOrganelleDB/mas
 def get_options(description):
     parser = ArgumentParser(description=description, usage="get_organelle_config.py -a embplant_pt,embplant_mt")
     parser.add_argument("-a", "--add", dest="add_organelle_type",
-                      help="Add database for organelle type(s). Followed by any of all/" +
-                           "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma such as "
-                           "embplant_pt,embplant_mt,fungus_mt.")
-    parser.add_argument("--use-version", dest="version", default="latest",
-                      help="The version of database to add. Find more versions at github.com/Kinggerm/GetOrganelleDB. "
-                           "Default: %(default)s")
+                        help="Add database for organelle type(s). Followed by any of all/" +
+                             "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma such as "
+                             "embplant_pt,embplant_mt,fungus_mt.")
+    parser.add_argument("--use-version", dest="db_version", default="latest",
+                        help="The version of database to add. "
+                             "Find more versions at github.com/Kinggerm/GetOrganelleDB. "
+                             "Default: %(default)s")
     parser.add_argument("-r", "--rm", dest="rm_organelle_type",
-                      help="Remove local database(s) for organelle type(s). Followed by any of all/" +
-                           "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma "
-                           "such as embplant_pt,embplant_mt.")
+                        help="Remove local database(s) for organelle type(s). Followed by any of all/" +
+                             "/".join(ORGANELLE_TYPE_LIST) + " or multiple types joined by comma "
+                             "such as embplant_pt,embplant_mt.")
     parser.add_argument("--update", dest="update", default=False, action="store_true",
-                      help="Update local databases to the latest online version, or the local version "
-                           "if \"--use-local LOCAL_DB_PATH\" provided.")
+                        help="Update local databases to the latest online version, or the local version "
+                             "if \"--use-local LOCAL_DB_PATH\" provided.")
     parser.add_argument("--config-dir", dest="get_organelle_path", default=None,
-                      help="The directory where the default databases were placed. "
-                           "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
-                           "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
-                           "Default: " + GO_PATH)
+                        help="The directory where the default databases were placed. "
+                             "The default value also can be changed by adding 'export GETORG_PATH=your_favor' "
+                             "to the shell script (e.g. ~/.bash_profile or ~/.bashrc) "
+                             "Default: " + GO_PATH)
     parser.add_argument("--use-local", dest="use_local",
-                      help="Input a path. This local database path must include subdirectories "
-                           "LabelDatabase and SeedDatabase, under which there is the fasta file(s) named by the "
-                           "organelle type you want add, such as fungus_mt.fasta. ")
+                        help="Input a path. This local database path must include subdirectories "
+                             "LabelDatabase and SeedDatabase, under which there is the fasta file(s) named by the "
+                             "organelle type you want add, such as fungus_mt.fasta. ")
     parser.add_argument("--clean", dest="clean", default=False, action="store_true",
-                      help="Remove all configured database files (==\"--rm all\").")
+                        help="Remove all configured database files (==\"--rm all\").")
     parser.add_argument("--list", dest="list_available", default=False, action="store_true",
-                      help="List configured databases checking and exit. ")
+                        help="List configured databases checking and exit. ")
     parser.add_argument("--check", dest="check", default=False, action="store_true",
-                      help="Check configured database files and exit. ")
+                        help="Check configured database files and exit. ")
     parser.add_argument("--db-type", dest="db_type", default="both",
-                      help="The database type (seed/label/both). Default: %(default)s")
+                        help="The database type (seed/label/both). Default: %(default)s")
     parser.add_argument("--which-blast", dest="which_blast", default="",
-                      help="Assign the path to BLAST binary files if not added to the path. "
-                           "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
-                           "/ncbi-blast\" first, then $PATH")
+                        help="Assign the path to BLAST binary files if not added to the path. "
+                             "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
+                             "/ncbi-blast\" first, then $PATH")
     parser.add_argument("--which-bowtie2", dest="which_bowtie2", default="",
-                      help="Assign the path to Bowtie2 binary files if not added to the path. "
-                           "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
-                           "/bowtie2\" first, then $PATH")
+                        help="Assign the path to Bowtie2 binary files if not added to the path. "
+                             "Default: try \"" + os.path.realpath("GetOrganelleDep") + "/" + SYSTEM_NAME +
+                             "/bowtie2\" first, then $PATH")
     parser.add_argument("--verbose", dest="verbose", default=False, action="store_true",
-                      help="verbose output to the screen. Default: %(default)s")
+                        help="verbose output to the screen. Default: %(default)s")
     parser.add_argument("-v", "--version", action="version",
                         version="GetOrganelle v{version}".format(version=get_versions()))
     options = parser.parse_args()
@@ -207,22 +208,28 @@ def get_options(description):
                 if not os.path.isfile(this_fas_f):
                     sys.stdout.write("File " + this_fas_f + " not available!\n")
                     sys.exit()
-        options.version = "customized"
+        options.db_version = "customized"
         sys.stdout.write("Use local database: " + options.use_local + "\n")
     else:
         if options.update:
-            options.version = "latest"
-        if options.version == "latest":
+            options.db_version = "latest"
+        if options.db_version == "latest":
             remote_quest = get_static_html_context(VERSION_URLS[0], verbose=options.verbose,
                                                    alternative_url_list=VERSION_URLS[1:])
             if remote_quest["status"]:
-                options.version = remote_quest["content"].strip()
+                options.db_version = remote_quest["content"].strip()
             else:
                 sys.stderr.write("Error: " + remote_quest["info"] + "\n")
                 sys.stderr.write("Please check your connection to github/gitee!\n")
                 sys.stdout.write("\nYou can download the database files from www.github.com/Kinggerm/GetOrganelleDB "
                                  "and install it from from local (flag --use-local)\n")
                 sys.exit()
+        if options.db_version not in SEED_DB_HASH or options.db_version not in LABEL_DB_HASH:
+            sys.stderr.write("GetOrganelle v{} does not support Database v{}\n".
+                             format(get_versions(), options.db_version) +
+                             "Please upgrade GetOrganelle (recommended) "
+                             "or degrade the Database version (not recommended; --use-version)\n")
+            sys.exit()
 
     return options
 
@@ -365,14 +372,14 @@ def main():
                                                          fasta_f=target_output, overwrite=False,
                                                          verbose=options.verbose)
                     else:
-                        if existing_seed_db[sub_o_type]["version"] == options.version:
+                        if existing_seed_db[sub_o_type]["version"] == options.db_version:
                             # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                             initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                      fasta_f=target_output, overwrite=False,
                                                      verbose=options.verbose)
                         else:
-                            these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in seed_url_temp]
-                            check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
+                            these_urls = [sub_url.format(options.db_version, sub_o_type) for sub_url in seed_url_temp]
+                            check_sha256 = SEED_DB_HASH[options.db_version][sub_o_type]["sha256"]
                             status = download_file_with_progress(
                                 remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
                                 timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
@@ -383,7 +390,7 @@ def main():
                             initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                                      fasta_f=target_output, overwrite=True,
                                                      verbose=options.verbose)
-                            existing_seed_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
+                            existing_seed_db[sub_o_type] = {"version": options.db_version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
 
         if options.db_type in ("label", "both"):
@@ -420,14 +427,14 @@ def main():
                                                              fasta_f=target_output, overwrite=False,
                                                              verbose=options.verbose)
                     else:
-                        if existing_seed_db[sub_o_type]["version"] == options.version:
+                        if existing_seed_db[sub_o_type]["version"] == options.db_version:
                             # sys.stdout.write("The same " + sub_o_type + " Seed Database exists. Skipped.\n")
                             initialize_notation_database(which_blast=options.which_blast,
                                                          fasta_f=target_output, overwrite=False,
                                                          verbose=options.verbose)
                         else:
-                            these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
-                            check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
+                            these_urls = [sub_url.format(options.db_version, sub_o_type) for sub_url in label_url_temp]
+                            check_sha256 = LABEL_DB_HASH[options.db_version][sub_o_type]["sha256"]
                             status = download_file_with_progress(
                                 remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
                                 timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
@@ -437,7 +444,7 @@ def main():
                                 continue
                             initialize_notation_database(which_blast=options.which_blast,
                                                          fasta_f=target_output, overwrite=True, verbose=options.verbose)
-                            existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
+                            existing_label_db[sub_o_type] = {"version": options.db_version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
     # Case 4
@@ -465,8 +472,8 @@ def main():
                                                  fasta_f=target_output, overwrite=True,
                                                  verbose=options.verbose)
                 else:
-                    these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in seed_url_temp]
-                    check_sha256 = SEED_DB_HASH[options.version][sub_o_type]["sha256"]
+                    these_urls = [sub_url.format(options.db_version, sub_o_type) for sub_url in seed_url_temp]
+                    check_sha256 = SEED_DB_HASH[options.db_version][sub_o_type]["sha256"]
                     status = download_file_with_progress(
                         remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
                         timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
@@ -476,7 +483,7 @@ def main():
                     initialize_seed_database(which_bowtie2=options.which_bowtie2,
                                              fasta_f=target_output, overwrite=True,
                                              verbose=options.verbose)
-                    existing_seed_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
+                    existing_seed_db[sub_o_type] = {"version": options.db_version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_seed_db, output_to_file=seed_version_f)
 
         if options.db_type in ("label", "both"):
@@ -502,8 +509,8 @@ def main():
                         initialize_notation_database(which_blast=options.which_blast,
                                                      fasta_f=target_output, overwrite=True, verbose=options.verbose)
                 else:
-                    these_urls = [sub_url.format(options.version, sub_o_type) for sub_url in label_url_temp]
-                    check_sha256 = LABEL_DB_HASH[options.version][sub_o_type]["sha256"]
+                    these_urls = [sub_url.format(options.db_version, sub_o_type) for sub_url in label_url_temp]
+                    check_sha256 = LABEL_DB_HASH[options.db_version][sub_o_type]["sha256"]
                     status = download_file_with_progress(
                         remote_url=these_urls[0], output_file=target_output, sha256_v=check_sha256,
                         timeout=time_out, alternative_url_list=these_urls[1:], verbose=options.verbose)
@@ -512,7 +519,7 @@ def main():
                         continue
                     initialize_notation_database(which_blast=options.which_blast,
                                                  fasta_f=target_output, overwrite=True, verbose=options.verbose)
-                    existing_label_db[sub_o_type] = {"version": options.version, "sha256": check_sha256}
+                    existing_label_db[sub_o_type] = {"version": options.db_version, "sha256": check_sha256}
                 write_version_file(version_dict=existing_label_db, output_to_file=label_version_f)
 
     sys.stdout.write("\nTotal cost: %.2f s\n" % (time.time() - time_start))

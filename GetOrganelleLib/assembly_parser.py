@@ -2965,8 +2965,8 @@ class Assembly(SimpleAssembly):
                                                         length=len(new_seq),
                                                         coverage=new_average_cov,
                                                         forward_seq=new_seq,
-                                                        head_connections=OrderedDict([((l_name, l_end), None)]),
-                                                        tail_connections=OrderedDict([((r_name, r_end), None)]))
+                                                        head_connections=OrderedDict([((l_name, l_end), ctg_olp)]),
+                                                        tail_connections=OrderedDict([((r_name, r_end), ctg_olp)]))
                     self.vertex_info[l_name].connections[l_end][(gap_name, False)] = ctg_olp
                     self.vertex_info[r_name].connections[r_end][(gap_name, True)] = ctg_olp
                     gap_added = True

@@ -84,14 +84,14 @@ But you are still highly recommended to read the following minimal introductions
 
 ### Starting from Reads
   
-  The green workflow in the chat below shows the processes of `get_organelle_from_reads.py`.
+  The green workflow in the flowchart below shows the processes of `get_organelle_from_reads.py`.
 
   * <b>Input data</b>
 
-  Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). 
-  Usually, >1G per end is enough for plastome for most normal angiosperm samples, 
-  and >5G per end is enough for mitochondria genome assembly. 
-  Since v1.6.2, `get_organelle_from_reads.py` will automatically estimate the read data it needs, without user assignment nor data reducing (see flags `--reduce-reads-for-coverage` and `--max-reads`). 
+    Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). 
+    Usually, >1G per end is enough for plastome for most normal angiosperm samples, 
+    and >5G per end is enough for mitochondria genome assembly. 
+    Since v1.6.2, `get_organelle_from_reads.py` will automatically estimate the read data it needs, without user assignment nor data reducing (see flags `--reduce-reads-for-coverage` and `--max-reads`). 
   
   * <b>Main Options</b>
     
@@ -125,13 +125,13 @@ But you are still highly recommended to read the following minimal introductions
     * `extended_K*.assembly_graph.fastg.extend_embplant_pt-embplant_mt.fastg`, a simplified assembly graph 
     * `extended_K*.assembly_graph.fastg.extend_embplant_pt-embplant_mt.csv`, a tab-format contig label file for bandage visualization
   
-  You may delete the files other than above if the resulting genome is complete (indicated in the log file and the name of the `*.fasta`). 
-  You are expected to obtain the complete organelle genome assembly for most animal/fungal mitogenomes and plant chloroplast genomes 
-  (see [here for nuclear ribosomal DNAs](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#why-does-getorganelle-generate-a-circular-genome-for-embplant_nrfungus_nr)) with the recommended recipes. 
-  
-  If GetOrganelle failed to generate the complete circular genome (produce `*scaffolds*path_sequence.fasta`), 
-  please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run. 
-  You could also use the incomplete sequence to conduct downstream analysis.
+    You may delete the files other than above if the resulting genome is complete (indicated in the log file and the name of the `*.fasta`). 
+    You are expected to obtain the complete organelle genome assembly for most animal/fungal mitogenomes and plant chloroplast genomes 
+    (see [here for nuclear ribosomal DNAs](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#why-does-getorganelle-generate-a-circular-genome-for-embplant_nrfungus_nr)) with the recommended recipes. 
+    
+    If GetOrganelle failed to generate the complete circular genome (produce `*scaffolds*path_sequence.fasta`), 
+    please follow [here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-should-i-do-with-incomplete-resultbroken-assembly-graph) to adjust your parameters for a second run. 
+    You could also use the incomplete sequence to conduct downstream analysis.
 
 ### Starting from Assembly
 

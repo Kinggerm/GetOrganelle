@@ -10,7 +10,7 @@
 
 This toolkit assemblies organelle genome from genomic skimming data. 
 
-It achieved the best performance overall both on simulated and real data and was recommended as the default for chloroplast genome assemblies in a third-party comparison paper ([Freudenthal et al. 2020. Genome Biology](https://doi.org/10.1186/s13059-020-02153-6)).
+It achieved the best performance overall both on simulated and real data and was recommended as the default for chloroplast genome assembly in a third-party comparison paper ([Freudenthal et al. 2020. Genome Biology](https://doi.org/10.1186/s13059-020-02153-6)).
 
 <div id="citation"></div>
 
@@ -33,16 +33,19 @@ Bandage: [Wick, R. R., M. B. Schultz, J. Zobel and K. E. Holt. 2015. Bandage: in
 
 ## Installation & Initialization
 
-GetOrganelle is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. It was built for Linux and macOS. Windows Subsystem Linux is currently not supported, we are working on this.
+GetOrganelle is currently maintained under Python 3.7.0, but designed to be compatible with versions higher than 3.5.1 and 2.7.11. 
+It was built for Linux and macOS. Windows Subsystem Linux is currently not supported, we are working on this.
 
 * The easiest way to install GetOrganelle and its [dependencies](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#requirement--dependencies) is using conda:
        
        
       conda install -c bioconda getorganelle
 
-  You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. If you don't like conda, or want to follow the latest versions, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation).
+  You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. 
+  If you don't like conda, or want to follow the latest updates, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation) (my preference).
 
-* After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle genome type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, fungus_nr, animal_mt, and/or other_pt). Supposing you are assembling chloroplast genomes:
+* After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle genome type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, fungus_nr, animal_mt, and/or other_pt). 
+Supposing you are assembling chloroplast genomes:
 
     
       get_organelle_config.py --add embplant_pt,embplant_mt

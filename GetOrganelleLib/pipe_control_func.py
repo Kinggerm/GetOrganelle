@@ -860,7 +860,10 @@ def detect_bowtie2_version(which_bowtie2):
         output, err = subprocess.Popen(
             os.path.join(which_bowtie2, "bowtie2") + " --version", stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, shell=True).communicate()
-        this_lines = output.decode("utf8").split("\n")[:3]
+        output = output.decode("utf8")
+        if "(ERR)" in output:
+            return "Bowtie2 ERROR"
+        this_lines = output.split("\n")[:3]
         return "Bowtie2 " + this_lines[0].split()[-1].strip()
     else:
         return "Bowtie2 N/A"

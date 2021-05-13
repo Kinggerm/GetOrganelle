@@ -598,7 +598,7 @@ class Assembly(SimpleAssembly):
         self.vertex_to_float_copy = {}
         self.copy_to_vertex = {}
         self.__inverted_repeat_vertex = {}
-        self.merging_history = {}
+        # self.merging_history = {}
 
     # def uni_overlap(self):
     #     if self.__uni_overlap is None:
@@ -820,6 +820,36 @@ class Assembly(SimpleAssembly):
                             all_both_ends[this_ends].add((each_vertex, direction_remained))
         return [vertices for vertices in all_both_ends.values() if len(vertices) > 1]
 
+    def find_pair_closing_the_path(self, start_v, start_e, terminating_end_set, starting_end_set):
+        in_pipe_leak = False
+        circle_in_between = []
+        in_vertex_ends = set()
+        in_vertex_ends.add((start_v, start_e))
+        in_searching_con = [(start_v, not start_e)]
+        while in_searching_con:
+            in_search_v, in_search_e = in_searching_con.pop(0)
+            if (in_search_v, in_search_e) in terminating_end_set:
+                # start from the same (next_t_v, next_t_e), merging to two different ends of connection_set_f
+                if circle_in_between:
+                    in_pipe_leak = True
+                    break
+                else:
+                    circle_in_between.append(((start_v, start_e), (in_search_v, in_search_e)))
+            elif (in_search_v, in_search_e) in starting_end_set:
+                in_pipe_leak = True
+                break
+            else:
+                for n_in_search_v, n_in_search_e in self.vertex_info[in_search_v].connections[in_search_e]:
+                    if (n_in_search_v, n_in_search_e) in in_vertex_ends:
+                        pass
+                    else:
+                        in_vertex_ends.add((n_in_search_v, n_in_search_e))
+                        in_searching_con.append((n_in_search_v, not n_in_search_e))
+        if not in_pipe_leak:
+            return circle_in_between
+        else:
+            return []
+
     def is_sequential_repeat(self, search_vertex_name, return_pair_in_the_trunk_path=True):
         if search_vertex_name not in self.vertex_info:
             raise ProcessingGraphFailed("Vertex name " + search_vertex_name + " not found!")
@@ -827,44 +857,14 @@ class Assembly(SimpleAssembly):
         connection_set_f = self.vertex_info[search_vertex_name].connections[False]
         all_pairs_of_inner_circles = []
 
-        def path_without_leakage(start_v, start_e, terminating_end_set):
-            in_pipe_leak = False
-            circle_in_between = []
-            in_vertex_ends = set()
-            in_vertex_ends.add((start_v, start_e))
-            in_searching_con = [(start_v, not start_e)]
-            while in_searching_con:
-                in_search_v, in_search_e = in_searching_con.pop(0)
-                if (in_search_v, in_search_e) in terminating_end_set:
-                    # start from the same (next_t_v, next_t_e), merging to two different ends of connection_set_f
-                    if circle_in_between:
-                        in_pipe_leak = True
-                        break
-                    else:
-                        circle_in_between.append(((start_v, start_e), (in_search_v, in_search_e)))
-                elif (in_search_v, in_search_e) in connection_set_t:
-                    in_pipe_leak = True
-                    break
-                else:
-                    for n_in_search_v, n_in_search_e in self.vertex_info[in_search_v].connections[in_search_e]:
-                        if (n_in_search_v, n_in_search_e) in in_vertex_ends:
-                            pass
-                        else:
-                            in_vertex_ends.add((n_in_search_v, n_in_search_e))
-                            in_searching_con.append((n_in_search_v, not n_in_search_e))
-            if not in_pipe_leak:
-                return circle_in_between
-            else:
-                return []
-
         # branching ends
         if len(connection_set_t) == len(connection_set_f) == 2:
             for next_t_v, next_t_e in list(connection_set_t):
-                this_inner_circle = path_without_leakage(next_t_v, next_t_e, connection_set_f)
+                this_inner_circle = self.find_pair_closing_the_path(next_t_v, next_t_e, connection_set_f, connection_set_t)
                 if this_inner_circle:
                     # check leakage in reverse direction
                     reverse_v, reverse_e = this_inner_circle[0][1]
-                    not_leak = path_without_leakage(reverse_v, reverse_e, connection_set_t)
+                    not_leak = self.find_pair_closing_the_path(reverse_v, reverse_e, connection_set_t, connection_set_f)
                     if not_leak:
                         all_pairs_of_inner_circles.extend(this_inner_circle)
             # sort pairs by average depths(?)
@@ -1106,10 +1106,10 @@ class Assembly(SimpleAssembly):
                     if (next_v, next_e) == (from_vertex, not from_end):
                         # skip every self-loop 2020-06-23
                         # pseudo_self_circle_str = "P" + from_vertex
-                        # if pseudo_self_circle_str not in extra_str_to_symbol:
-                        #     extra_str_to_symbol[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
-                        #     extra_symbol_to_str[extra_str_to_symbol[pseudo_self_circle_str]] = pseudo_self_circle_str
-                        # result_form -= (extra_str_to_symbol[pseudo_self_circle_str] - 1)
+                        # if pseudo_self_circle_str not in extra_str_to_symbol_m2:
+                        #     extra_str_to_symbol_m2[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
+                        #     extra_symbol_to_str_m2[extra_str_to_symbol_m2[pseudo_self_circle_str]] = pseudo_self_circle_str
+                        # result_form -= (extra_str_to_symbol_m2[pseudo_self_circle_str] - 1)
                         pass
                     # elif (next_v, next_e) != (back_to_vertex, back_to_end):
                     elif (next_v, next_e) not in here_record_ends:
@@ -1125,14 +1125,18 @@ class Assembly(SimpleAssembly):
         def constraint_min_function(x):
             replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
             expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
-            min_copy = np.array([1.001] * len(all_v_symbols) + [2.001] * len(extra_symbol_to_str))
+            min_copy = np.array([1.001] * len(all_v_symbols) +
+                                [1.001] * len(extra_symbol_to_str_m1) +
+                                [2.001] * len(extra_symbol_to_str_m2))
             # effect: expression_array >= int(min_copy)
             return expression_array - min_copy
 
         def constraint_min_function_for_customized_brute(x):
             replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
             expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
-            min_copy = np.array([1.0] * len(all_v_symbols) + [2.0] * len(extra_symbol_to_str))
+            min_copy = np.array([1.0] * len(all_v_symbols) +
+                                [1.0] * len(extra_symbol_to_str_m1) +
+                                [2.0] * len(extra_symbol_to_str_m2))
             # effect: expression_array >= min_copy
             return expression_array - min_copy
 
@@ -1140,7 +1144,8 @@ class Assembly(SimpleAssembly):
             replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
             expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
             max_copy = np.array([maximum_copy_num] * len(all_v_symbols) +
-                                [maximum_copy_num * 2] * len(extra_symbol_to_str))
+                                [maximum_copy_num] * len(extra_symbol_to_str_m1) +
+                                [maximum_copy_num * 2] * len(extra_symbol_to_str_m2))
             # effect: expression_array <= max_copy
             return max_copy - expression_array
 
@@ -1165,22 +1170,34 @@ class Assembly(SimpleAssembly):
                         try:
                             if (cons["fun"](value_set) < 0).any():
                                 is_valid_set = False
+                                # if in_log_handler and (debug or display_p):
+                                #     in_log_handler.info("value_set={} ; illegal ineq constraints".format(value_set))
                                 break
                         except TypeError:
+                            # if in_log_handler and (debug or display_p):
+                            #     in_log_handler.info("value_set={} ; illegal ineq constraints".format(value_set))
                             is_valid_set = False
                             break
                     elif cons["type"] == "eq":
                         try:
                             if cons["fun"](value_set) != 0:
                                 is_valid_set = False
+                                # if in_log_handler and (debug or display_p):
+                                #     in_log_handler.info("value_set={} ; illegal eq constraints".format(value_set))
                                 break
                         except TypeError:
+                            # if in_log_handler and (debug or display_p):
+                            #     in_log_handler.info("value_set={} ; illegal eq constraints".format(value_set))
                             is_valid_set = False
                             break
                 if not is_valid_set:
                     continue
                 count_valid += 1
-                this_fun_val = round(func(value_set), round_digit)
+                this_fun_val = func(value_set)
+                if in_log_handler:
+                    if debug or display_p:
+                        in_log_handler.info("value_set={} ; fun_val={}".format(value_set, this_fun_val))
+                this_fun_val = round(this_fun_val, round_digit)
                 if this_fun_val < best_fun_val:
                     best_para_val = [value_set]
                     best_fun_val = this_fun_val
@@ -1229,8 +1246,10 @@ class Assembly(SimpleAssembly):
         vertex_to_symbols = {vertex_name: Symbol("V" + vertex_name, integer=True)  # positive=True)
                              for vertex_name in vertices_list}
         symbols_to_vertex = {vertex_to_symbols[vertex_name]: vertex_name for vertex_name in vertices_list}
-        extra_str_to_symbol = {}
-        extra_symbol_to_str = {}
+        extra_str_to_symbol_m1 = {}
+        extra_str_to_symbol_m2 = {}
+        extra_symbol_to_str_m1 = {}
+        extra_symbol_to_str_m2 = {}
         formulae = []
         recorded_ends = set()
         for vertex_name in vertices_list:
@@ -1283,15 +1302,17 @@ class Assembly(SimpleAssembly):
                         formulae.append(vertex_to_symbols[vertex_name] - 1)
 
         # add self-loop formulae
+        self_loop_v = set()
         for vertex_name in vertices_list:
             if self.vertex_info[vertex_name].is_self_loop():
+                self_loop_v.add(vertex_name)
                 if log_handler:
                     log_handler.warning("Self-loop contig detected: Vertex_" + vertex_name)
                 pseudo_self_loop_str = "P" + vertex_name
-                if pseudo_self_loop_str not in extra_str_to_symbol:
-                    extra_str_to_symbol[pseudo_self_loop_str] = Symbol(pseudo_self_loop_str, integer=True)
-                    extra_symbol_to_str[extra_str_to_symbol[pseudo_self_loop_str]] = pseudo_self_loop_str
-                this_formula = vertex_to_symbols[vertex_name] - extra_str_to_symbol[pseudo_self_loop_str]
+                if pseudo_self_loop_str not in extra_str_to_symbol_m1:
+                    extra_str_to_symbol_m1[pseudo_self_loop_str] = Symbol(pseudo_self_loop_str, integer=True)
+                    extra_symbol_to_str_m1[extra_str_to_symbol_m1[pseudo_self_loop_str]] = pseudo_self_loop_str
+                this_formula = vertex_to_symbols[vertex_name] - extra_str_to_symbol_m1[pseudo_self_loop_str]
                 formulae.append(this_formula)
                 if verbose:
                     if log_handler:
@@ -1310,11 +1331,18 @@ class Assembly(SimpleAssembly):
                 # from_v and to_v are already in the "trunk path", if they are the same,
                 # the graph is like two circles sharing the same sequential repeat, no need to add this limitation
                 if from_v != to_v:
-                    new_str = "E" + str(len(extra_str_to_symbol))
-                    extra_str_to_symbol[new_str] = Symbol(new_str, integer=True)
-                    extra_symbol_to_str[extra_str_to_symbol[new_str]] = new_str
-                    this_formula = vertex_to_symbols[vertex_name] - \
-                                   vertex_to_symbols[from_v] * extra_str_to_symbol[new_str]
+                    new_str = "E" + str(len(extra_str_to_symbol_m1) + len(extra_str_to_symbol_m2))
+                    if vertex_name in self_loop_v:
+                        # self-loop vertex is allowed to have the multiplicity of 1
+                        extra_str_to_symbol_m1[new_str] = Symbol(new_str, integer=True)
+                        extra_symbol_to_str_m1[extra_str_to_symbol_m1[new_str]] = new_str
+                        this_formula = vertex_to_symbols[vertex_name] - \
+                                       vertex_to_symbols[from_v] * extra_str_to_symbol_m1[new_str]
+                    else:
+                        extra_str_to_symbol_m2[new_str] = Symbol(new_str, integer=True)
+                        extra_symbol_to_str_m2[extra_str_to_symbol_m2[new_str]] = new_str
+                        this_formula = vertex_to_symbols[vertex_name] - \
+                                       vertex_to_symbols[from_v] * extra_str_to_symbol_m2[new_str]
                     formulae.append(this_formula)
                     if verbose:
                         if log_handler:
@@ -1323,7 +1351,7 @@ class Assembly(SimpleAssembly):
                             sys.stdout.write("formulating for: " + vertex_name + ": " + str(this_formula) + "\n")
 
         all_v_symbols = list(symbols_to_vertex)
-        all_symbols = all_v_symbols + list(extra_symbol_to_str)
+        all_symbols = all_v_symbols + list(extra_symbol_to_str_m1) + list(extra_symbol_to_str_m2)
         if verbose or debug:
             if log_handler:
                 log_handler.info("formulae: " + str(formulae))
@@ -3281,7 +3309,7 @@ class Assembly(SimpleAssembly):
                     if log_handler:
                         log_handler.warning("More than one circular genome structure produced ...")
                         log_handler.warning("Please check the final result to confirm whether they are "
-                                            " simply different in SSC direction (two flip-flop configurations)!")
+                                            "simply different in SSC direction (two flip-flop configurations)!")
                     else:
                         sys.stdout.write("More than one circular genome structure produced ...\n")
                         sys.stdout.write("Please check the final result to confirm whether they are "
@@ -3534,11 +3562,11 @@ class Assembly(SimpleAssembly):
                     if log_handler:
                         log_handler.warning("More than one structure (gene order) produced ...")
                         log_handler.warning("Please check the final result to confirm whether they are "
-                                            " simply different in SSC direction (two flip-flop configurations)!")
+                                            "simply different in SSC direction (two flip-flop configurations)!")
                     else:
                         sys.stdout.write("More than one structure (gene order) produced ...\n")
                         sys.stdout.write("Please check the final result to confirm whether they are "
-                                         " simply different in SSC direction (two flip-flop configurations)!\n")
+                                         "simply different in SSC direction (two flip-flop configurations)!\n")
             return sorted_paths
 
     def export_path(self, in_path):

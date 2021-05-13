@@ -231,7 +231,7 @@ def get_options(description, version):
                                      help="Word size (W) for pre-grouping. Used to reproduce result when word size is "
                                           "a certain value during pregrouping process and later changed during reads "
                                           "extending process. Similar to word size. Default: the same to word size.")
-        group_extending.add_argument("-R", "--max-rounds", dest="max_rounds", type=int, default=inf,
+        group_extending.add_argument("-R", "--max-rounds", dest="max_rounds", type=int,  # default=inf,
                                      help="Maximum number of extending rounds (suggested: >=2). "
                                           "Default: 15 (-F embplant_pt), 30 (-F embplant_mt/other_pt), "
                                           "10 (-F embplant_nr/animal_mt/fungus_mt/fungus_nr), inf (-P 0).")
@@ -290,7 +290,7 @@ def get_options(description, version):
                                           "length value. If you are using limited loci, e.g. rbcL gene as the seed for "
                                           "assembling the whole plastome (with extending length ca. 75000 >> 6000), "
                                           "you should set maximum extending length to inf. "
-                                          "Should be a list of numbers/auto/no split by comma(s) on a multi-organelle mode, "
+                                          "Should be a list of numbers/auto/inf split by comma(s) on a multi-organelle mode, "
                                           "with the same list length to organelle_type (followed by '-F'). "
                                           "Default: inf. ")
         # group 4

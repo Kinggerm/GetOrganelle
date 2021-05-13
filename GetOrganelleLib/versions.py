@@ -6,10 +6,26 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.5",
+        "features": [
+            "1. assembly_parser.py: fix a bug in estimation of the multiplicity of self-loop vertex, "
+            "   which was falsely forced to be at least 2. (detected in a case of Yan Zhong@SCNU)",
+            "2. get_organelle_from_reads.py: typo in instruction for --max-extending-len corrected",
+            "3. redundant Assembly.merging_history() removed",
+            "4. fix a small bug in Assembly.is_sequential_repeat(), "
+            "   isolate path_without_leakage as find_pair_closing_the_path",
+            "5. get_organelle_from_reads.py: fix an inconformity between the document and the default for -R, ",
+            "6. pipe_control_func.py: detect bowtie2 version improved",
+        ],
+        "time": "2021-05-13 16:50 UTC+8"
+    },
+    {
         "number": "1.7.4.1",
         "features": [
-            "1. get_organelle_config.py: provide guidance for old code and new database incompatibility (reported by Wenxiang Liu@SWFU)",
-            "2. assembly_parser.py: fix a bug after scaffolding with SPAdes path (introduced in 1.7.4 feature 5; reported by Robin van Velzen@WUR)",
+            "1. get_organelle_config.py: provide guidance for old code and new database incompatibility "
+            "   (reported by Wenxiang Liu@SWFU)",
+            "2. assembly_parser.py: fix a bug after scaffolding with SPAdes path "
+            "   (introduced in 1.7.4 feature 5; reported by Robin van Velzen@WUR)",
             "3. update README.md with improved instruction",
         ],
         "time": "2021-04-16 14:46 UTC+8"
@@ -21,7 +37,8 @@ versions = [
             "2. get_static_html_context: requests.exceptions.ReadTimeout added"
             "3. get_organelle_from_reads.py: '--overwrite' added; catch shutil.rmtree() errors; no python-lib -> error."
             "4. get_organelle_from_*.py: turning off bandage if the result is not circular",
-            "5. assembly_parser.py: recording every overlap value rather than using a universal value for hifiasm (in response to Christopher Benson@PSU)",
+            "5. assembly_parser.py: recording every overlap value rather than using a universal value for hifiasm "
+            "   (in response to Christopher Benson@PSU)",
             "6. optparse -> argparse (in response to Matthias Bernt@UFZ)",
             "7. get_organelle_from_assembly.py: fix a bug with the malfunction of --continue when the input is gfa ",
             "8. get_organelle_from_reads.py/disentangle_organelle_assembly.py: correct typos",

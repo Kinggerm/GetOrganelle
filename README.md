@@ -228,4 +228,4 @@ Although older versions like 1.6.3/1.7.1 will be more stable, but we encourage y
 
 * Send email to us ([jianjun.jin@columbia.edu](mailto:jianjun.jin@columbia.edu)&[jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn), [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn))
 
-* Join the QQ group (ID: 859158590)
+* Join the QQ group (ID: 908302723)

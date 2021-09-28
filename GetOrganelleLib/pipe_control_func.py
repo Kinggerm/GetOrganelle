@@ -69,7 +69,8 @@ SEQ_DB_PATH = os.path.join(GO_PATH, SEQ_NAME)
 HEAD_MAXIMUM_LINES = 2147483647
 
 INVALID_PATH_CHAR_RANGES = [
-    [u'\u4e00', u'\u9fff']  # chinese characters are not accepted by SPAdes
+    [u'\u4e00', u'\u9fff'],  # chinese characters are not accepted by SPAdes
+    [" ", " "]
 ]
 
 

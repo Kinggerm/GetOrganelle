@@ -719,14 +719,15 @@ def get_options(description, version):
         log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 
-        if options.run_spades:
-            for fq_file in [options.fq_file_1, options.fq_file_2] * int(bool(options.fq_file_1 and options.fq_file_2))\
-                           + options.unpaired_fq_files:
-                assert is_valid_path(os.path.basename(fq_file)), \
-                    "Invalid characters for SPAdes in file name: " + os.path.basename(fq_file)
-            for fq_file in [options.output_base, options.prefix]:
-                assert is_valid_path(os.path.realpath(fq_file)), \
-                    "Invalid characters for SPAdes in path: " + os.path.realpath(fq_file)
+        # if options.run_spades:
+        # space is forbidden for both spades and blast
+        for fq_file in [options.fq_file_1, options.fq_file_2] * int(bool(options.fq_file_1 and options.fq_file_2))\
+                       + options.unpaired_fq_files:
+            assert is_valid_path(os.path.basename(fq_file)), \
+                "Invalid characters (e.g. space, non-ascii) for SPAdes in file name: " + os.path.basename(fq_file)
+        for fq_file in [options.output_base, options.prefix]:
+            assert is_valid_path(os.path.realpath(fq_file)), \
+                "Invalid characters (e.g. space, non-ascii) for SPAdes in path: " + os.path.realpath(fq_file)
 
         log_handler = timed_log(log_handler, options.output_base, options.prefix + "get_org.")
         if options.word_size is None:

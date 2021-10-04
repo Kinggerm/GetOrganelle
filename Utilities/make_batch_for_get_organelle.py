@@ -3,8 +3,8 @@
 import os
 from argparse import ArgumentParser
 
-usage = "mk_get_organelle.py -o basename -p \"\" " \
-        "[a_list_of_directories_containing_balanced_fastq_file, default='./*']"
+usage = "make_batch_for_get_organelle.py -o basename -p \"-F embplant_pt\" " \
+        "[a_list_of_directories_containing_balanced_fastq_file]"
 parser = ArgumentParser(usage=usage)
 parser.add_argument('sample_dirs', metavar='sample_dirs', type=str, nargs="+",
                         help="Input a list of folders (split the files by spaces). "
@@ -13,7 +13,7 @@ parser.add_argument('-o', dest='output_base',
                     help='output base name for each sample')
 parser.add_argument('-p', dest='other_arguments',
                     help='Other arguments that get_organelle_from_reads.py would take.'
-                         'Use double quotation marks to include all the arguments'
+                         'Use double quotation marks to include all the arguments. '
                          'Example: "-s plastome.fasta -a mitochondrial.fasta -F embplant_pt -w 105"')
 parser.add_argument('--all', dest='skip_done', default=True, action='store_false',
                     help='Choose to make command for all samples including samples with results.'

@@ -399,6 +399,11 @@ def get_options(description, version):
         log_handler.info("WORKING DIR: " + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 
+        assert is_valid_path(os.path.realpath(options.output_base)), \
+            "Invalid characters (e.g. space, non-ascii) for SPAdes in path: " + os.path.realpath(options.output_base)
+        assert is_valid_path(options.prefix), \
+            "Invalid characters (e.g. space, non-ascii) for SPAdes in prefix: " + options.prefix
+
         log_handler = timed_log(log_handler, options.output_base, options.prefix + "get_org.")
 
         # using the default

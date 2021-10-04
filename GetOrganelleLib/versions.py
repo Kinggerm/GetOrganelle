@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.5.1",
+        "features": [
+            "1. make_batch_for_get_organelle.py: usage updated (reported by Fei Zhao@KIB)",
+            "2. space in the output path should be forbidden (reported by Manuela Sann@UFreiburg)",
+        ],
+        "time": "2021-05-13 16:50 UTC+8"
+    },
+    {
         "number": "1.7.5",
         "features": [
             "1. assembly_parser.py: fix a bug in estimation of the multiplicity of self-loop vertex, "

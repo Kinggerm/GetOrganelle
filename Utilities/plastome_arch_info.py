@@ -39,7 +39,7 @@ def get_options(description):
 def main():
     time0 = time.time()
     description = """\n## This script helps you count the LSC/SSC/IR-DR lengths from a batch of plastome sequences.\n
-                  ## by jinjianjun@mail.kib.ac.cn\n\n"""
+                  ## Jianjun\n\n"""
     options, sequence_files = get_options(description=description)
     sys.stdout.write(
         "file_name\tsequence_name\ttotal_length\tLSC_length\tSSC_length\tIR/DR_length\tarch_Notes\tGC_content\n")

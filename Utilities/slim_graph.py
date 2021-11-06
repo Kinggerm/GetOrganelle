@@ -917,7 +917,7 @@ def main():
                   "\n" \
                   "\nslim_graph.py is a script for excluding certain contigs " \
                   "from assembly graph file (*.fastg/*.fasta) by blast\n" \
-                  "By jinjianjun@mail.kib.ac.cn\n"
+                  "\n"
     options, assemblies, log_handler = get_options(print_title)
     from GetOrganelleLib.assembly_parser import Assembly
     from GetOrganelleLib.seq_parser import SequenceList

@@ -129,7 +129,7 @@ def main():
     print_title = "GetOrganelle v" + str(get_versions()) + \
                   "\n\nThis is a script for extracting organelle genomes" \
                   " from slim_fastg.py-produced files (csv & fastg). " + \
-                  "\nBy jinjianjun@mail.kib.ac.cn\n\n"
+                  "\n\n"
     options, log_handler = get_options(print_title)
 
     @set_time_limit(options.time_limit)
@@ -326,7 +326,7 @@ def main():
                                  "instead of circular genome.")
             log_handler = simple_log(log_handler, options.output_directory, options.prefix + ".disentangle.")
             log_handler.info("\nTotal cost " + str(time.time() - time0))
-            log_handler.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")
+            log_handler.info("Please open an issue at https://github.com/Kinggerm/GetOrganelle/issues if you find bugs!\n")
     except Exception as e:
         log_handler.exception(str(e))
         log_handler.error("Disentangling failed!")
@@ -335,7 +335,7 @@ def main():
                              "instead of circular genome.")
         log_handler = simple_log(log_handler, options.output_directory, options.prefix + ".disentangle.")
         log_handler.info("\nTotal cost " + str(time.time() - time0))
-        log_handler.info("Please email jinjianjun@mail.kib.ac.cn if you find bugs!\n")
+        log_handler.info("Please open an issue at https://github.com/Kinggerm/GetOrganelle/issues if you find bugs!\n")
     logging.shutdown()
 
 

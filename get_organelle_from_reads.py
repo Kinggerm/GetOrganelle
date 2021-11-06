@@ -4119,7 +4119,7 @@ def main():
             if set(slim_stat_codes) == {2}:
                 log_handler.warning("No sequence hit our LabelDatabase!")
                 log_handler.warning("This might due to unreasonable seed/parameter choices or a bug.")
-                log_handler.info("Please email jianjun.jin@columbia.edu and jinjianjun@mail.kib.ac.cn "
+                log_handler.info("Please open an issue at https://github.com/Kinggerm/GetOrganelle/issues "
                                  "with the get_org.log.txt file.\n")
             elif 0 in slim_stat_codes:
                 log_handler.info("Slimming assembly graphs finished.\n")
@@ -4176,8 +4176,9 @@ def main():
         log_handler.exception("")
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("Please email jianjun.jin@columbia.edu and jinjianjun@mail.kib.ac.cn if you find bugs!")
-        log_handler.info("Please provide me with the get_org.log.txt file!")
+        log_handler.info("Please open an issue at https://github.com/Kinggerm/GetOrganelle/issues if you find bugs!")
+        log_handler.info("Please provide the get_org.log.txt "
+                         "and the assembly graph (can be *.png to protect your data privacy) if possible!")
     logging.shutdown()
 
 

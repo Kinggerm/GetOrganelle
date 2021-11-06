@@ -1065,8 +1065,9 @@ def main():
         log_handler.exception("")
         log_handler = simple_log(log_handler, options.output_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("Please email jinjianjun@mail.kib.ac.cn or jianjun.jin@columbia.edu if you find bugs!")
-        log_handler.info("Please provide me with the get_org.log.txt file!")
+        log_handler.info("Please open an issue at https://github.com/Kinggerm/GetOrganelle/issues if you find bugs!")
+        log_handler.info("Please provide the get_org.log.txt and "
+                         "the assembly graph (can be *.png to protect your data privacy)!")
     logging.shutdown()
 
 

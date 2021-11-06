@@ -294,7 +294,7 @@ def parse_geneious_fasta(fasta_matrix):
 def require_commands():
     usage = "python this_script.py Query.gb -r Reference.gb" \
             "\n\nThis script only checks the mainly check the reliability of automatically annotated tRNA and CDS." \
-            "\nBy jinjianjun@mail.kib.ac.cn"
+            "\n"
     parser = ArgumentParser(usage=usage)
     group_need = parser.add_argument_group("NECESSARY OPTIONS")
     group_need.add_argument('query_gb', metavar='query', type=str, nargs='+',

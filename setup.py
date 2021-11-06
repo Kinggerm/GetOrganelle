@@ -195,7 +195,7 @@ if not in_situ:
         version=get_versions(),
         description="a fast and versatile toolkit for accurate de novo assembly of organelle genomes.",
         author="Jian-Jun Jin",
-        author_email="jinjianjun@mail.kib.ac.cn",
+        author_email="jj3111@columbia.edu",
         url="http://github.com/Kinggerm/GetOrganelle",
         license="GNU General Public License, version 3",
         packages=PACKAGES,

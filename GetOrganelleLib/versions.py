@@ -6,6 +6,16 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.5.2",
+        "features": [
+            "1. ask the questions publicly",
+            "2. statistical_func.py: weighted_gmm_with_em_aic(): fix a bug that will be triggered by "
+            "   graph produced by join_spades_fastg_by_blast.py (reported by Mergi Dinka); "
+            "   also fix a hidden mis-indexing issue there",
+        ],
+        "time": "2021-12-15 02:35 UTC-5"
+    },
+    {
         "number": "1.7.5.1",
         "features": [
             "1. make_batch_for_get_organelle.py: usage updated (reported by Fei Zhao@KIB)",

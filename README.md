@@ -222,10 +222,12 @@ To extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`
 
 Please check [GetOrganelle wiki page](https://github.com/Kinggerm/GetOrganelle/wiki) first. If your question is running specific, please attach the `get_org.log.txt` file and the post-slimming assembly graph (`assembly_graph.fastg.extend_*.fastg`, could be Bandage-visualized *.png format to protect your data privacy).
 
-Although older versions like 1.6.3/1.7.1 will be more stable, but we encourage you to keep updated. GetOrganelle was actively updated with new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
+Although older versions like 1.6.3/1.7.1/1.7.5 may be more stable, but we always strongly encourage you to keep updated. GetOrganelle was actively updated with new fixes and new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
 
-* Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues).
+* Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues): recommended
 
-* Send email to us ([jianjun.jin@columbia.edu](mailto:jianjun.jin@columbia.edu)&[jinjianjun@mail.kib.ac.cn](mailto:jinjianjun@mail.kib.ac.cn), [yuwenbin@xtbg.ac.cn](mailto:yuwenbin@xtbg.ac.cn))
+* [GoogleGroups](https://groups.google.com/g/getorganelle)
 
-* Join the QQ group (ID: 908302723)
+* QQ group (ID: 908302723)
+
+* Emails: Do NOT directly write to us with your questions, post the questions **publicly**, using above platforms (we will be informed automatically) or any other platforms (inform us of it). Our emails (jianjun.jin@columbia.edu, yuwenbin@xtbg.ac.cn) are only for receiving public question alert and private data (if applied) associated with those public questions. When you send your private data to us, enclose the email with a link where you posted the question. Our only reply emails will be a receiving confirmation, while our answers will be posted in a public place. 

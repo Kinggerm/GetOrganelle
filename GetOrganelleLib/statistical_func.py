@@ -62,28 +62,28 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
                 total_loglike += sum(stats.norm.logpdf(points, pr["mu"], pr["sigma"]) * weights + log(pr["percent"]))
         return total_loglike
 
-    def assign_cluster_labels(dat_arr, dat_w, parameters, limited):
+    def assign_cluster_labels(dat_arr, dat_w, parameters, lb_fixed):
         # assign every data point to its most likely cluster
         if len(parameters) == 1:
             return np.array([0] * int(data_len))
         else:
             # the parameter set of the first cluster
-            loglike_res = stats.norm.logpdf(dat_arr, parameters[0]["mu"], parameters[1]["sigma"]) * dat_w + \
-                          log(parameters[1]["percent"])
+            loglike_res = stats.norm.logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) * dat_w + \
+                          log(parameters[0]["percent"])
             # the parameter set of the rest cluster
             for pr in parameters[1:]:
                 loglike_res = np.vstack(
                     (loglike_res, stats.norm.logpdf(dat_arr, pr["mu"], pr["sigma"]) * dat_w + log(pr["percent"])))
             # assign labels
             new_labels = loglike_res.argmax(axis=0)
-            if limited:
+            if lb_fixed:
                 intermediate_labels = []
                 for here_dat_id in range(int(data_len)):
-                    if here_dat_id in limited:
-                        if new_labels[here_dat_id] in limited[here_dat_id]:
+                    if here_dat_id in lb_fixed:
+                        if new_labels[here_dat_id] in lb_fixed[here_dat_id]:
                             intermediate_labels.append(new_labels[here_dat_id])
                         else:
-                            intermediate_labels.append(sorted(limited[here_dat_id])[0])
+                            intermediate_labels.append(sorted(lb_fixed[here_dat_id])[0])
                     else:
                         intermediate_labels.append(new_labels[here_dat_id])
                 new_labels = np.array(intermediate_labels)
@@ -93,31 +93,34 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
                 # if dat_item in cluster_limited else
                 # new_labels[here_dat_id]
                 # for here_dat_id, dat_item in enumerate(data_array)])
-                limited_values = set(dat_arr[list(limited)])
+                limited_values = set(dat_arr[list(lb_fixed)])
             else:
                 limited_values = set()
-            # re-pick if some cluster are empty
+            # if there is an empty cluster,
+            # and if there is another non-empty cluster with two ends not in the fixed (lb_fixed),
+            # then move one of the end (min or max) from that non-empty cluster to the empty cluster
             label_counts = {lb: 0 for lb in range(len(parameters))}
             for ct_lb in new_labels:
                 label_counts[ct_lb] += 1
             for empty_lb in label_counts:
                 if label_counts[empty_lb] == 0:
-                    affordable_lbs = {af_lb: [min, max] for af_lb in label_counts if label_counts[af_lb] > 1}
-                    for af_lb in sorted(affordable_lbs):
+                    non_empty_lbs = {ne_lb: [min, max] for ne_lb in label_counts if label_counts[ne_lb] > 1}
+                    for af_lb in sorted(non_empty_lbs):
                         these_points = dat_arr[new_labels == af_lb]
                         if max(these_points) in limited_values:
-                            affordable_lbs[af_lb].remove(max)
+                            non_empty_lbs[af_lb].remove(max)
                         if min(these_points) in limited_values:
-                            affordable_lbs[af_lb].remove(min)
-                        if not affordable_lbs[af_lb]:
-                            del affordable_lbs[af_lb]
-                    if affordable_lbs:
-                        chose_lb = random.choice(list(affordable_lbs))
+                            non_empty_lbs[af_lb].remove(min)
+                        if not non_empty_lbs[af_lb]:
+                            del non_empty_lbs[af_lb]
+                    if non_empty_lbs:
+                        chose_lb = random.choice(list(non_empty_lbs))
                         chose_points = dat_arr[new_labels == chose_lb]
-                        data_point = random.choice(affordable_lbs[chose_lb])(chose_points)
-                        transfer_index = np.where(dat_arr == data_point)[0]
+                        # random.choice([min, max]), then use the resulting function to pick the point
+                        data_point = random.choice(non_empty_lbs[chose_lb])(chose_points)
+                        transfer_index = random.choice(np.where(dat_arr == data_point)[0])
                         new_labels[transfer_index] = empty_lb
-                        label_counts[chose_lb] -= len(transfer_index)
+                        label_counts[chose_lb] -= 1
             return new_labels
 
     def updating_parameter(dat_arr, dat_w, lbs, parameters):
@@ -161,6 +164,7 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
         freedom_dat_item = int(data_len)
     minimum_cluster = min(freedom_dat_item, minimum_cluster)
     maximum_cluster = min(freedom_dat_item, maximum_cluster)
+    # iteratively try the num of clusters
     for total_cluster_num in range(minimum_cluster, maximum_cluster + 1):
         # initialization
         labels = np.random.choice(total_cluster_num, int(data_len))

@@ -12,6 +12,7 @@ versions = [
             "2. statistical_func.py: weighted_gmm_with_em_aic(): fix a bug that will be triggered by "
             "   graph produced by join_spades_fastg_by_blast.py (reported by Mergi Dinka); "
             "   also fix a hidden mis-indexing issue there",
+            "3. Utilities/join_spades_fastg_by_blast.py: update on a v name issue",
         ],
         "time": "2021-12-15 02:35 UTC-5"
     },

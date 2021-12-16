@@ -256,8 +256,11 @@ def blast_and_call_new_matrix(fasta_file, index_files, out_file, len_db, which_b
         for numbers in ''.join(filter(lambda ch: ch in '0123456789-_', crazy_string)).split('_'):
             for num in numbers.split('-'):
                 used_edge_numbers.append(int(num))
-    used_edge_numbers.sort()
-    variances_to_pass = {'edge': used_edge_numbers[-1]+1, 'index': len_fastg}
+    if used_edge_numbers:
+        used_edge_numbers.sort()
+        variances_to_pass = {'edge': used_edge_numbers[-1]+1, 'index': len_fastg}
+    else:
+        variances_to_pass = {'edge': 1, 'index': len_fastg}
 
     def make_connections(edge1, base1, edge2, base2, k_mer):
         # if end to end and disable self-connection

@@ -93,7 +93,7 @@ But you are still highly recommended to read the following minimal introductions
 
   * <b>Input data</b>
 
-    Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). 
+    Currently, `get_organelle_from_reads.py` was written for illumina pair-end/single-end data (fastq or fastq.gz). We recommend using adapter-trimmed raw reads without quality control.
     Usually, >1G per end is enough for plastome for most normal angiosperm samples, 
     and >5G per end is enough for mitochondria genome assembly. 
     Since v1.6.2, `get_organelle_from_reads.py` will automatically estimate the read data it needs, without user assignment nor data reducing (see flags `--reduce-reads-for-coverage` and `--max-reads`). 
@@ -224,7 +224,13 @@ Please check [GetOrganelle wiki page](https://github.com/Kinggerm/GetOrganelle/w
 
 Although older versions like 1.6.3/1.7.1/1.7.5 may be more stable, but we always strongly encourage you to keep updated. GetOrganelle was actively updated with new fixes and new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
 
-* Report bugs & Open issues [here](https://github.com/Kinggerm/GetOrganelle/issues): recommended
+* Find Questions & Answers at [GetOrganelle Discussions](https://github.com/Kinggerm/GetOrganelle/discussions/categories/q-a): **Recommended** 
+  
+  This was previously located at GetOrganelle Issues where you may find old Q&A
+
+* Report Bugs & Issues at [GetOrganelle Issues](https://github.com/Kinggerm/GetOrganelle/issues): 
+  
+  Please avoid duplicate and miscellaneous issues
 
 * [GoogleGroups](https://groups.google.com/g/getorganelle)
 

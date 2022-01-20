@@ -301,8 +301,8 @@ def get_options(description, version):
                                          "would be automatically discarded by GetOrganelle. "
                                          "Default: %(default)s")
         group_assembly.add_argument("--spades-options", dest="other_spades_options", default="",
-                                    help="Other SPAdes options. Use double quotation marks to include all the arguments "
-                                         "and parameters.")
+                                    help="Other SPAdes options. Use double quotation marks to include all "
+                                         "the arguments and parameters.")
         group_assembly.add_argument("--no-spades", dest="run_spades", action="store_false", default=True,
                                     help="Disable SPAdes.")
         group_assembly.add_argument("--ignore-k", dest="ignore_kmer_res", default=40, type=int,
@@ -1008,7 +1008,8 @@ def get_options(description, version):
 def estimate_maximum_n_reads_using_mapping(
         twice_max_coverage, check_dir, original_fq_list, reads_paired,
         maximum_n_reads_hard_bound, seed_files, organelle_types, in_customs, ex_customs, target_genome_sizes,
-        keep_temp, resume, which_blast, which_spades, which_bowtie2, threads, random_seed, verbose_log, log_handler):
+        keep_temp, resume, other_spades_opts,
+        which_blast, which_spades, which_bowtie2, threads, random_seed, verbose_log, log_handler):
     from GetOrganelleLib.sam_parser import MapRecords, get_cover_range
     if executable(os.path.join(UTILITY_PATH, "slim_graph.py -h")):
         which_slim = UTILITY_PATH
@@ -1142,6 +1143,7 @@ def estimate_maximum_n_reads_using_mapping(
                         original_fq_files=check_fq_files, mapped_fq_file=mapped_fq, seed_fs_file=seed_f,
                         mean_read_len=mean_read_len, organelle_type=organelle_type,
                         in_custom=this_in, ex_custom=this_ex, threads=threads, resume=resume,
+                        other_spades_opts=other_spades_opts,
                         which_spades=which_spades, which_slim=which_slim, which_blast=which_blast,
                         log_handler=log_handler if verbose_log else None, verbose_log=verbose_log)
                 except NotImplementedError:
@@ -1301,7 +1303,7 @@ def extend_with_constant_words(baits_pool, raw_fq_files, word_size, output, jump
 
 def pre_assembly_mapped_reads_for_base_cov(
         original_fq_files, mapped_fq_file, seed_fs_file, mean_read_len, organelle_type, in_custom, ex_custom,
-        threads, resume, which_spades, which_slim, which_blast,
+        threads, resume, other_spades_opts, which_spades, which_slim, which_blast,
         log_handler=None, verbose_log=False, keep_temp=False):
     from GetOrganelleLib.assembly_parser import get_graph_coverages_range_simple
     draft_kmer = min(45, int(mean_read_len / 2) * 2 - 3)
@@ -1342,7 +1344,7 @@ def pre_assembly_mapped_reads_for_base_cov(
         try:
             # log_handler.info(" ...")
             this_command = os.path.join(which_spades, "spades.py") + " -t " + str(threads) + \
-                           " -s " + mapped_fq_file + \
+                           " -s " + mapped_fq_file + " " + other_spades_opts + \
                            " -k " + str(draft_kmer) + " --only-assembler -o " + this_modified_dir
             pre_assembly = subprocess.Popen(this_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             if verbose_log and log_handler:
@@ -1397,7 +1399,8 @@ def pre_assembly_mapped_reads_for_base_cov(
                 extend_with_constant_words(
                     theses_words, original_fq_files, word_size=gathering_word_size, output=more_fq_file)
             more_command = os.path.join(which_spades, "spades.py") + " -t " + str(threads) + " -s " + \
-                           more_fq_file + " -k " + str(draft_kmer) + " --only-assembler -o " + this_modified_dir
+                           more_fq_file + " " + other_spades_opts + " -k " + str(draft_kmer) + \
+                           " --only-assembler -o " + this_modified_dir
             pre_assembly = subprocess.Popen(
                 more_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             if verbose_log and log_handler:
@@ -1449,7 +1452,7 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
                      organelle_types, in_custom_list, ex_custom_list, mean_error_rate, target_genome_sizes,
                      max_extending_len, mean_read_len, max_read_len, low_quality_pattern,
                      all_read_nums, reduce_reads_for_cov,
-                     log_handler, which_spades, which_blast, which_bowtie2,
+                     log_handler, other_spades_opts, which_spades, which_blast, which_bowtie2,
                      wc_bc_ratio_constant=0.35, larger_auto_ws=False,
                      threads=1, resume=False, random_seed=12345, verbose_log=False, zip_files=False):
     from GetOrganelleLib.sam_parser import MapRecords, get_cover_range, mapping_gap_info_from_coverage_dict
@@ -1517,6 +1520,7 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
                         # TODO check in_customs lengths
                         organelle_type=organelle_types[go_t], in_custom=this_in, ex_custom=this_ex,
                         threads=threads, resume=resume, log_handler=log_handler, verbose_log=verbose_log,
+                        other_spades_opts=other_spades_opts,
                         which_spades=which_spades, which_slim=which_slim, which_blast=which_blast)
                 except NotImplementedError:
                     if max_extending_len[go_t] == -1:
@@ -1819,7 +1823,7 @@ def make_read_index(original_fq_files, direction_according_to_user_input, all_re
     else:
         if not index_in_memory:
             temp1_contig_out = open(temp1_contig_dir[0], 'w')
-        lengths = []
+        # lengths = []
         use_user_direction = False
         for id_file, file_name in enumerate(original_fq_files):
             file_in = open(file_name, "r")
@@ -1889,14 +1893,14 @@ def make_read_index(original_fq_files, direction_according_to_user_input, all_re
                                 if cancel_seq_parts and len(this_seq) > 1:
                                     cancel_seq_parts = False
                                 this_c_seq = complementary_seqs(this_seq)
-                                lengths.extend([len(seq_part) for seq_part in this_seq])
+                                # lengths.extend([len(seq_part) for seq_part in this_seq])
                             else:
                                 this_seq = this_seq[0]
                                 this_c_seq = complementary_seq(this_seq)
-                                lengths.append(len(this_seq))
+                                # lengths.append(len(this_seq))
                         else:
                             this_c_seq = complementary_seq(this_seq)
-                            lengths.append(len(this_seq))
+                            # lengths.append(len(this_seq))
                         if rm_duplicates:
                             if this_seq in seq_duplicates:
                                 line_clusters[seq_duplicates[this_seq]].append(line_count)
@@ -1963,14 +1967,14 @@ def make_read_index(original_fq_files, direction_according_to_user_input, all_re
                                 if cancel_seq_parts and len(this_seq) > 1:
                                     cancel_seq_parts = False
                                 this_c_seq = complementary_seqs(this_seq)
-                                lengths.extend([len(seq_part) for seq_part in this_seq])
+                                # lengths.extend([len(seq_part) for seq_part in this_seq])
                             else:
                                 this_seq = this_seq[0]
                                 this_c_seq = complementary_seq(this_seq)
-                                lengths.append(len(this_seq))
+                                # lengths.append(len(this_seq))
                         else:
                             this_c_seq = complementary_seq(this_seq)
-                            lengths.append(len(this_seq))
+                            # lengths.append(len(this_seq))
                         if rm_duplicates:
                             if this_seq in seq_duplicates:
                                 line_clusters[seq_duplicates[this_seq]].append(line_count)
@@ -2042,14 +2046,12 @@ def make_read_index(original_fq_files, direction_according_to_user_input, all_re
         if rm_duplicates:
             if len_indices == 0 and line_count // 4 > 0:
                 log_handler.error("No qualified reads found!")
-                max_read_len = max(lengths)
-                if max_read_len < word_size:
-                    log_handler.error("Word size (" + str(word_size) + ") CANNOT be larger than your "
-                                      "post-trimmed maximum read length (" + str(max_read_len) + ")!")
+                log_handler.error("Word size (" + str(word_size) + ") CANNOT be larger than your "
+                                  "post-trimmed maximum read length!")
                 exit()
             log_handler.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
         else:
-            del lengths
+            # del lengths
             log_handler.info(memory_usage + str(len_indices) + " reads")
     if keep_seq_parts and cancel_seq_parts:
         keep_seq_parts = False
@@ -3788,18 +3790,18 @@ def main():
             original_fq_files = [fastq_file for fastq_file in options.unpaired_fq_files]
             direction_according_to_user_input = [1] * len(options.unpaired_fq_files)
         all_read_nums = [options.maximum_n_reads for foo in original_fq_files]
-        other_options = options.other_spades_options.split(' ')
-        if '-o' in other_options:
-            which_out = other_options.index('-o')
-            spades_output = other_options[which_out + 1]
-            del other_options[which_out: which_out + 2]
+        other_spd_options = options.other_spades_options.split(' ')
+        if '-o' in other_spd_options:
+            which_out = other_spd_options.index('-o')
+            spades_output = other_spd_options[which_out + 1]
+            del other_spd_options[which_out: which_out + 2]
         else:
             spades_output = os.path.join(out_base, options.prefix + "extended_spades")
-        if "--phred-offset" in other_options:
+        if "--phred-offset" in other_spd_options:
             log_handler.warning("--spades-options '--phred-offset' was deprecated in GetOrganelle. ")
-            which_po = other_options.index("--phred-offset")
-            del other_options[which_po: which_po + 2]
-        other_options = ' '.join(other_options)
+            which_po = other_spd_options.index("--phred-offset")
+            del other_spd_options[which_po: which_po + 2]
+        other_spd_options = ' '.join(other_spd_options)
 
         """ get reads """
         extended_files_exist = max(
@@ -3876,6 +3878,7 @@ def main():
                         in_customs=options.genes_fasta, ex_customs=options.exclude_genes,
                         target_genome_sizes=options.target_genome_size,
                         keep_temp=options.keep_temp_files, resume=options.script_resume,
+                        other_spades_opts=other_spd_options,
                         which_blast=options.which_blast, which_spades=options.which_spades,
                         which_bowtie2=options.which_bowtie2, threads=options.threads,
                         random_seed=options.random_seed, verbose_log=options.verbose_log, log_handler=log_handler)
@@ -3969,7 +3972,9 @@ def main():
                                  max_extending_len=options.max_extending_len, mean_read_len=mean_read_len,
                                  max_read_len=max_read_len, low_quality_pattern=low_quality_pattern,
                                  all_read_nums=all_read_nums, reduce_reads_for_cov=options.reduce_reads_for_cov,
-                                 log_handler=log_handler, which_spades=options.which_spades,
+                                 log_handler=log_handler,
+                                 other_spades_opts=other_spd_options,
+                                 which_spades=options.which_spades,
                                  which_blast=options.which_blast, which_bowtie2=options.which_bowtie2,
                                  wc_bc_ratio_constant=0.35, larger_auto_ws=options.larger_auto_ws,
                                  threads=options.threads, random_seed=options.random_seed,
@@ -4082,11 +4087,11 @@ def main():
                 log_handler.info("Assembling using SPAdes ...")
                 if not executable("pigz -h"):
                     log_handler.warning("Compression after read correction will be skipped for lack of 'pigz'")
-                    if "--disable-gzip-output" not in other_options:
-                        other_options += " --disable-gzip-output"
+                    if "--disable-gzip-output" not in other_spd_options:
+                        other_spd_options += " --disable-gzip-output"
                 if phred_offset in (33, 64):
-                    other_options += " --phred-offset %i" % phred_offset
-                is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_options, out_base,
+                    other_spd_options += " --phred-offset %i" % phred_offset
+                is_assembled = assembly_with_spades(options.spades_kmer, spades_output, other_spd_options, out_base,
                                                     options.prefix, original_fq_files, reads_paired,
                                                     which_spades=options.which_spades, verbose_log=options.verbose_log,
                                                     resume=resume, threads=options.threads, log_handler=log_handler)

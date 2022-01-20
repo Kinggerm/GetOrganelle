@@ -875,7 +875,7 @@ def detect_spades_version(which_spades):
         output, err = subprocess.Popen(
             os.path.join(which_spades, "spades.py") + " -v", stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, shell=True).communicate()
-        return output.decode("utf8").replace("v", "").strip()
+        return output.decode("utf8").replace("v", "").replace("genome assembler ", "").strip()
     else:
         return "SPAdes N/A"
 

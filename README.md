@@ -82,10 +82,10 @@ Find more real data examples at [GetOrganelle/wiki/Examples](https://github.com/
 
 ## Instruction
 
-<b>Find more organelle genome assembly instruction at [GetOrganelle/wiki](https://github.com/Kinggerm/GetOrganelle/wiki).</b>
+<b>Find more organelle genome assembly instruction at [GetOrganelle/wiki](https://github.com/Kinggerm/GetOrganelle/wiki). </b>
 
 <b>In most cases, what you actually need to do is just typing in one simple command as suggested in <a href="#recipes">Recipes</a >. 
-But you are still highly recommended to read the following minimal introductions</b>:
+But you are still highly recommended reading the following minimal introductions</b>:
 
 ### Starting from Reads
   
@@ -234,6 +234,6 @@ Although older versions like 1.6.3/1.7.1/1.7.5 may be more stable, but we always
 
 * [GoogleGroups](https://groups.google.com/g/getorganelle)
 
-* QQ group (ID: 908302723)
+* QQ group (ID: 908302723): only for mutual help, and we will no longer reply to questions there
 
-* Emails: Do NOT directly write to us with your questions, post the questions **publicly**, using above platforms (we will be informed automatically) or any other platforms (inform us of it). Our emails (jianjun.jin@columbia.edu, yuwenbin@xtbg.ac.cn) are only for receiving public question alert and private data (if applied) associated with those public questions. When you send your private data to us, enclose the email with a link where you posted the question. Our only reply emails will be a receiving confirmation, while our answers will be posted in a public place. 
+**Do NOT** directly write to us with your questions, instead please post the questions **publicly**, using above platforms (we will be informed automatically) or any other platforms (inform us of it). Our emails (jianjun.jin@columbia.edu, yuwenbin@xtbg.ac.cn) are only for receiving public question alert and private data (if applied) associated with those public questions. When you send your private data to us, enclose the email with a link where you posted the question. Our only reply emails will be a receiving confirmation, while our answers will be posted in a public place. 

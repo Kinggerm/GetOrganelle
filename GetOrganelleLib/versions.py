@@ -6,13 +6,23 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.5.3",
+        "features": [
+            "1. get_organelle_from_reads.py: fix a bug when no qualified reads found (issue 123)",
+            "2. get_organelle_from_reads.py: pass --spades-options to pre-assembly for Mac M1 (issue 127)",
+            "3. Update README.md: input read qc; issues->discussions",
+        ],
+        "time": "2022-01-19 21:00 UTC-5"
+    },
+    {
         "number": "1.7.5.2",
         "features": [
             "1. ask the questions publicly",
             "2. statistical_func.py: weighted_gmm_with_em_aic(): fix a bug that will be triggered by "
             "   graph produced by join_spades_fastg_by_blast.py (reported by Mergi Dinka); "
             "   also fix a hidden mis-indexing issue there",
-            "3. Utilities/join_spades_fastg_by_blast.py: update on a v name issue",
+            "3. Utilities/join_spades_fastg_by_blast.py: update on a v name issue "
+            "   (issues 119)",
         ],
         "time": "2021-12-15 02:35 UTC-5"
     },

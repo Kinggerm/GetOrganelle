@@ -10,9 +10,10 @@ versions = [
         "features": [
             "1. get_organelle_from_reads.py: fix a bug when no qualified reads found (issue 123)",
             "2. get_organelle_from_reads.py: pass --spades-options to pre-assembly for Mac M1 (issue 127)",
-            "3. Update README.md: input read qc; issues->discussions",
+            "3. get_organelle_from_reads.py:slim_spades_result: avoid ValueError",
+            "4. Update README.md: input read qc; issues->discussions",
         ],
-        "time": "2022-01-19 21:00 UTC-5"
+        "time": "2022-01-21 11:20 UTC-5"
     },
     {
         "number": "1.7.5.2",

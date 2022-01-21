@@ -3263,6 +3263,8 @@ def slim_spades_result(organelle_types, in_custom, ex_custom, spades_output, ign
                           and kmer_d.startswith("K")
                           and os.path.exists(os.path.join(spades_output, kmer_d, "assembly_graph.fastg"))],
                          reverse=True)
+    if not kmer_values:
+        return [], ignore_kmer_res  # to avoid "ValueError: max() arg is an empty sequence"
     if max(kmer_values) <= ignore_kmer_res:
         log_handler.info("Small kmer values, resetting \"--ignore-k -1\"")
         ignore_kmer_res = -1

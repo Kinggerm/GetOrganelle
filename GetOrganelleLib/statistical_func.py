@@ -4,7 +4,7 @@ except ImportError:
     class stats:
         class norm:
             def logpdf(foo1, foo2, foo3):
-                raise ImportError("No module named scipy")
+                raise ImportError("Failed in 'from scipy import stats, inf, log'!")
     inf = float("inf")
     from math import log
 from copy import deepcopy

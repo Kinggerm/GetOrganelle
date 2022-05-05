@@ -6,7 +6,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/downloads.svg)](https://anaconda.org/bioconda/getorganelle)
 
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
-[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.5.0.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
+[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.6.0.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
 
 **Urgent notice: please update to 1.7.5+, which fixed the bug on the multiplicity estimation of self-loop vertices.**
 

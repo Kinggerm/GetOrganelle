@@ -113,9 +113,10 @@ def get_options(description):
     global _GO_PATH, _LBL_DB_PATH, _SEQ_DB_PATH
     if options.get_organelle_path:
         _GO_PATH = os.path.expanduser(options.get_organelle_path)
-        if os.path.isdir(_GO_PATH):
-            _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
-            _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
+        if not os.path.isdir(_GO_PATH):
+            os.mkdir(_GO_PATH)
+        _LBL_DB_PATH = os.path.join(_GO_PATH, LBL_NAME)
+        _SEQ_DB_PATH = os.path.join(_GO_PATH, SEQ_NAME)
 
     # check directories
     if not os.path.isdir(_GO_PATH):
@@ -160,7 +161,7 @@ def get_options(description):
     sys.stdout.write("DEPENDENCIES: " + "; ".join([bowtie2_v, blast_v]) + "\n")
     sys.stdout.write("WORKING DIR: " + os.getcwd() + "\n")
     sys.stdout.write(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n\n")
-    if not (options.add_organelle_type or options.rm_organelle_type or options.update or options.clean):
+    if not (options.add_organelle_type or options.rm_organelle_type or options.update or options.clean or options.check):
         parser.print_help()
         sys.stdout.write("Insufficient arguments!\n")
         sys.exit()

@@ -6,6 +6,16 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.6.0",
+        "features": [
+            "1. improve the target component recognition on non-circular cases (discussion 138 & issue 141)",
+            "2. assembly_graph.py & statistical_func.py: specify scipy error (issue 132)",
+            "3. compatible with the newly released GetOrganelleDB v0.0.1.minima",
+            "4. get_organelle_config.py: fix a bug when there was not directory made, --config-dir is invalid",
+        ],
+        "time": "2022-05-05 16:20 UTC-5"
+    },
+    {
         "number": "1.7.5.3",
         "features": [
             "1. get_organelle_from_reads.py: fix a bug when no qualified reads found (issue 123)",

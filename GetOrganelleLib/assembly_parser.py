@@ -9,15 +9,15 @@ try:
     from scipy import optimize
 except ImportError:
     def Symbol(foo, integer):
-        raise ImportError("No module named sympy")
+        raise ImportError("Failed in 'from sympy import Symbol, solve, lambdify'!")
 
 
     def solve(foo1, foo2):
-        raise ImportError("No module named sympy")
+        raise ImportError("Failed in 'from sympy import Symbol, solve, lambdify'!")
 
 
     def lambdify(args=None, expr=None):
-        raise ImportError("No module named sympy")
+        raise ImportError("Failed in 'from sympy import Symbol, solve, lambdify'!")
 
 
     class optimize:
@@ -25,7 +25,7 @@ except ImportError:
             pass
 
         def minimize(self, fun=None, x0=None, jac=None, method=None, bounds=None, constraints=None, options=None):
-            raise ImportError("No module named scipy")
+            raise ImportError("Failed in 'from scipy import optimize'!")
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))

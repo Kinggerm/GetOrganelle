@@ -8,7 +8,8 @@ versions = [
     {
         "number": "1.7.6.0",
         "features": [
-            "1. improve the target component recognition on non-circular cases (discussion 138 & issue 141)",
+            "1. improve the target component recognition on non-circular cases (discussion 138 & issue 141) "
+            "   by setting the standard coverage as the coverage of the contig with maximum weight",
             "2. assembly_graph.py & statistical_func.py: specify scipy error (issue 132)",
             "3. compatible with the newly released GetOrganelleDB v0.0.1.minima",
             "4. get_organelle_config.py: fix a bug when there was not directory made, --config-dir is invalid",

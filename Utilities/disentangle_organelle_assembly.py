@@ -134,7 +134,7 @@ def main():
 
     @set_time_limit(options.time_limit)
     def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="embplant_pt",
-                                      log_hard_cov_threshold=10., expected_max_size=inf, expected_min_size=0,
+                                      hard_cov_threshold=10., expected_max_size=inf, expected_min_size=0,
                                       contamination_depth=3., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
                                       min_sigma_factor=0.1, max_copy_in=10, only_max_cov=True,
@@ -163,7 +163,7 @@ def main():
             copy_results = input_graph.find_target_graph(tab_file, database_name=mode, mode=mode,
                                                          type_factor=type_factor,
                                                          weight_factor=weight_factor,
-                                                         log_hard_cov_threshold=log_hard_cov_threshold,
+                                                         hard_cov_threshold=hard_cov_threshold,
                                                          contamination_depth=contamination_depth,
                                                          contamination_similarity=contamination_similarity,
                                                          degenerate=degenerate, degenerate_depth=degenerate_depth,
@@ -297,7 +297,7 @@ def main():
                                       type_factor=options.type_factor,
                                       mode=options.mode,
                                       weight_factor=options.weight_factor,
-                                      log_hard_cov_threshold=options.depth_factor,
+                                      hard_cov_threshold=options.depth_factor,
                                       contamination_depth=options.contamination_depth,
                                       contamination_similarity=options.contamination_similarity,
                                       degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,

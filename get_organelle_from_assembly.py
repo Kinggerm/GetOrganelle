@@ -623,7 +623,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             else:
                 target_results = input_graph.find_target_graph(tab_f,
                                                                mode=mode_in, database_name=in_db_n, type_factor=type_f,
-                                                               log_hard_cov_threshold=hard_c_t,
+                                                               hard_cov_threshold=hard_c_t,
                                                                contamination_depth=c_d,
                                                                contamination_similarity=c_s,
                                                                degenerate=deg, degenerate_depth=deg_dep,

@@ -1729,26 +1729,35 @@ class Assembly(SimpleAssembly):
         if database_name not in self.tagged_vertices or len(self.tagged_vertices[database_name]) == 0:
             raise ProcessingGraphFailed("No available " + database_name + " information found in " + tab_file)
 
-    def filter_by_coverage(self, drop_num=1, database_n="embplant_pt", log_hard_cov_threshold=10.,
+    def filter_by_coverage(self, drop_num=1, database_n="embplant_pt", hard_cov_threshold=10.,
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
                            verbose=False, log_handler=None, debug=False):
         changed = False
         # overlap = self.__overlap if self.__overlap else 0
-        log_hard_cov_threshold = abs(log(log_hard_cov_threshold))
-        vertices = sorted(self.vertex_info)
-        v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1) for this_v in vertices}
-        try:
-            max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[database_n]])
-        except ValueError as e:
-            if log_handler:
-                log_handler.info("tagged vertices: " + str(self.tagged_vertices))
-            else:
-                sys.stdout.write("tagged vertices: " + str(self.tagged_vertices) + "\n")
-            raise e
+        log_hard_cov_threshold = abs(log(hard_cov_threshold))
+        vertices = sorted(
+            self.vertex_info, key=lambda x: (-self.vertex_info[x].other_attr.get("weight", {}).get(database_n, 0), x))
+        # 2022-05-06: use the coverage of the contig with the max weight instead of the max coverage
+        standard_coverage = self.vertex_info[vertices[0]].cov / self.vertex_to_copy.get(vertices[0], 1)
+        if log_handler and (debug or verbose):
+            log_handler.info("coverage threshold set: " + str(standard_coverage))
+        elif verbose or debug:
+            sys.stdout.write("coverage threshold set: " + str(standard_coverage) + "\n")
+        # 2022-05-06: use the coverage of the contig with the max weight instead of the max coverage
+        # v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1) for this_v in vertices}
+        # try:
+        #     max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[database_n]])
+        # except ValueError as e:
+        #     if log_handler:
+        #         log_handler.info("tagged vertices: " + str(self.tagged_vertices))
+        #     else:
+        #         sys.stdout.write("tagged vertices: " + str(self.tagged_vertices) + "\n")
+        #     raise e
+
         # removing coverage with 10 times lower/greater than tagged_cov
         removing_low_cov = [candidate_v
                             for candidate_v in vertices
-                            if abs(log(self.vertex_info[candidate_v].cov / max_tagged_cov)) > log_hard_cov_threshold]
+                            if abs(log(self.vertex_info[candidate_v].cov / standard_coverage)) > log_hard_cov_threshold]
         if removing_low_cov:
             if log_handler and (debug or verbose):
                 log_handler.info("removing extremely outlying coverage contigs: " + str(removing_low_cov))
@@ -2292,7 +2301,7 @@ class Assembly(SimpleAssembly):
 
     def find_target_graph(self, tab_file, database_name, mode="embplant_pt", type_factor=3, weight_factor=100.0,
                           max_contig_multiplicity=8, min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
-                          log_hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
+                          hard_cov_threshold=10., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
                           min_single_copy_percent=50, meta=False,
                           broken_graph_allowed=False, temp_graph=None, verbose=True,
@@ -2308,7 +2317,7 @@ class Assembly(SimpleAssembly):
         :param min_sigma_factor:
         :param expected_max_size:
         :param expected_min_size:
-        :param log_hard_cov_threshold:
+        :param hard_cov_threshold:
         :param contamination_depth:
         :param contamination_similarity:
         :param degenerate:
@@ -2432,10 +2441,6 @@ class Assembly(SimpleAssembly):
                                               for log_v in sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
                 new_assembly.merge_all_possible_vertices()
                 new_assembly.tag_in_between(database_n=database_name)
-                # new_assembly.processing_polymorphism(mode=mode, contamination_depth=contamination_depth,
-                #                                      contamination_similarity=contamination_similarity,
-                #                                      degenerate=False, verbose=verbose, debug=debug,
-                #                                      log_handler=log_handler)
                 write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 1)
                 changed = True
                 count_large_round = 0
@@ -2464,7 +2469,7 @@ class Assembly(SimpleAssembly):
                                 this_del, parameters = \
                                     new_assembly.filter_by_coverage(database_n=database_name,
                                                                     weight_factor=weight_factor,
-                                                                    log_hard_cov_threshold=log_hard_cov_threshold,
+                                                                    hard_cov_threshold=hard_cov_threshold,
                                                                     min_sigma_factor=min_sigma_factor,
                                                                     min_cluster=2, log_handler=log_handler,
                                                                     verbose=verbose, debug=debug)
@@ -2477,7 +2482,7 @@ class Assembly(SimpleAssembly):
                                 this_del, parameters = \
                                     new_assembly.filter_by_coverage(database_n=database_name,
                                                                     weight_factor=weight_factor,
-                                                                    log_hard_cov_threshold=log_hard_cov_threshold,
+                                                                    hard_cov_threshold=hard_cov_threshold,
                                                                     min_sigma_factor=min_sigma_factor,
                                                                     log_handler=log_handler, verbose=verbose,
                                                                     debug=debug)
@@ -2512,14 +2517,14 @@ class Assembly(SimpleAssembly):
                         elif len(new_assembly.vertex_clusters) == 1:
                             pass
                         else:
-                            cluster_weights = [sum([new_assembly.vertex_info[x_v].other_attr["weight"][database_name]
-                                                    for x_v in x
-                                                    if
-                                                    "weight" in new_assembly.vertex_info[x_v].other_attr
-                                                    and
-                                                    database_name in new_assembly.vertex_info[x_v].other_attr[
-                                                        "weight"]])
-                                               for x in new_assembly.vertex_clusters]
+                            cluster_weights = \
+                                [sum([new_assembly.vertex_info[x_v].other_attr["weight"][database_name]
+                                      for x_v in x
+                                      if
+                                      "weight" in new_assembly.vertex_info[x_v].other_attr
+                                      and
+                                      database_name in new_assembly.vertex_info[x_v].other_attr["weight"]])
+                                 for x in new_assembly.vertex_clusters]
                             best = max(cluster_weights)
                             best_id = cluster_weights.index(best)
                             if broken_graph_allowed:
@@ -2612,14 +2617,6 @@ class Assembly(SimpleAssembly):
                                             "removing terminal contigs: " + str(delete_those_vertices) + "\n")
                                 new_assembly.remove_vertex(delete_those_vertices)
                                 changed = True
-
-                    # # merge vertices
-                    # new_assembly.merge_all_possible_vertices()
-                    # new_assembly.tag_in_between(mode=mode)
-                    # break self-connection if necessary
-                    # for vertex_name in new_assembly.vertex_info:
-                    #     if (vertex_name, True) in
-                    # -> not finished!!
 
                     # merge vertices
                     new_assembly.merge_all_possible_vertices()

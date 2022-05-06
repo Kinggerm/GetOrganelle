@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.6.1",
+        "features": [
+            "1. update the hash values of GetOrganelleDB v0.0.1.minima",
+            "2. get_organelle_config.py: fix a bug for malfunctioning --verbose",
+        ],
+        "time": "2022-05-06 18:50 UTC-5"
+    },
+    {
         "number": "1.7.6.0",
         "features": [
             "1. improve the target component recognition on non-circular cases (discussion 138 & issue 141) "
@@ -14,7 +22,7 @@ versions = [
             "3. compatible with the newly released GetOrganelleDB v0.0.1.minima",
             "4. get_organelle_config.py: fix a bug when there was no directory made, --config-dir is invalid",
         ],
-        "time": "2022-05-05 16:20 UTC-5"
+        "time": "2022-05-06 12:20 UTC-5"
     },
     {
         "number": "1.7.5.3",

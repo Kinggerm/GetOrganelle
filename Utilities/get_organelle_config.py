@@ -285,7 +285,7 @@ def initialize_seed_database(which_bowtie2, fasta_f, overwrite=False, verbose=Fa
                          for postfix in
                          (".1.bt2l", ".2.bt2l", ".3.bt2l", ".4.bt2l", ".rev.1.bt2l", ".rev.2.bt2l")]) != 6:
         build_bowtie2_db(seed_file=seed_file, seed_index_base=output_base, which_bowtie2=which_bowtie2,
-                         overwrite=overwrite, random_seed=12345, silent=verbose, verbose_log=verbose)
+                         overwrite=overwrite, random_seed=12345, silent=not verbose, verbose_log=verbose)
         sys.stdout.write("finished\n")
     else:
         sys.stdout.write("skipped\n")

@@ -120,6 +120,20 @@ def timed_log(log, output_base, prefix, log_level="NOTSET"):
     return log_timed
 
 
+def final_error_summary_log(log_handler, out_base, prefix, time0, graph_file="assembly_graph.fastg.*.fastg"):
+    log_handler = simple_log(log_handler, out_base, prefix=prefix + "get_org.")
+    log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s\n")
+    log_handler.info("#" * 30)
+    log_handler.info("For trouble-shooting, please ")
+    log_handler.info("Firstly, check https://github.com/Kinggerm/GetOrganelle/wiki/FAQ")
+    log_handler.info("Secondly, check if there are open/closed issues related at "
+                     "https://github.com/Kinggerm/GetOrganelle/issues")
+    log_handler.info("If your problem was still not solved, "
+                     "\n  please open an issue at https://github.com/Kinggerm/GetOrganelle/issues"
+                     "\n  please provide the get_org.log.txt and the "
+                     + graph_file + " file(s) (can be visualized as *.png to protect your data privacy) if possible!")
+
+
 if MAJOR_VERSION == 2:
     class TimeoutError(Exception):
         def __init__(self, value=""):
@@ -1117,10 +1131,10 @@ def get_current_db_versions(db_type, seq_db_path, lbl_db_path, clean_mode=True,
                                 seed_f_hash != SEED_DB_HASH[db_version][og_type]["sha256"] or \
                                 seed_f_hash != db_hash:
                                 if log_handler:
-                                    log_handler.error(seed_f + " not damaged! "
+                                    log_handler.error(seed_f + " damaged! "
                                                       "Please run `get_organelle_config.py --clean` to reset!")
                                 else:
-                                    sys.stdout.write(seed_f + " not damaged! "
+                                    sys.stdout.write(seed_f + " damaged! "
                                                      "Please run `get_organelle_config.py --clean` to reset!\n")
                                 sys.exit()
         if not clean_mode:
@@ -1162,10 +1176,10 @@ def get_current_db_versions(db_type, seq_db_path, lbl_db_path, clean_mode=True,
                                 label_f_hash != LABEL_DB_HASH[db_version][og_type]["sha256"] or \
                                 label_f_hash != db_hash:
                                 if log_handler:
-                                    log_handler.error(label_f + " not damaged! "
+                                    log_handler.error(label_f + " damaged! "
                                                       "Please run `get_organelle_config.py --clean` to reset!")
                                 else:
-                                    sys.stdout.write(label_f + " not damaged! "
+                                    sys.stdout.write(label_f + " damaged! "
                                                      "Please run `get_organelle_config.py --clean` to reset!\n")
                                 sys.exit()
         if not clean_mode:
@@ -1228,7 +1242,7 @@ LABEL_DB_HASH = \
     "0.0.1.minima":
         {
         "embplant_nr":
-            {"sha256": "603033541683b7c53fb63970c188eb2891844f6419eca342fa648f6ff5e29d71", "size": 16500},
+            {"sha256": "bf36ab074c3b020561e7211c0ae698290dc89276a96cf6ae42c093430d55e100", "size": 5435},
         "embplant_pt":
             {"sha256": "a38f3d65009c75aa00a13c8a737fb8390843409671d0e061d56d26b6b9c7ed14", "size": 88006},
         "animal_mt":
@@ -1236,7 +1250,7 @@ LABEL_DB_HASH = \
         "fungus_mt":
             {"sha256": "903e3a3c82aaedece3033218e0623caccabce3d58866d1577ecbfdf0d7115cca", "size": 20281},
         "embplant_mt":
-            {"sha256": "f3621444441fbf4fa98835999b20e7ac1673a8866cb119707200412c46263570", "size": 148338},
+            {"sha256": "a8d78dfa5b8235af8038a3a292733e0799e9d67d146f05dc4d869fef5b0e6c15", "size": 40710},
         "other_pt":
             {"sha256": "62fb528edcd956ce605c9292063d3d7a0f168d36b6f4f114bb1050236622cc41", "size": 141269},
         "fungus_nr":

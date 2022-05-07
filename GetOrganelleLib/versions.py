@@ -10,8 +10,9 @@ versions = [
         "features": [
             "1. update the hash values of GetOrganelleDB v0.0.1.minima",
             "2. get_organelle_config.py: fix a bug for malfunctioning --verbose",
+            "3. get_organelle_*.py: better log and fix typo"
         ],
-        "time": "2022-05-06 18:50 UTC-5"
+        "time": "2022-05-06 21:20 UTC-5"
     },
     {
         "number": "1.7.6.0",

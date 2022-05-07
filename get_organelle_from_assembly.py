@@ -1063,16 +1063,7 @@ def main():
         log_handler.info("Thank you!")
     except:
         log_handler.exception("")
-        log_handler = simple_log(log_handler, options.output_base, prefix=options.prefix + "get_org.")
-        log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
-        log_handler.info("For trouble-shooting, please ")
-        log_handler.info("Firstly, check https://github.com/Kinggerm/GetOrganelle/wiki/FAQ")
-        log_handler.info("Secondly, check if there are open/closed issues related at "
-                         "https://github.com/Kinggerm/GetOrganelle/issues")
-        log_handler.info("If your problem is still not solved, "
-                         "\n  please open an issue at https://github.com/Kinggerm/GetOrganelle/issues."
-                         "\n  please provide the get_org.log.txt "
-                         "and the assembly graph (can be *.png to protect your data privacy) if possible!")
+        final_error_summary_log(log_handler, options.out_base, options.prefix, time0, "the slimmed_assembly_graph.*")
     logging.shutdown()
 
 

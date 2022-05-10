@@ -111,7 +111,8 @@ But you are still highly recommended reading the following minimal introductions
     
     * `-k` The best kmer(s) depend on a wide variety of factors too. 
     Although more kmer values add the time consuming, you are recommended to use a wide range of kmers to benefit from the power of SPAdes. 
-    Empirically, you should include at least including one small kmer (e.g. `21`) and one large kmer (`105`) for a successful organelle genome assembly.
+    Empirically, you should include at least including one small kmer (e.g. `21`) and one large kmer (`85`) for a successful organelle genome assembly. 
+    The largest kmer in the gradient may be crucial to the success rate of achieving the complete circular organelle genome. 
     
     * `-s` GetOrganelle takes the seed (fasta format; if this was not provided, 
     the default is `GetOrganelleLib/SeedDatabase/*.fasta`) as probe, 

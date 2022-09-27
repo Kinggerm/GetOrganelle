@@ -275,7 +275,8 @@ def make_blast_db(input_file, output_base, which_blast="", log_handler=None, ver
         exit()
 
 
-def execute_blast(query, blast_db, output, threads, outfmt=6, e_value="1e-25", word_size=11, other_options="",
+def execute_blast(query, blast_db, output, threads, outfmt=6,
+                  e_value="1e-25", percent_identity=None, word_size=11, other_options="",
                   which_blast="", silent=False, log_handler=None):
     if not silent:
         if log_handler:
@@ -284,8 +285,8 @@ def execute_blast(query, blast_db, output, threads, outfmt=6, e_value="1e-25", w
             sys.stdout.write("Executing BLAST ...\n")
     make_blast = subprocess.Popen(
         os.path.join(which_blast, "blastn") + " -evalue " + str(e_value) + " -num_threads " + str(threads) +
-        " -word_size " + str(word_size) + " " + other_options + " "
-        " -query " + query + " -db " + blast_db + " -out " + output + " -outfmt " + str(outfmt),
+        " -word_size " + str(word_size) + ("-perc_identity %f" % percent_identity if percent_identity else "") +
+        " " + other_options + " -query " + query + " -db " + blast_db + " -out " + output + " -outfmt " + str(outfmt),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = make_blast.communicate()
     if "(ERR)" in output.decode("utf-8") or "Error:" in output.decode("utf-8") or "error" in output.decode("utf-8"):

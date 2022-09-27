@@ -11,7 +11,7 @@ versions = [
             "1. merge all possible nodes", #TODO
             "2. add Utilities/get_annotated_regions_from_gb.py",
             "3. fix a bug in seq_parser.SequenceList.remove",
-            "4. Utilities/slim_graph.py: --blast-options added",
+            "4. Utilities/slim_graph.py: --percent and --blast-options added",
         ],
         "time": "2022-09-27 13:52 UTC-5"
     },

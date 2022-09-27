@@ -59,23 +59,14 @@ def get_options(print_title):
                              "or a combination of above split by comma(s) "
                              "(corresponds to certain arguments as following listed). "
                              "\t"
-                             " ------------------------------------------------------ "
                              "\nembplant_pt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "embplant_pt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nother_pt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "other_pt.fasta") + "\""
-                             " ------------------------------------------------------ "                                                                                                                                        
                              "\nembplant_mt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "embplant_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nembplant_nr \t \" --include-priority " + os.path.join(LBL_DB_PATH, "embplant_nr.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nanimal_mt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "animal_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nfungus_mt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "fungus_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nfungus_nr \t \" --include-priority " + os.path.join(LBL_DB_PATH, "fungus_nr.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nother_pt,embplant_mt,fungus_mt \t \" --include-priority " + os.path.join(LBL_DB_PATH, "other_pt.fasta") + "," + os.path.join(LBL_DB_PATH, "embplant_mt.fasta") + "," + os.path.join(LBL_DB_PATH, "fungus_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "For easy usage and compatibility of old versions, following redirection "
                              "would be automatically fulfilled without warning:\t"
                              "\nplant_cp->embplant_pt; plant_pt->embplant_pt; "
@@ -90,19 +81,12 @@ def get_options(print_title):
                              "or a combination of above split by comma(s) "
                              "(be similar to -F and corresponds to certain arguments as following listed). "
                              "\t"
-                             " ------------------------------------------------------ "
                              "\nembplant_pt \t \" --exclude " + os.path.join(LBL_DB_PATH, "embplant_pt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nembplant_mt \t \" --exclude " + os.path.join(LBL_DB_PATH, "embplant_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nembplant_nr \t \" --exclude " + os.path.join(LBL_DB_PATH, "embplant_nr.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nanimal_mt \t \" --exclude " + os.path.join(LBL_DB_PATH, "animal_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nfungus_mt \t \" --exclude " + os.path.join(LBL_DB_PATH, "fungus_mt.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nfungus_nr \t \" --exclude " + os.path.join(LBL_DB_PATH, "fungus_nr.fasta") + "\""
-                             " ------------------------------------------------------ "
                              "\nembplant_mt,embplant_nr \t \" --exclude " + os.path.join(LBL_DB_PATH, "embplant_mt.fasta") + "," + os.path.join(LBL_DB_PATH, "embplant_nr.fasta") + "\""
                              " ------------------------------------------------------ "
                              "For easy usage and compatibility of old versions, following redirection "
@@ -111,13 +95,9 @@ def get_options(print_title):
                              "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
     parser.add_argument("--no-hits", dest="treat_no_hits", default="ex_no_con",
                         help="Provide treatment for non-hitting contigs.\t"
-                             " ------------------------------------------------------ "
                              "\nex_no_con \t keep those connect with hitting-include contigs. (Default)"
-                             " ------------------------------------------------------ "
                              "\nex_no_hit \t exclude all."
-                             " ------------------------------------------------------ "
-                             "\nkeep_all \t keep all"
-                             " ------------------------------------------------------ ")
+                             "\nkeep_all \t keep all")
     parser.add_argument("--max-slim-extending-len", dest="max_slim_extending_len",
                         default=MAX_SLIM_EXTENDING_LENS["anonym"],
                         type=float,
@@ -163,8 +143,10 @@ def get_options(print_title):
                              "But you could assign a new directory with this option.")
     parser.add_argument("-e", "--evalue", dest="evalue", default=1e-25, type=float,
                         help="blastn evalue threshold. Default: %(default)s")
+    parser.add_argument("--percent", "--perc-identity", dest="percent_identity", default=None, type=float,
+                        help="blastn percent identity threshold. Default unset.")
     parser.add_argument("--blast-options", dest="blast_options", default="",
-                        help="other blastn options. e.g. --blast-options \"-perc_identity 90.0\".")
+                        help="other blastn options. e.g. --blast-options \"-word_size 13\".")
     parser.add_argument("--prefix", dest="prefix", default="",
                         help="Add prefix to the output basename. Conflict with \"--out-base\".")
     parser.add_argument("--out-base", dest="out_base", default="",
@@ -502,6 +484,7 @@ def blast_and_call_names(
         out_file,
         threads,
         e_value=1e-25,
+        percent_identity=None,
         other_options="",
         which_blast="",
         log_handler=None):
@@ -514,7 +497,7 @@ def blast_and_call_names(
             else:
                 sys.stdout.write('\nExecuting BLAST to ' + index_f + '...')
             execute_blast(query=fasta_file, blast_db=index_f, output=out_file, threads=threads,
-                          outfmt=6, other_options=other_options,
+                          outfmt=6, other_options=other_options, percent_identity=percent_identity,
                           e_value=e_value, which_blast=which_blast, log_handler=log_handler)
             time1 = time.time()
             if log_handler:
@@ -1032,11 +1015,13 @@ def main():
                 # structure: names[query][this_database][label] = [(q_min, q_max, q_score)]
                 in_names = blast_and_call_names(fasta_file=blast_fas, index_files=include_indices,
                                                 out_file=blast_fas+'.blast_in', threads=options.threads,
-                                                e_value=options.evalue, other_options=options.blast_options,
+                                                e_value=options.evalue, percent_identity=options.percent_identity,
+                                                other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
                 ex_names = blast_and_call_names(fasta_file=blast_fas, index_files=exclude_indices,
                                                 out_file=blast_fas+'.blast_ex', threads=options.threads,
-                                                e_value=options.evalue, other_options=options.blast_options,
+                                                e_value=options.evalue, percent_identity=options.percent_identity,
+                                                other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
                 if bool(include_indices) or bool(exclude_indices):
                     in_names_r, ex_names_r, aver_dep = modify_in_ex_according_to_depth(

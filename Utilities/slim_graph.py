@@ -163,6 +163,8 @@ def get_options(print_title):
                              "But you could assign a new directory with this option.")
     parser.add_argument("-e", "--evalue", dest="evalue", default=1e-25, type=float,
                         help="blastn evalue threshold. Default: %(default)s")
+    parser.add_argument("--blast-options", dest="blast_options", default="",
+                        help="other blastn options. e.g. --blast-options \"-perc_identity 90.0\".")
     parser.add_argument("--prefix", dest="prefix", default="",
                         help="Add prefix to the output basename. Conflict with \"--out-base\".")
     parser.add_argument("--out-base", dest="out_base", default="",
@@ -494,7 +496,15 @@ def make_new_matrix_with_names(names, old_matrix):
     return old_matrix
 
 
-def blast_and_call_names(fasta_file, index_files, out_file, threads, e_value=1e-25, which_blast="", log_handler=None):
+def blast_and_call_names(
+        fasta_file,
+        index_files,
+        out_file,
+        threads,
+        e_value=1e-25,
+        other_options="",
+        which_blast="",
+        log_handler=None):
     names = {}
     if index_files:
         time0 = time.time()
@@ -504,7 +514,8 @@ def blast_and_call_names(fasta_file, index_files, out_file, threads, e_value=1e-
             else:
                 sys.stdout.write('\nExecuting BLAST to ' + index_f + '...')
             execute_blast(query=fasta_file, blast_db=index_f, output=out_file, threads=threads,
-                          outfmt=6, e_value=e_value, which_blast=which_blast, log_handler=log_handler)
+                          outfmt=6, other_options=other_options,
+                          e_value=e_value, which_blast=which_blast, log_handler=log_handler)
             time1 = time.time()
             if log_handler:
                 log_handler.info('Executing BLAST to ' + index_f + ' finished.')
@@ -1021,11 +1032,11 @@ def main():
                 # structure: names[query][this_database][label] = [(q_min, q_max, q_score)]
                 in_names = blast_and_call_names(fasta_file=blast_fas, index_files=include_indices,
                                                 out_file=blast_fas+'.blast_in', threads=options.threads,
-                                                e_value=options.evalue,
+                                                e_value=options.evalue, other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
                 ex_names = blast_and_call_names(fasta_file=blast_fas, index_files=exclude_indices,
                                                 out_file=blast_fas+'.blast_ex', threads=options.threads,
-                                                e_value=options.evalue,
+                                                e_value=options.evalue, other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
                 if bool(include_indices) or bool(exclude_indices):
                     in_names_r, ex_names_r, aver_dep = modify_in_ex_according_to_depth(

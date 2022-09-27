@@ -6,6 +6,16 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.7.0",
+        "features": [
+            "1. merge all possible nodes", #TODO
+            "2. add Utilities/get_annotated_regions_from_gb.py",
+            "3. fix a bug in seq_parser.SequenceList.remove",
+            "4. Utilities/slim_graph.py: --blast-options added",
+        ],
+        "time": "2022-09-27 13:52 UTC-5"
+    },
+    {
         "number": "1.7.6.1",
         "features": [
             "1. update the hash values of GetOrganelleDB v0.0.1.minima",

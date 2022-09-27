@@ -109,9 +109,10 @@ class SequenceList(object):
                 del self.sequences[go_to]
             else:
                 go_to += 1
+        self.__dict = {}
+        for go_s, seq in enumerate(self.sequences):
+            self.__dict[seq.label] = go_s
         if del_names:
-            for go_s, seq in enumerate(self.sequences):
-                self.__dict[seq.label] = go_s
             sys.stdout.write("Warning: sequence(s) " + ",".join(sorted(del_names)) + " not found!\n")
 
     def read_fasta(self, fasta_file):

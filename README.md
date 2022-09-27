@@ -6,9 +6,9 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/downloads.svg)](https://anaconda.org/bioconda/getorganelle)
 
 [![GitHub release](https://img.shields.io/github/release/Kinggerm/GetOrganelle.svg)](https://GitHub.com/Kinggerm/GetOrganelle/releases/)
-[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.6.1.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
+[![GitHub version](https://img.shields.io/github/commits-since/Kinggerm/GetOrganelle/1.7.7.0.svg)](https://github.com/Kinggerm/GetOrganelle/commit/master)
 
-**Urgent notice: please update to 1.7.5+, which fixed the bug on the multiplicity estimation of self-loop vertices.**
+**notice: please update to 1.7.5+, which fixed the bug on the multiplicity estimation of self-loop vertices.**
 
 This toolkit assemblies organelle genome from genomic skimming data. 
 
@@ -46,7 +46,7 @@ It was built for Linux and macOS. Windows Subsystem Linux is currently not suppo
   You have to install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/projects/continuumio-conda/en/latest/user-guide/install/index.html) before using the above command. 
   If you don't like conda, or want to follow the latest updates, you can find [more installation options here](https://github.com/Kinggerm/GetOrganelle/wiki/Installation#installation) (my preference).
 
-* After installation of GetOrganelle v1.7.0+, please download and initialize the database of your preferred organelle genome type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, fungus_nr, animal_mt, and/or other_pt). 
+* After installation of GetOrganelle v1.7+, please download and initialize the database of your preferred organelle genome type (embplant_pt, embplant_mt, embplant_nr, fungus_mt, fungus_nr, animal_mt, and/or other_pt). 
 Supposing you are assembling chloroplast genomes:
 
     
@@ -159,6 +159,7 @@ But you are still highly recommended reading the following minimal introductions
     The key output files include
     
     * `*.path_sequence.fasta`, one fasta file represents one type of genome structure
+    * `*.fastg`, the organelle related assembly graph to report for improvement and debug
     * `*.selected_graph.gfa`, the [organelle-only assembly graph](https://github.com/Kinggerm/GetOrganelle/wiki/Terminology)
     * `get_org.log.txt`, the log file
   
@@ -223,7 +224,7 @@ To extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`
 
 Please check [GetOrganelle wiki page](https://github.com/Kinggerm/GetOrganelle/wiki) first. If your question is running specific, please attach the `get_org.log.txt` file and the post-slimming assembly graph (`assembly_graph.fastg.extend_*.fastg`, could be Bandage-visualized *.png format to protect your data privacy).
 
-Although older versions like 1.6.3/1.7.1/1.7.5 may be more stable, but we always strongly encourage you to keep updated. GetOrganelle was actively updated with new fixes and new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
+Although older versions like 1.6.3/1.7.1/1.7.6 may be more stable, but we always strongly encourage you to keep updated. GetOrganelle was actively updated with new fixes and new features, but new bugs too. So if you catch one, please do not be surprised and report it to us. We usually have quick response to bugs.
 
 * Find Questions & Answers at [GetOrganelle Discussions](https://github.com/Kinggerm/GetOrganelle/discussions/categories/q-a): **Recommended** 
   

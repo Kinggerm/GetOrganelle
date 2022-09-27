@@ -285,7 +285,7 @@ def execute_blast(query, blast_db, output, threads, outfmt=6,
             sys.stdout.write("Executing BLAST ...\n")
     make_blast = subprocess.Popen(
         os.path.join(which_blast, "blastn") + " -evalue " + str(e_value) + " -num_threads " + str(threads) +
-        " -word_size " + str(word_size) + ("-perc_identity %f" % percent_identity if percent_identity else "") +
+        " -word_size " + str(word_size) + (" -perc_identity %f" % percent_identity if percent_identity else "") +
         " " + other_options + " -query " + query + " -db " + blast_db + " -out " + output + " -outfmt " + str(outfmt),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     output, err = make_blast.communicate()

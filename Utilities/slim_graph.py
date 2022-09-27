@@ -1067,16 +1067,13 @@ def main():
                     log_handler.error("\n" + str(e).strip())
                     log_handler.error(
                         'Slimming file ' + str(i + 1) + '/' + str(len(assemblies)) + ': ' + assemblies[i] + ' failed!\n')
-                    if options.verbose_log:
-                        raise e
-
+                    raise e
                 else:
                     sys.stdout.write("\n" + str(e).strip() + "\n")
                     sys.stdout.write(
                         '\nSlimming file ' + str(i + 1) + '/' + str(len(assemblies)) + ': ' + assemblies[i] + ' failed!'
                         '\n' + '=' * 100 + "\n")
-                    if options.verbose_log:
-                        raise e
+                    raise e
             else:
                 if log_handler:
                     log_handler.info('Slimming file ' + str(i+1) + '/' + str(len(assemblies)) + ': ' + assemblies[i] + ' finished!\n')

@@ -6,14 +6,15 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.7.7.0",
+        "number": "1.7.7.0-pre",
         "features": [
             "1. merge all possible nodes", #TODO
             "2. add Utilities/get_annotated_regions_from_gb.py",
             "3. fix a bug in seq_parser.SequenceList.remove",
             "4. Utilities/slim_graph.py: --percent and --blast-options added; exception catch",
+            "5. fix a bug in get_organelle_config.py:pipe_control_func.py:SEED_DB_HASH (issue 199)",
         ],
-        "time": "2022-09-27 13:52 UTC-5"
+        "time": "2022-10-06 09:02 UTC-5"
     },
     {
         "number": "1.7.6.1",

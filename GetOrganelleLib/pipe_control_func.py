@@ -1279,19 +1279,19 @@ SEED_DB_HASH = \
     "0.0.1":
         {
         "embplant_nr":
-            {"sha256": "bf36ab074c3b020561e7211c0ae698290dc89276a96cf6ae42c093430d55e100", "size": 5435},
+            {"sha256": "e19365f85b3bda29aabb5cf1ceb5c814e667ba251b08388d805b52b1f1fe1445", "size": 18309},
         "embplant_pt":
-            {"sha256": "a38f3d65009c75aa00a13c8a737fb8390843409671d0e061d56d26b6b9c7ed14", "size": 88006},
+            {"sha256": "e8e5f461d6e5fe67c5314e46c61265e6ff1079886af3b959609dde2be97d870d", "size": 15342405},
         "animal_mt":
-            {"sha256": "2d4e8f441a531cbee64d1514542edf3d158b2e1fcedccc15d32b7a3e9fa0a5a3", "size": 14483},
+            {"sha256": "a293c02e0c0496beb29383927cc7c643b13e09f8cfa03f7688b352315a43f898", "size": 30285897},
         "fungus_mt":
-            {"sha256": "903e3a3c82aaedece3033218e0623caccabce3d58866d1577ecbfdf0d7115cca", "size": 20281},
+            {"sha256": "abbc7658c9431d11454f2fec75b7b5f4deeb12bc3590351dc93883655c7c194e", "size": 7977301},
         "embplant_mt":
-            {"sha256": "a8d78dfa5b8235af8038a3a292733e0799e9d67d146f05dc4d869fef5b0e6c15", "size": 40710},
+            {"sha256": "2f28612e7c2280a7273738eded0dd2fcfb59c6153c1cf3bac15e4e7ed1bf4e89", "size": 407052},
         "other_pt":
-            {"sha256": "62fb528edcd956ce605c9292063d3d7a0f168d36b6f4f114bb1050236622cc41", "size": 141269},
+            {"sha256": "a548538ef6560ededefb7e0d9c41f1dcb8585dccb1d06124ffb95e6770df2c6b", "size": 14667508},
         "fungus_nr":
-            {"sha256": "4532be1e3f1cc2627c876f435dc72e6a9def6060f322e41f84c24912017f879a", "size": 2984},
+            {"sha256": "73bec014ebbbd88f7e51aa5575ea0cd05b8336a2b41808ff6c7cfb825271e5a9", "size": 375273},
         },
     "0.0.1.minima": {
         "embplant_nr":

@@ -18,7 +18,7 @@ versions = [
             "8. update Assembly improvement in gfa/fastg parser/writer: "
             "   storing other attributes if unknown; output unequal overlaps",
         ],
-        "time": "2022-11-14 09:02 UTC-5"
+        "time": "2022-11-14 00:30 UTC-5"
     },
     {
         "number": "1.7.6.1",

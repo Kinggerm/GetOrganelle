@@ -1,6 +1,6 @@
 # GetOrganelle
 
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda)
+[comment]: <> ([![Anaconda-Server Badge]&#40;https://anaconda.org/bioconda/getorganelle/badges/installer/conda.svg&#41;]&#40;https://conda.anaconda.org/bioconda&#41;)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/version.svg)](https://anaconda.org/bioconda/getorganelle)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/latest_release_date.svg)](https://anaconda.org/bioconda/getorganelle)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/getorganelle/badges/downloads.svg)](https://anaconda.org/bioconda/getorganelle)
@@ -196,17 +196,17 @@ To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
 To assembly fungus mitochondria:
 
     get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out
-    # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
+    # if you fail with the default database, use your own seed database and label database with "-s" and "--genes" 
 
 To assembly fungus nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-28S):
 
     get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_nr -o fungus_nr_out  
-    # if you fails with the default database, use your own seed database and label database with "-s" and "--genes" 
+    # if you fail with the default database, use your own seed database and label database with "-s" and "--genes" 
 
 To assembly animal mitochondria:
 
     get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   
-    # if you fails with the default database, rerun it using your own seed database (or the output of a first GetOrganelle run) and label database with "-s" and "--genes"
+    # if you fail with the default database, rerun it using your own seed database (or the output of a first GetOrganelle run) and label database with "-s" and "--genes"
 
 See a brief illustrations of those arguments by typing in:
 

@@ -4174,6 +4174,13 @@ def main():
                                 log_handler.info("Extracting " + sub_organelle_type + " from the assemblies failed.\n")
             else:
                 log_handler.error("No valid assembly graph found!")
+                log_handler.warning("This might due to a damaged dependency, "
+                                    "to unreasonable seed/parameter choices, or to a bug.")
+                log_handler.info("Please first search similar issues at "
+                                 "https://github.com/Kinggerm/GetOrganelle/issues, "
+                                 "then leave your message following the same issue, "
+                                 "or open an issue at https://github.com/Kinggerm/GetOrganelle/issues if it is new, "
+                                 "Please always attach the get_org.log.txt file.\n")
         log_handler = simple_log(log_handler, out_base, prefix=options.prefix + "get_org.")
         log_handler.info("\nTotal cost " + "%.2f" % (time.time() - time0) + " s")
         log_handler.info("Thank you!")

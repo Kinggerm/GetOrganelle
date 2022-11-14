@@ -863,7 +863,7 @@ def detect_blast_path(which_blast, dependency_path):
             output, err = subprocess.Popen(
                 try_this_bin + " -version", stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, shell=True).communicate()
-            if "not found" in output.decode("utf8"):
+            if "not found" in output.decode("utf8") or "blastn: error" in output.decode("utf8"):
                 sys.stderr.write(output.decode("utf8") + "\n")
                 sys.exit()
             else:
@@ -878,6 +878,7 @@ def detect_bowtie2_version(which_bowtie2):
             stderr=subprocess.STDOUT, shell=True).communicate()
         output = output.decode("utf8")
         if "(ERR)" in output:
+            sys.stderr.write(output)
             return "Bowtie2 ERROR"
         this_lines = output.split("\n")[:3]
         return "Bowtie2 " + this_lines[0].split()[-1].strip()
@@ -904,6 +905,7 @@ def detect_blast_version(which_blast):
             this_lines = output.decode("utf8").split("\n")[:2]
             return "Blast " + this_lines[1].strip().split()[2].replace(",", "").strip()
         except IndexError:
+            sys.stderr.write(output.decode("utf8") + "\n")
             return "Blast N/A"
     else:
         return "Blast N/A"

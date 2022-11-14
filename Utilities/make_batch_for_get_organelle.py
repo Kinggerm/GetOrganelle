@@ -3,7 +3,10 @@
 import os
 from argparse import ArgumentParser
 
-usage = "make_batch_for_get_organelle.py -o basename -p \"-F embplant_pt\" " \
+usage = "Note: you may also want to use the for loop to create you batch rather than using this old-fashioned script " \
+        "originally designed for certain form of organized dataset with sometimes multiple pairs of fastq reads." \
+        "\n" \
+        "make_batch_for_get_organelle.py -o basename -p \"-F embplant_pt\" " \
         "[a_list_of_directories_containing_balanced_fastq_file]"
 parser = ArgumentParser(usage=usage)
 parser.add_argument('sample_dirs', metavar='sample_dirs', type=str, nargs="+",
@@ -18,8 +21,8 @@ parser.add_argument('-p', dest='other_arguments',
 parser.add_argument('--all', dest='skip_done', default=True, action='store_false',
                     help='Choose to make command for all samples including samples with results.'
                          'Default: skip those with results.')
-parser.add_argument('--annotated', dest='ano_skip', default=False, action='store_true',
-                    help='Choose to make annotated command for skipped commands.'
+parser.add_argument('--skip-comment', dest='ano_skip', default=False, action='store_true',
+                    help='Choose to treat #-commented command as skipped.'
                          'Default: False.')
 parser.add_argument('--strict', dest='strict_name', default=False, action='store_true',
                     help='Choose to only search for the fastq with the same base name with the directory '

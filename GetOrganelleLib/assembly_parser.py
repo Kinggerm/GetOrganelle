@@ -89,8 +89,9 @@ class Vertex(object):
         elif forward_seq is None:
             self.seq = {True: None, False: None}
         else:
-            self.seq = {True: "", False: ""}
-        """ True: tail, False: head """
+            self.seq = {True: None, False: None}
+
+        # True: tail, False: head
         self.connections = {True: OrderedDict(), False: OrderedDict()}
         assert tail_connections is None or isinstance(tail_connections, OrderedDict), \
             "tail_connections must be an OrderedDict()"
@@ -152,16 +153,23 @@ class MergingHistory(object):
                 else:
                     self.__list.extend(each_item.list())
 
-    def add(self, new_history_or_vertex, add_new_to_front=False, reverse_the_latter=False):
+    def add(self, new_history_or_vertex, add_new_to_front=False, reverse_the_new=False):
         is_vertex = isinstance(new_history_or_vertex, tuple) and len(new_history_or_vertex) == 2
         is_hist = isinstance(new_history_or_vertex, MergingHistory)
         assert is_vertex or is_hist
         if add_new_to_front:
-            if reverse_the_latter:
-                self.reverse()
-            self.__list.insert(0, new_history_or_vertex)
+            if reverse_the_new:
+                if is_vertex:
+                    self.__list.insert(0, (new_history_or_vertex[0], not new_history_or_vertex[1]))
+                else:
+                    self.__list = list(-new_history_or_vertex) + self.__list
+            else:
+                if is_vertex:
+                    self.__list.insert(0, new_history_or_vertex)
+                else:
+                    self.__list = list(new_history_or_vertex) + self.__list
         else:
-            if reverse_the_latter:
+            if reverse_the_new:
                 if is_vertex:
                     self.__list.append((new_history_or_vertex[0], not new_history_or_vertex[1]))
                 else:
@@ -201,7 +209,6 @@ class MergingHistory(object):
         return v_set
 
 
-
 class ConsensusHistory(object):
     def __init__(self, merging_items):
         """
@@ -215,7 +222,7 @@ class ConsensusHistory(object):
     def add_consensus(self, vertex):
         """
         :param vertex: (name, vertex)
-        :return: 
+        :return:
         """
         assert isinstance(vertex, tuple) and len(vertex) == 2
         self.__list.append(vertex)
@@ -234,7 +241,6 @@ class ConsensusHistory(object):
             else:
                 v_set.add(each_item[0])
         return v_set
-
 
 
 class SimpleAssembly(object):
@@ -296,6 +302,7 @@ class SimpleAssembly(object):
                         kmer_count = None
                         seq_depth_tag = None
                         sh_256_val = None
+                        other_attributes = {}
                         for element in elements:
                             element = element.split(":")  # element_tag, element_type, element_description
                             # skip RC/FC
@@ -324,6 +331,8 @@ class SimpleAssembly(object):
                                 else:
                                     raise ProcessingGraphFailed(
                                         seq_file_path + " for " + vertex_name + " does not exist!")
+                            else:
+                                other_attributes[element[0].upper()] = element[-1]
                         seq_len = len(sequence)
                         if seq_len_tag is not None and seq_len != seq_len_tag:
                             raise ProcessingGraphFailed(vertex_name + " has unmatched sequence length as noted!")
@@ -335,11 +344,15 @@ class SimpleAssembly(object):
                             elif seq_depth_tag is not None:
                                 seq_depth = seq_depth_tag
                             if min_cov <= seq_depth <= max_cov:
-                                self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, seq_depth, sequence)
+                                vert = Vertex(vertex_name, seq_len, seq_depth, sequence)
+                                vert.other_attr = other_attributes
+                                self.vertex_info[vertex_name] = vert
                                 if vertex_name.isdigit():
                                     self.vertex_info[vertex_name].fill_fastg_form_name()
                         else:
-                            self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, default_cov, sequence)
+                            vert = Vertex(vertex_name, seq_len, default_cov, sequence)
+                            vert.other_attr = other_attributes
+                            self.vertex_info[vertex_name] = vert
                 gfa_open.seek(0)
                 for line in gfa_open:
                     if line.startswith("L\t"):
@@ -375,6 +388,7 @@ class SimpleAssembly(object):
                         kmer_count = None
                         seq_depth_tag = None
                         sh_256_val = None
+                        other_attributes = {}
                         for element in elements:
                             element = element.split(":")  # element_tag, element_type, element_description
                             # skip RC/FC
@@ -401,6 +415,8 @@ class SimpleAssembly(object):
                                 else:
                                     raise ProcessingGraphFailed(
                                         seq_file_path + " for " + vertex_name + " does not exist!")
+                            else:
+                                other_attributes[element[0].upper()] = element[-1]
                         seq_len = len(sequence)
                         if seq_len_tag is not None and seq_len != seq_len_tag:
                             raise ProcessingGraphFailed(vertex_name + " has unmatched sequence length as noted!")
@@ -413,10 +429,12 @@ class SimpleAssembly(object):
                                 seq_depth = seq_depth_tag
                             if min_cov <= seq_depth <= max_cov:
                                 self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, seq_depth, sequence)
+                                self.vertex_info[vertex_name].other_attr = other_attributes
                                 if vertex_name.isdigit():
                                     self.vertex_info[vertex_name].fill_fastg_form_name()
                         else:
                             self.vertex_info[vertex_name] = Vertex(vertex_name, seq_len, default_cov, sequence)
+                            self.vertex_info[vertex_name].other_attr = other_attributes
                 gfa_open.seek(0)
                 for line in gfa_open:
                     if line.startswith("E\t"):  # gfa2 uses E
@@ -485,7 +503,7 @@ class SimpleAssembly(object):
                             next_end = next_vertex_str.endswith("'")
                             # Adding connection information (edge) to both of the related vertices
                             # even it is only mentioned once in some SPAdes output files
-                            self.vertex_info[vertex_name].connections[this_end][(next_name, next_end)] = 0
+                            self.vertex_info[vertex_name].connections[this_end][(next_name, next_end)] = 0  # None?
                             self.vertex_info[next_name].connections[next_end][(vertex_name, this_end)] = 0
                 # sequence
                 if not self.vertex_info[vertex_name].seq[True]:
@@ -556,16 +574,28 @@ class SimpleAssembly(object):
         out_matrix.interleaved = 70
         out_matrix.write_fasta(out_file, interleaved=interleaved)
 
-    def write_to_gfa(self, out_file, check_postfix=True):
+    def write_to_gfa(self, out_file, check_postfix=True, other_attr=None):
+        """
+        :param out_file: str
+        :param check_postfix: bool
+        :param other_attr: dict, e.g. {"CL":"z", "C2":"z"}
+        """
         if check_postfix and not out_file.endswith(".gfa"):
             out_file += ".gfa"
+        if not other_attr:
+            other_attr = {}
         out_file_handler = open(out_file, "w")
         for vertex_name in self.vertex_info:
-            out_file_handler.write("\t".join([
-                "S", vertex_name, self.vertex_info[vertex_name].seq[True],
-                "LN:i:" + str(self.vertex_info[vertex_name].len),
-                "RC:i:" + str(int(self.vertex_info[vertex_name].len * self.vertex_info[vertex_name].cov))
-            ]) + "\n")
+            out_file_handler.write("\t".join(
+                [
+                    "S", vertex_name, self.vertex_info[vertex_name].seq[True],
+                    "LN:i:" + str(self.vertex_info[vertex_name].len),
+                    "RC:i:" + str(int(self.vertex_info[vertex_name].len * self.vertex_info[vertex_name].cov))] +
+                [
+                    "%s:%s:%s" % (attr_name, attr_type, self.vertex_info[vertex_name].other_attr.get(attr_name, ""))
+                    for attr_name, attr_type in other_attr.items()
+                    if self.vertex_info[vertex_name].other_attr.get(attr_name, False)
+                ]) + "\n")
         recorded_connections = set()
         for vertex_name in self.vertex_info:
             for this_end in (False, True):
@@ -598,7 +628,8 @@ class Assembly(SimpleAssembly):
         self.vertex_to_float_copy = {}
         self.copy_to_vertex = {}
         self.__inverted_repeat_vertex = {}
-        # self.merging_history = {}
+
+        # Note: traversome move palindromic_repeats here rather than inside get_all_circular_paths/get_all_paths
 
     # def uni_overlap(self):
     #     if self.__uni_overlap is None:
@@ -703,6 +734,8 @@ class Assembly(SimpleAssembly):
                                                                               "sum_len": sum(this_orf_lens)}
 
     def update_vertex_clusters(self):
+        # TODO: faster algorithm exists
+
         self.vertex_clusters = []
         vertices = sorted(self.vertex_info)
         for this_vertex in vertices:
@@ -860,7 +893,8 @@ class Assembly(SimpleAssembly):
         # branching ends
         if len(connection_set_t) == len(connection_set_f) == 2:
             for next_t_v, next_t_e in list(connection_set_t):
-                this_inner_circle = self.find_pair_closing_the_path(next_t_v, next_t_e, connection_set_f, connection_set_t)
+                this_inner_circle = self.find_pair_closing_the_path(next_t_v, next_t_e, connection_set_f,
+                                                                    connection_set_t)
                 if this_inner_circle:
                     # check leakage in reverse direction
                     reverse_v, reverse_e = this_inner_circle[0][1]
@@ -904,28 +938,10 @@ class Assembly(SimpleAssembly):
                     if len(self.vertex_info[next_vertex].connections[next_end]) == 1 and this_vertex != next_vertex:
                         # reverse the names
                         merged = True
-                        self.vertex_info[this_vertex].merging_history.add((next_vertex, not next_end),
-                                                                          add_new_to_front=this_end,
-                                                                          reverse_the_latter=not next_end)
+                        self.vertex_info[this_vertex].merging_history.add((next_vertex, not this_end == next_end),
+                                                                          add_new_to_front=not this_end,
+                                                                          reverse_the_new=False)
                         new_vertex = str(self.vertex_info[this_vertex].merging_history)
-                        # if this_end:
-                        #     if next_end:
-                        #         new_vertex = this_vertex + "_" + "_".join(next_vertex.split("_")[::-1])
-                        #     else:
-                        #         new_vertex = this_vertex + "_" + next_vertex
-                        # else:
-                        #     if next_end:
-                        #         new_vertex = next_vertex + "_" + this_vertex
-                        #     else:
-                        #         new_vertex = "_".join(next_vertex.split("_")[::-1]) + "_" + this_vertex
-
-                        # record merging history
-                        # self.merging_history[new_vertex] = self.merging_history.get(this_vertex, {this_vertex}) | \
-                        #                                    self.merging_history.get(next_vertex, {next_vertex})
-                        # if this_vertex in self.merging_history:
-                        #     del self.merging_history[this_vertex]
-                        # if next_vertex in self.merging_history:
-                        #     del self.merging_history[next_vertex]
 
                         limited_vertices.remove(next_vertex)
                         limited_vertices.append(new_vertex)
@@ -2222,7 +2238,8 @@ class Assembly(SimpleAssembly):
                                     2 * abs(len(seq_1) - len(seq_2)) / float(len(seq_1) + len(seq_2)) <= degenerate_dif:
                                 base_dif = find_string_difference_regional_kmer_counting(seq_1, seq_2)
                             else:
-                                base_dif, proper_end = find_string_difference(seq_1, seq_2, max(2, int(len(seq_1) * 0.005)))
+                                base_dif, proper_end = find_string_difference(seq_1, seq_2,
+                                                                              max(2, int(len(seq_1) * 0.005)))
                             if float(base_dif) * 2 / (len(seq_1) + len(seq_2)) < contamination_dif:
                                 removing_irrelevant_v.add(this_v)
                                 this_contamination_or_polymorphic = True
@@ -2334,6 +2351,7 @@ class Assembly(SimpleAssembly):
         :param debug:
         :return:
         """
+
         # overlap = self.__overlap if self.__overlap else 0
 
         def log_target_res(final_res_combinations_inside):
@@ -2692,7 +2710,7 @@ class Assembly(SimpleAssembly):
                                 if this_assembly_g.uni_overlap():
                                     for inside_v in this_assembly_g.vertex_info:
                                         draft_size_estimates += \
-                                            (this_assembly_g.vertex_info[inside_v].len - this_assembly_g.uni_overlap())\
+                                            (this_assembly_g.vertex_info[inside_v].len - this_assembly_g.uni_overlap()) \
                                             * this_assembly_g.vertex_to_copy[inside_v]
                                 else:
                                     for inside_v in this_assembly_g.vertex_info:
@@ -3201,20 +3219,22 @@ class Assembly(SimpleAssembly):
                                     sub_paths_for_checking.append([])
                         # picking the vertex with the longest length with strand of least orfs
                         lsc_pair_id = sorted(range(len(sub_paths_for_checking)),
-                            key=lambda x:
-                            (
-                             # sum of the contig lengths
-                             -sum([self.vertex_info[sub_v].len
-                                   for sub_v, sub_e in sub_paths_for_checking[x]]) +
-                             # sum of the overlap
-                             # self.__overlap * (len(sub_paths_for_checking[x]) - 1),
-                             sum([self.vertex_info[l_v].connections[l_e]
-                                  [(sub_paths_for_checking[x][go_s + 1][0], not sub_paths_for_checking[x][go_s + 1][1])]
-                                  for go_s, (l_v, l_e) in enumerate(sub_paths_for_checking[x][:-1])]),
-                             # sum of the orf
-                             sum([self.vertex_info[sub_v].other_attr["orf"][sub_e]["sum_len"]
-                                  for sub_v, sub_e in sub_paths_for_checking[x]]),
-                             x))[0]
+                                             key=lambda x:
+                                             (
+                                                 # sum of the contig lengths
+                                                 -sum([self.vertex_info[sub_v].len
+                                                       for sub_v, sub_e in sub_paths_for_checking[x]]) +
+                                                 # sum of the overlap
+                                                 # self.__overlap * (len(sub_paths_for_checking[x]) - 1),
+                                                 sum([self.vertex_info[l_v].connections[l_e]
+                                                      [(sub_paths_for_checking[x][go_s + 1][0],
+                                                        not sub_paths_for_checking[x][go_s + 1][1])]
+                                                      for go_s, (l_v, l_e) in
+                                                      enumerate(sub_paths_for_checking[x][:-1])]),
+                                                 # sum of the orf
+                                                 sum([self.vertex_info[sub_v].other_attr["orf"][sub_e]["sum_len"]
+                                                      for sub_v, sub_e in sub_paths_for_checking[x]]),
+                                                 x))[0]
                         if reverse_start_direction_for_pt:
                             if lsc_pair_id % 2 == 0:
                                 paths[go_p] = reseed_a_path(each_path, branching_sc_pair_list[lsc_pair_id + 1][0])
@@ -3798,7 +3818,7 @@ class NaiveKmerNodeGraph(Assembly):
             for contig_n_1, contig_e_1 in joint_kmer_end_to_contig_end[joint_kmer_n][True]:
                 for contig_n_2, contig_e_2 in joint_kmer_end_to_contig_end[joint_kmer_n][False]:
                     assembly_graph.vertex_info[contig_n_1].connections[contig_e_1][(contig_n_2, contig_e_2)] = \
-                    assembly_graph.vertex_info[contig_n_2].connections[contig_e_2][(contig_n_1, contig_e_1)] = \
+                        assembly_graph.vertex_info[contig_n_2].connections[contig_e_2][(contig_n_1, contig_e_1)] = \
                         self.__kmer
         return assembly_graph
 

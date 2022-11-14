@@ -1050,7 +1050,7 @@ def main():
                     log_handler.info("Generating slimmed file to " + out_fas)
                 else:
                     sys.stdout.write("Generating slimmed file to " + out_fas + "\n")
-                if new_assembly:
+                if is_graph:
                     if is_fastg:
                         new_assembly.write_to_fastg(out_fas, check_postfix=False)
                     else:

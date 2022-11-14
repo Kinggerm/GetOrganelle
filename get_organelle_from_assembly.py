@@ -561,7 +561,8 @@ def slim_assembly_graph(organelle_types, in_custom, ex_custom, graph_in, graph_o
     #     if log_handler:
     #         log_handler.error("Slimming " + graph_in + " failed.")
     #     return os.path.join(which_slim, "slim_graph.py") + " not accessible!\n" + output.decode("utf8").strip()
-    if " failed" in output.decode("utf8") or " - ERROR" in output.decode("utf8"):
+    if " failed" in output.decode("utf8") or " - ERROR" in output.decode("utf8") or \
+            "slim_graph.py: error" in output.decode("utf8"):
         if log_handler:
             log_handler.error("Slimming " + graph_in + " failed. "
                               "Please check *slim.log.txt for details. ")
@@ -1063,7 +1064,7 @@ def main():
         log_handler.info("Thank you!")
     except:
         log_handler.exception("")
-        final_error_summary_log(log_handler, options.out_base, options.prefix, time0, "the slimmed_assembly_graph.*")
+        final_error_summary_log(log_handler, options.output_base, options.prefix, time0, "the slimmed_assembly_graph.*")
     logging.shutdown()
 
 

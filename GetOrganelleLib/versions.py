@@ -6,15 +6,19 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.7.7.0-pre",
+        "number": "1.7.7.0-pre3",
         "features": [
-            "1. merge all possible nodes", #TODO
+            "1. Assembly.merge_all_possible_nodes: fix a bug which will result in bad contig names",
             "2. add Utilities/get_annotated_regions_from_gb.py",
             "3. fix a bug in seq_parser.SequenceList.remove",
             "4. Utilities/slim_graph.py: --percent and --blast-options added; exception catch",
             "5. fix a bug in get_organelle_config.py:pipe_control_func.py:SEED_DB_HASH (issue 199)",
+            "6. print slim_graph.py error (in from_assembly) and blastn error",
+            "7. fix a bug in slim_graph.py (issue 196)",
+            "8. update Assembly improvement in gfa/fastg parser/writer: "
+            "   storing other attributes if unknown; output unequal overlaps",
         ],
-        "time": "2022-10-06 09:02 UTC-5"
+        "time": "2022-11-14 09:02 UTC-5"
     },
     {
         "number": "1.7.6.1",
@@ -99,7 +103,7 @@ versions = [
             "3. get_organelle_from_reads.py: '--overwrite' added; catch shutil.rmtree() errors; no python-lib -> error."
             "4. get_organelle_from_*.py: turning off bandage if the result is not circular",
             "5. assembly_parser.py: recording every overlap value rather than using a universal value for hifiasm "
-            "   (in response to Christopher Benson@PSU)",
+            "   (in response to Christopher Benson@PSU); with changes on merge_all_possible_vertices",
             "6. optparse -> argparse (in response to Matthias Bernt@UFZ)",
             "7. get_organelle_from_assembly.py: fix a bug with the malfunction of --continue when the input is gfa ",
             "8. get_organelle_from_reads.py/disentangle_organelle_assembly.py: correct typos",

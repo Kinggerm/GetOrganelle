@@ -171,54 +171,82 @@ But you are still highly recommended reading the following minimal introductions
 
 ## Recipes
 
-To assembly Embryophyta plant plastome (e.g. using 2G raw data of 150 bp paired reads), typically I use:
+Please refer to the [GetOrganelle FAQ](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ) to fine-tune the arguments, especially concerning [word size](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#what-is-a-good-word-size-value), [memory](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#memoryerror), and [clock time](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#how-to-speed-up-getorganelle-runs).
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output -R 15 -k 21,45,65,85,105 -F embplant_pt
+### _From Reads_
 
-or in a draft way:
+* **Embryophyta**
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output --fast -k 21,65,105 -w 0.68 -F embplant_pt
+    To assembly Embryophyta plant plastid genome (plastome), e.g. using 2G raw data of 150 bp paired reads, typically I use:
 
-or in a slow and memory-economic way:
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output -R 15 -k 21,45,65,85,105 -F embplant_pt
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save
-
-To assembly Embryophyta plant mitochondria (usually you need more than 5G raw data):
-
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o mitochondria_output -R 50 -k 21,45,65,85,105 -P 1000000 -F embplant_mt
-    # 1. please use the FASTG file as the final output for downstream manual processing. until further updates, the FASTA output of plant mitochondria genome of numerous repeats may be error-prone
-    # 2. embplant_mt mode was not tested in the GetOrganelle paper due to the complexity of plant mitogenomes and the defects of short reads
+    or in a draft way:
     
-To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output --fast -k 21,65,105 -w 0.68 -F embplant_pt
+    
+    or in a slow and memory-economic way:
+    
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o plastome_output -R 30 -k 21,45,65,85,105  -F embplant_pt --memory-save
+    
+    To assembly Embryophyta plant mitochondria genome (mitogenome), usually you need more than 5G raw data:
+    
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o mitochondria_output -R 20 -k 21,45,65,85,105 -P 1000000 -F embplant_mt
+      # 1. please use the FASTG file as the final output for downstream manual processing. until further updates, the FASTA output of plant mitochondria genome of numerous repeats may be error-prone
+      # 2. embplant_mt mode was not tested in the GetOrganelle paper due to the complexity of plant mitogenomes and the defects of short reads. So there is room for improvement in the argument choices.
+        
+    To assembly Embryophyta plant nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-26S):
+    
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o nr_output -R 10 -k 35,85,115 -F embplant_nr
+      # Please also take a look at this FAQ https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#why-does-getorganelle-generate-a-circular-genome-or-not-for-embplant_nrfungus_nr
+      
+* **Non-embryophyte**
+    
+    Non embryophyte plastomes and mitogenomes can be divergent from the embryophyte. We have not explored it very much. But many users have successfully assemble them using GetOrganelle using the default database or a [customized database](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#how-to-assemble-a-target-organelle-genome-using-my-own-reference).
+    
+    There is a built-in `other_pt` mode and prepared default database for the non embryophyte plastomes. I would start with `-F other_pt` and similar options as in the `embplant_pt` part. However, there is no such built-in mode for non embryophyte mitogenomes. So besides using similar options as in the `embplant_mt` part, I would make a pair of customized seed database and label database, then use them to run GetOrganelle following [the guidance here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#how-to-assemble-a-target-organelle-genome-using-my-own-reference).
+    
+* **Fungus**
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -o nr_output -R 10 -k 35,85,115 -F embplant_nr
+    To assembly fungus mitochondria genome:
+    
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out
+      # if you fail with the default database, use your own seed database and label database with "-s" and "--genes" 
+    
+    To assembly fungus nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-28S):
+    
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_nr -o fungus_nr_out  
+      # if you fail with the default database, use your own seed database and label database with "-s" and "--genes" 
+      # Please also take a look at this FAQ https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#why-does-getorganelle-generate-a-circular-genome-or-not-for-embplant_nrfungus_nr
+      
+* **Animal**
+    
+    To assembly animal mitochondria:
+    
+      get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   
+      # if you fail with the default database, rerun it using your own seed database (or the output of a first GetOrganelle run) and label database with "-s" and "--genes"
+      
+    Animal nuclear ribosomal RNA will be available in the future. [Issue136](https://github.com/Kinggerm/GetOrganelle/issues/136) is the place to follow.
+    
+### _From Assembly Graph_
 
-To assembly fungus mitochondria:
+There are as many available organelle types as the `From Reads` section (see more by `get_organelle_from_assembly.py -h`), but the simplest usage is not that different. Here is an example to extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`; e.g. from long-read sequencing assemblies):
+    
+    get_organelle_from_assembly.py -F embplant_pt -g ONT_assembly_graph.gfa
 
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_mt -o fungus_mt_out
-    # if you fail with the default database, use your own seed database and label database with "-s" and "--genes" 
-
-To assembly fungus nuclear ribosomal RNA (18S-ITS1-5.8S-ITS2-28S):
-
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F fungus_nr -o fungus_nr_out  
-    # if you fail with the default database, use your own seed database and label database with "-s" and "--genes" 
-
-To assembly animal mitochondria:
-
-    get_organelle_from_reads.py -1 forward.fq -2 reverse.fq -R 10 -k 21,45,65,85,105 -F animal_mt -o animal_mt_out   
-    # if you fail with the default database, rerun it using your own seed database (or the output of a first GetOrganelle run) and label database with "-s" and "--genes"
+### _Arguments_
 
 See a brief illustrations of those arguments by typing in:
-
+    
     get_organelle_from_reads.py -h
-    
+        
 or see the detailed illustrations:
-    
+        
     get_organelle_from_reads.py --help
     
-To extract the plastid genome from an existing assembly graph (`*.fastg`/`*.gfa`; e.g. from long-read sequencing assemblies):
+The same brief `-h` and verbose `--help` menu can be find for `get_organelle_from_assembly.py`.
 
-    get_organelle_from_assembly.py -F embplant_pt -g ONT_assembly_graph.gfa
+You may also find a summary of above information [here at Usage](https://github.com/Kinggerm/GetOrganelle/wiki/Usage).
 
 
 ## Contact

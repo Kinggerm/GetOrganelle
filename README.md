@@ -204,7 +204,7 @@ Please refer to the [GetOrganelle FAQ](https://github.com/Kinggerm/GetOrganelle/
     
     Non embryophyte plastomes and mitogenomes can be divergent from the embryophyte. We have not explored it very much. But many users have successfully assemble them using GetOrganelle using the default database or a [customized database](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#how-to-assemble-a-target-organelle-genome-using-my-own-reference).
     
-    There is a built-in `other_pt` mode and prepared default database for the non embryophyte plastomes. I would start with `-F other_pt` and similar options as in the `embplant_pt` part. However, there is no such built-in mode for non embryophyte mitogenomes. So besides using similar options as in the `embplant_mt` part, I would make a pair of customized seed database and label database, then use them to run GetOrganelle following [the guidance here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#how-to-assemble-a-target-organelle-genome-using-my-own-reference).
+    There is a built-in `other_pt` mode and prepared default database for the non embryophyte plastomes. I would start with `-F other_pt` and similar options as in the `embplant_pt` part. However, there is no such built-in mode for non embryophyte mitogenomes. Considering that the sequences may be highly divergent from embplant_mt, besides using similar options as in the `embplant_mt` part, I would make a pair of customized seed database and label database, then use them to run GetOrganelle following [the guidance here](https://github.com/Kinggerm/GetOrganelle/wiki/FAQ#how-to-assemble-a-target-organelle-genome-using-my-own-reference).
     
 * **Fungus**
 

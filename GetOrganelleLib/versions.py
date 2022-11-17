@@ -6,7 +6,7 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.7.7.0-pre3",
+        "number": "1.7.7.0-pre4",
         "features": [
             "1. Assembly.merge_all_possible_nodes: fix a bug which will result in bad contig names",
             "2. add Utilities/get_annotated_regions_from_gb.py",

@@ -113,6 +113,7 @@ scripts_to_install = ["get_organelle_from_reads.py",
                       "Utilities/disentangle_organelle_assembly.py",
                       "Utilities/evaluate_assembly_using_mapping.py",
                       "Utilities/fastg_to_gfa.py",
+                      "Utilities/get_annotated_regions_from_gb.py"
                       "Utilities/get_organelle_config.py",
                       "Utilities/get_pair_reads.py",
                       "Utilities/gfa_to_fastg.py",

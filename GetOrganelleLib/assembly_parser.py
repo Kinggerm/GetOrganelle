@@ -1759,21 +1759,13 @@ class Assembly(SimpleAssembly):
             log_handler.info("coverage threshold set: " + str(standard_coverage))
         elif verbose or debug:
             sys.stdout.write("coverage threshold set: " + str(standard_coverage) + "\n")
-        # 2022-05-06: use the coverage of the contig with the max weight instead of the max coverage
-        # v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1) for this_v in vertices}
-        # try:
-        #     max_tagged_cov = max([v_coverages[tagged_v] for tagged_v in self.tagged_vertices[database_n]])
-        # except ValueError as e:
-        #     if log_handler:
-        #         log_handler.info("tagged vertices: " + str(self.tagged_vertices))
-        #     else:
-        #         sys.stdout.write("tagged vertices: " + str(self.tagged_vertices) + "\n")
-        #     raise e
 
         # removing coverage with 10 times lower/greater than tagged_cov
+        # if abs(log(self.vertex_info[candidate_v].cov / standard_coverage)) > log_hard_cov_threshold]
+        # 2022-12-05 only remove lower contigs
         removing_low_cov = [candidate_v
                             for candidate_v in vertices
-                            if abs(log(self.vertex_info[candidate_v].cov / standard_coverage)) > log_hard_cov_threshold]
+                            if -log(self.vertex_info[candidate_v].cov / standard_coverage) > log_hard_cov_threshold]
         if removing_low_cov:
             if log_handler and (debug or verbose):
                 log_handler.info("removing extremely outlying coverage contigs: " + str(removing_low_cov))
@@ -2415,15 +2407,15 @@ class Assembly(SimpleAssembly):
             else:
                 return old_temp_file + extra_str
 
-        def write_temp_out(_assembly, _database_name, _temp_graph, _temp_csv, go_id):
+        def write_temp_out(_assembly, _database_name, _temp_graph, _temp_csv, step_tag):
             if _temp_graph:
-                tmp_graph_1 = add_temp_id(_temp_graph, ".%02d.%02d" % (count_all_temp[0], go_id))
-                tmp_csv_1 = add_temp_id(_temp_csv, ".%02d.%02d" % (count_all_temp[0], go_id))
+                tmp_graph_1 = add_temp_id(_temp_graph, ".%02d.%s" % (count_all_temp[0], step_tag))
+                tmp_csv_1 = add_temp_id(_temp_csv, ".%02d.%s" % (count_all_temp[0], step_tag))
                 if verbose:
                     if log_handler:
-                        log_handler.info("Writing out temp graph (%d): %s" % (go_id, tmp_graph_1))
+                        log_handler.info("Writing out temp graph (%s): %s" % (step_tag, tmp_graph_1))
                     else:
-                        sys.stdout.write("Writing out temp graph (%d): %s" % (go_id, tmp_graph_1) + "\n")
+                        sys.stdout.write("Writing out temp graph (%s): %s" % (step_tag, tmp_graph_1) + "\n")
                 _assembly.write_to_gfa(tmp_graph_1)
                 _assembly.write_out_tags([_database_name], tmp_csv_1)
                 count_all_temp[0] += 1
@@ -2459,7 +2451,7 @@ class Assembly(SimpleAssembly):
                                               for log_v in sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
                 new_assembly.merge_all_possible_vertices()
                 new_assembly.tag_in_between(database_n=database_name)
-                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 1)
+                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "a")
                 changed = True
                 count_large_round = 0
                 while changed:
@@ -2520,6 +2512,8 @@ class Assembly(SimpleAssembly):
                                                           for log_v
                                                           in
                                                           sorted(new_assembly.tagged_vertices[database_name])]) + "\n")
+                            if this_del and temp_graph:
+                                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "b")
                             new_assembly.estimate_copy_and_depth_by_cov(
                                 new_assembly.tagged_vertices[database_name], debug=debug, log_handler=log_handler,
                                 verbose=verbose, mode=mode)
@@ -2567,7 +2561,7 @@ class Assembly(SimpleAssembly):
                                 del temp_cluster_weights[best_id]
                                 second = max(temp_cluster_weights)
                                 if best < second * weight_factor:
-                                    write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 2)
+                                    write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "c")
                                     raise ProcessingGraphFailed("Multiple isolated " + mode + " components detected! "
                                                                                               "Broken or contamination?")
                                 for j, w in enumerate(cluster_weights):
@@ -2581,7 +2575,7 @@ class Assembly(SimpleAssembly):
                                                 for mu, sigma in parameters:
                                                     if abs(new_cov - mu) < sigma:
                                                         write_temp_out(new_assembly, database_name,
-                                                                       temp_graph, temp_csv, 3)
+                                                                       temp_graph, temp_csv, "d")
                                                         raise ProcessingGraphFailed(
                                                             "Complicated graph: please check around EDGE_" + del_v + "!"
                                                                                                                      "# tags: " +
@@ -2603,6 +2597,8 @@ class Assembly(SimpleAssembly):
                                 cluster_trimmed = True
                                 changed = True
 
+                                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "e")
+
                     # merge vertices
                     new_assembly.merge_all_possible_vertices()
                     new_assembly.tag_in_between(database_n=database_name)
@@ -2621,7 +2617,7 @@ class Assembly(SimpleAssembly):
                                 if sum([bool(len(cn))
                                         for cn in new_assembly.vertex_info[vertex_name].connections.values()]) != 2:
                                     if vertex_name in new_assembly.tagged_vertices[database_name]:
-                                        write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 4)
+                                        write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "f")
                                         raise ProcessingGraphFailed(
                                             "Incomplete/Complicated graph: please check around EDGE_" + vertex_name + "!")
                                     else:
@@ -2645,9 +2641,9 @@ class Assembly(SimpleAssembly):
                                                          degenerate_similarity=degenerate_similarity,
                                                          verbose=verbose, debug=debug, log_handler=log_handler)
                     new_assembly.tag_in_between(database_n=database_name)
-                    write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 5)
+                    write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "g")
 
-                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 6)
+                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "h")
                 new_assembly.processing_polymorphism(database_name=database_name,
                                                      contamination_depth=contamination_depth,
                                                      contamination_similarity=contamination_similarity,
@@ -2656,7 +2652,7 @@ class Assembly(SimpleAssembly):
                                                      warning_count=1, only_keep_max_cov=only_keep_max_cov,
                                                      verbose=verbose, debug=debug, log_handler=log_handler)
                 new_assembly.merge_all_possible_vertices()
-                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 7)
+                write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "i")
 
                 # create idealized vertices and edges
                 try:
@@ -2841,7 +2837,7 @@ class Assembly(SimpleAssembly):
                         if outer_continue:
                             continue
                     elif temp_graph:
-                        write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 8)
+                        write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "j")
                         raise ProcessingGraphFailed("Complicated " + mode + " graph! Detecting path(s) failed!")
                     else:
                         if verbose and log_handler:
@@ -2884,7 +2880,7 @@ class Assembly(SimpleAssembly):
                         is_reasonable_res = False
                         continue
         except KeyboardInterrupt as e:
-            write_temp_out(new_assembly, database_name, temp_graph, temp_csv, 9)
+            write_temp_out(new_assembly, database_name, temp_graph, temp_csv, "k")
             if log_handler:
                 log_handler.exception("")
                 raise e

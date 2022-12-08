@@ -3584,7 +3584,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
     timeout_flag = "'--disentangle-time-limit'"
     export_succeeded = False
     path_prefix = os.path.join(out_base, organelle_prefix)
-    graph_temp_file = path_prefix + ".temp.gfa" if options.keep_temp_files else None
+    graph_temp_file1 = path_prefix + "R1.temp.gfa" if options.keep_temp_files else None
     for go_k, kmer_dir in enumerate(kmer_dirs):
         out_fastg = slim_out_fg[go_k]
         if out_fastg and os.path.getsize(out_fastg):
@@ -3609,7 +3609,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                      here_only_max_c=True,
                                      here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                                      time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
-                                     temp_graph=graph_temp_file)
+                                     temp_graph=graph_temp_file1)
             except ImportError as e:
                 log_handler.error("Disentangling failed: " + str(e))
                 return False
@@ -3632,6 +3632,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 break
 
     if not export_succeeded and do_spades_scaffolding:
+        graph_temp_file1s = path_prefix + "R1S.temp.gfa" if options.keep_temp_files else None
         largest_k_graph_f_exist = bool(slim_out_fg[0])
         if kmer_dirs and largest_k_graph_f_exist:
             out_fastg = slim_out_fg[0]
@@ -3651,7 +3652,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                          here_only_max_c=True, with_spades_scaffolds=True,
                                          here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                                          time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
-                                         temp_graph=graph_temp_file)
+                                         temp_graph=graph_temp_file1s)
                 except FileNotFoundError:
                     log_handler.warning("scaffolds.fasta and/or scaffolds.paths not found!")
                 except ImportError as e:
@@ -3675,6 +3676,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     export_succeeded = True
 
     if not export_succeeded:
+        graph_temp_file2 = path_prefix + "R2.temp.gfa" if options.keep_temp_files else None
         largest_k_graph_f_exist = bool(slim_out_fg[0])
         if kmer_dirs and largest_k_graph_f_exist:
             for go_k, kmer_dir in enumerate(kmer_dirs):
@@ -3701,7 +3703,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                  expected_min_size=expected_minimum_size,
                                                  here_only_max_c=True, here_acyclic_allowed=True,
                                                  time_limit=3600, timeout_flag_str=timeout_flag,
-                                                 temp_graph=graph_temp_file)
+                                                 temp_graph=graph_temp_file2)
                     except (ImportError, AttributeError) as e:
                         log_handler.error("Disentangling failed: " + str(e))
                         break

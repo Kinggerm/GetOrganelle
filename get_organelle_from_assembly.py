@@ -815,7 +815,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     timeout_flag = "'--disentangle-time-limit'"
     export_succeeded = False
     path_prefix = os.path.join(out_base, organelle_prefix)
-    graph_temp_file = path_prefix + ".temp.gfa" if options.keep_temp_files else None
+    graph_temp_file1 = path_prefix + ".temp.R1.gfa" if options.keep_temp_files else None
     try:
         """disentangle"""
         disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
@@ -833,7 +833,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                              min_sigma_factor=options.min_sigma_factor,
                              here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                              time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
-                             temp_graph=graph_temp_file)
+                             temp_graph=graph_temp_file1)
     except ImportError as e:
         log_handler.error("Disentangling failed: " + str(e))
         return False
@@ -852,7 +852,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     else:
         export_succeeded = True
 
-    if not export_succeeded:
+    if not export_succeeded and options.spades_scaffolds_path:
+        graph_temp_file1s = path_prefix + ".temp.R1S.gfa" if options.keep_temp_files else None
         try:
             """disentangle"""
             disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
@@ -871,7 +872,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  spades_scaffolds_path=options.spades_scaffolds_path,
                                  here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                                  time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
-                                 temp_graph=graph_temp_file)
+                                 temp_graph=graph_temp_file1s)
         except ImportError as e:
             log_handler.error("Disentangling failed: " + str(e))
             return False
@@ -891,6 +892,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             export_succeeded = True
 
     if not export_succeeded:
+        graph_temp_file2 = path_prefix + ".temp.R2.gfa" if options.keep_temp_files else None
         try:
             """disentangle the graph as scaffold(s)/contig(s)"""
             disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
@@ -909,7 +911,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  here_max_copy=options.max_multiplicity,
                                  here_only_max_c=options.only_keep_max_cov, here_acyclic_allowed=True,
                                  time_limit=3600, timeout_flag_str=timeout_flag,
-                                 temp_graph=graph_temp_file)
+                                 temp_graph=graph_temp_file2)
         except (ImportError, AttributeError) as e:
             log_handler.error("Disentangling failed: " + str(e).strip())
         except RuntimeError as e:

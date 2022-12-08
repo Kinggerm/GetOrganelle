@@ -6,6 +6,14 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.7.1",
+        "features": [
+            "1. remove redundant disentangling for get_organelle_from_assembly.py",
+            "2. separate temporary files from different rounds",
+        ],
+        "time": "2022-12-05 13:30 UTC-5"
+    },
+    {
         "number": "1.7.7.0",
         "features": [
             "1. Assembly.merge_all_possible_nodes: fix a bug which will result in bad contig names",

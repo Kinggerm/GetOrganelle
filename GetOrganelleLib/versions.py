@@ -6,12 +6,19 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.7.7.1",
+        "number": "1.8.0.0-pre1",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",
+            "3. remove upper boundary for coverage-based filtering",
+            "4. remove max multiplicity boundary",
+            "5. use gekko instead of scipy for multiplicity estimation",
+            "6. limit the number of paths before generating",
+            "7. log copy info for --no-slim",
+            "8. statistical_func.py: fix a bug"
+            "   random.choice(np.array([0])) triggers IndexError: Cannot choose from an empty sequence",
         ],
-        "time": "2022-12-05 13:30 UTC-5"
+        "time": "2022-12-18 16:30 UTC-5"
     },
     {
         "number": "1.7.7.0",

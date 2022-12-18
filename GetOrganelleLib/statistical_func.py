@@ -102,6 +102,7 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
             label_counts = {lb: 0 for lb in range(len(parameters))}
             for ct_lb in new_labels:
                 label_counts[ct_lb] += 1
+            print("label_counts", label_counts)
             for empty_lb in label_counts:
                 if label_counts[empty_lb] == 0:
                     non_empty_lbs = {ne_lb: [min, max] for ne_lb in label_counts if label_counts[ne_lb] > 1}
@@ -118,9 +119,12 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
                         chose_points = dat_arr[new_labels == chose_lb]
                         # random.choice([min, max]), then use the resulting function to pick the point
                         data_point = random.choice(non_empty_lbs[chose_lb])(chose_points)
-                        transfer_index = random.choice(np.where(dat_arr == data_point)[0])
+                        # random.choice(np.array([0])) triggers: IndexError: Cannot choose from an empty sequence
+                        transfer_index = random.choice(list(np.where(dat_arr == data_point)[0]))
                         new_labels[transfer_index] = empty_lb
                         label_counts[chose_lb] -= 1
+                        # 2022-12-18 fix a long-lasting issue
+                        label_counts[empty_lb] += 1
             return new_labels
 
     def updating_parameter(dat_arr, dat_w, lbs, parameters):

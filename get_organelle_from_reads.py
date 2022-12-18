@@ -3393,7 +3393,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                            read_len_for_log=read_len_for_log,
                                                            kmer_for_log=int(this_K[1:]),
                                                            log_handler=log_in, verbose=verbose_in,
-                                                           temp_graph=in_temp_graph)
+                                                           temp_graph=in_temp_graph,
+                                                           selected_graph=o_p + ".graph.selected_graph.gfa")
             if not target_results:
                 raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
@@ -3409,11 +3410,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     go_res += 1
                     broken_graph = res["graph"]
                     count_path = 0
-                    these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in)
+                    # use options.max_paths_num + 1 to trigger the warning
+                    these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in,
+                                                             max_paths_num=options.max_paths_num + 1)
                     # reducing paths
                     if len(these_paths) > options.max_paths_num:
                         log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
-                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                                       str(options.max_paths_num) +
+                                       "+ possible paths. (see '--max-paths-num' to change it.)")
                         these_paths = these_paths[:options.max_paths_num]
                     # exporting paths, reporting results
                     for this_paths, other_tag in these_paths:
@@ -3467,7 +3471,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         open(out_n, "w").write("\n".join(all_contig_str))
 
                     if set(still_complete[-len(these_paths):]) == {"complete"}:
-                        this_out_base = o_p + ".complete.graph" + str(go_res) + ".selected_graph."
+                        this_out_base = o_p + ".complete.graph" + str(go_res) + ".path_sequence."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(
@@ -3476,7 +3480,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     elif set(still_complete[-len(these_paths):]) == {"nearly-complete"}:
-                        this_out_base = o_p + ".nearly-complete.graph" + str(go_res) + ".selected_graph."
+                        this_out_base = o_p + ".nearly-complete.graph" + str(go_res) + ".path_sequence."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(
@@ -3485,7 +3489,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     else:
-                        this_out_base = o_p + ".contigs.graph" + str(go_res) + ".selected_graph."
+                        this_out_base = o_p + ".contigs.graph" + str(go_res) + ".path_sequence."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         # image_produced = draw_assembly_graph_using_bandage(
@@ -3506,13 +3510,15 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     go_res += 1
                     idealized_graph = res["graph"]
                     count_path = 0
-
+                    # use options.max_paths_num + 1 to trigger the warning
                     these_paths = idealized_graph.get_all_circular_paths(
-                        mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc)
+                        mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc,
+                        max_paths_num=options.max_paths_num + 1)
                     # reducing paths
                     if len(these_paths) > options.max_paths_num:
                         log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
-                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                                       str(options.max_paths_num) +
+                                       "+ possible paths. (see '--max-paths-num' to change it.)")
                         these_paths = these_paths[:options.max_paths_num]
 
                     # exporting paths, reporting results
@@ -3535,7 +3541,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                         ":".join([str(len_val) for len_val in ir_stats[:3]]))
                         log_in.info(
                             "Writing PATH" + str(count_path) + " of " + status_str + " " + mode_in + " to " + out_n)
-                    temp_base_out = o_p + "." + status_str + ".graph" + str(go_res) + ".selected_graph."
+                    temp_base_out = o_p + "." + status_str + ".graph" + str(go_res) + ".path_sequence."
                     log_in.info("Writing GRAPH to " + temp_base_out + "gfa")
                     idealized_graph.write_to_gfa(temp_base_out + "gfa")
                     image_produced = draw_assembly_graph_using_bandage(
@@ -4146,7 +4152,7 @@ def main():
                     for go_t, sub_organelle_type in enumerate(options.organelle_type):
                         og_prefix = options.prefix + organelle_type_prefix[go_t]
                         graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base)
-                                              if gfa_f.startswith(og_prefix) and gfa_f.endswith(".selected_graph.gfa")])
+                                              if gfa_f.startswith(og_prefix) and gfa_f.endswith(".path_sequence.gfa")])
                         fasta_existed = bool([fas_f for fas_f in os.listdir(out_base)
                                               if fas_f.startswith(og_prefix) and fas_f.endswith(".path_sequence.fasta")])
                         if resume and graph_existed and fasta_existed:

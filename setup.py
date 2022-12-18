@@ -50,9 +50,10 @@ except ImportError:
         # higher version not compatible with python2
         install_dependencies.append("scipy==1.2.1")
 else:
-    sys.stdout.write("Existed module numpy " + str(scipy.__version__) + "\n")
+    sys.stdout.write("Existed module scipy " + str(scipy.__version__) + "\n")
 try:
     import sympy
+    from sympy import Symbol, solve, lambdify, log
 except ImportError:
     if MAJOR_VERSION == 3:
         install_dependencies.append("sympy>=1.4")
@@ -66,6 +67,14 @@ except ImportError:
     install_dependencies.append("requests[security]")
 else:
     sys.stdout.write("Existed module requests " + str(requests.__version__) + "\n")
+
+try:
+    import gekko
+except ImportError:
+    install_dependencies.append("gekko>=1.0.4")
+else:
+    sys.stdout.write("Existed module gekko " + str(numpy.__version__) + "\n")
+
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 LIB_NAME = "GetOrganelleLib"
@@ -128,18 +137,18 @@ scripts_to_install = ["get_organelle_from_reads.py",
                       "Utilities/summary_get_organelle_output.py",
                       "Utilities/reconstruct_graph_from_fasta.py"]
 # rename execution program if not python
-dep_scripts_to_change = []
-if os.path.isdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
-    for spades_script in os.listdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
-        if spades_script.endswith(".py") and not spades_script.startswith("."):
-            dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin", spades_script))
-if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build")):
-    dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build"))
-if os.path.basename(sys.executable) != "python":
-    for rename_py_script in scripts_to_install + dep_scripts_to_change:
-        original_lines = open(rename_py_script, encoding="utf-8").readlines()
-        original_lines[0] = "#!" + sys.executable + "\n"
-        open(rename_py_script, "w", encoding="utf-8").writelines(original_lines)
+# dep_scripts_to_change = []
+# if os.path.isdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
+#     for spades_script in os.listdir(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin")):
+#         if spades_script.endswith(".py") and not spades_script.startswith("."):
+#             dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "SPAdes", "bin", spades_script))
+# if os.path.exists(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build")):
+#     dep_scripts_to_change.append(os.path.join(DEP_DIR, SYSTEM_NAME, "bowtie2", "bowtie2-build"))
+# if os.path.basename(sys.executable) != "python":
+#     for rename_py_script in scripts_to_install + dep_scripts_to_change:
+#         original_lines = open(rename_py_script, encoding="utf-8").readlines()
+#         original_lines[0] = "#!" + sys.executable + "\n"
+#         open(rename_py_script, "w", encoding="utf-8").writelines(original_lines)
 
 
 # check local BLAST

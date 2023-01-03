@@ -6,17 +6,20 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.8.0.0-pre1",
+        "number": "1.8.0.0-pre2",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",
             "3. remove upper boundary for coverage-based filtering",
             "4. remove max multiplicity boundary",
-            "5. use gekko instead of scipy for multiplicity estimation",
+            "5. use gekko instead of scipy for multiplicity estimation, with initials and option for multinomial",
             "6. limit the number of paths before generating",
             "7. log copy info for --no-slim",
             "8. statistical_func.py: fix a bug"
             "   random.choice(np.array([0])) triggers IndexError: Cannot choose from an empty sequence",
+            "9. assembly.parse_tab_file: "
+            "   only keep one vertex labeled for each gene tags -> "
+            "   gene tags can occur in multiple vertices that are linearly continuous",
         ],
         "time": "2022-12-18 16:30 UTC-5"
     },
@@ -427,7 +430,7 @@ versions = [
          "2. get_organelle_from_assembly.py: fix a bug on parsing gfa file with long seq head names; "
          "   --keep-temp fixed; fix a bug with '-h'; ",
          "3. Utilities/slim_fastg.py: --no-merge -> --merge; disable merge by default",
-         "4. GetOrganelleLib/assembly_parser.py: fix a bug with generating new vertices, "
+         "4. GetOrganelleLib/assembly_parser.py: fix a bug with generating new vertices_set, "
          "   as well as merge_all_possible_contigs; export plastome-LSC direction according to convention based on "
          "   accumulated orf lengths (the conventional reverse direction has more accumulated orf lengths), which "
          "   makes users easier to use; remove processing_polymorphism() before filter_by_coverage() to better "
@@ -573,7 +576,7 @@ versions = [
      "features": [
          "1.get_organelle_reads.py: fix a bug with --continue & --prefix when LogInfo() added; ",
          "2.assembly_parser.py & statistical_func.py: "
-         "if single copy vertex percentage is < 50%, continue dropping suspicious vertices",
+         "if single copy vertex percentage is < 50%, continue dropping suspicious vertices_set",
          "3.pip_control_func.py: for --prefix",
      ]},
     {"number": "1.4.3a",
@@ -615,7 +618,7 @@ versions = [
     {"number": "1.4.1",
      "features": [
          "1.assembly_parser.py: Assembly.export_path() and Assembly.merge_all_possible_vertices():"
-         " name of merged vertices optimized",
+         " name of merged vertices_set optimized",
          "2.README: PATH configuration",
          "3.mk_batch_for_iteratively_mapping_assembling.py: -t threads",
          "4.get_organelle_reads.py --fast mode modified",
@@ -720,7 +723,7 @@ versions = [
      ]},
     {"number": "1.2.0b",
      "features": [
-         "1.Assembly.parse_fastg(): (more robust) Add connection information to both of the related vertices"
+         "1.Assembly.parse_fastg(): (more robust) Add connection information to both of the related vertices_set"
          " even it is only mentioned once;",
          "2.Assembly.is_sequential_repeat(): fix a bug that leak in the reverse direction;",
          "3.add depth_factor to the main script;",

@@ -102,7 +102,6 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
             label_counts = {lb: 0 for lb in range(len(parameters))}
             for ct_lb in new_labels:
                 label_counts[ct_lb] += 1
-            print("label_counts", label_counts)
             for empty_lb in label_counts:
                 if label_counts[empty_lb] == 0:
                     non_empty_lbs = {ne_lb: [min, max] for ne_lb in label_counts if label_counts[ne_lb] > 1}

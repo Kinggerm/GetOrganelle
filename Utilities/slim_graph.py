@@ -517,6 +517,7 @@ def blast_and_call_names(
             for line in blast_out_lines:
                 line_split = line.strip().split('\t')
                 query, hit = line_split[0], line_split[1]
+                # TODO: maybe add hit start and end to provide information to assembly.parse_tab_file()
                 q_start, q_end, q_score = int(line_split[6]), int(line_split[7]), float(line_split[2])
                 q_min, q_max = min(q_start, q_end), max(q_start, q_end)
                 # q_score = abs(q_max - q_min + 1)*q_score
@@ -1029,7 +1030,7 @@ def main():
                         assembly_graph=this_assembly, depth_cutoff=options.depth_cutoff, log_handler=log_handler)
                 else:
                     in_names_r, ex_names_r, aver_dep = in_names, ex_names, None
-                # prepare bait_offsets: trim unlabeled terminal regions from bait vertices, for more accurate
+                # prepare bait_offsets: trim unlabeled terminal regions from bait vertices_set, for more accurate
                 # control of "maximum slimming extending length"
                 if this_assembly and options.treat_no_hits == "ex_no_con" and \
                         options.max_slim_extending_len not in (None, inf):

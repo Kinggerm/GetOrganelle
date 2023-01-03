@@ -87,7 +87,9 @@ def get_options(description):
     parser.add_argument("--use-local", dest="use_local",
                         help="Input a path. This local database path must include subdirectories "
                              "LabelDatabase and SeedDatabase, under which there is the fasta file(s) named by the "
-                             "organelle type you want add, such as fungus_mt.fasta. ")
+                             "organelle type you want add, such as fungus_mt.fasta. "
+                             "See https://github.com/Kinggerm/GetOrganelleDB#option-2-initialization-from-local-files "
+                             "for the guidelines. ")
     parser.add_argument("--clean", dest="clean", default=False, action="store_true",
                         help="Remove all configured database files (==\"--rm all\").")
     parser.add_argument("--list", dest="list_available", default=False, action="store_true",

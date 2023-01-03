@@ -31,7 +31,7 @@ def get_options(print_title):
                              "to try for linear/broken cases.")
     parser.add_argument("--weight-f", dest="weight_factor", type=float, default=100.0,
                         help="weight factor for excluding non-target contigs. Default:%(default)s")
-    parser.add_argument("--depth-f", dest="depth_factor", type=float, default=10.,
+    parser.add_argument("--depth-f", dest="depth_factor", type=float, default=5.,
                         help="Depth factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--type-f", dest="type_factor", type=float, default=3.,
                         help="Type factor for identifying genome type tag. Default:%(default)s")
@@ -134,7 +134,7 @@ def main():
 
     @set_time_limit(options.time_limit)
     def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="embplant_pt",
-                                      hard_cov_threshold=10., expected_max_size=inf, expected_min_size=0,
+                                      hard_cov_threshold=5., expected_max_size=inf, expected_min_size=0,
                                       contamination_depth=3., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
                                       min_sigma_factor=0.1, only_max_cov=True,  # max_copy_in=10,

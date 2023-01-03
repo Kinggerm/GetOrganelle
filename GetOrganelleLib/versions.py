@@ -20,6 +20,8 @@ versions = [
             "9. assembly.parse_tab_file: "
             "   only keep one vertex labeled for each gene tags -> "
             "   gene tags can occur in multiple vertices that are linearly continuous",
+            "10. change the default of depth_factor because the baseline is now set to be average rather than the max",
+            "11. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

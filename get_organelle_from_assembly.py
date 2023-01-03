@@ -129,7 +129,7 @@ def get_options(description, version):
         parser.add_argument("--spades-out-dir", dest="spades_scaffolds_path",
                             help="Input spades output directory with 'scaffolds.fasta' and 'scaffolds.paths', which are "
                                  "used for scaffolding disconnected contigs with GAPs. Default: disabled")
-        parser.add_argument("--depth-factor", dest="depth_factor", default=10.0, type=float,
+        parser.add_argument("--depth-factor", dest="depth_factor", default=5.0, type=float,
                             help="Depth factor for differentiate genome type of contigs. "
                                  "The genome type of contigs are determined by blast. "
                                  "Default: %(default)s")

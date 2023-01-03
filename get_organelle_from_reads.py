@@ -327,7 +327,7 @@ def get_options(description, version):
                                          "Could be a list of databases split by comma(s) but "
                                          "NOT required to have the same list length to organelle_type (followed by '-F'). "
                                          "The default value will become invalid when '--genes' or '--ex-genes' is used.")
-        group_assembly.add_argument("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
+        group_assembly.add_argument("--disentangle-df", dest="disentangle_depth_factor", default=5.0, type=float,
                                     help="Depth factor for differentiate genome type of contigs. "
                                          "The genome type of contigs are determined by blast. "
                                          "Default: %(default)s")

@@ -718,7 +718,7 @@ def generate_baits_offsets(in_names, databases, assembly_graph):
                     these_hit_list.extend(hit_info_list)
         all_loc_values = [x[0] for x in these_hit_list] + [x[1] for x in these_hit_list]
         min_loc = min(all_loc_values)
-        max_loc = min(all_loc_values)
+        max_loc = max(all_loc_values)
         vertex_trimming[(vertex_name, False)] = min_loc - 1
         vertex_trimming[(vertex_name, True)] = assembly_graph.vertex_info[vertex_name].len - max_loc
     return vertex_trimming
@@ -727,7 +727,7 @@ def generate_baits_offsets(in_names, databases, assembly_graph):
 def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_extending_len, bait_offsets,
                   aver_in_dep, depth_cutoff, treat_no_hits,
                   include_priority_assigned, include_assigned, exclude_priority_assigned, exclude_assigned,
-                  log_handler=None):
+                  verbose, log_handler=None):
     if log_handler:
         log_handler.info("Mapping names ...")
     time0 = time.time()
@@ -737,6 +737,12 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
             rm_contigs = [this_v.v_name
                           for this_v in assembly_graph
                           if 2 ** abs(math.log(this_v.cov / aver_in_dep, 2)) < depth_cutoff]
+            if verbose:
+                if log_handler:
+                    log_handler.info("Depth-cutoff-based removing(" + str(len(rm_contigs)) + "): " + str(rm_contigs))
+                else:
+                    sys.stdout.write(
+                        "Depth-cutoff-based removing(" + str(len(rm_contigs)) + "): " + str(rm_contigs) + "\n")
             assembly_graph.remove_vertex(rm_contigs)
         if exclude_priority_assigned:
             assembly_graph.remove_vertex(ex_names)
@@ -744,7 +750,9 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
                 assembly_graph.reduce_to_subgraph(bait_vertices=in_names,
                                                   bait_offsets=bait_offsets,
                                                   limit_extending_len=max_slim_extending_len,
-                                                  extending_len_weighted_by_depth=True)
+                                                  extending_len_weighted_by_depth=True,
+                                                  verbose=verbose,
+                                                  log_handler=log_handler)
             elif treat_no_hits == "ex_no_hit":
                 assembly_graph.remove_vertex([rm_c for rm_c in assembly_graph.vertex_info if rm_c not in in_names])
             else:
@@ -755,7 +763,9 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
                 assembly_graph.reduce_to_subgraph(bait_vertices=in_names,
                                                   bait_offsets=bait_offsets,
                                                   limit_extending_len=max_slim_extending_len,
-                                                  extending_len_weighted_by_depth=True)
+                                                  extending_len_weighted_by_depth=True,
+                                                  verbose=verbose,
+                                                  log_handler=log_handler)
             elif treat_no_hits == "ex_no_hit":
                 assembly_graph.remove_vertex([rm_c for rm_c in assembly_graph.vertex_info if rm_c not in in_names])
             else:
@@ -764,6 +774,13 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
             assembly_graph.remove_vertex(ex_names)
         else:
             pass
+        if verbose:
+            if log_handler:
+                log_handler.info("Vertices(" + str(len(assembly_graph.vertex_info)) + "): " +
+                                 str(assembly_graph.vertex_clusters))
+            else:
+                sys.stdout.write("Vertices(" + str(len(assembly_graph.vertex_info)) + "): " +
+                                 str(assembly_graph.vertex_clusters) + "\n")
     else:
         # accepted = set()
         if exclude_priority_assigned:
@@ -975,6 +992,13 @@ def main():
             this_matrix = None
             if is_graph:
                 this_assembly = Assembly(graph_file=fas_file, min_cov=options.min_depth, max_cov=options.max_depth)
+                if options.verbose_log:
+                    if log_handler:
+                        log_handler.info("Vertices(" + str(len(this_assembly.vertex_info)) + "): " +
+                                         str(this_assembly.vertex_clusters))
+                    else:
+                        sys.stdout.write("Vertices(" + str(len(this_assembly.vertex_info)) + "): " +
+                                         str(this_assembly.vertex_clusters) + "\n")
                 # merge contigs
                 if options.merge_contigs:
                     this_assembly.merge_all_possible_vertices()
@@ -1024,10 +1048,26 @@ def main():
                                                 e_value=options.evalue, percent_identity=options.percent_identity,
                                                 other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
+                if options.verbose_log:
+                    if log_handler:
+                        log_handler.info("in_names(" + str(len(in_names)) + "): " + str(sorted(in_names)))
+                        log_handler.info("ex_names(" + str(len(ex_names)) + "): " + str(sorted(ex_names)))
+                    else:
+                        sys.stdout.write("in_names(" + str(len(in_names)) + "): " + str(sorted(in_names)) + "\n")
+                        sys.stdout.write("ex_names(" + str(len(ex_names)) + "): " + str(sorted(ex_names)) + "\n")
                 if bool(include_indices) or bool(exclude_indices):
                     in_names_r, ex_names_r, aver_dep = modify_in_ex_according_to_depth(
                         in_names=in_names, ex_names=ex_names, significant=options.significant,
                         assembly_graph=this_assembly, depth_cutoff=options.depth_cutoff, log_handler=log_handler)
+                    if options.verbose_log:
+                        if log_handler:
+                            log_handler.info("in_names_r(" + str(len(in_names_r)) + "): " + str(sorted(in_names_r)))
+                            log_handler.info("ex_names_r(" + str(len(ex_names_r)) + "): " + str(sorted(ex_names)))
+                        else:
+                            sys.stdout.write(
+                                "in_names_r(" + str(len(in_names_r)) + "): " + str(sorted(in_names_r)) + "\n")
+                            sys.stdout.write(
+                                "ex_names_r(" + str(len(ex_names_r)) + "): " + str(sorted(ex_names_r)) + "\n")
                 else:
                     in_names_r, ex_names_r, aver_dep = in_names, ex_names, None
                 # prepare bait_offsets: trim unlabeled terminal regions from bait vertices_set, for more accurate
@@ -1038,6 +1078,11 @@ def main():
                         in_names=in_names, databases=include_indices, assembly_graph=this_assembly)
                 else:
                     bait_offsets = {}
+                # if options.verbose_log:
+                #     if log_handler:
+                #         log_handler.info("bait_offsets: " + str(bait_offsets))
+                #     else:
+                #         sys.stdout.write("bait_offsets: " + str(bait_offsets) + "\n")
                 new_assembly, new_matrix = \
                     reduce_matrix(in_names=in_names_r, ex_names=ex_names_r, seq_matrix=this_matrix,
                                   assembly_graph=this_assembly, max_slim_extending_len=options.max_slim_extending_len,
@@ -1046,11 +1091,19 @@ def main():
                                   include_priority_assigned=options.include_priority,
                                   include_assigned=options.include,
                                   exclude_priority_assigned=options.exclude_priority,
-                                  exclude_assigned=options.exclude, log_handler=log_handler)
+                                  exclude_assigned=options.exclude, verbose=options.verbose_log,
+                                  log_handler=log_handler)
                 if log_handler:
                     log_handler.info("Generating slimmed file to " + out_fas)
                 else:
                     sys.stdout.write("Generating slimmed file to " + out_fas + "\n")
+                if options.verbose_log:
+                    if log_handler:
+                        log_handler.info("Vertices(" + str(len(new_assembly.vertex_info)) + "): " +
+                                         str(new_assembly.vertex_clusters))
+                    else:
+                        sys.stdout.write("Vertices(" + str(len(new_assembly.vertex_info)) + "): " +
+                                         str(new_assembly.vertex_clusters) + "\n")
                 if is_graph:
                     if is_fastg:
                         new_assembly.write_to_fastg(out_fas, check_postfix=False)

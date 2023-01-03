@@ -21,7 +21,7 @@ versions = [
             "   only keep one vertex labeled for each gene tags -> "
             "   gene tags can occur in multiple vertices that are linearly continuous",
         ],
-        "time": "2022-12-18 16:30 UTC-5"
+        "time": "2023-01-03 10:00 UTC-5"
     },
     {
         "number": "1.7.7.0",

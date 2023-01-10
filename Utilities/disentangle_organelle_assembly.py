@@ -30,7 +30,8 @@ def get_options(print_title):
                              "organelle genome), and would directly give up linear/broken graphs. Choose this option "
                              "to try for linear/broken cases.")
     parser.add_argument("--weight-f", dest="weight_factor", type=float, default=100.0,
-                        help="weight factor for excluding non-target contigs. Default:%(default)s")
+                        help="weight factor for excluding isolated/terminal suspicious contigs with gene labels. "
+                             "Default:%(default)s")
     parser.add_argument("--depth-f", dest="depth_factor", type=float, default=5.,
                         help="Depth factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--type-f", dest="type_factor", type=float, default=3.,
@@ -160,7 +161,7 @@ def main():
                 sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
             temp_graph = prefix + ".temp.fastg" if keep_temp else None
             selected_graph = prefix + ".graph.selected_graph.gfa"
-            copy_results = input_graph.find_target_graph(tab_file, database_name=mode, mode=mode,
+            copy_results = input_graph.find_target_graph(tab_file, db_name=mode, mode=mode,
                                                          type_factor=type_factor,
                                                          weight_factor=weight_factor,
                                                          hard_cov_threshold=hard_cov_threshold,

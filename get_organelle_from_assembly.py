@@ -136,6 +136,9 @@ def get_options(description, version):
         parser.add_argument("--type-f", dest="type_factor", type=float, default=3.,
                             help="Type factor for identifying contig type tag when multiple tags exist in one contig. "
                                  "Default:%(default)s")
+        parser.add_argument("--weight-f", dest="weight_factor", type=float, default=100.0,
+                            help="weight factor for excluding isolated/terminal suspicious contigs with gene labels. "
+                                 "Default:%(default)s")
         parser.add_argument("--contamination-depth", dest="contamination_depth", default=3., type=float,
                             help="Depth factor for confirming contamination in parallel contigs. Default: %(default)s")
         parser.add_argument("--contamination-similarity", dest="contamination_similarity", default=0.9, type=float,
@@ -631,7 +634,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             else:
                 selected_graph = o_p + ".graph.selected_graph.gfa"
                 target_results = input_graph.find_target_graph(tab_f,
-                                                               mode=mode_in, database_name=in_db_n, type_factor=type_f,
+                                                               mode=mode_in, db_name=in_db_n, type_factor=type_f,
                                                                hard_cov_threshold=hard_c_t,
                                                                contamination_depth=c_d,
                                                                contamination_similarity=c_s,
@@ -832,7 +835,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         """disentangle"""
         disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
                              tab_file=slim_out_csv, output=path_prefix,
-                             weight_factor=100, type_factor=options.type_factor,
+                             weight_factor=options.weight_factor, type_factor=options.type_factor,
                              hard_cov_threshold=options.depth_factor,
                              contamination_depth=options.contamination_depth,
                              contamination_similarity=options.contamination_similarity,
@@ -870,7 +873,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             """disentangle"""
             disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
                                  tab_file=slim_out_csv, output=path_prefix,
-                                 weight_factor=100, type_factor=options.type_factor,
+                                 weight_factor=options.weight_factor, type_factor=options.type_factor,
                                  hard_cov_threshold=options.depth_factor,
                                  contamination_depth=options.contamination_depth,
                                  contamination_similarity=options.contamination_similarity,
@@ -909,7 +912,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             """disentangle the graph as scaffold(s)/contig(s)"""
             disentangle_assembly(fastg_file=slim_out_fg, blast_db_base=blast_db, mode=organelle_type,
                                  tab_file=slim_out_csv, output=path_prefix,
-                                 weight_factor=100, type_factor=options.type_factor,
+                                 weight_factor=options.weight_factor, type_factor=options.type_factor,
                                  here_verbose=verbose, log_dis=log_handler,
                                  hard_cov_threshold=options.depth_factor * 0.8,
                                  contamination_depth=options.contamination_depth,

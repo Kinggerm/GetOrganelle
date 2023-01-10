@@ -3379,7 +3379,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             this_tmp_graph = in_temp_graph + ".scaffolds.gfa"
                         input_graph.write_to_gfa(this_tmp_graph)
             target_results = input_graph.find_target_graph(tab_f,
-                                                           mode=mode_in, database_name=in_db_n, type_factor=type_f,
+                                                           mode=mode_in, db_name=in_db_n, type_factor=type_f,
                                                            hard_cov_threshold=hard_c_t,
                                                            contamination_depth=c_d,
                                                            contamination_similarity=c_s,

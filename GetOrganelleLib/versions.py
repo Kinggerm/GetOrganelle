@@ -22,6 +22,7 @@ versions = [
             "   gene tags can occur in multiple vertices that are linearly continuous",
             "10. change the default of depth_factor because the baseline is now set to be average rather than the max",
             "11. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
+            "12. add weight_factor to get_organelle_from_assembly.py",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

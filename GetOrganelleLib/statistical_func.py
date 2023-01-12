@@ -1,12 +1,12 @@
-try:
-    from scipy import stats, inf, log
-except ImportError:
-    class stats:
-        class norm:
-            def logpdf(foo1, foo2, foo3):
-                raise ImportError("Failed in 'from scipy import stats, inf, log'!")
-    inf = float("inf")
-    from math import log
+# try:
+#     from scipy import stats, inf, log
+# except ImportError:
+#     class stats:
+#         class norm:
+#             def logpdf(foo1, foo2, foo3):
+#                 raise ImportError("Failed in 'from scipy import stats, inf, log'!")
+#     inf = float("inf")
+from math import log, inf, sqrt, pi
 from copy import deepcopy
 try:
     import numpy as np
@@ -38,8 +38,20 @@ def weighted_mean_and_std(values, weights):
     return mean, std
 
 
-def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, maximum_cluster=5, min_sigma_factor=1E-5,
-                             cluster_limited=None, log_handler=None, verbose_log=False):
+def norm_logpdf(numpy_array, mu, sigma):
+    u = (numpy_array-mu)/abs(sigma)
+    return log(1/(sqrt(2*pi)*abs(sigma)))-u*u/2
+
+
+def weighted_gmm_with_em_aic(data_array,
+                             data_weights=None,
+                             minimum_cluster=1,
+                             maximum_cluster=5,
+                             min_sigma_factor=1E-5,
+                             cluster_limited=None,
+                             cluster_bans=None,
+                             log_handler=None,
+                             verbose_log=False):
     """
     :param data_array:
     :param data_weights:
@@ -47,10 +59,16 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
     :param maximum_cluster:
     :param min_sigma_factor:
     :param cluster_limited: {dat_id1: {0, 1}, dat_id2: {0}, dat_id3: {0} ...}
+           cluster_limited has priority over cluster_bans if conflicted
+    :param cluster_bans: {dat_a: {0, 1}, dat_b: {0}, dat_c: {0} ...}
     :param log_handler:
     :param verbose_log:
     :return:
     """
+    # import time
+    # time0 = time.time()
+    # pdf_time = [0.]
+
     min_sigma = min_sigma_factor * np.average(data_array, weights=data_weights)
 
     def model_loglike(dat_arr, dat_w, lbs, parameters):
@@ -59,8 +77,29 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
             points = dat_arr[lbs == go_to_cl]
             weights = dat_w[lbs == go_to_cl]
             if len(points):
-                total_loglike += sum(stats.norm.logpdf(points, pr["mu"], pr["sigma"]) * weights + log(pr["percent"]))
+                total_loglike += sum(norm_logpdf(points, pr["mu"], pr["sigma"]) * weights + log(pr["percent"]))
         return total_loglike
+
+    def revise_labels_according_to_constraints(_raw_lbs, _fixed, loglike_table=None):
+        _new_labels = list(_raw_lbs)
+        for _dat_id in range(int(data_len)):
+            if _dat_id in _fixed:
+                if _raw_lbs[_dat_id] in _fixed[_dat_id]:
+                    # _new_labels[_dat_id] = _raw_lbs[_dat_id]
+                    pass
+                else:
+                    if loglike_table is None:
+                        _new_labels[_dat_id] = sorted(_fixed[_dat_id])[0]
+                    else:
+                        val_increasing_order = list(loglike_table[:, _dat_id].argsort())
+                        for order_id in range(len(val_increasing_order) - 2, -1, -1):  # search from the sub-optimum
+                            this_label = val_increasing_order.index(order_id)
+                            if this_label in _fixed[_dat_id]:
+                                _new_labels[_dat_id] = this_label
+            else:
+                # _new_labels[_dat_id] = _raw_lbs[_dat_id]
+                pass
+        return np.array(_new_labels)
 
     def assign_cluster_labels(dat_arr, dat_w, parameters, lb_fixed):
         # assign every data point to its most likely cluster
@@ -68,25 +107,28 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
             return np.array([0] * int(data_len))
         else:
             # the parameter set of the first cluster
-            loglike_res = stats.norm.logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) * dat_w + \
+            # timex = time.time()
+            loglike_res = norm_logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) * dat_w + \
                           log(parameters[0]["percent"])
             # the parameter set of the rest cluster
             for pr in parameters[1:]:
                 loglike_res = np.vstack(
-                    (loglike_res, stats.norm.logpdf(dat_arr, pr["mu"], pr["sigma"]) * dat_w + log(pr["percent"])))
+                    (loglike_res, norm_logpdf(dat_arr, pr["mu"], pr["sigma"]) * dat_w + log(pr["percent"])))
+            # pdf_time[0] += time.time() - timex
             # assign labels
             new_labels = loglike_res.argmax(axis=0)
             if lb_fixed:
-                intermediate_labels = []
-                for here_dat_id in range(int(data_len)):
-                    if here_dat_id in lb_fixed:
-                        if new_labels[here_dat_id] in lb_fixed[here_dat_id]:
-                            intermediate_labels.append(new_labels[here_dat_id])
-                        else:
-                            intermediate_labels.append(sorted(lb_fixed[here_dat_id])[0])
-                    else:
-                        intermediate_labels.append(new_labels[here_dat_id])
-                new_labels = np.array(intermediate_labels)
+                # intermediate_labels = []
+                # for here_dat_id in range(int(data_len)):
+                #     if here_dat_id in lb_fixed:
+                #         if new_labels[here_dat_id] in lb_fixed[here_dat_id]:
+                #             intermediate_labels.append(new_labels[here_dat_id])
+                #         else:
+                #             intermediate_labels.append(sorted(lb_fixed[here_dat_id])[0])
+                #     else:
+                #         intermediate_labels.append(new_labels[here_dat_id])
+                # np.array(intermediate_labels)
+                new_labels = revise_labels_according_to_constraints(new_labels, lb_fixed, loglike_res)
                 # new_labels = np.array([
                 # sorted(cluster_limited[dat_item])[0]
                 # if new_labels[here_dat_id] not in cluster_limited[dat_item] else new_labels[here_dat_id]
@@ -158,72 +200,96 @@ def weighted_gmm_with_em_aic(data_array, data_weights=None, minimum_cluster=1, m
         data_weights = np.array([raw_w / average_weights for raw_w in data_weights])
 
     results = []
-    if cluster_limited:
+    # adjust the min and max number of clusters according to constraints
+    if cluster_limited is None:
+        freedom_dat_item = int(data_len)
+        cluster_limited = {}
+    else:
         cls = set()
         for sub_cls in cluster_limited.values():
             cls |= sub_cls
         freedom_dat_item = int(data_len) - len(cluster_limited) + len(cls)
+    min_choices = 0
+    if cluster_bans is None:
+        cluster_bans = {}
     else:
-        freedom_dat_item = int(data_len)
-    minimum_cluster = min(freedom_dat_item, minimum_cluster)
-    maximum_cluster = min(freedom_dat_item, maximum_cluster)
+        for ban_dat_id, sub_cls in cluster_bans.items():
+            if ban_dat_id not in cluster_limited:  # cluster_limited has priority over cluster_bans
+                min_choices = max(len(sub_cls) + 1, min_choices)
+    assert min_choices < freedom_dat_item, "unrealistic constraints: \ncluster_limited: " + \
+                                           str(cluster_limited) + "\ncluster_bans: " + \
+                                           str(cluster_bans)
+    minimum_cluster = min(freedom_dat_item, max(minimum_cluster, min_choices))
+    maximum_cluster = min(freedom_dat_item, max(maximum_cluster, min_choices))
+
+    # timey = time.time()
+    # round_times = []
     # iteratively try the num of clusters
     for total_cluster_num in range(minimum_cluster, maximum_cluster + 1):
         # initialization
         labels = np.random.choice(total_cluster_num, int(data_len))
         if cluster_limited:
-            temp_labels = []
-            for dat_id in range(int(data_len)):
-                if dat_id in cluster_limited:
-                    if labels[dat_id] in cluster_limited[dat_id]:
-                        temp_labels.append(labels[dat_id])
-                    else:
-                        temp_labels.append(sorted(cluster_limited[dat_id])[0])
-                else:
-                    temp_labels.append(labels[dat_id])
-            labels = np.array(temp_labels)
+            this_limit = deepcopy(cluster_limited)
+            for dat_id in cluster_bans:
+                if dat_id not in this_limit:
+                    this_limit[dat_id] = set()
+                    for potential_lb_id in range(total_cluster_num):
+                        if potential_lb_id not in cluster_bans[dat_id]:
+                            this_limit[dat_id].add(potential_lb_id)
+            labels = revise_labels_according_to_constraints(labels, this_limit)
+        else:
+            this_limit = {}
         norm_parameters = updating_parameter(data_array, data_weights, labels,
                                              [{"mu": 0, "sigma": 1, "percent": total_cluster_num/data_len}
                                               for foo in range(total_cluster_num)])
         loglike_shift = inf
         prev_loglike = -inf
-        epsilon = 0.01
+        epsilon = 0.001
         count_iterations = 0
-        best_loglike = prev_loglike
+        best_loglike = -inf
         best_parameter = norm_parameters
-        try:
-            while loglike_shift > epsilon:
-                count_iterations += 1
-                # expectation
-                labels = assign_cluster_labels(data_array, data_weights, norm_parameters, cluster_limited)
-                # maximization
-                updated_parameters = updating_parameter(data_array, data_weights, labels, deepcopy(norm_parameters))
-                # loglike shift
-                this_loglike = model_loglike(data_array, data_weights, labels, updated_parameters)
-                loglike_shift = abs(this_loglike - prev_loglike)
-                # update
-                prev_loglike = this_loglike
-                norm_parameters = updated_parameters
-                if this_loglike > best_loglike:
-                    best_parameter = updated_parameters
-                    best_loglike = this_loglike
-            labels = assign_cluster_labels(data_array, data_weights, best_parameter, None)
-            results.append({"loglike": best_loglike, "iterates": count_iterations, "cluster_num": total_cluster_num,
-                            "parameters": best_parameter, "labels": labels,
-                            "aic": aic(prev_loglike, 2 * total_cluster_num),
-                            "bic": bic(prev_loglike, 2 * total_cluster_num, data_len)})
-        except TypeError as e:
-            if log_handler:
-                log_handler.error("This error might be caused by outdated version of scipy!")
+        count_best = 1
+        while loglike_shift > epsilon and count_iterations < 500 and count_best < 100:
+            count_iterations += 1
+            # expectation
+            labels = assign_cluster_labels(data_array, data_weights, norm_parameters, this_limit)
+            # maximization
+            updated_parameters = updating_parameter(data_array, data_weights, labels, deepcopy(norm_parameters))
+            # loglike shift
+            this_loglike = model_loglike(data_array, data_weights, labels, updated_parameters)
+            loglike_shift = abs((this_loglike - prev_loglike) / this_loglike)
+            # update
+            prev_loglike = this_loglike
+            norm_parameters = updated_parameters
+            # print(count_iterations)
+            # print(labels)
+            # print(this_loglike, best_loglike)
+            if this_loglike > best_loglike:
+                best_parameter = updated_parameters
+                best_loglike = this_loglike
+                count_best = 1
             else:
-                sys.stdout.write("This error might be caused by outdated version of scipy!\n")
-            raise e
+                count_best += 1
+        labels = assign_cluster_labels(data_array, data_weights, best_parameter, None)
+        results.append({"loglike": best_loglike, "iterates": count_iterations, "cluster_num": total_cluster_num,
+                        "parameters": best_parameter, "labels": labels,
+                        "aic": aic(best_loglike, 2 * total_cluster_num),
+                        "bic": bic(best_loglike, 2 * total_cluster_num, data_len)})
+        # except TypeError as e:
+        #     if log_handler:
+        #         log_handler.error("This error might be caused by outdated version of scipy!")
+        #     else:
+        #         sys.stdout.write("This error might be caused by outdated version of scipy!\n")
+        #     raise e
+        # round_times.append(time.time() - timey)
+        # timey = time.time()
     if verbose_log:
         if log_handler:
             log_handler.info(str(results))
         else:
             sys.stdout.write(str(results) + "\n")
     best_scheme = sorted(results, key=lambda x: x["bic"])[0]
+    # print(time.time() - time0, round_times, pdf_time)
     return best_scheme
 
 

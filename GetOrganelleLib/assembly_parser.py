@@ -1,10 +1,8 @@
-import math
 import os
 import sys
 from itertools import combinations, product
 from hashlib import sha256
 from collections import OrderedDict
-from gekko import GEKKO
 
 try:
     from sympy import Symbol, solve, lambdify
@@ -25,6 +23,12 @@ except ImportError:
 
     def symlog(foo):
         raise ImportError("Failed in 'from sympy import Symbol, solve, lambdify, log'!")
+
+try:
+    from gekko import GEKKO
+except ImportError:
+    def GEKKO(remote):
+        raise ImportError("Failed in 'from gekko import GEKKO'!")
 
 
     # class optimize:
@@ -3248,85 +3252,90 @@ class Assembly(SimpleAssembly):
     #     #             sys.stdout.write(
     #     #                 "Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)) + "\n")
 
-    def tag_in_between(self, database_n):
-        # add those in between the tagged vertices_set to tagged_vertices, which offered the only connection
-        updated = True
-        candidate_vertices = list(self.vertex_info)
-        while updated:
-            updated = False
-            go_to_v = 0
-            while go_to_v < len(candidate_vertices):
-                can_v = candidate_vertices[go_to_v]
-                if can_v in self.tagged_vertices[database_n]:
-                    del candidate_vertices[go_to_v]
-                    continue
-                else:
-                    if sum([bool(c_c) for c_c in self.vertex_info[can_v].connections.values()]) != 2:
+    def tag_in_between(self, database_n=None):
+        """add those in between the tagged vertices_set to tagged_vertices, which offered the only connection"""
+        if database_n is None:
+            db_types = sorted(self.tagged_vertices)
+        else:
+            db_types = [database_n]
+        for db_n in db_types:
+            updated = True
+            candidate_vertices = list(self.vertex_info)
+            while updated:
+                updated = False
+                go_to_v = 0
+                while go_to_v < len(candidate_vertices):
+                    can_v = candidate_vertices[go_to_v]
+                    if can_v in self.tagged_vertices[db_n]:
                         del candidate_vertices[go_to_v]
                         continue
-                    count_nearby_tagged = []
-                    for can_end in (True, False):
-                        for next_v, next_e in self.vertex_info[can_v].connections[can_end]:
-                            # candidate_v is the only output vertex to next_v
-                            if next_v in self.tagged_vertices[database_n] and \
-                                    len(self.vertex_info[next_v].connections[next_e]) == 1:
-                                count_nearby_tagged.append((next_v, next_e))
-                                break
-                    if len(count_nearby_tagged) == 2:
-                        del candidate_vertices[go_to_v]
-                        # add in between
-                        self.tagged_vertices[database_n].add(can_v)
-                        if "weight" not in self.vertex_info[can_v].other_attr:
-                            self.vertex_info[can_v].other_attr["weight"] = {}
-                        if database_n not in self.vertex_info[can_v].other_attr["weight"]:
-                            self.vertex_info[can_v].other_attr["weight"][database_n] = 0
-                        self.vertex_info[can_v].other_attr["weight"][database_n] += 1 * self.vertex_info[can_v].cov
-                        if database_n != "embplant_mt":
-                            # Adding extra circle - the contig in-between the sequential repeats
-                            # To avoid risk of tagging mt as pt by mistake,
-                            # the repeated contig must be at least 2 folds of the nearby tagged contigs
-                            near_by_pairs = self.is_sequential_repeat(can_v, return_pair_in_the_trunk_path=False)
-                            if near_by_pairs:
-                                checking_new = []
-                                coverage_folds = []
-                                for near_by_p in near_by_pairs:
-                                    for (near_v, near_e) in near_by_p:
-                                        if (near_v, near_e) not in count_nearby_tagged:
-                                            checking_new.append(near_v)
-                                            # comment out for improper design: if the untagged is mt
-                                            # coverage_folds.append(
-                                            #     round(self.vertex_info[can_v].cov /
-                                            #           self.vertex_info[near_v].cov, 0))
-                                for near_v, near_e in count_nearby_tagged:
-                                    coverage_folds.append(
-                                        round(self.vertex_info[can_v].cov /
-                                              self.vertex_info[near_v].cov, 0))
-                                # if coverage folds is
-                                if max(coverage_folds) >= 2:
-                                    for extra_v_to_add in set(checking_new):
-                                        self.tagged_vertices[database_n].add(extra_v_to_add)
-                                        try:
-                                            candidate_vertices.remove(extra_v_to_add)
-                                        except ValueError:
-                                            pass
-                                        # when a contig has no weights
-                                        if "weight" not in self.vertex_info[extra_v_to_add].other_attr:
-                                            self.vertex_info[extra_v_to_add].other_attr["weight"] = {database_n: 0}
-                                        # when a contig has weights of other database
-                                        if database_n not in self.vertex_info[extra_v_to_add].other_attr["weight"]:
-                                            self.vertex_info[extra_v_to_add].other_attr["weight"][database_n] = 0
-                                        self.vertex_info[extra_v_to_add].other_attr["weight"][database_n] \
-                                            += 1 * self.vertex_info[extra_v_to_add].cov
-                        updated = True
-                        break
                     else:
-                        go_to_v += 1
+                        if sum([bool(c_c) for c_c in self.vertex_info[can_v].connections.values()]) != 2:
+                            del candidate_vertices[go_to_v]
+                            continue
+                        count_nearby_tagged = []
+                        for can_end in (True, False):
+                            for next_v, next_e in self.vertex_info[can_v].connections[can_end]:
+                                # candidate_v is the only output vertex to next_v
+                                if next_v in self.tagged_vertices[db_n] and \
+                                        len(self.vertex_info[next_v].connections[next_e]) == 1:
+                                    count_nearby_tagged.append((next_v, next_e))
+                                    break
+                        if len(count_nearby_tagged) == 2:
+                            del candidate_vertices[go_to_v]
+                            # add in between
+                            self.tagged_vertices[db_n].add(can_v)
+                            if "weight" not in self.vertex_info[can_v].other_attr:
+                                self.vertex_info[can_v].other_attr["weight"] = {}
+                            if db_n not in self.vertex_info[can_v].other_attr["weight"]:
+                                self.vertex_info[can_v].other_attr["weight"][db_n] = 0
+                            self.vertex_info[can_v].other_attr["weight"][db_n] += 1 * self.vertex_info[can_v].cov
+                            if db_n != "embplant_mt":
+                                # Adding extra circle - the contig in-between the sequential repeats
+                                # To avoid risk of tagging mt as pt by mistake,
+                                # the repeated contig must be at least 2 folds of the nearby tagged contigs
+                                near_by_pairs = self.is_sequential_repeat(can_v, return_pair_in_the_trunk_path=False)
+                                if near_by_pairs:
+                                    checking_new = []
+                                    coverage_folds = []
+                                    for near_by_p in near_by_pairs:
+                                        for (near_v, near_e) in near_by_p:
+                                            if (near_v, near_e) not in count_nearby_tagged:
+                                                checking_new.append(near_v)
+                                                # comment out for improper design: if the untagged is mt
+                                                # coverage_folds.append(
+                                                #     round(self.vertex_info[can_v].cov /
+                                                #           self.vertex_info[near_v].cov, 0))
+                                    for near_v, near_e in count_nearby_tagged:
+                                        coverage_folds.append(
+                                            round(self.vertex_info[can_v].cov /
+                                                  self.vertex_info[near_v].cov, 0))
+                                    # if coverage folds is
+                                    if max(coverage_folds) >= 2:
+                                        for extra_v_to_add in set(checking_new):
+                                            self.tagged_vertices[db_n].add(extra_v_to_add)
+                                            try:
+                                                candidate_vertices.remove(extra_v_to_add)
+                                            except ValueError:
+                                                pass
+                                            # when a contig has no weights
+                                            if "weight" not in self.vertex_info[extra_v_to_add].other_attr:
+                                                self.vertex_info[extra_v_to_add].other_attr["weight"] = {db_n: 0}
+                                            # when a contig has weights of other database
+                                            if db_n not in self.vertex_info[extra_v_to_add].other_attr["weight"]:
+                                                self.vertex_info[extra_v_to_add].other_attr["weight"][db_n] = 0
+                                            self.vertex_info[extra_v_to_add].other_attr["weight"][db_n] \
+                                                += 1 * self.vertex_info[extra_v_to_add].cov
+                            updated = True
+                            break
+                        else:
+                            go_to_v += 1
 
     def parse_tab_file(self,
                        tab_file,
                        database_name,
                        type_factor,
-                       max_gene_gap=250,
+                       max_gene_gap=300,
                        max_cov_diff=3.,
                        log_handler=None,
                        verbose=False):
@@ -3393,6 +3402,9 @@ class Assembly(SimpleAssembly):
         idx_v_cluster = False
         v_to_cluster = {}
         len_cluster = len(self.vertex_clusters)
+        # import time
+        # time0 = time.time()
+        # gmm_time = 0
         for locus_type in tag_loci:
             sum_tag_loci[locus_type] = {}
             for locus_name in tag_loci[locus_type]:
@@ -3406,75 +3418,85 @@ class Assembly(SimpleAssembly):
                                 v_to_cluster[v_name] = go_c
                     # 2023-01-07 added
                     single_locus_info = tag_loci[locus_type][locus_name]
-                    # 2.1 to speed up, remove tags out of the main connected component
-                    if len(single_locus_info) > 10:
-                        if verbose and log_handler:
-                            log_handler.info("  removing minor-component tags " + locus_type + ":" + locus_name)
-                        g_weights = [0.] * len_cluster
-                        cluster_to_info_id = {c_id: [] for c_id in range(len_cluster)}
-                        for go_r, rec in enumerate(single_locus_info):
-                            cluster_id = v_to_cluster[rec["vertex"]]
-                            g_weights[cluster_id] += rec["weight"]
-                            cluster_to_info_id[cluster_id].append(go_r)
-                        max_g_w = max(g_weights)
-                        rm_r_ids = []
-                        for go_c in range(len_cluster):
-                            # arbitrary weight different between connected components
-                            if g_weights[go_c] * 20 < max_g_w:
-                                rm_r_ids.extend(cluster_to_info_id[go_c])
-                        rm_r_ids.sort(reverse=True)
-                        if verbose and log_handler:
-                            log_handler.info("      " + str(len(rm_r_ids)) + "/" + str(len(single_locus_info)) +
-                                             " removed: " + str([single_locus_info[_r]["vertex"] for _r in rm_r_ids]))
-                        for go_r in rm_r_ids:
-                            del single_locus_info[go_r]
+                    # 2.1 to speed up, remove tags (de-weight) out of the main connected component
+                    # if len(single_locus_info) > 10:
+                    if verbose and log_handler:
+                        log_handler.info("  de-weighting minor-component tags " + locus_type + ":" + locus_name)
+                    g_weights = [0.] * len_cluster
+                    cluster_to_info_id = {c_id: [] for c_id in range(len_cluster)}
+                    for go_r, rec in enumerate(single_locus_info):
+                        cluster_id = v_to_cluster[rec["vertex"]]
+                        g_weights[cluster_id] += rec["weight"]
+                        cluster_to_info_id[cluster_id].append(go_r)
+                    max_g_w = max(g_weights)
+                    rm_r_ids = []
+                    for go_c in range(len_cluster):
+                        # arbitrary weight different between connected components
+                        if g_weights[go_c] * 20 < max_g_w:
+                            rm_r_ids.extend(cluster_to_info_id[go_c])
+                    rm_r_ids.sort(reverse=True)
+                    if verbose and log_handler:
+                        log_handler.info("      " + str(len(rm_r_ids)) + "/" + str(len(single_locus_info)) +
+                                         " de-weighted: " + str([single_locus_info[_r]["vertex"] for _r in rm_r_ids]))
+                    for go_r in rm_r_ids:
+                        del single_locus_info[go_r]
 
-                    # 2.2 to speed up, remove tags of minor coverage
-                    if len(single_locus_info) > 15:
-                        if verbose and log_handler:
-                            log_handler.info("  removing tags based coverage " + locus_type + ":" + locus_name)
-                        single_locus_info.sort(key=lambda x: -x["weight"])
-                        vertices = [x["vertex"] for x in single_locus_info]
-                        # self.get_clusters(limited_vertices=vertices)
-                        # maybe increase the vertex weight in the main component
-                        coverages = [self.vertex_info[x["vertex"]].cov for x in single_locus_info]
-                        # v_weights = [x["weight"] for x in single_locus_info]
-                        v_weights = [self.vertex_info[x["vertex"]].len for x in single_locus_info]
-                        if verbose and log_handler:
-                            log_handler.info("      vertices: " + str(vertices) + "; depths: " + str(coverages) +
-                                             "; weights: " + str(v_weights))
-                        gmm_scheme = weighted_gmm_with_em_aic(
-                            data_array=coverages,
-                            data_weights=v_weights,
-                            maximum_cluster=5,
-                            log_handler=log_handler,
-                            verbose_log=verbose)
-                        labels = gmm_scheme["labels"]
-                        if log_handler and verbose:
-                            log_handler.info("      labels: " + str(list(labels)))
-                        l_weights = [0.] * gmm_scheme["cluster_num"]
-                        for go_r, lb in enumerate(labels):
-                            l_weights[lb] += single_locus_info[go_r]["weight"]
-                        selected_lb = l_weights.index(max(l_weights))
-                        keep_lbs = {go_l
-                                    for go_l, params in enumerate(gmm_scheme["parameters"])
-                                    if params["mu"] >= gmm_scheme["parameters"][selected_lb]["mu"]}
-                        rm_idx = sorted([go_r for go_r, lb in enumerate(labels) if lb not in keep_lbs], reverse=True)
-                        if verbose and log_handler:
-                            log_handler.info("      " + str(len(rm_idx)) + "/" + str(len(single_locus_info)) +
-                                             " removed: " + str([single_locus_info[_r]["vertex"] for _r in rm_idx]))
-                        for go_r in rm_idx:
-                            del single_locus_info[go_r]
+                    # if len(self._get_tagged_merged_paths([_rec["vertex"] for _rec in single_locus_info])) > 1:
+                    # 2.2 mark tags of minor coverage as negative
+                    if verbose and log_handler:
+                        log_handler.info("  negatizing tags based coverage " + locus_type + ":" + locus_name)
+                    single_locus_info.sort(key=lambda x: -x["weight"])
+                    vertices = [x["vertex"] for x in single_locus_info]
+                    # self.get_clusters(limited_vertices=vertices)
+                    # maybe increase the vertex weight in the main component
+                    coverages = [self.vertex_info[x["vertex"]].cov for x in single_locus_info]
+                    # v_weights = [x["weight"] for x in single_locus_info]
+                    v_weights = [self.vertex_info[x["vertex"]].len for x in single_locus_info]
+                    if verbose and log_handler:
+                        log_handler.info("      vertices: " + str(vertices) + "; depths: " + str(coverages) +
+                                         "; weights: " + str(v_weights))
+                    # timex = time.time()
+                    # most time consuming step
+                    gmm_scheme = weighted_gmm_with_em_aic(
+                        data_array=coverages,
+                        data_weights=v_weights,
+                        maximum_cluster=5,
+                        log_handler=log_handler,
+                        verbose_log=verbose)
+                    # print(time.time() - timex)
+                    # gmm_time += time.time() - timex
+                    labels = gmm_scheme["labels"]
+                    if log_handler and verbose:
+                        log_handler.info("      labels: " + str(list(labels)))
+                    l_weights = [0.] * gmm_scheme["cluster_num"]
+                    for go_r, lb in enumerate(labels):
+                        l_weights[lb] += single_locus_info[go_r]["weight"]
+                    selected_lb = l_weights.index(max(l_weights))
+                    selected_param = gmm_scheme["parameters"][selected_lb]
+                    selected_mu, selected_sigma = selected_param["mu"], selected_param["sigma"]
+                    keep_lbs = {go_l
+                                for go_l, params in enumerate(gmm_scheme["parameters"])
+                                if params["mu"] - selected_mu > -2 * max(selected_sigma, params["sigma"])}
+                    # rm_idx = sorted([go_r for go_r, lb in enumerate(labels) if lb not in keep_lbs], reverse=True)
+                    ne_idx = [go_r for go_r, lb in enumerate(labels) if lb not in keep_lbs]
+                    if verbose and log_handler:
+                        log_handler.info("      " + str(len(ne_idx)) + "/" + str(len(single_locus_info)) +
+                                         " negatized: " + str([single_locus_info[_r]["vertex"] for _r in ne_idx]))
+                    # for go_r in rm_idx:
+                    #     del single_locus_info[go_r]
+                    for go_r in ne_idx:
+                        single_locus_info[go_r]["weight"] = -1 * abs(single_locus_info[go_r]["weight"])
 
                     # 2.3. remove redundant tags that occur in parallel vertices
                     if verbose and log_handler:
-                        log_handler.info("  removing parallel tags: " + locus_type + ":" + locus_name)
+                        log_handler.info("  negatizing parallel tags: " + locus_type + ":" + locus_name)
                     single_locus_vs = {rec["vertex"]: go_r for go_r, rec in enumerate(single_locus_info)}
                     parallel_vertices_list = self.detect_parallel_vertices(
                         limited_vertices=list(single_locus_vs),
                         detect_neighbors=False)
                     if parallel_vertices_list:
                         rm_r_ids = set()
+                        ne_r_ids = set()
                         for prl_vertices_set in parallel_vertices_list:
                             # sort by weight, then coverage
                             prl_vertices = sorted(
@@ -3482,23 +3504,47 @@ class Assembly(SimpleAssembly):
                                 key=lambda x: (
                                     -single_locus_info[single_locus_vs[x[0]]]["weight"],
                                     -self.vertex_info[x[0]].cov))
-                            for v_name, v_end in prl_vertices[1:]:
-                                rm_r_ids.add(single_locus_vs[v_name])
+                            up_v, up_e = prl_vertices[0]
+                            up_id = single_locus_vs[up_v]
+                            up_lb = labels[up_id]
+                            up_sigma = gmm_scheme["parameters"][up_lb]["sigma"]
+                            up_cov = self.vertex_info[up_v].cov
+                            for de_name, de_end in prl_vertices[1:]:
+                                de_id = single_locus_vs[de_name]
+                                de_lb = labels[de_id]
+                                de_sigma = gmm_scheme["parameters"][de_lb]["sigma"]
+                                de_cov = self.vertex_info[de_name].cov
+                                if abs(de_cov - up_cov) < 2 * max(up_sigma, de_sigma) or \
+                                        single_locus_info[de_id]["weight"] / de_cov > \
+                                        single_locus_info[up_id]["weight"] / up_cov:
+                                    # to be conserved
+                                    rm_r_ids.add(de_id)
+                                else:
+                                    ne_r_ids.add(de_id)
                         if verbose and log_handler:
-                            log_handler.info("    " + str(len(rm_r_ids)) + "/" + str(len(single_locus_info)) +
-                                             " removed: " + str([single_locus_info[_r]["vertex"] for _r in rm_r_ids]))
+                            log_handler.info("    (" + str(len(ne_r_ids)) + "+" + str(len(rm_r_ids)) +
+                                             ")/" + str(len(single_locus_info)) +
+                                             " negatized: " +
+                                             str([single_locus_info[_r]["vertex"] for _r in ne_r_ids]) +
+                                             " de-weighted: " +
+                                             str([single_locus_info[_r]["vertex"] for _r in rm_r_ids]))
                         for rm_id in sorted(rm_r_ids, reverse=True):
                             del single_locus_info[rm_id]
+                        for go_r in ne_r_ids:
+                            single_locus_info[go_r]["weight"] = -1 * abs(single_locus_info[go_r]["weight"])
+
                     # 2.4 search for the linear tags maximize the total gene weight
                     if verbose and log_handler:
                         log_handler.info("  linearize " + locus_type + ":" + locus_name)
                     sum_tag_loci[locus_type][locus_name] = \
                         self._find_linear_tags(single_locus_info, max_gene_gap, max_cov_diff, verbose, log_handler)
-
+        # print("gmm cost", gmm_time)
+        # print("tagging cost", time.time() - time0)
         # 3. assign information in sum_tag_loci to contigs.other_attr
         # 2022-12-22 modified
         for locus_type in sum_tag_loci:
             self.tagged_vertices[locus_type] = set()
+            self.tagged_vertices[locus_type + "-"] = set()  # negative type
             for locus_name in sum_tag_loci[locus_type]:
                 # 2022-12-22 modified
                 for vertex_name, loci_weight in zip(sum_tag_loci[locus_type][locus_name]["vertex"],
@@ -3519,22 +3565,61 @@ class Assembly(SimpleAssembly):
                         self.vertex_info[vertex_name].other_attr["weight"][locus_type] += loci_weight
                     else:
                         self.vertex_info[vertex_name].other_attr["weight"][locus_type] = loci_weight
-                    self.tagged_vertices[locus_type].add(vertex_name)
+                    # self.tagged_vertices[locus_type].add(vertex_name)
 
-        # 4. clarify locus_type for each contig by comparing weights
+        # 4. clarify locus_type for each contig by comparing weights, and add to self.tagged_vertices
         for vertex_name in self.vertex_info:
             if "weight" in self.vertex_info[vertex_name].other_attr:
+                all_weights = [(loc_type, self.vertex_info[vertex_name].other_attr["weight"][loc_type])
+                               for loc_type in self.vertex_info[vertex_name].other_attr["weight"]]
                 if len(self.vertex_info[vertex_name].other_attr["weight"]) > 1:
-                    all_weights = sorted([(loc_type, self.vertex_info[vertex_name].other_attr["weight"][loc_type])
-                                          for loc_type in self.vertex_info[vertex_name].other_attr["weight"]],
-                                         key=lambda x: -x[1])
-                    best_t, best_w = all_weights[0]
+                    all_weights.sort(key=lambda x: -x[1])
+                best_t, best_w = all_weights[0]
+                if best_w > 0:
+                    self.tagged_vertices[best_t].add(vertex_name)
                     for next_t, next_w in all_weights[1:]:
-                        if next_w * type_factor < best_w:
-                            self.tagged_vertices[next_t].remove(vertex_name)
+                        if next_w * type_factor >= best_w:
+                            self.tagged_vertices[next_t].add(vertex_name)
+                elif best_w <= 0:
+                    for next_t, next_w in all_weights:
+                        if next_w < 0:
+                            self.tagged_vertices[next_t + "-"].add(vertex_name)
 
         if database_name not in self.tagged_vertices or len(self.tagged_vertices[database_name]) == 0:
             raise ProcessingGraphFailed("No available " + database_name + " information found in " + tab_file)
+        # print("parsing cost", time.time() - time0)
+
+    def _get_tagged_merged_paths(self, tagged_vs):
+        vs_to_merge = set(tagged_vs)
+        merged_paths = []
+        while vs_to_merge:
+            check_v = vs_to_merge.pop()
+            extend_e = True
+            this_path = [(check_v, extend_e)]
+            while True:
+                this_v, this_e = this_path[-1]
+                next_con_tagged = [(_v, _e)
+                                   for _v, _e in self.vertex_info[this_v].connections[this_e]
+                                   if _v in vs_to_merge]
+                # print("this_path", this_path)
+                # print("next_con_tagged", next_con_tagged)
+                if len(next_con_tagged) == 1:
+                    next_v, next_e = next_con_tagged[0]
+                    back_con_tagged = [(_v, _e)
+                                       for _v, _e in self.vertex_info[next_v].connections[next_e]
+                                       if _v == this_v or _v in vs_to_merge]
+                    # print("back_con_tagged", back_con_tagged)
+                    if back_con_tagged == [(this_v, this_e)]:
+                        this_path.append((next_v, not next_e))
+                        vs_to_merge.discard(next_v)
+                        continue
+                if extend_e:
+                    this_path = [(_v, not _e) for _v, _e in this_path[::-1]]
+                    extend_e = False
+                else:
+                    break
+            merged_paths.append(this_path)
+        return merged_paths
 
     def _find_linear_tags(self, tag_locus_info, max_gene_gap, max_cov_diff, verbose=False, log_handler=None):
 
@@ -3580,247 +3665,218 @@ class Assembly(SimpleAssembly):
                 candidate_options.append(_c_opt)
             return True
 
-        tagged_vs = sorted([_rec["vertex"] for _rec in tag_locus_info])
+        tagged_vs = sorted([_rec["vertex"] for _rec in tag_locus_info if _rec["weight"] > 0])
 
         # check_gene = False
         # if "323673" in tagged_vs:
         #     check_gene = True
 
         # merge tagged vertices into paths before linear searching
-        vs_to_merge = set(tagged_vs)
-        merged_paths = []
-        while vs_to_merge:
-            check_v = vs_to_merge.pop()
-            extend_e = True
-            this_path = [(check_v, extend_e)]
-            while True:
-                this_v, this_e = this_path[-1]
-                next_con_tagged = [(_v, _e)
-                                   for _v, _e in self.vertex_info[this_v].connections[this_e]
-                                   if _v in vs_to_merge]
-                # print("this_path", this_path)
-                # print("next_con_tagged", next_con_tagged)
-                if len(next_con_tagged) == 1:
-                    next_v, next_e = next_con_tagged[0]
-                    back_con_tagged = [(_v, _e)
-                                       for _v, _e in self.vertex_info[next_v].connections[next_e]
-                                       if _v == this_v or _v in vs_to_merge]
-                    # print("back_con_tagged", back_con_tagged)
-                    if back_con_tagged == [(this_v, this_e)]:
-                        this_path.append((next_v, not next_e))
-                        vs_to_merge.discard(next_v)
-                        continue
-                if extend_e:
-                    this_path = [(_v, not _e) for _v, _e in this_path[::-1]]
-                    extend_e = False
-                else:
-                    break
-            merged_paths.append(this_path)
-        # print(merged_paths)
-        # if check_gene:
-        #     input()
+        merged_paths = self._get_tagged_merged_paths(tagged_vs)
         candidate_options = [{}]
         candidate_options[0]["tuple"] = self.standardize_paths(merged_paths)
         candidate_options[0]["paths"] = [list(_p) for _p in candidate_options[0]["tuple"]]
         candidate_options[0]["path_id"] = {_v: _p_id
                                            for _p_id, _p in enumerate(candidate_options[0]["paths"])
                                            for _v, _e in _p}
-        # tagged_set = set(tagged_vs)
-        intermediate_combinations = set([])  # to avoid repeated calculation
+        if len(candidate_options[0]["tuple"]) > 1:
+            # tagged_set = set(tagged_vs)
+            intermediate_combinations = set([])  # to avoid repeated calculation
 
-        # # start_v = sorted(tag_loci[locus_type][locus_name],
-        # #                  key=lambda x: (-x["weight"], x["vertex"]))[0]["vertex"]
-        # # start_v = tagged_vs[0]
-        # # sv_id = tagged_vs.index(start_v)
-        # candidate_options = [{"paths": [[(_v, True)] for _v in tagged_vs],
-        #                       "path_id": {_v: p_id for p_id, _v in enumerate(tagged_vs)}
-        #                       }]
-        # # palindromic repeats does not matter, just cause duplicates
-        # candidate_options[0]["tuple"] = self.standardize_paths(candidate_options[0]["paths"])
+            # # start_v = sorted(tag_loci[locus_type][locus_name],
+            # #                  key=lambda x: (-x["weight"], x["vertex"]))[0]["vertex"]
+            # # start_v = tagged_vs[0]
+            # # sv_id = tagged_vs.index(start_v)
+            # candidate_options = [{"paths": [[(_v, True)] for _v in tagged_vs],
+            #                       "path_id": {_v: p_id for p_id, _v in enumerate(tagged_vs)}
+            #                       }]
+            # # palindromic repeats does not matter, just cause duplicates
+            # candidate_options[0]["tuple"] = self.standardize_paths(candidate_options[0]["paths"])
 
-        go_candidate = 0
-        while go_candidate < len(candidate_options):
-            # if check_gene:
-            #     print("go_candidate", go_candidate)
-            #     input("")
-            if candidate_options[go_candidate]["tuple"] in intermediate_combinations:
-                del candidate_options[go_candidate]  # searched
-            else:
-                c_opt = candidate_options[go_candidate]
+            go_candidate = 0
+            while go_candidate < len(candidate_options):
                 # if check_gene:
-                #     print("c_opt (" + str(len(c_opt["paths"])) + "):", c_opt["paths"])
+                #     print("go_candidate", go_candidate)
                 #     input("")
-                intermediate_combinations.add(c_opt["tuple"])
-                extended = False
-                count_keep = 0
-                raw_opt = deepcopy(c_opt)
-                for go_p, this_path in enumerate(list(raw_opt["paths"])):
-                    # Problematic
-                    # # only start from single-end terminal path, middle path will be extended anyway
-                    # next_con_pair = []
-                    # next_con_ls_pair = []
-                    # next_con_ls_tagged_pair = []
-                    # for rev_p in (False, True):
-                    #     if rev_p:
-                    #         extend_v, extend_e = this_path[0]
-                    #         extend_e = not extend_e
-                    #     else:
-                    #         extend_v, extend_e = this_path[-1]
-                    #     next_connections = self.vertex_info[extend_v].connections[extend_e]
-                    #     next_con_pair.append(next_connections)
-                    #     # constraint the coverage change
-                    #     next_connect_ls = [(_n, _e)
-                    #                        for _n, _e in next_connections
-                    #                        if self.vertex_info[_n].cov / max_cov_diff
-                    #                        < self.vertex_info[extend_v].cov
-                    #                        < max_cov_diff * self.vertex_info[_n].cov]
-                    #     next_con_ls_pair.append(next_connect_ls)
-                    #     next_con_ls_tagged_pair.append([_n for _n, _e in next_connect_ls if _n in raw_opt["path_id"]])
-                    # if len(this_path) == 1 and bool(next_con_ls_tagged_pair[0]) == bool(next_con_ls_tagged_pair[1]):
-                    #     # 1. middle path will be extended by other starts
-                    #     # 2. double-ended terminal or self-loop will be isolated anyway
-                    #     # so skip those senarios
-                    #     continue
-                    # rev_p = bool(next_con_ls_tagged_pair[1])
-
-                    for rev_p in (False, True):
-                        # if check_gene:
-                        #     print("  go_p", go_p, rev_p, this_path)
-                        #     # print("  next_con_ls_tagged_pair:", next_con_ls_tagged_pair)
-                        #     input("")
-                        if rev_p:
-                            # palindromic repeats does not matter, just cause duplicates
-                            this_path = [(this_v, not this_e) for this_v, this_e in this_path[::-1]]
-
+                if candidate_options[go_candidate]["tuple"] in intermediate_combinations:
+                    del candidate_options[go_candidate]  # searched
+                else:
+                    c_opt = candidate_options[go_candidate]
+                    # if check_gene:
+                    #     print("c_opt (" + str(len(c_opt["paths"])) + "):", c_opt["paths"])
+                    #     input("")
+                    intermediate_combinations.add(c_opt["tuple"])
+                    extended = False
+                    count_keep = 0
+                    raw_opt = deepcopy(c_opt)
+                    for go_p, this_path in enumerate(list(raw_opt["paths"])):
                         # Problematic
-                        # next_connections = next_con_pair[int(rev_p)]
-                        # next_connect_ls = next_con_ls_pair[int(rev_p)]
+                        # # only start from single-end terminal path, middle path will be extended anyway
+                        # next_con_pair = []
+                        # next_con_ls_pair = []
+                        # next_con_ls_tagged_pair = []
+                        # for rev_p in (False, True):
+                        #     if rev_p:
+                        #         extend_v, extend_e = this_path[0]
+                        #         extend_e = not extend_e
+                        #     else:
+                        #         extend_v, extend_e = this_path[-1]
+                        #     next_connections = self.vertex_info[extend_v].connections[extend_e]
+                        #     next_con_pair.append(next_connections)
+                        #     # constraint the coverage change
+                        #     next_connect_ls = [(_n, _e)
+                        #                        for _n, _e in next_connections
+                        #                        if self.vertex_info[_n].cov / max_cov_diff
+                        #                        < self.vertex_info[extend_v].cov
+                        #                        < max_cov_diff * self.vertex_info[_n].cov]
+                        #     next_con_ls_pair.append(next_connect_ls)
+                        #     next_con_ls_tagged_pair.append([_n for _n, _e in next_connect_ls if _n in raw_opt["path_id"]])
+                        # if len(this_path) == 1 and bool(next_con_ls_tagged_pair[0]) == bool(next_con_ls_tagged_pair[1]):
+                        #     # 1. middle path will be extended by other starts
+                        #     # 2. double-ended terminal or self-loop will be isolated anyway
+                        #     # so skip those senarios
+                        #     continue
+                        # rev_p = bool(next_con_ls_tagged_pair[1])
 
-                        extend_v, extend_e = this_path[-1]
-                        next_connections = self.vertex_info[extend_v].connections[extend_e]
-                        # constraint the coverage change
-                        next_connect_ls = [(_n, _e)
-                                           for _n, _e in next_connections
-                                           if self.vertex_info[_n].cov / max_cov_diff
-                                           < self.vertex_info[extend_v].cov
-                                           < max_cov_diff * self.vertex_info[_n].cov]
-                        # if check_gene:
-                        #     print("    next_connections", next_connections)
-                        #     input("")
-                        if len(next_connect_ls) == 0:
-                            continue
-                        else:
-                            for next_v, next_e in next_connect_ls:
-                                if this_path.count((next_v, not next_e)) \
-                                        >= len(self.vertex_info[next_v].connections[next_e]):
-                                    # real multiplicity does not matter, just search for the simplest path
-                                    # that represent the gene
-                                    continue
-                                elif next_v in raw_opt["path_id"]:
-                                    next_p_id = raw_opt["path_id"][next_v]
-                                    if next_p_id != go_p:  # not self-loop
-                                        if _try_merge(go_p, rev_p, next_p_id, (next_v, not next_e)):
-                                            # if check_gene:
-                                            #     print("    merged with ", next_v, next_p_id, self.vertex_info[next_v].cov)
-                                            #     input("")
-                                            count_keep += 1
-                                            extended = True
-                                else:
-                                    # allow gaps
-                                    # if check_gene:
-                                    #     print("    check gaps")
-                                    accumulated_gap = self.vertex_info[next_v].len - next_connections[(next_v, next_e)]
-                                    gap_paths = [{"p": [(next_v, not next_e)], "l": accumulated_gap}]
-                                    go_g = 0
-                                    while go_g < len(gap_paths):
-                                        if gap_paths[go_g]["l"] > max_gene_gap:
-                                            del gap_paths[go_g]
-                                        else:
-                                            next_ext_v, next_ext_e = gap_paths[go_g]["p"][-1]
-                                            nn_cons = self.vertex_info[next_ext_v].connections[next_ext_e]
-                                            # constraint the coverage change
-                                            nn_con_ls = [(_n, _e)
-                                                         for _n, _e in nn_cons
-                                                         if self.vertex_info[_n].cov / max_cov_diff
-                                                         < self.vertex_info[next_ext_v].cov
-                                                         < max_cov_diff * self.vertex_info[_n].cov]
-                                            if len(nn_con_ls) == 0:
+                        for rev_p in (False, True):
+                            # if check_gene:
+                            #     print("  go_p", go_p, rev_p, this_path)
+                            #     # print("  next_con_ls_tagged_pair:", next_con_ls_tagged_pair)
+                            #     input("")
+                            if rev_p:
+                                # palindromic repeats does not matter, just cause duplicates
+                                this_path = [(this_v, not this_e) for this_v, this_e in this_path[::-1]]
+
+                            # Problematic
+                            # next_connections = next_con_pair[int(rev_p)]
+                            # next_connect_ls = next_con_ls_pair[int(rev_p)]
+
+                            extend_v, extend_e = this_path[-1]
+                            next_connections = self.vertex_info[extend_v].connections[extend_e]
+                            # constraint the coverage change
+                            next_connect_ls = [(_n, _e)
+                                               for _n, _e in next_connections
+                                               if self.vertex_info[_n].cov / max_cov_diff
+                                               < self.vertex_info[extend_v].cov
+                                               < max_cov_diff * self.vertex_info[_n].cov]
+                            # if check_gene:
+                            #     print("    next_connections", next_connections)
+                            #     input("")
+                            if len(next_connect_ls) == 0:
+                                continue
+                            else:
+                                for next_v, next_e in next_connect_ls:
+                                    if this_path.count((next_v, not next_e)) \
+                                            >= len(self.vertex_info[next_v].connections[next_e]):
+                                        # real multiplicity does not matter, just search for the simplest path
+                                        # that represent the gene
+                                        continue
+                                    elif next_v in raw_opt["path_id"]:
+                                        next_p_id = raw_opt["path_id"][next_v]
+                                        if next_p_id != go_p:  # not self-loop
+                                            if _try_merge(go_p, rev_p, next_p_id, (next_v, not next_e)):
+                                                # if check_gene:
+                                                #     print("    merged with ", next_v, next_p_id, self.vertex_info[next_v].cov)
+                                                #     input("")
+                                                count_keep += 1
+                                                extended = True
+                                    else:
+                                        # allow gaps
+                                        # if check_gene:
+                                        #     print("    check gaps")
+                                        accumulated_gap = self.vertex_info[next_v].len - \
+                                                          next_connections[(next_v, next_e)]
+                                        gap_paths = [{"p": [(next_v, not next_e)], "l": accumulated_gap}]
+                                        go_g = 0
+                                        while go_g < len(gap_paths):
+                                            if gap_paths[go_g]["l"] > max_gene_gap:
                                                 del gap_paths[go_g]
-                                            # elif len(nn_con_ls) == 1:
-                                            #     nn_v, nn_e = nn_con_ls[0]
-                                            #     gap_paths[go_g]["p"].append((nn_v, not nn_e))
-                                            #     # either jump to the next gap path option
-                                            #     # or add the accumulated gap_length,
-                                            #     # which both lead to search termination
-                                            #     if nn_v in raw_opt["path_id"]:
-                                            #         # nn_p_id = c_opt["path_id"][nn_v]
-                                            #         # if nn_p_id == go_p:
-                                            #         #     del gap_paths[go_g]
-                                            #         go_g += 1
-                                            #     else:
-                                            #         gap_paths[go_g]["l"] += \
-                                            #             self.vertex_info[nn_v].len - nn_cons[(nn_v, nn_e)]
                                             else:
-                                                dup_p = deepcopy(gap_paths[go_g])
-                                                for go_c, (nn_v, nn_e) in enumerate(nn_con_ls):
-                                                    if go_c == 0:
-                                                        gap_paths[go_g]["p"].append((nn_v, not nn_e))
-                                                        if nn_v in raw_opt["path_id"]:
-                                                            go_g += 1
+                                                next_ext_v, next_ext_e = gap_paths[go_g]["p"][-1]
+                                                nn_cons = self.vertex_info[next_ext_v].connections[next_ext_e]
+                                                # constraint the coverage change
+                                                nn_con_ls = [(_n, _e)
+                                                             for _n, _e in nn_cons
+                                                             if self.vertex_info[_n].cov / max_cov_diff
+                                                             < self.vertex_info[next_ext_v].cov
+                                                             < max_cov_diff * self.vertex_info[_n].cov]
+                                                if len(nn_con_ls) == 0:
+                                                    del gap_paths[go_g]
+                                                # elif len(nn_con_ls) == 1:
+                                                #     nn_v, nn_e = nn_con_ls[0]
+                                                #     gap_paths[go_g]["p"].append((nn_v, not nn_e))
+                                                #     # either jump to the next gap path option
+                                                #     # or add the accumulated gap_length,
+                                                #     # which both lead to search termination
+                                                #     if nn_v in raw_opt["path_id"]:
+                                                #         # nn_p_id = c_opt["path_id"][nn_v]
+                                                #         # if nn_p_id == go_p:
+                                                #         #     del gap_paths[go_g]
+                                                #         go_g += 1
+                                                #     else:
+                                                #         gap_paths[go_g]["l"] += \
+                                                #             self.vertex_info[nn_v].len - nn_cons[(nn_v, nn_e)]
+                                                else:
+                                                    dup_p = deepcopy(gap_paths[go_g])
+                                                    for go_c, (nn_v, nn_e) in enumerate(nn_con_ls):
+                                                        if go_c == 0:
+                                                            gap_paths[go_g]["p"].append((nn_v, not nn_e))
+                                                            if nn_v in raw_opt["path_id"]:
+                                                                go_g += 1
+                                                            else:
+                                                                gap_paths[go_g]["l"] += \
+                                                                    self.vertex_info[nn_v].len - nn_cons[(nn_v, nn_e)]
                                                         else:
-                                                            gap_paths[go_g]["l"] += \
-                                                                self.vertex_info[nn_v].len - nn_cons[(nn_v, nn_e)]
-                                                    else:
-                                                        if go_c < len(nn_con_ls) - 1:
-                                                            this_p = deepcopy(dup_p)
-                                                        else:
-                                                            this_p = dup_p
-                                                        this_p["p"].append((nn_v, not nn_e))
-                                                        if nn_v in raw_opt["path_id"]:
-                                                            gap_paths.insert(go_g, this_p)
-                                                            go_g += 1
-                                                        else:
-                                                            this_p["l"] += \
-                                                                self.vertex_info[nn_v].len - nn_cons[(nn_v, nn_e)]
-                                                            gap_paths.append(this_p)
-                                    # if check_gene:
-                                    #     print("    gap_paths", gap_paths)
-                                    if gap_paths:
-                                        if len(gap_paths) == 1:
-                                            p_start = nn_v, nn_e = gap_paths[0]["p"][-1]
-                                            nn_p_id = raw_opt["path_id"][nn_v]
-                                            # if check_gene:
-                                            #     print("go_p, rev_p, nn_p_id, p_start, gap_paths[0]['p'][:-1]")
-                                            #     print(go_p, rev_p, nn_p_id, p_start, gap_paths[0]["p"][:-1])
-                                            if nn_p_id != go_p:
-                                                if _try_merge(go_p, rev_p, nn_p_id, p_start, gap_paths[0]["p"][:-1]):
-                                                    # if check_gene:
-                                                    #     print("    merged (gap) with ", nn_v, nn_p_id,
-                                                    #           self.vertex_info[nn_v].cov)
-                                                    #     input("")
-                                                    count_keep += 1
-                                                    extended = True
-                                                # else:
-                                                #     continue
-                                        else:
-                                            for go_g, gap_path in enumerate(gap_paths):
-                                                p_start = nn_v, nn_e = gap_path["p"][-1]
+                                                            if go_c < len(nn_con_ls) - 1:
+                                                                this_p = deepcopy(dup_p)
+                                                            else:
+                                                                this_p = dup_p
+                                                            this_p["p"].append((nn_v, not nn_e))
+                                                            if nn_v in raw_opt["path_id"]:
+                                                                gap_paths.insert(go_g, this_p)
+                                                                go_g += 1
+                                                            else:
+                                                                this_p["l"] += \
+                                                                    self.vertex_info[nn_v].len - nn_cons[(nn_v, nn_e)]
+                                                                gap_paths.append(this_p)
+                                        # if check_gene:
+                                        #     print("    gap_paths", gap_paths)
+                                        if gap_paths:
+                                            if len(gap_paths) == 1:
+                                                p_start = nn_v, nn_e = gap_paths[0]["p"][-1]
                                                 nn_p_id = raw_opt["path_id"][nn_v]
-                                                if nn_p_id == go_p:
-                                                    continue
-                                                if _try_merge(go_p, rev_p, nn_p_id, p_start, gap_path["p"][:-1]):
-                                                    # if check_gene:
-                                                    #     print("    merged (gap) with ", nn_v, nn_p_id,
-                                                    #           self.vertex_info[nn_v].cov)
-                                                    #     input("")
-                                                    count_keep += 1
-                                                    extended = True
-                        #     if extended:
-                        #         break
-                        # if extended:
-                        #     break
-                if not extended:
-                    go_candidate += 1
+                                                # if check_gene:
+                                                #     print("go_p, rev_p, nn_p_id, p_start, gap_paths[0]['p'][:-1]")
+                                                #     print(go_p, rev_p, nn_p_id, p_start, gap_paths[0]["p"][:-1])
+                                                if nn_p_id != go_p:
+                                                    if _try_merge(go_p, rev_p, nn_p_id, p_start, gap_paths[0]["p"][:-1]):
+                                                        # if check_gene:
+                                                        #     print("    merged (gap) with ", nn_v, nn_p_id,
+                                                        #           self.vertex_info[nn_v].cov)
+                                                        #     input("")
+                                                        count_keep += 1
+                                                        extended = True
+                                                    # else:
+                                                    #     continue
+                                            else:
+                                                for go_g, gap_path in enumerate(gap_paths):
+                                                    p_start = nn_v, nn_e = gap_path["p"][-1]
+                                                    nn_p_id = raw_opt["path_id"][nn_v]
+                                                    if nn_p_id == go_p:
+                                                        continue
+                                                    if _try_merge(go_p, rev_p, nn_p_id, p_start, gap_path["p"][:-1]):
+                                                        # if check_gene:
+                                                        #     print("    merged (gap) with ", nn_v, nn_p_id,
+                                                        #           self.vertex_info[nn_v].cov)
+                                                        #     input("")
+                                                        count_keep += 1
+                                                        extended = True
+                            #     if extended:
+                            #         break
+                            # if extended:
+                            #     break
+                    if not extended:
+                        go_candidate += 1
         tagged_v_w = {_rec["vertex"]: _rec["weight"] for _rec in tag_locus_info}
         # pick the paths with the largest weight
         # sort candidate_options by its maximum path weight (sum of v weights in a path), decreasingly
@@ -3842,8 +3898,24 @@ class Assembly(SimpleAssembly):
         if verbose and log_handler:
             log_handler.info("    best_path: " + str(best_path))
         # generate info table
-        labeled_vs = sorted(set([_v for _v, _e in best_path]))
-        return {"vertex": labeled_vs, "weight": [tagged_v_w.get(_v, 0.) for _v in labeled_vs]}
+        # labeled_vs = sorted(set([_v for _v, _e in best_path]))
+        labeled_vs = set([_v for _v, _e in best_path])
+        res_dict = {"vertex": [], "weight": []}
+        for this_v in sorted(labeled_vs):
+            res_dict["vertex"].append(this_v)
+            res_dict["weight"].append(tagged_v_w.get(this_v, 0.))
+        for record in tag_locus_info:
+            this_v = record["vertex"]
+            this_w = record["weight"]
+            if this_v not in labeled_vs:
+                if this_w < 0:
+                    res_dict["vertex"].append(this_v)
+                    res_dict["weight"].append(this_w)
+                elif self.check_connected(labeled_vs | {this_v}):
+                    # connected but not real one should have negative weight
+                    res_dict["vertex"].append(this_v)
+                    res_dict["weight"].append(-abs(this_w))
+        return res_dict
 
     def filter_by_coverage(self, drop_num=1, database_n="embplant_pt", min_cov_folds=5.,
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
@@ -3890,20 +3962,34 @@ class Assembly(SimpleAssembly):
                                   * (terminal_extra_weight if self.vertex_info[this_v].is_terminal() else 1)
                                   for this_v in vertices])
         tag_kinds = [tag_kind for tag_kind in self.tagged_vertices if self.tagged_vertices[tag_kind]]
-        tag_kinds.sort(key=lambda x: x != database_n)
+        set_kinds = [tag_kind for tag_kind in tag_kinds if not tag_kind.startswith("-")]
+        # introduced 2023-01-11
+        ban_kind_set = set([ban_kind for ban_kind in tag_kinds if ban_kind.startswith("-") and ban_kind in set_kinds])
+        set_kinds.sort(key=lambda x: x != database_n)
+        # force labeled vertex to be in specific cluster, which provide the supervision information for the clustering
         set_cluster = {}
-        for v_id, vertex_name in enumerate(vertices):
-            for go_tag, this_tag in enumerate(tag_kinds):
+        for go_tag, this_tag in enumerate(set_kinds):
+            for v_id, vertex_name in enumerate(vertices):
                 if vertex_name in self.tagged_vertices[this_tag]:
                     if v_id not in set_cluster:
                         set_cluster[v_id] = set()
                     set_cluster[v_id].add(go_tag)
+        # introduced 2023-01-11
+        ban_cluster = {}
+        for go_tag, this_tag in enumerate(set_kinds):
+            ban_tag = this_tag + "-"
+            if ban_tag in ban_kind_set:
+                for v_id, vertex_name in enumerate(vertices):
+                    if vertex_name in self.tagged_vertices[ban_tag]:
+                        if v_id not in ban_cluster:
+                            ban_cluster[v_id] = set()
+                        ban_cluster[v_id].add(go_tag)
+        # min number of clusters
         min_tag_kind = {0}
         for v_id in set_cluster:
             if 0 not in set_cluster[v_id]:
                 min_tag_kind |= set_cluster[v_id]
         min_cluster = max(min_cluster, len(min_tag_kind))
-
         # old way:
         # set_cluster = {v_coverages[tagged_v]: 0 for tagged_v in self.tagged_vertices[mode]}
 
@@ -3917,7 +4003,8 @@ class Assembly(SimpleAssembly):
             sys.stdout.write("Coverages: " + str([float("%.1f" % cov_x) for cov_x in coverages]) + "\n")
         gmm_scheme = weighted_gmm_with_em_aic(coverages, data_weights=cover_weights,
                                               minimum_cluster=min_cluster, maximum_cluster=6,
-                                              cluster_limited=set_cluster, min_sigma_factor=min_sigma_factor,
+                                              cluster_limited=set_cluster, cluster_bans=ban_cluster,
+                                              min_sigma_factor=min_sigma_factor,
                                               log_handler=log_handler, verbose_log=verbose)
         cluster_num = gmm_scheme["cluster_num"]
         parameters = gmm_scheme["parameters"]
@@ -3974,9 +4061,9 @@ class Assembly(SimpleAssembly):
 
         # 2
         # exclude_label_type = set()
-        # if len(tag_kinds) > 1:
+        # if len(set_kinds) > 1:
         #     for go_l, this_label in enumerate(labels):
-        #         for this_tag in tag_kinds[1:]:
+        #         for this_tag in set_kinds[1:]:
         #             if vertices_set[go_l] in self.tagged_vertices[this_tag]:
         #                 exclude_label_type.add(this_label)
         #                 break
@@ -4004,7 +4091,7 @@ class Assembly(SimpleAssembly):
                 this_dist = abs(rem_mu - check_mu) - 2 * (check_sigma + rem_sigma)
                 candidate_dropping_label_type[lab_tp] = min(candidate_dropping_label_type[lab_tp], this_dist)
         dropping_type = sorted(candidate_dropping_label_type, key=lambda x: -candidate_dropping_label_type[x])
-        drop_num = max(len(tag_kinds) - 1, drop_num)
+        drop_num = max(len(set_kinds) - 1, drop_num)
         dropping_type = dropping_type[:drop_num]
         if debug or verbose:
             if log_handler:
@@ -4579,6 +4666,7 @@ class Assembly(SimpleAssembly):
                 max_cov_diff=hard_cov_threshold,  #  contamination_depth?
                 verbose=verbose,
                 log_handler=log_handler)
+
         new_assembly = deepcopy(self)
         is_reasonable_res = False
         data_contains_outlier = False
@@ -4599,7 +4687,7 @@ class Assembly(SimpleAssembly):
                                          str(["%.1f" % new_assembly.vertex_info[log_v].cov
                                               for log_v in sorted(new_assembly.tagged_vertices[db_name])]) + "\n")
                 new_assembly.merge_all_possible_vertices()
-                new_assembly.tag_in_between(database_n=db_name)
+                new_assembly.tag_in_between()
                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "a")
                 changed = True
                 count_large_round = 0
@@ -4766,7 +4854,7 @@ class Assembly(SimpleAssembly):
 
                     # merge vertices_set
                     new_assembly.merge_all_possible_vertices()
-                    new_assembly.tag_in_between(database_n=db_name)
+                    new_assembly.tag_in_between()
 
                     # no tip contigs allowed
                     if broken_graph_allowed:
@@ -4829,7 +4917,7 @@ class Assembly(SimpleAssembly):
                                                          degenerate=False, degenerate_depth=degenerate_depth,
                                                          degenerate_similarity=degenerate_similarity,
                                                          verbose=verbose, debug=debug, log_handler=log_handler)
-                    new_assembly.tag_in_between(database_n=db_name)
+                    new_assembly.tag_in_between()
                     write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "g")
 
                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "h")

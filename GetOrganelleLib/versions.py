@@ -6,23 +6,26 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.8.0.0-pre2",
+        "number": "1.8.0.0-pre3",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",
             "3. remove upper boundary for coverage-based filtering",
             "4. remove max multiplicity boundary",
-            "5. use gekko instead of scipy for multiplicity estimation, with initials and option for multinomial",
+            "5. remove scipy: "
+            "   5.1. use gekko instead of scipy for multiplicity estimation, with initials and option for multinomial;"
+            "   5.2. use custom norm_logpdf function instead of slow scipy.stats.norm.logpdf",
             "6. limit the number of paths before generating",
             "7. log copy info for --no-slim",
             "8. statistical_func.py: fix a bug"
             "   random.choice(np.array([0])) triggers IndexError: Cannot choose from an empty sequence",
             "9. assembly.parse_tab_file: "
             "   only keep one vertex labeled for each gene tags -> "
-            "   gene tags can occur in multiple vertices that are linearly continuous",
-            "10. change the default of depth_factor because the baseline is now set to be average rather than the max",
-            "11. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
-            "12. add weight_factor to get_organelle_from_assembly.py",
+            "   gene tags can occur in multiple vertices that are linearly continuous;",
+            "10. using negative tag weights to better differentiate target and non-target but similar neighbors",
+            "11. change the default of depth_factor because the baseline is now set to be average rather than the max",
+            "12. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
+            "13. add weight_factor to get_organelle_from_assembly.py",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

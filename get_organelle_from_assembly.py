@@ -366,12 +366,12 @@ def get_options(description, version):
         else:
             lib_versions_info.append("sympy " + sympy.__version__)
         try:
-            import scipy
+            import gekko
         except ImportError:
-            log_handler.error("scipy is not available! Please install scipy!")
+            log_handler.error("gekko is not available! Please install gekko!")
             sys.exit()
         else:
-            lib_versions_info.append("scipy " + scipy.__version__)
+            lib_versions_info.append("gekko " + gekko.__version__)
         log_handler.info("PYTHON LIBS: " + "; ".join(lib_versions_info))
         dep_versions_info = []
         if not options.no_slim:

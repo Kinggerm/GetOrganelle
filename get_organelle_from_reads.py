@@ -673,11 +673,11 @@ def get_options(description, version):
         else:
             lib_versions_info.append("sympy " + sympy.__version__)
         try:
-            import scipy
+            import gekko
         except ImportError:
-            lib_not_available.append("scipy")
+            lib_not_available.append("gekko")
         else:
-            lib_versions_info.append("scipy " + scipy.__version__)
+            lib_versions_info.append("gekko " + gekko.__version__)
         try:
             import psutil
         except ImportError:

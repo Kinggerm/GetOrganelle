@@ -41,16 +41,16 @@ except ImportError:
         install_dependencies.append("numpy==1.16.4")
 else:
     sys.stdout.write("Existed module numpy " + str(numpy.__version__) + "\n")
-try:
-    import scipy
-except ImportError:
-    if MAJOR_VERSION == 3:
-        install_dependencies.append("scipy>=1.3.0")
-    else:
-        # higher version not compatible with python2
-        install_dependencies.append("scipy==1.2.1")
-else:
-    sys.stdout.write("Existed module scipy " + str(scipy.__version__) + "\n")
+# try:
+#     import scipy
+# except ImportError:
+#     if MAJOR_VERSION == 3:
+#         install_dependencies.append("scipy>=1.3.0")
+#     else:
+#         # higher version not compatible with python2
+#         install_dependencies.append("scipy==1.2.1")
+# else:
+#     sys.stdout.write("Existed module scipy " + str(scipy.__version__) + "\n")
 try:
     import sympy
     from sympy import Symbol, solve, lambdify, log
@@ -73,7 +73,7 @@ try:
 except ImportError:
     install_dependencies.append("gekko>=1.0.4")
 else:
-    sys.stdout.write("Existed module gekko " + str(numpy.__version__) + "\n")
+    sys.stdout.write("Existed module gekko " + str(gekko.__version__) + "\n")
 
 
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]

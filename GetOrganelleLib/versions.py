@@ -27,6 +27,7 @@ versions = [
             "12. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
             "13. add weight_factor to get_organelle_from_assembly.py",
             "14. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
+            "15. skip clustering and other steps when len(vertex_info)==1",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

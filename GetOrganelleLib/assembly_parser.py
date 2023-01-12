@@ -1115,7 +1115,18 @@ class Assembly(SimpleAssembly):
         return merged
 
     def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="embplant_pt",
-                                       re_initialize=False, log_handler=None, verbose=True, debug=False):
+                                       min_sigma=0.1, re_initialize=False, log_handler=None, verbose=True, debug=False):
+        """
+        :param limited_vertices:
+        :param given_average_cov:
+        :param mode:
+        :param min_sigma: when only one sample
+        :param re_initialize:
+        :param log_handler:
+        :param verbose:
+        :param debug:
+        :return:
+        """
         # overlap = self.__overlap if self.__overlap else 0
         # those are all empirical values
         # TODO: GetOrganelle need a better algorithm for target filtering
@@ -1162,7 +1173,7 @@ class Assembly(SimpleAssembly):
             previous_val = {0.}
             new_val = -1.
             new_std = -1.
-            # arbitrary setting
+            # arbitrary setting, without influence of limited_vertices
             min_average_depth = 0.9 * min([self.vertex_info[vertex_n].cov for vertex_n in self.vertex_info])
             while round(new_val, 5) not in previous_val:
                 previous_val.add(round(new_val, 5))
@@ -1204,10 +1215,10 @@ class Assembly(SimpleAssembly):
                 else:
                     sys.stdout.write("updating average " + mode + cov_str + str(round(new_val, 2)) + "\n")
             # print("return ", new_val)
-            return new_val, new_std
+            return new_val, new_val * min_sigma if len(limited_vertices) == 1 and new_std == 0. else new_std
         else:
             # adjust this_copy according to user-defined depth
-            for vertex_name in self.vertex_info:
+            for vertex_name in limited_vertices:
                 if vertex_name in self.vertex_to_copy:
                     old_copy = self.vertex_to_copy[vertex_name]
                     self.copy_to_vertex[old_copy].remove(vertex_name)
@@ -1224,7 +1235,8 @@ class Assembly(SimpleAssembly):
                 cov_ls.append(self.vertex_info[vertex_name].cov / this_copy)
                 len_ls.append(self.vertex_info[vertex_name].len * this_copy)
             new_std = (sum([_w * (given_average_cov - _c) ** 2 for _c, _w in zip(cov_ls, len_ls)]) / sum(len_ls)) ** 0.5
-            return given_average_cov, new_std
+            return given_average_cov, \
+                   given_average_cov * min_sigma if len(limited_vertices) == 1 and new_std == 0. else new_std
 
     def estimate_copy_and_depth_precisely_using_multinomial(
             self, expected_average_cov,  # broken_graph_allowed=False,
@@ -3338,6 +3350,7 @@ class Assembly(SimpleAssembly):
                        max_gene_gap=300,
                        max_cov_diff=3.,
                        log_handler=None,
+                       append_info=False,
                        verbose=False):
         """
         :param tab_file:
@@ -3346,6 +3359,7 @@ class Assembly(SimpleAssembly):
         :param max_gene_gap:
         :param max_cov_diff:
         :param log_handler:
+        :param append_info: not recommended, keep the original information in the vertex info
         :param verbose:
         :return:
         """
@@ -3542,6 +3556,10 @@ class Assembly(SimpleAssembly):
         # print("tagging cost", time.time() - time0)
         # 3. assign information in sum_tag_loci to contigs.other_attr
         # 2022-12-22 modified
+        if not append_info:
+            # clean previous info
+            for vertex_name in self.vertex_info:
+                self.vertex_info[vertex_name].other_attr["tags"] = {}
         for locus_type in sum_tag_loci:
             self.tagged_vertices[locus_type] = set()
             self.tagged_vertices[locus_type + "-"] = set()  # negative type
@@ -3921,6 +3939,9 @@ class Assembly(SimpleAssembly):
                            weight_factor=100., min_sigma_factor=0.1, min_cluster=1, terminal_extra_weight=5.,
                            verbose=False, log_handler=None, debug=False):
         changed = False
+        if len(self.vertex_info) == 1 and list(self.vertex_info)[0] in self.tagged_vertices[database_n]:
+            only_cov = self.vertex_info[list(self.vertex_info)[0]].cov
+            return changed, [(only_cov, only_cov * min_sigma_factor)]
         # overlap = self.__overlap if self.__overlap else 0
         # log_min_cov_folds = abs(log(min_cov_folds))
         vertices = sorted(
@@ -3948,7 +3969,9 @@ class Assembly(SimpleAssembly):
         merged = self.merge_all_possible_vertices()
         if merged:
             changed = True
-            self.estimate_copy_and_depth_by_cov(self.tagged_vertices[database_n], debug=debug, log_handler=log_handler,
+            self.estimate_copy_and_depth_by_cov(self.tagged_vertices[database_n],
+                                                min_sigma=min_sigma_factor,
+                                                debug=debug, log_handler=log_handler,
                                                 verbose=verbose, mode=database_n)
         vertices = sorted(self.vertex_info)
         v_coverages = {this_v: self.vertex_info[this_v].cov / self.vertex_to_copy.get(this_v, 1)
@@ -4510,8 +4533,15 @@ class Assembly(SimpleAssembly):
             #         sys.stdout.write("Warning: Only the contig with the max cov was kept for each of those " +
             #                          str(count_using_only_max) + " polymorphic loci.\n")
 
-    def find_target_graph(self, tab_file, db_name, mode="embplant_pt", type_factor=3, weight_factor=100.0,
-                          min_sigma_factor=0.1, expected_max_size=inf, expected_min_size=0,
+    def find_target_graph(self,
+                          # tab_file,
+                          db_name,
+                          mode="embplant_pt",
+                          # type_factor=3,
+                          weight_factor=100.0,
+                          min_sigma_factor=0.1,
+                          expected_max_size=inf,
+                          expected_min_size=0,
                           # max_contig_multiplicity=8,
                           hard_cov_threshold=5., contamination_depth=3., contamination_similarity=0.95,
                           degenerate=True, degenerate_depth=1.5, degenerate_similarity=0.98, only_keep_max_cov=True,
@@ -4522,10 +4552,8 @@ class Assembly(SimpleAssembly):
                           read_len_for_log=None, kmer_for_log=None,
                           log_handler=None, debug=False):
         """
-        :param tab_file:
         :param db_name:
         :param mode:
-        :param type_factor:
         :param weight_factor:
         :param min_sigma_factor:
         :param expected_max_size:
@@ -4645,27 +4673,27 @@ class Assembly(SimpleAssembly):
         if broken_graph_allowed and not meta:
             weight_factor = 10000.
 
-        if meta:
-            try:
-                self.parse_tab_file(
-                    tab_file,
-                    database_name=db_name,
-                    type_factor=type_factor,
-                    max_gene_gap=250,
-                    max_cov_diff=hard_cov_threshold,
-                    verbose=verbose,
-                    log_handler=log_handler)
-            except ProcessingGraphFailed:
-                return []
-        else:
-            self.parse_tab_file(
-                tab_file,
-                database_name=db_name,
-                type_factor=type_factor,
-                max_gene_gap=250,
-                max_cov_diff=hard_cov_threshold,  #  contamination_depth?
-                verbose=verbose,
-                log_handler=log_handler)
+        # if meta:
+        #     try:
+        #         self.parse_tab_file(
+        #             tab_file,
+        #             database_name=db_name,
+        #             type_factor=type_factor,
+        #             max_gene_gap=250,
+        #             max_cov_diff=hard_cov_threshold,
+        #             verbose=verbose,
+        #             log_handler=log_handler)
+        #     except ProcessingGraphFailed:
+        #         return []
+        # else:
+        #     self.parse_tab_file(
+        #         tab_file,
+        #         database_name=db_name,
+        #         type_factor=type_factor,
+        #         max_gene_gap=250,
+        #         max_cov_diff=hard_cov_threshold,  #  contamination_depth?
+        #         verbose=verbose,
+        #         log_handler=log_handler)
 
         new_assembly = deepcopy(self)
         is_reasonable_res = False
@@ -4709,7 +4737,8 @@ class Assembly(SimpleAssembly):
                         # parameters = []
                         this_del = False
                         new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                            new_assembly.tagged_vertices[db_name], debug=debug, log_handler=log_handler,
+                            new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
+                            debug=debug, log_handler=log_handler,
                             verbose=verbose, mode=mode)
                         while first_round or delete_those_vertices or this_del:
                             if data_contains_outlier:
@@ -4752,7 +4781,8 @@ class Assembly(SimpleAssembly):
                             if this_del and temp_graph:
                                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "b")
                             new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                                new_assembly.tagged_vertices[db_name], debug=debug, log_handler=log_handler,
+                                new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
+                                debug=debug, log_handler=log_handler,
                                 verbose=verbose, mode=mode)
                             first_round = False
 
@@ -4774,6 +4804,8 @@ class Assembly(SimpleAssembly):
                                       and
                                       db_name in new_assembly.vertex_info[x_v].other_attr["weight"]])
                                  for x in new_assembly.vertex_clusters]
+                            if verbose and log_handler:
+                                log_handler.info("cluster_weights: " + str(cluster_weights))
                             best = max(cluster_weights)
                             best_id = cluster_weights.index(best)
                             if broken_graph_allowed:
@@ -4851,10 +4883,16 @@ class Assembly(SimpleAssembly):
                                 changed = True
 
                                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "e")
+                        if len(new_assembly.vertex_info) == 1 and \
+                                list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                            break
 
                     # merge vertices_set
                     new_assembly.merge_all_possible_vertices()
                     new_assembly.tag_in_between()
+                    if len(new_assembly.vertex_info) == 1 and \
+                            list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                        break
 
                     # no tip contigs allowed
                     if broken_graph_allowed:
@@ -4879,8 +4917,16 @@ class Assembly(SimpleAssembly):
                                     # 1. tagged
                                     # 2. normal depth (3 sigma)
                                     # 3. enough weight
+                                    if verbose and log_handler:
+                                        log_handler.info(str(new_ave_cov) + "[" + str(ave_std) + "]~" +
+                                                         str(new_assembly.vertex_info[_v_n].cov))
+                                        if "weight" in new_assembly.vertex_info[_v_n].other_attr:
+                                            log_handler.info("v_weight/total_weight: " +
+                                                             str(new_assembly.vertex_info[_v_n].other_attr["weight"].
+                                                                 get(db_name, 0.)) + "/" + str(total_weight))
+
                                     if _v_n in new_assembly.tagged_vertices[db_name]:
-                                        if abs(new_ave_cov - new_assembly.vertex_info[_v_n].cov) < 3 * ave_std and \
+                                        if abs(new_ave_cov - new_assembly.vertex_info[_v_n].cov) <= 3 * ave_std and \
                                                 "weight" in new_assembly.vertex_info[_v_n].other_attr and \
                                                 new_assembly.vertex_info[_v_n].other_attr["weight"].get(db_name, 0.) * \
                                                 weight_factor > total_weight:
@@ -4890,7 +4936,7 @@ class Assembly(SimpleAssembly):
                                         else:
                                             if (verbose or debug) and log_handler:
                                                 log_handler.warning(
-                                                    "removing tagged but low-coverage terminal contig: "+ _v_n + ":" +
+                                                    "removing tagged but low-coverage terminal contig: " + _v_n + ":" +
                                                     str(new_assembly.vertex_info[_v_n].other_attr["tags"]))
                                             delete_those_vertices.add(_v_n)
                                     else:
@@ -4904,11 +4950,18 @@ class Assembly(SimpleAssembly):
                                             "removing terminal contigs: " + str(delete_those_vertices) + "\n")
                                 new_assembly.remove_vertex(delete_those_vertices)
                                 changed = True
+                            if len(new_assembly.vertex_info) == 1 and \
+                                    list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                                break
 
                     # merge vertices_set
                     new_assembly.merge_all_possible_vertices()
+                    if len(new_assembly.vertex_info) == 1 and \
+                            list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                        break
                     new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                        new_assembly.tagged_vertices[db_name], debug=debug, log_handler=log_handler,
+                        new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
+                        debug=debug, log_handler=log_handler,
                         verbose=verbose, mode=mode)
                     new_assembly.processing_polymorphism(database_name=db_name,
                                                          average_depth=new_ave_cov,
@@ -4921,32 +4974,43 @@ class Assembly(SimpleAssembly):
                     write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "g")
 
                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "h")
-                new_assembly.processing_polymorphism(database_name=db_name,
-                                                     contamination_depth=contamination_depth,
-                                                     contamination_similarity=contamination_similarity,
-                                                     degenerate=degenerate, degenerate_depth=degenerate_depth,
-                                                     degenerate_similarity=degenerate_similarity,
-                                                     warning_count=1, only_keep_max_cov=only_keep_max_cov,
-                                                     verbose=verbose, debug=debug, log_handler=log_handler)
-                new_assembly.merge_all_possible_vertices()
-                write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "i")
+                if len(new_assembly.vertex_info) == 1 and \
+                        list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                    pass
+                else:
+                    new_assembly.processing_polymorphism(database_name=db_name,
+                                                         contamination_depth=contamination_depth,
+                                                         contamination_similarity=contamination_similarity,
+                                                         degenerate=degenerate, degenerate_depth=degenerate_depth,
+                                                         degenerate_similarity=degenerate_similarity,
+                                                         warning_count=1, only_keep_max_cov=only_keep_max_cov,
+                                                         verbose=verbose, debug=debug, log_handler=log_handler)
+                    new_assembly.merge_all_possible_vertices()
+                    write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "i")
 
                 # create idealized vertices_set and edges
                 try:
-                    new_average_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(log_handler=log_handler,
-                                                                                           verbose=verbose,
-                                                                                           mode="all", debug=debug)
-                    final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
-                        expected_average_cov=new_average_cov,
-                        # broken_graph_allowed=broken_graph_allowed,
+                    new_average_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
+                        min_sigma=min_sigma_factor,
                         log_handler=log_handler,
-                        verbose=verbose, debug=debug)
-                    # maybe no more multiple results since 2022-12 gekko update
-                    # if verbose:
-                    #     if log_handler:
-                    #         log_handler.info(str(len(final_res_combinations)) + " candidate graph(s) generated.")
-                    #     else:
-                    #         sys.stdout.write(str(len(final_res_combinations)) + " candidate graph(s) generated.\n")
+                        verbose=verbose,
+                        mode="all",
+                        debug=debug)
+                    if len(new_assembly.vertex_info) == 1 and \
+                            list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                        final_res_combinations = [{"graph": new_assembly, "cov": new_average_cov}]
+                    else:
+                        final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(
+                            expected_average_cov=new_average_cov,
+                            # broken_graph_allowed=broken_graph_allowed,
+                            log_handler=log_handler,
+                            verbose=verbose, debug=debug)
+                        # maybe no more multiple results since 2022-12 gekko update
+                        # if verbose:
+                        #     if log_handler:
+                        #         log_handler.info(str(len(final_res_combinations)) + " candidate graph(s) generated.")
+                        #     else:
+                        #         sys.stdout.write(str(len(final_res_combinations)) + " candidate graph(s) generated.\n")
                     absurd_copy_nums = True
                     no_single_copy = True
                     while absurd_copy_nums:
@@ -5015,6 +5079,7 @@ class Assembly(SimpleAssembly):
                                         new_possible_graph.remove_vertex(dropping_names)
                                         new_possible_graph.merge_all_possible_vertices()
                                         new_ave_cov, ave_std = new_possible_graph.estimate_copy_and_depth_by_cov(
+                                            min_sigma=min_sigma_factor,
                                             log_handler=log_handler, verbose=verbose, mode="all", debug=debug)
 
                                         final_res_combinations.extend(
@@ -5064,7 +5129,8 @@ class Assembly(SimpleAssembly):
                             raise e
 
                     new_average_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                        re_initialize=True, log_handler=log_handler, verbose=verbose, mode="all", debug=debug)
+                        re_initialize=True, min_sigma=min_sigma_factor,
+                        log_handler=log_handler, verbose=verbose, mode="all", debug=debug)
                     outer_continue = False
                     for remove_all_connections in (False, True):
                         # if connections_removed and remove_all_connections:

@@ -134,7 +134,12 @@ def main():
     options, log_handler = get_options(print_title)
 
     @set_time_limit(options.time_limit)
-    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="embplant_pt",
+    def disentangle_circular_assembly(input_graph,
+                                      # tab_file,
+                                      prefix,
+                                      weight_factor,
+                                      # type_factor,
+                                      mode="embplant_pt",
                                       hard_cov_threshold=5., expected_max_size=inf, expected_min_size=0,
                                       contamination_depth=3., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
@@ -142,27 +147,27 @@ def main():
                                       keep_temp=False, acyclic_allowed=False,
                                       verbose=False, inner_logging=None, debug=False):
         if options.resume and os.path.exists(prefix + ".graph1.path_sequence.gfa"):
-            pass
             if inner_logging:
                 inner_logging.info(">>> Result graph existed!")
             else:
                 sys.stdout.write(">>> Result graph existed!\n")
         else:
-            time_a = time.time()
-            if inner_logging:
-                inner_logging.info(">>> Parsing " + fastg_file + " ..")
-            else:
-                sys.stdout.write("Parsing " + fastg_file + " ..\n")
-            input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
+            # time_a = time.time()
+            # if inner_logging:
+            #     inner_logging.info(">>> Parsing " + fastg_file + " ..")
+            # else:
+            #     sys.stdout.write("Parsing " + fastg_file + " ..\n")
+            # input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
             time_b = time.time()
-            if inner_logging:
-                inner_logging.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
-            else:
-                sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
+            # if inner_logging:
+            #     inner_logging.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
+            # else:
+            #     sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
             temp_graph = prefix + ".temp.fastg" if keep_temp else None
             selected_graph = prefix + ".graph.selected_graph.gfa"
-            copy_results = input_graph.find_target_graph(tab_file, db_name=mode, mode=mode,
-                                                         type_factor=type_factor,
+            copy_results = input_graph.find_target_graph(  # tab_file,
+                                                         db_name=mode, mode=mode,
+                                                         # type_factor=type_factor,
                                                          weight_factor=weight_factor,
                                                          hard_cov_threshold=hard_cov_threshold,
                                                          contamination_depth=contamination_depth,
@@ -298,9 +303,29 @@ def main():
                 sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
 
     try:
-        disentangle_circular_assembly(options.fastg_file, options.tab_file,
+        time_1 = time.time()
+        if log_handler:
+            log_handler.info(">>> Parsing " + options.fastg_file + " ..")
+        else:
+            sys.stdout.write("Parsing " + options.fastg_file + " ..\n")
+        assembly_graph_obj = Assembly(options.fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
+        assembly_graph_obj.parse_tab_file(
+            options.tab_file,
+            database_name=options.mode,
+            type_factor=options.type_factor,
+            max_gene_gap=250,
+            max_cov_diff=options.depth_factor,  # contamination_depth?
+            verbose=options.verbose,
+            log_handler=log_handler)
+        time_2 = time.time()
+        if log_handler:
+            log_handler.info(">>> Parsing input fastg file finished: " + str(round(time_2 - time_1, 4)) + "s")
+        else:
+            sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_2 - time_1, 4)) + "s\n")
+        disentangle_circular_assembly(assembly_graph_obj,
+                                      # options.tab_file,
                                       os.path.join(options.output_directory, options.prefix),
-                                      type_factor=options.type_factor,
+                                      # type_factor=options.type_factor,
                                       mode=options.mode,
                                       weight_factor=options.weight_factor,
                                       hard_cov_threshold=options.depth_factor,

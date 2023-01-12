@@ -316,8 +316,8 @@ def get_options(description, version):
                                          "with the same list length to organelle_type (followed by '-F'). "
                                          "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
                                          "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
-                                                                                                    "contingent on the organelle types chosen (-F). "
-                                                                                                    "The default value become invalid when '--genes' or '--ex-genes' is used.")
+                                         "contingent on the organelle types chosen (-F). "
+                                         "The default value become invalid when '--genes' or '--ex-genes' is used.")
         group_assembly.add_argument("--ex-genes", dest="exclude_genes",
                                     help="This is optional and Not suggested, since non-target contigs could contribute "
                                          "information for better downstream coverage-based clustering. "
@@ -331,6 +331,9 @@ def get_options(description, version):
                                     help="Depth factor for differentiate genome type of contigs. "
                                          "The genome type of contigs are determined by blast. "
                                          "Default: %(default)s")
+        group_assembly.add_argument("--disentangle-tf", dest="disentangle_type_factor", type=float, default=3.,
+                                    help="Type factor for identifying contig type tag when multiple tags exist in one contig. "
+                                         "Default:%(default)s")
         group_assembly.add_argument("--contamination-depth", dest="contamination_depth", default=3., type=float,
                                     help="Depth factor for confirming contamination in parallel contigs. Default: %(default)s")
         group_assembly.add_argument("--contamination-similarity", dest="contamination_similarity", default=0.9,
@@ -3338,8 +3341,11 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
 def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_fg, organelle_prefix,
                              organelle_type, blast_db, read_len_for_log, verbose, log_handler, basic_prefix,
                              expected_maximum_size, expected_minimum_size, do_spades_scaffolding, options):
+
     from GetOrganelleLib.assembly_parser import ProcessingGraphFailed, Assembly
-    def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
+
+    def disentangle_assembly(assembly_obj, fastg_file, tab_file, output, weight_factor, log_dis, time_limit,
+                             type_factor=3.,
                              mode="embplant_pt", blast_db_base="embplant_pt", contamination_depth=3.,
                              contamination_similarity=0.95, degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=0.98,
@@ -3348,7 +3354,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                              here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'", temp_graph=None):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
-        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt",
+        def disentangle_inside(input_graph,
+                               fastg_f,
+                               tab_f,
+                               o_p,
+                               w_f,
+                               log_in,
+                               type_f=3.,
+                               mode_in="embplant_pt",
                                in_db_n="embplant_pt", c_d=3., c_s=0.95,
                                deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
                                max_s=inf, min_s=0, with_spades_scaffolds_in=False,
@@ -3364,7 +3377,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 log_in.info("Disentangling " + fastg_f + " as a/an " + in_db_n + "-insufficient graph ... ")
             else:
                 log_in.info("Disentangling " + fastg_f + " as a circular genome ... ")
-            input_graph = Assembly(fastg_f)
+            # input_graph = Assembly(fastg_f)
             if with_spades_scaffolds_in:
                 if not input_graph.add_gap_nodes_with_spades_res(os.path.join(spades_output, "scaffolds.fasta"),
                                                                  os.path.join(spades_output, "scaffolds.paths"),
@@ -3372,14 +3385,24 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                                  log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
                 else:
+                    input_graph.parse_tab_file(
+                        tab_f,
+                        database_name=in_db_n,
+                        type_factor=type_f,
+                        max_gene_gap=250,
+                        max_cov_diff=hard_c_t,  # contamination_depth?
+                        verbose=verbose,
+                        log_handler=log_handler)
                     if in_temp_graph:
                         if in_temp_graph.endswith(".gfa"):
                             this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"
                         else:
                             this_tmp_graph = in_temp_graph + ".scaffolds.gfa"
                         input_graph.write_to_gfa(this_tmp_graph)
-            target_results = input_graph.find_target_graph(tab_f,
-                                                           mode=mode_in, db_name=in_db_n, type_factor=type_f,
+            target_results = input_graph.find_target_graph(  # tab_f,
+                                                           mode=mode_in,
+                                                           db_name=in_db_n,
+                                                           # type_factor=type_f,
                                                            hard_cov_threshold=hard_c_t,
                                                            contamination_depth=c_d,
                                                            contamination_similarity=c_s,
@@ -3569,8 +3592,10 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                 " using Bandage to confirm the final result.")
             log_in.info("Writing output finished.")
 
-        disentangle_inside(fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
-                           type_f=type_factor, mode_in=mode, in_db_n=blast_db_base,
+        disentangle_inside(input_graph=deepcopy(assembly_obj),
+                           fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
+                           type_f=type_factor,
+                           mode_in=mode, in_db_n=blast_db_base,
                            c_d=contamination_depth, c_s=contamination_similarity,
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
                            hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
@@ -3591,24 +3616,41 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
     export_succeeded = False
     path_prefix = os.path.join(out_base, organelle_prefix)
     graph_temp_file1 = path_prefix + "R1.temp.gfa" if options.keep_temp_files else None
+    file_to_assembly_obj = {}
     for go_k, kmer_dir in enumerate(kmer_dirs):
         out_fastg = slim_out_fg[go_k]
         if out_fastg and os.path.getsize(out_fastg):
             try:
                 """disentangle"""
-
                 out_csv = out_fastg[:-5] + "csv"
                 # if it is the first round (the largest kmer), copy the slimmed result to the main spades output
                 # if go_k == 0:
                 #     main_spades_folder = os.path.split(kmer_dir)[0]
                 #     os.system("cp " + out_fastg + " " + main_spades_folder)
                 #     os.system("cp " + out_csv + " " + main_spades_folder)
-                disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
-                                     mode=organelle_type, tab_file=out_csv, output=path_prefix,
-                                     weight_factor=100, hard_cov_threshold=options.disentangle_depth_factor,
+                assembly_graph_obj = Assembly(out_fastg)
+                assembly_graph_obj.parse_tab_file(
+                    out_csv,
+                    database_name=blast_db,
+                    type_factor=options.disentangle_type_factor,
+                    max_gene_gap=250,
+                    max_cov_diff=options.disentangle_depth_factor,  # contamination_depth?
+                    verbose=verbose,
+                    log_handler=log_handler)
+                file_to_assembly_obj[out_fastg] = assembly_graph_obj
+                disentangle_assembly(assembly_obj=assembly_graph_obj,
+                                     fastg_file=out_fastg,
+                                     blast_db_base=blast_db,
+                                     mode=organelle_type,
+                                     tab_file=out_csv,
+                                     output=path_prefix,
+                                     weight_factor=100,
+                                     type_factor=options.disentangle_type_factor,
+                                     hard_cov_threshold=options.disentangle_depth_factor,
                                      contamination_depth=options.contamination_depth,
                                      contamination_similarity=options.contamination_similarity,
-                                     degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
+                                     degenerate=options.degenerate,
+                                     degenerate_depth=options.degenerate_depth,
                                      degenerate_similarity=options.degenerate_similarity,
                                      expected_max_size=expected_maximum_size,
                                      expected_min_size=expected_minimum_size,
@@ -3646,9 +3688,15 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 try:
                     """disentangle"""
                     out_csv = out_fastg[:-5] + "csv"
-                    disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
-                                         mode=organelle_type, tab_file=out_csv, output=path_prefix,
-                                         weight_factor=100, hard_cov_threshold=options.disentangle_depth_factor,
+                    disentangle_assembly(assembly_obj=file_to_assembly_obj[out_fastg],
+                                         fastg_file=out_fastg,
+                                         blast_db_base=blast_db,
+                                         mode=organelle_type,
+                                         tab_file=out_csv,
+                                         output=path_prefix,
+                                         weight_factor=100,
+                                         type_factor=options.disentangle_type_factor,
+                                         hard_cov_threshold=options.disentangle_depth_factor,
                                          contamination_depth=options.contamination_depth,
                                          contamination_similarity=options.contamination_similarity,
                                          degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
@@ -3695,9 +3743,15 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         if out_fastg_list:
                             out_fastg = out_fastg_list[0]
                             out_csv = out_fastg[:-5] + "csv"
-                            disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
-                                                 mode=organelle_type, tab_file=out_csv,
-                                                 output=path_prefix, weight_factor=100, here_verbose=verbose,
+                            disentangle_assembly(assembly_obj=file_to_assembly_obj[out_fastg],
+                                                 fastg_file=out_fastg,
+                                                 blast_db_base=blast_db,
+                                                 mode=organelle_type,
+                                                 tab_file=out_csv,
+                                                 output=path_prefix,
+                                                 weight_factor=100,
+                                                 type_factor=options.disentangle_type_factor,
+                                                 here_verbose=verbose,
                                                  log_dis=log_handler,
                                                  hard_cov_threshold=options.disentangle_depth_factor * 0.8,
                                                  contamination_depth=options.contamination_depth,

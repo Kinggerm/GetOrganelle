@@ -26,6 +26,7 @@ versions = [
             "11. change the default of depth_factor because the baseline is now set to be average rather than the max",
             "12. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
             "13. add weight_factor to get_organelle_from_assembly.py",
+            "14. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

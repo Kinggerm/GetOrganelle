@@ -1238,708 +1238,708 @@ class Assembly(SimpleAssembly):
             return given_average_cov, \
                    given_average_cov * min_sigma if len(limited_vertices) == 1 and new_std == 0. else new_std
 
-    def estimate_copy_and_depth_precisely_using_multinomial(
-            self, expected_average_cov,  # broken_graph_allowed=False,
-            verbose=False, log_handler=None, debug=False,
-            target_name_for_log="target", n_iterations=None):
-        """
-        Currently problematic because of
-        frequently reporting
-        Exception: @error: Solution Not Found
-
-        :param expected_average_cov:
-        :param verbose:
-        :param log_handler:
-        :param debug:
-        :param target_name_for_log:
-        :return:
-        """
-        # TODO: to test whether it's better than least-square
-
-        def get_formula(from_vertex, from_end, back_to_vertex, back_to_end, here_record_ends):
-            result_form = vertex_to_symbols[from_vertex]
-            here_record_ends.add((from_vertex, from_end))
-            # if back_to_vertex ~ from_vertex (from_vertex == back_to_vertex) form a loop, skipped
-            if from_vertex != back_to_vertex:
-                for next_v, next_e in self.vertex_info[from_vertex].connections[from_end]:
-                    # if next_v ~ from_vertex (next_v == from_vertex) form a loop, add a pseudo vertex
-                    if (next_v, next_e) == (from_vertex, not from_end):
-                        # skip every self-loop 2020-06-23
-                        # pseudo_self_circle_str = "P" + from_vertex
-                        # if pseudo_self_circle_str not in extra_str_to_symbol_m2:
-                        #     extra_str_to_symbol_m2[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
-                        #     extra_symbol_to_str_m2[extra_str_to_symbol_m2[pseudo_self_circle_str]] = pseudo_self_circle_str
-                        # result_form -= (extra_str_to_symbol_m2[pseudo_self_circle_str] - 1)
-                        pass
-                    # elif (next_v, next_e) != (back_to_vertex, back_to_end):
-                    elif (next_v, next_e) not in here_record_ends:
-                        result_form -= get_formula(next_v, next_e, from_vertex, from_end, here_record_ends)
-            return result_form
-
-        # # for compatibility between scipy and sympy
-        # def least_square_function_v(x):
-        #     return least_square_function(*tuple(x))
-        #
-        # """ create constraints by creating inequations: the copy of every contig has to be >= 1 """
-        #
-        # def constraint_min_function(x):
-        #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
-        #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
-        #     min_copy = np.array([1.001] * len(all_v_symbols) +
-        #                         [1.001] * len(extra_symbol_to_str_m1) +
-        #                         [2.001] * len(extra_symbol_to_str_m2))
-        #     # effect: expression_array >= int(min_copy)
-        #     return expression_array - min_copy
-        #
-        # def constraint_min_function_for_customized_brute(x):
-        #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
-        #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
-        #     min_copy = np.array([1.0] * len(all_v_symbols) +
-        #                         [1.0] * len(extra_symbol_to_str_m1) +
-        #                         [2.0] * len(extra_symbol_to_str_m2))
-        #     # effect: expression_array >= min_copy
-        #     return expression_array - min_copy
-
-        def constraint_min_function_for_gekko(g_vars):
-            subs_tuples = [(symb_used_, Symbol("g_vars[" + str(go_sym) + "]"))
-                           for go_sym, symb_used_ in enumerate(free_copy_variables)]
-            expression_array = [copy_solution[this_sym].subs(subs_tuples) for this_sym in all_symbols]
-            min_copy = [1] * len(all_v_symbols) + \
-                       [1] * len(extra_symbol_to_str_m1) + \
-                       [2] * len(extra_symbol_to_str_m2)
-            # effect: expression_array >= min_copy
-            expression = []
-            if verbose or debug:
-                for e, c in zip(expression_array, min_copy):
-                    expression.append(eval(str(e) + ">=" + str(c)))
-                    log_handler.info("  constraint: " + str(e) + ">=" + str(c))
-            else:
-                for e, c in zip(expression_array, min_copy):
-                    expression.append(eval(str(e) + ">=" + str(c)))
-            expression = [expr for expr in expression if not isinstance(expr, bool)]
-            return expression
-
-        # def constraint_max_function(x):
-        #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
-        #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
-        #     max_copy = np.array([expected_average_cov] * len(all_v_symbols) +
-        #                         [expected_average_cov] * len(extra_symbol_to_str_m1) +
-        #                         [expected_average_cov * 2] * len(extra_symbol_to_str_m2))
-        #     # effect: expression_array <= max_copy
-        #     return max_copy - expression_array
-        #
-        # def constraint_int_function(x):
-        #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
-        #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
-        #     # diff = np.array([0] * len(all_symbols))
-        #     return sum([abs(every_copy - int(every_copy)) for every_copy in expression_array])
-        #
-        # def minimize_brute_force(func, range_list, constraint_list, round_digit=4, display_p=True,
-        #                          in_log_handler=log_handler):
-        #     # time0 = time.time()
-        #     best_fun_val = inf
-        #     best_para_val = []
-        #     count_round = 0
-        #     count_valid = 0
-        #     for value_set in product(*[list(this_range) for this_range in range_list]):
-        #         count_round += 1
-        #         is_valid_set = True
-        #         for cons in constraint_list:
-        #             if cons["type"] == "ineq":
-        #                 try:
-        #                     if (cons["fun"](value_set) < 0).any():
-        #                         is_valid_set = False
-        #                         # if in_log_handler and (debug or display_p):
-        #                         #     in_log_handler.info("value_set={} ; illegal ineq constraints".format(value_set))
-        #                         break
-        #                 except TypeError:
-        #                     # if in_log_handler and (debug or display_p):
-        #                     #     in_log_handler.info("value_set={} ; illegal ineq constraints".format(value_set))
-        #                     is_valid_set = False
-        #                     break
-        #             elif cons["type"] == "eq":
-        #                 try:
-        #                     if cons["fun"](value_set) != 0:
-        #                         is_valid_set = False
-        #                         # if in_log_handler and (debug or display_p):
-        #                         #     in_log_handler.info("value_set={} ; illegal eq constraints".format(value_set))
-        #                         break
-        #                 except TypeError:
-        #                     # if in_log_handler and (debug or display_p):
-        #                     #     in_log_handler.info("value_set={} ; illegal eq constraints".format(value_set))
-        #                     is_valid_set = False
-        #                     break
-        #         if not is_valid_set:
-        #             continue
-        #         count_valid += 1
-        #         this_fun_val = func(value_set)
-        #         if in_log_handler:
-        #             if debug or display_p:
-        #                 in_log_handler.info("value_set={} ; fun_val={}".format(value_set, this_fun_val))
-        #         this_fun_val = round(this_fun_val, round_digit)
-        #         if this_fun_val < best_fun_val:
-        #             best_para_val = [value_set]
-        #             best_fun_val = this_fun_val
-        #         elif this_fun_val == best_fun_val:
-        #             best_para_val.append(value_set)
-        #         else:
-        #             pass
-        #     if in_log_handler:
-        #         if debug or display_p:
-        #             in_log_handler.info("Brute valid/candidate rounds: " + str(count_valid) + "/" + str(count_round))
-        #             in_log_handler.info("Brute best function value: " + str(best_fun_val))
-        #         if debug:
-        #             in_log_handler.info("Best solution: " + str(best_para_val))
-        #     else:
-        #         if debug or display_p:
-        #             sys.stdout.write(
-        #                 "Brute valid/candidate rounds: " + str(count_valid) + "/" + str(count_round) + "\n")
-        #             sys.stdout.write("Brute best function value: " + str(best_fun_val) + "\n")
-        #         if debug:
-        #             sys.stdout.write("Best solution: " + str(best_para_val) + "\n")
-        #     return best_para_val
-
-        vertices_list = sorted(self.vertex_info)
-        if len(vertices_list) == 1:
-            cov_ = self.vertex_info[vertices_list[0]].cov
-            # 2022-12-15, remove return_new_graph
-            # if return_new_graphs:
-            return [{"graph": deepcopy(self), "cov": cov_}]
-            # else:
-            #     if log_handler:
-            #         log_handler.info("Average " + target_name_for_log + " kmer-coverage = " + str(round(cov_, 2)))
-            #     else:
-            #         sys.stdout.write(
-            #             "Average " + target_name_for_log + " kmer-coverage = " + str(round(cov_, 2)) + "\n")
-            #     return
-
-        # reduce expected_average_cov to reduce computational burden
-        all_coverages = [self.vertex_info[v_name].cov for v_name in vertices_list]
-        # max_contig_multiplicity = \
-        #     min(max_contig_multiplicity, int(2 * math.ceil(max(all_coverages) / min(all_coverages))))
-        # if verbose:
-        #     if log_handler:
-        #         log_handler.info("Maximum multiplicity: " + str(max_contig_multiplicity))
-        #     else:
-        #         sys.stdout.write("Maximum multiplicity: " + str(max_contig_multiplicity) + "\n")
-
-        """ create constraints by creating multivariate equations """
-        vertex_to_symbols = {vertex_name: Symbol("V" + vertex_name, integer=True)  # positive=True)
-                             for vertex_name in vertices_list}
-        symbols_to_vertex = {vertex_to_symbols[vertex_name]: vertex_name for vertex_name in vertices_list}
-        extra_str_to_symbol_m1 = {}
-        extra_str_to_symbol_m2 = {}
-        extra_symbol_to_str_m1 = {}
-        extra_symbol_to_str_m2 = {}
-        extra_symbol_initial_values = {}
-        formulae = []
-        recorded_ends = set()
-        for vertex_name in vertices_list:
-            for this_end in (True, False):
-                if (vertex_name, this_end) not in recorded_ends:
-                    recorded_ends.add((vertex_name, this_end))
-                    if self.vertex_info[vertex_name].connections[this_end]:
-                        this_formula = vertex_to_symbols[vertex_name]
-                        formulized = False
-                        for n_v, n_e in self.vertex_info[vertex_name].connections[this_end]:
-                            if (n_v, n_e) not in recorded_ends:
-                                # if n_v in vertices_set:
-                                # recorded_ends.add((n_v, n_e))
-                                try:
-                                    this_formula -= get_formula(n_v, n_e, vertex_name, this_end, recorded_ends)
-                                    formulized = True
-                                    # if verbose:
-                                    #     if log_handler:
-                                    #         log_handler.info("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                    #                          vertex_name + ECHO_DIRECTION[this_end] + ": " +
-                                    #                          str(this_formula))
-                                    #     else:
-                                    #         sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                    #                          vertex_name + ECHO_DIRECTION[this_end] + ": " +
-                                    #                          str(this_formula)+"\n")
-                                except RecursionError:
-                                    if log_handler:
-                                        log_handler.warning("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                                            vertex_name + ECHO_DIRECTION[this_end] + " failed!")
-                                    else:
-                                        sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
-                                                         vertex_name + ECHO_DIRECTION[this_end] + " failed!\n")
-                                    raise ProcessingGraphFailed("RecursionError!")
-                        if verbose:
-                            if log_handler:
-                                log_handler.info(
-                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
-                                    str(this_formula))
-                            else:
-                                sys.stdout.write(
-                                    "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
-                                    str(this_formula) + "\n")
-                        if formulized:
-                            formulae.append(this_formula)
-                    # 2022-12-13 remove this restriction
-                    #            because we have a reduce_list_with_gcd for all graph component
-                    # elif broken_graph_allowed:
-                    #     # Extra limitation to force terminal vertex to have only one copy, to avoid over-estimation
-                    #     # Under-estimation would not be a problem here,
-                    #     # because the True-multiple-copy vertex would simply have no other connections,
-                    #     # or failed in the following estimation if it does
-                    #     formulae.append(vertex_to_symbols[vertex_name] - 1)
-
-        # add self-loop formulae
-        self_loop_v = set()
-        for vertex_name in vertices_list:
-            if self.vertex_info[vertex_name].is_self_loop():
-                self_loop_v.add(vertex_name)
-                if log_handler:
-                    log_handler.warning("Self-loop contig detected: Vertex_" + vertex_name)
-                pseudo_self_loop_str = "P" + vertex_name
-                if pseudo_self_loop_str not in extra_str_to_symbol_m1:
-                    extra_str_to_symbol_m1[pseudo_self_loop_str] = Symbol(pseudo_self_loop_str, integer=True)
-                    extra_symbol_to_str_m1[extra_str_to_symbol_m1[pseudo_self_loop_str]] = pseudo_self_loop_str
-                this_formula = vertex_to_symbols[vertex_name] - extra_str_to_symbol_m1[pseudo_self_loop_str]
-                extra_symbol_initial_values[extra_str_to_symbol_m1[pseudo_self_loop_str]] = \
-                    self.vertex_to_copy[vertex_name]
-                formulae.append(this_formula)
-                if verbose:
-                    if log_handler:
-                        log_handler.info(
-                            "formulating for: " + vertex_name + ECHO_DIRECTION[True] + ": " + str(this_formula))
-                    else:
-                        sys.stdout.write(
-                            "formulating for: " + vertex_name + ECHO_DIRECTION[True] + ": " + str(this_formula) + "\n")
-
-        # add following extra limitation
-        # set cov_sequential_repeat = x*near_by_cov, x is an integer
-        for vertex_name in vertices_list:
-            single_pair_in_the_trunk_path = self.is_sequential_repeat(vertex_name)
-            if single_pair_in_the_trunk_path:
-                (from_v, from_e), (to_v, to_e) = single_pair_in_the_trunk_path
-                # from_v and to_v are already in the "trunk path", if they are the same,
-                # the graph is like two circles sharing the same sequential repeat, no need to add this limitation
-                if from_v != to_v:
-                    new_str = "E" + str(len(extra_str_to_symbol_m1) + len(extra_str_to_symbol_m2))
-                    if vertex_name in self_loop_v:
-                        # self-loop vertex is allowed to have the multiplicity of 1
-                        extra_str_to_symbol_m1[new_str] = Symbol(new_str, integer=True)
-                        extra_symbol_to_str_m1[extra_str_to_symbol_m1[new_str]] = new_str
-                        this_formula = vertex_to_symbols[vertex_name] - \
-                                       vertex_to_symbols[from_v] * extra_str_to_symbol_m1[new_str]
-                        extra_symbol_initial_values[extra_str_to_symbol_m1[new_str]] = \
-                            round(self.vertex_to_float_copy[vertex_name] / self.vertex_to_float_copy[from_v])
-                    else:
-                        extra_str_to_symbol_m2[new_str] = Symbol(new_str, integer=True)
-                        extra_symbol_to_str_m2[extra_str_to_symbol_m2[new_str]] = new_str
-                        this_formula = vertex_to_symbols[vertex_name] - \
-                                       vertex_to_symbols[from_v] * extra_str_to_symbol_m2[new_str]
-                        extra_symbol_initial_values[extra_str_to_symbol_m2[new_str]] = \
-                            round(self.vertex_to_float_copy[vertex_name] / self.vertex_to_float_copy[from_v])
-                    formulae.append(this_formula)
-                    if verbose:
-                        if log_handler:
-                            log_handler.info("formulating for: " + vertex_name + ": " + str(this_formula))
-                        else:
-                            sys.stdout.write("formulating for: " + vertex_name + ": " + str(this_formula) + "\n")
-
-        all_v_symbols = list(symbols_to_vertex)
-        all_symbols = all_v_symbols + list(extra_symbol_to_str_m1) + list(extra_symbol_to_str_m2)
-        if verbose or debug:
-            if log_handler:
-                log_handler.info("formulae: " + str(formulae))
-            else:
-                sys.stdout.write("formulae: " + str(formulae) + "\n")
-        # solve the equations
-        copy_solution = solve(formulae, all_v_symbols)
-
-        copy_solution = copy_solution if copy_solution else {}
-        if type(copy_solution) == list:  # delete 0 containing set, even for self-loop vertex
-            go_solution = 0
-            while go_solution < len(copy_solution):
-                if 0 in set(copy_solution[go_solution].values()):
-                    del copy_solution[go_solution]
-                else:
-                    go_solution += 1
-        if not copy_solution:
-            raise ProcessingGraphFailed("Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (1)!")
-        elif type(copy_solution) == list:
-            if len(copy_solution) > 2:
-                raise ProcessingGraphFailed("Incomplete/Complicated " + target_name_for_log + " graph (2)!")
-            else:
-                copy_solution = copy_solution[0]
-
-        free_copy_variables = list()
-        for symbol_used in all_symbols:
-            if symbol_used not in copy_solution:
-                free_copy_variables.append(symbol_used)
-                copy_solution[symbol_used] = symbol_used
-        if verbose:
-            if log_handler:
-                log_handler.info("copy equations: " + str(copy_solution))
-                log_handler.info("free variables: " + str(free_copy_variables))
-            else:
-                sys.stdout.write("copy equations: " + str(copy_solution) + "\n")
-                sys.stdout.write("free variables: " + str(free_copy_variables) + "\n")
-
-        # """ minimizing equation-based copy's deviations from coverage-based copy values """
-        # least_square_expr = 0
-        # for symbol_used in all_v_symbols:
-        #     # least_square_expr += copy_solution[symbol_used]
-        #     this_vertex = symbols_to_vertex[symbol_used]
-        #     this_copy = self.vertex_to_float_copy[this_vertex]
-        #     least_square_expr += (copy_solution[symbol_used] - this_copy) ** 2  # * self.vertex_info[this_vertex]["len"]
-        # least_square_function = lambdify(args=free_copy_variables, expr=least_square_expr)
-
-        if free_copy_variables:
-            """ Maximize the likelihood of the multinomial distribution of kmers (kmer_cov * contig_len)"""
-            m = GEKKO(remote=False)
-            g_vars = m.Array(m.Var,
-                             len(free_copy_variables),
-                             lb=1,
-                             ub=int(4 * math.ceil(max(all_coverages) / min(all_coverages))),
-                             integer=True)
-            # initialize free variables
-            for go_sym, symbol_used in enumerate(free_copy_variables):
-                if symbol_used in symbols_to_vertex and symbols_to_vertex[symbol_used] in self.vertex_to_copy:
-                    g_vars[go_sym].value = self.vertex_to_copy[symbols_to_vertex[symbol_used]]
-                elif symbol_used in extra_symbol_initial_values:
-                    g_vars[go_sym].value = extra_symbol_initial_values[symbol_used]
-            replacements = [(symbol_used, Symbol("g_vars[" + str(go_sym) + "]"))
-                            for go_sym, symbol_used in enumerate(free_copy_variables)]
-            # account for the influence of the overlap
-            total_len = 0
-            multinomial_loglike_list = []
-            v_to_len = {}
-            v_to_copy = {}
-            v_to_real_len = {}
-            all_obs = []
-            if self.__uni_overlap:
-                for symbol_used in all_v_symbols:
-                    this_vertex = symbols_to_vertex[symbol_used]
-                    v_to_real_len[this_vertex] = self.vertex_info[this_vertex].len - self.__uni_overlap
-                    v_to_copy[this_vertex] = eval(str(copy_solution[symbol_used].subs(replacements)))
-                    v_to_len[this_vertex] = v_to_copy[this_vertex] * v_to_real_len[this_vertex]
-                    total_len += v_to_len[this_vertex]
-                for symbol_used in all_v_symbols:
-                    this_vertex = symbols_to_vertex[symbol_used]
-                    prob = v_to_len[this_vertex] / total_len
-                    obs = self.vertex_info[this_vertex].cov * v_to_real_len[this_vertex]
-                    multinomial_loglike_list.append(m.log(prob) * obs)
-                    all_obs.append(obs)
-                    if verbose:
-                        if log_handler:
-                            log_handler.info("   >" + this_vertex + "\t" + str(obs))  # + "\t" + str(prob)
-                        else:
-                            sys.stdout.write("   >" + this_vertex + "\t" + str(obs) + "\n")
-            else:
-                for symbol_used in all_v_symbols:
-                    this_vertex = symbols_to_vertex[symbol_used]
-                    overlaps = [_ovl
-                                for _strand in (True, False)
-                                for _next, _ovl in self.vertex_info[this_vertex].connections[_strand].items()]
-                    approximate_overlap = average_np_free(overlaps)
-                    v_to_real_len[this_vertex] = self.vertex_info[this_vertex].len - approximate_overlap
-                    v_to_copy[this_vertex] = eval(str(copy_solution[symbol_used].subs(replacements)))
-                    v_to_len[this_vertex] = v_to_copy[this_vertex] * v_to_real_len[this_vertex]
-                    total_len += v_to_len[this_vertex]
-                for symbol_used in all_v_symbols:
-                    this_vertex = symbols_to_vertex[symbol_used]
-                    prob = v_to_len[this_vertex] / total_len
-                    obs = self.vertex_info[this_vertex].cov * v_to_real_len[this_vertex]
-                    multinomial_loglike_list.append(m.log(prob) * obs)
-                    all_obs.append(obs)
-                    if verbose:
-                        if log_handler:
-                            log_handler.info("   >" + this_vertex + "\t" + str(obs))  # + "\t" + str(prob)
-                        else:
-                            sys.stdout.write("   >" + this_vertex + "\t" + str(obs) + "\n")
-            """extra arbitrary restriction to avoid over inflation of copies"""
-            sum_obs = sum(all_obs)
-            multinomial_loglike_list.append(-abs(sum_obs / expected_average_cov - total_len))
-            # """extra restriction to constraint the integer solution for dependant variables"""
-            # for symbol_used in all_v_symbols:
-            #     this_vertex = symbols_to_vertex[symbol_used]
-            #     multinomial_loglike_list.append(sum_obs * (v_to_copy[this_vertex] - int(v_to_copy[this_vertex])) ** 2)
-            """generate the expression"""
-            # multinomial_loglike_expr = m.sum(multinomial_loglike_list) will lead to No solution error
-            multinomial_loglike_expr = sum(multinomial_loglike_list)
-            exp_str_len = len(str(multinomial_loglike_expr))
-            if exp_str_len > 15000:  # not allowed by Gekko:APM
-                num_blocks = math.ceil(exp_str_len / 10000.)
-                block_size = math.ceil(len(multinomial_loglike_list) / float(num_blocks))
-                block_list = []
-                for g_b in range(num_blocks):
-                    block_list.append(sum(multinomial_loglike_list[g_b * block_size: (g_b + 1)* block_size]))
-                multinomial_loglike_expr = m.sum(block_list)
-            # for symbol_used in all_v_symbols:
-            #     this_vertex = symbols_to_vertex[symbol_used]
-            #     total_len += eval(str(copy_solution[symbol_used].subs(replacements))) * self.vertex_info[this_vertex].len
-            # multinomial_like_expr = 0
-            # for symbol_used in all_v_symbols:
-            #     this_vertex = symbols_to_vertex[symbol_used]
-            #     prob = eval(str(copy_solution[symbol_used].subs(replacements))) \
-            #            * self.vertex_info[this_vertex].len / total_len
-            #     obs = self.vertex_info[this_vertex].cov * self.vertex_info[this_vertex].len
-            #     multinomial_like_expr += m.log(prob) * obs
-            #     if verbose:
-            #         if log_handler:
-            #             log_handler.info("   >" + this_vertex + "\t" + str(obs))  # + "\t" + str(prob)
-            #         else:
-            #             sys.stdout.write("   >" + this_vertex + "\t" + str(obs) + "\n")
-
-            # multinomial_like_function = lambdify(args=free_copy_variables, expr=multinomial_like_expr)
-            m.Equations(constraint_min_function_for_gekko(g_vars))
-            m.Maximize(multinomial_loglike_expr)
-            # m.Minimize(least_square_function_v(g_vars))
-            # 1 for APOPT, 2 for BPOPT, 3 for IPOPT, 0 for all available solvers
-            # here only 1 and 3 are available
-            m.options.SOLVER = 1
-            # setting empirical options
-            # 5000 costs ~ 150 sec
-            if n_iterations is None:
-                n_high_copy = sum([math.log2(self.vertex_to_float_copy[_v])
-                                   for _v in self.vertex_info if self.vertex_to_float_copy[_v] > 2])
-                n_iterations = 500 + int(len(self.vertex_info) * n_high_copy)
-            if verbose or debug:
-                log_handler.info("setting n_iterations=" + str(n_iterations))
-            m.solver_options = ['minlp_maximum_iterations ' + str(n_iterations),
-                                # minlp iterations with integer solution
-                                'minlp_max_iter_with_int_sol ' + str(n_iterations),
-                                # treat minlp as nlp
-                                'minlp_as_nlp 0',
-                                # nlp sub-problem max iterations
-                                'nlp_maximum_iterations ' + str(n_iterations),
-                                # 1 = depth first, 2 = breadth first
-                                'minlp_branch_method 2',
-                                # maximum deviation from whole number
-                                'minlp_integer_tol 1.0e-6',
-                                # covergence tolerance
-                                'minlp_gap_tol 1.0e-6']
-            if debug or verbose:
-                m.solve()
-            else:
-                m.solve(disp=False)
-            # print([x.value[0] for x in g_vars])
-            copy_results = list([x.value[0] for x in g_vars])
-
-            # # for safe running
-            # if len(free_copy_variables) > 10:
-            #     raise ProcessingGraphFailed("Free variable > 10 is not accepted yet!")
-            #
-            # if expected_average_cov ** len(free_copy_variables) < 5E6:
-            #     # sometimes, SLSQP ignores bounds and constraints
-            #     copy_results = minimize_brute_force(
-            #         func=least_square_function_v, range_list=[range(1, expected_average_cov + 1)] * len(free_copy_variables),
-            #         constraint_list=({'type': 'ineq', 'fun': constraint_min_function_for_customized_brute},
-            #                          {'type': 'eq', 'fun': constraint_int_function},
-            #                          {'type': 'ineq', 'fun': constraint_max_function}),
-            #         display_p=verbose)
-            # else:
-            #     constraints = ({'type': 'ineq', 'fun': constraint_min_function},
-            #                    {'type': 'eq', 'fun': constraint_int_function},
-            #                    {'type': 'ineq', 'fun': constraint_max_function})
-            #     copy_results = set()
-            #     best_fun = inf
-            #     opt = {'disp': verbose, "maxiter": 100}
-            #     for initial_copy in range(expected_average_cov * 2 + 1):
-            #         if initial_copy < expected_average_cov:
-            #             initials = np.array([initial_copy + 1] * len(free_copy_variables))
-            #         elif initial_copy < expected_average_cov * 2:
-            #             initials = np.array([random.randint(1, expected_average_cov)] * len(free_copy_variables))
-            #         else:
-            #             initials = np.array([self.vertex_to_copy.get(symbols_to_vertex.get(symb, False), 2)
-            #                                  for symb in free_copy_variables])
-            #         bounds = [(1, expected_average_cov) for foo in range(len(free_copy_variables))]
-            #         try:
-            #             copy_result = optimize.minimize(fun=least_square_function_v, x0=initials, jac=False,
-            #                                             method='SLSQP', bounds=bounds, constraints=constraints, options=opt)
-            #         except Exception:
-            #             continue
-            #         if copy_result.fun < best_fun:
-            #             best_fun = round(copy_result.fun, 2)
-            #             copy_results = {tuple(copy_result.x)}
-            #         elif copy_result.fun == best_fun:
-            #             copy_results.add(tuple(copy_result.x))
-            #         else:
-            #             pass
-            #     if debug or verbose:
-            #         if log_handler:
-            #             log_handler.info("Best function value: " + str(best_fun))
-            #         else:
-            #             sys.stdout.write("Best function value: " + str(best_fun) + "\n")
-            if verbose or debug:
-                if log_handler:
-                    log_handler.info("Copy results: " + str(copy_results))
-                else:
-                    sys.stdout.write("Copy results: " + str(copy_results) + "\n")
-            # if len(copy_results) == 1:
-            #     copy_results = list(copy_results)
-            # elif len(copy_results) > 1:
-            #     # draftly sort results by freedom vertices_set
-            #     copy_results = sorted(copy_results, key=lambda
-            #         x: sum([(x[go_sym] - self.vertex_to_float_copy[symbols_to_vertex[symb_used]]) ** 2
-            #                 for go_sym, symb_used in enumerate(free_copy_variables)
-            #                 if symb_used in symbols_to_vertex]))
-            # else:
-            #     raise ProcessingGraphFailed("Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (3)!")
-        else:
-            copy_results = []
-
-        # if return_new_graphs:
-        # """ produce all possible vertex copy combinations """
-        final_results = []
-        all_copy_sets = set()
-        # maybe no more multiple results since 2022-12 gekko update
-        for go_res, copy_result in enumerate([copy_results]):
-            free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
-                                        for i, this_copy in enumerate(copy_result)}
-
-            """ simplify copy values """
-            # 2020-02-22 added to avoid multiplicities res such as: [4, 8, 4]
-            # 2022-12-15 add cluster info to simplify by graph components when the graph is broken
-            all_copies = []
-            v_to_cid = {}
-            for go_id, this_symbol in enumerate(all_v_symbols):
-                vertex_name = symbols_to_vertex[this_symbol]
-                v_to_cid[vertex_name] = go_id
-                this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
-                if this_copy <= 0:
-                    raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
-                all_copies.append(this_copy)
-            if len(self.vertex_clusters) == 1:
-                if len(all_copies) == 0:
-                    raise ProcessingGraphFailed(
-                        "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
-                elif len(all_copies) == 1:
-                    all_copies = [1]
-                elif min(all_copies) == 1:
-                    pass
-                else:
-                    new_all_copies = reduce_list_with_gcd(all_copies)
-                    if verbose and new_all_copies != all_copies:
-                        if log_handler:
-                            log_handler.info("Estimated copies: " + str(all_copies))
-                            log_handler.info("Reduced copies: " + str(new_all_copies))
-                        else:
-                            sys.stdout.write("Estimated copies: " + str(all_copies) + "\n")
-                            sys.stdout.write("Reduced copies: " + str(new_all_copies) + "\n")
-                    all_copies = new_all_copies
-            else:
-                for v_cluster in self.vertex_clusters:
-                    ids = [v_to_cid[_v] for _v in v_cluster]
-                    component_copies = [all_copies[_id] for _id in ids]
-                    if len(component_copies) == 0:
-                        raise ProcessingGraphFailed(
-                            "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
-                    elif len(component_copies) == 1:
-                        component_copies = [1]
-                    elif min(component_copies) == 1:
-                        pass
-                    else:
-                        new_comp_copies = reduce_list_with_gcd(component_copies)
-                        if verbose and new_comp_copies != component_copies:
-                            if log_handler:
-                                log_handler.info("Estimated copies: " + str(component_copies))
-                                log_handler.info("Reduced copies: " + str(new_comp_copies))
-                            else:
-                                sys.stdout.write("Estimated copies: " + str(component_copies) + "\n")
-                                sys.stdout.write("Reduced copies: " + str(new_comp_copies) + "\n")
-                        component_copies = new_comp_copies
-                    for sequential_id, _id in enumerate(ids):
-                        all_copies[_id] = component_copies[sequential_id]
-
-            all_copies = tuple(all_copies)
-            if all_copies not in all_copy_sets:
-                all_copy_sets.add(all_copies)
-            else:
-                continue
-
-            """ record new copy values """
-            final_results.append({"graph": deepcopy(self)})
-            for go_s, this_symbol in enumerate(all_v_symbols):
-                vertex_name = symbols_to_vertex[this_symbol]
-                if vertex_name in final_results[go_res]["graph"].vertex_to_copy:
-                    old_copy = final_results[go_res]["graph"].vertex_to_copy[vertex_name]
-                    final_results[go_res]["graph"].copy_to_vertex[old_copy].remove(vertex_name)
-                    if not final_results[go_res]["graph"].copy_to_vertex[old_copy]:
-                        del final_results[go_res]["graph"].copy_to_vertex[old_copy]
-                this_copy = all_copies[go_s]
-                final_results[go_res]["graph"].vertex_to_copy[vertex_name] = this_copy
-                if this_copy not in final_results[go_res]["graph"].copy_to_vertex:
-                    final_results[go_res]["graph"].copy_to_vertex[this_copy] = set()
-                final_results[go_res]["graph"].copy_to_vertex[this_copy].add(vertex_name)
-
-            """ re-estimate baseline depth """
-            total_product = 0.
-            total_len = 0
-            for vertex_name in vertices_list:
-                this_len = self.vertex_info[vertex_name].len \
-                           * final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)
-                this_cov = self.vertex_info[vertex_name].cov \
-                           / final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)
-                total_len += this_len
-                total_product += this_len * this_cov
-            final_results[go_res]["cov"] = total_product / total_len
-        return final_results
-        # else:
-        #     """ produce the first-ranked copy combination """
-        #     free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
-        #                                 for i, this_copy in enumerate(copy_results)}
-        #
-        #     """ simplify copy values """  # 2020-02-22 added to avoid multiplicities res such as: [4, 8, 4]
-        #     all_copies = []
-        #     for this_symbol in all_v_symbols:
-        #         vertex_name = symbols_to_vertex[this_symbol]
-        #         this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
-        #         if this_copy <= 0:
-        #             raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
-        #         all_copies.append(this_copy)
-        #     if len(all_copies) == 0:
-        #         raise ProcessingGraphFailed(
-        #             "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
-        #     elif len(all_copies) == 1:
-        #         all_copies = [1]
-        #     elif min(all_copies) == 1:
-        #         pass
-        #     else:
-        #         new_all_copies = reduce_list_with_gcd(all_copies)
-        #         if verbose and new_all_copies != all_copies:
-        #             if log_handler:
-        #                 log_handler.info("Estimated copies: " + str(all_copies))
-        #                 log_handler.info("Reduced copies: " + str(new_all_copies))
-        #             else:
-        #                 sys.stdout.write("Estimated copies: " + str(all_copies) + "\n")
-        #                 sys.stdout.write("Reduced copies: " + str(new_all_copies) + "\n")
-        #         all_copies = new_all_copies
-        #
-        #     """ record new copy values """
-        #     for go_s, this_symbol in enumerate(all_v_symbols):
-        #         vertex_name = symbols_to_vertex[this_symbol]
-        #         if vertex_name in self.vertex_to_copy:
-        #             old_copy = self.vertex_to_copy[vertex_name]
-        #             self.copy_to_vertex[old_copy].remove(vertex_name)
-        #             if not self.copy_to_vertex[old_copy]:
-        #                 del self.copy_to_vertex[old_copy]
-        #         this_copy = all_copies[go_s]
-        #         self.vertex_to_copy[vertex_name] = this_copy
-        #         if this_copy not in self.copy_to_vertex:
-        #             self.copy_to_vertex[this_copy] = set()
-        #         self.copy_to_vertex[this_copy].add(vertex_name)
-        #
-        #     if debug or verbose:
-        #         """ re-estimate baseline depth """
-        #         total_product = 0.
-        #         total_len = 0
-        #         for vertex_name in vertices_list:
-        #             this_len = self.vertex_info[vertex_name].len \
-        #                        * self.vertex_to_copy.get(vertex_name, 1)
-        #             this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
-        #             total_len += this_len
-        #             total_product += this_len * this_cov
-        #         new_val = total_product / total_len
-        #         if log_handler:
-        #             log_handler.info("Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)))
-        #         else:
-        #             sys.stdout.write(
-        #                 "Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)) + "\n")
+    # def estimate_copy_and_depth_precisely_using_multinomial(
+    #         self, expected_average_cov,  # broken_graph_allowed=False,
+    #         verbose=False, log_handler=None, debug=False,
+    #         target_name_for_log="target", n_iterations=None):
+    #     """
+    #     Currently problematic because of
+    #     frequently reporting
+    #     Exception: @error: Solution Not Found
+    #
+    #     :param expected_average_cov:
+    #     :param verbose:
+    #     :param log_handler:
+    #     :param debug:
+    #     :param target_name_for_log:
+    #     :return:
+    #     """
+    #     # TODO: to test whether it's better than least-square
+    #
+    #     def get_formula(from_vertex, from_end, back_to_vertex, back_to_end, here_record_ends):
+    #         result_form = vertex_to_symbols[from_vertex]
+    #         here_record_ends.add((from_vertex, from_end))
+    #         # if back_to_vertex ~ from_vertex (from_vertex == back_to_vertex) form a loop, skipped
+    #         if from_vertex != back_to_vertex:
+    #             for next_v, next_e in self.vertex_info[from_vertex].connections[from_end]:
+    #                 # if next_v ~ from_vertex (next_v == from_vertex) form a loop, add a pseudo vertex
+    #                 if (next_v, next_e) == (from_vertex, not from_end):
+    #                     # skip every self-loop 2020-06-23
+    #                     # pseudo_self_circle_str = "P" + from_vertex
+    #                     # if pseudo_self_circle_str not in extra_str_to_symbol_m2:
+    #                     #     extra_str_to_symbol_m2[pseudo_self_circle_str] = Symbol(pseudo_self_circle_str, integer=True)
+    #                     #     extra_symbol_to_str_m2[extra_str_to_symbol_m2[pseudo_self_circle_str]] = pseudo_self_circle_str
+    #                     # result_form -= (extra_str_to_symbol_m2[pseudo_self_circle_str] - 1)
+    #                     pass
+    #                 # elif (next_v, next_e) != (back_to_vertex, back_to_end):
+    #                 elif (next_v, next_e) not in here_record_ends:
+    #                     result_form -= get_formula(next_v, next_e, from_vertex, from_end, here_record_ends)
+    #         return result_form
+    #
+    #     # # for compatibility between scipy and sympy
+    #     # def least_square_function_v(x):
+    #     #     return least_square_function(*tuple(x))
+    #     #
+    #     # """ create constraints by creating inequations: the copy of every contig has to be >= 1 """
+    #     #
+    #     # def constraint_min_function(x):
+    #     #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
+    #     #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
+    #     #     min_copy = np.array([1.001] * len(all_v_symbols) +
+    #     #                         [1.001] * len(extra_symbol_to_str_m1) +
+    #     #                         [2.001] * len(extra_symbol_to_str_m2))
+    #     #     # effect: expression_array >= int(min_copy)
+    #     #     return expression_array - min_copy
+    #     #
+    #     # def constraint_min_function_for_customized_brute(x):
+    #     #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
+    #     #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
+    #     #     min_copy = np.array([1.0] * len(all_v_symbols) +
+    #     #                         [1.0] * len(extra_symbol_to_str_m1) +
+    #     #                         [2.0] * len(extra_symbol_to_str_m2))
+    #     #     # effect: expression_array >= min_copy
+    #     #     return expression_array - min_copy
+    #
+    #     def constraint_min_function_for_gekko(g_vars):
+    #         subs_tuples = [(symb_used_, Symbol("g_vars[" + str(go_sym) + "]"))
+    #                        for go_sym, symb_used_ in enumerate(free_copy_variables)]
+    #         expression_array = [copy_solution[this_sym].subs(subs_tuples) for this_sym in all_symbols]
+    #         min_copy = [1] * len(all_v_symbols) + \
+    #                    [1] * len(extra_symbol_to_str_m1) + \
+    #                    [2] * len(extra_symbol_to_str_m2)
+    #         # effect: expression_array >= min_copy
+    #         expression = []
+    #         if verbose or debug:
+    #             for e, c in zip(expression_array, min_copy):
+    #                 expression.append(eval(str(e) + ">=" + str(c)))
+    #                 log_handler.info("  constraint: " + str(e) + ">=" + str(c))
+    #         else:
+    #             for e, c in zip(expression_array, min_copy):
+    #                 expression.append(eval(str(e) + ">=" + str(c)))
+    #         expression = [expr for expr in expression if not isinstance(expr, bool)]
+    #         return expression
+    #
+    #     # def constraint_max_function(x):
+    #     #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
+    #     #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
+    #     #     max_copy = np.array([expected_average_cov] * len(all_v_symbols) +
+    #     #                         [expected_average_cov] * len(extra_symbol_to_str_m1) +
+    #     #                         [expected_average_cov * 2] * len(extra_symbol_to_str_m2))
+    #     #     # effect: expression_array <= max_copy
+    #     #     return max_copy - expression_array
+    #     #
+    #     # def constraint_int_function(x):
+    #     #     replacements = [(symbol_used, x[go_sym]) for go_sym, symbol_used in enumerate(free_copy_variables)]
+    #     #     expression_array = np.array([copy_solution[this_sym].subs(replacements) for this_sym in all_symbols])
+    #     #     # diff = np.array([0] * len(all_symbols))
+    #     #     return sum([abs(every_copy - int(every_copy)) for every_copy in expression_array])
+    #     #
+    #     # def minimize_brute_force(func, range_list, constraint_list, round_digit=4, display_p=True,
+    #     #                          in_log_handler=log_handler):
+    #     #     # time0 = time.time()
+    #     #     best_fun_val = inf
+    #     #     best_para_val = []
+    #     #     count_round = 0
+    #     #     count_valid = 0
+    #     #     for value_set in product(*[list(this_range) for this_range in range_list]):
+    #     #         count_round += 1
+    #     #         is_valid_set = True
+    #     #         for cons in constraint_list:
+    #     #             if cons["type"] == "ineq":
+    #     #                 try:
+    #     #                     if (cons["fun"](value_set) < 0).any():
+    #     #                         is_valid_set = False
+    #     #                         # if in_log_handler and (debug or display_p):
+    #     #                         #     in_log_handler.info("value_set={} ; illegal ineq constraints".format(value_set))
+    #     #                         break
+    #     #                 except TypeError:
+    #     #                     # if in_log_handler and (debug or display_p):
+    #     #                     #     in_log_handler.info("value_set={} ; illegal ineq constraints".format(value_set))
+    #     #                     is_valid_set = False
+    #     #                     break
+    #     #             elif cons["type"] == "eq":
+    #     #                 try:
+    #     #                     if cons["fun"](value_set) != 0:
+    #     #                         is_valid_set = False
+    #     #                         # if in_log_handler and (debug or display_p):
+    #     #                         #     in_log_handler.info("value_set={} ; illegal eq constraints".format(value_set))
+    #     #                         break
+    #     #                 except TypeError:
+    #     #                     # if in_log_handler and (debug or display_p):
+    #     #                     #     in_log_handler.info("value_set={} ; illegal eq constraints".format(value_set))
+    #     #                     is_valid_set = False
+    #     #                     break
+    #     #         if not is_valid_set:
+    #     #             continue
+    #     #         count_valid += 1
+    #     #         this_fun_val = func(value_set)
+    #     #         if in_log_handler:
+    #     #             if debug or display_p:
+    #     #                 in_log_handler.info("value_set={} ; fun_val={}".format(value_set, this_fun_val))
+    #     #         this_fun_val = round(this_fun_val, round_digit)
+    #     #         if this_fun_val < best_fun_val:
+    #     #             best_para_val = [value_set]
+    #     #             best_fun_val = this_fun_val
+    #     #         elif this_fun_val == best_fun_val:
+    #     #             best_para_val.append(value_set)
+    #     #         else:
+    #     #             pass
+    #     #     if in_log_handler:
+    #     #         if debug or display_p:
+    #     #             in_log_handler.info("Brute valid/candidate rounds: " + str(count_valid) + "/" + str(count_round))
+    #     #             in_log_handler.info("Brute best function value: " + str(best_fun_val))
+    #     #         if debug:
+    #     #             in_log_handler.info("Best solution: " + str(best_para_val))
+    #     #     else:
+    #     #         if debug or display_p:
+    #     #             sys.stdout.write(
+    #     #                 "Brute valid/candidate rounds: " + str(count_valid) + "/" + str(count_round) + "\n")
+    #     #             sys.stdout.write("Brute best function value: " + str(best_fun_val) + "\n")
+    #     #         if debug:
+    #     #             sys.stdout.write("Best solution: " + str(best_para_val) + "\n")
+    #     #     return best_para_val
+    #
+    #     vertices_list = sorted(self.vertex_info)
+    #     if len(vertices_list) == 1:
+    #         cov_ = self.vertex_info[vertices_list[0]].cov
+    #         # 2022-12-15, remove return_new_graph
+    #         # if return_new_graphs:
+    #         return [{"graph": deepcopy(self), "cov": cov_}]
+    #         # else:
+    #         #     if log_handler:
+    #         #         log_handler.info("Average " + target_name_for_log + " kmer-coverage = " + str(round(cov_, 2)))
+    #         #     else:
+    #         #         sys.stdout.write(
+    #         #             "Average " + target_name_for_log + " kmer-coverage = " + str(round(cov_, 2)) + "\n")
+    #         #     return
+    #
+    #     # reduce expected_average_cov to reduce computational burden
+    #     all_coverages = [self.vertex_info[v_name].cov for v_name in vertices_list]
+    #     # max_contig_multiplicity = \
+    #     #     min(max_contig_multiplicity, int(2 * math.ceil(max(all_coverages) / min(all_coverages))))
+    #     # if verbose:
+    #     #     if log_handler:
+    #     #         log_handler.info("Maximum multiplicity: " + str(max_contig_multiplicity))
+    #     #     else:
+    #     #         sys.stdout.write("Maximum multiplicity: " + str(max_contig_multiplicity) + "\n")
+    #
+    #     """ create constraints by creating multivariate equations """
+    #     vertex_to_symbols = {vertex_name: Symbol("V" + vertex_name, integer=True)  # positive=True)
+    #                          for vertex_name in vertices_list}
+    #     symbols_to_vertex = {vertex_to_symbols[vertex_name]: vertex_name for vertex_name in vertices_list}
+    #     extra_str_to_symbol_m1 = {}
+    #     extra_str_to_symbol_m2 = {}
+    #     extra_symbol_to_str_m1 = {}
+    #     extra_symbol_to_str_m2 = {}
+    #     extra_symbol_initial_values = {}
+    #     formulae = []
+    #     recorded_ends = set()
+    #     for vertex_name in vertices_list:
+    #         for this_end in (True, False):
+    #             if (vertex_name, this_end) not in recorded_ends:
+    #                 recorded_ends.add((vertex_name, this_end))
+    #                 if self.vertex_info[vertex_name].connections[this_end]:
+    #                     this_formula = vertex_to_symbols[vertex_name]
+    #                     formulized = False
+    #                     for n_v, n_e in self.vertex_info[vertex_name].connections[this_end]:
+    #                         if (n_v, n_e) not in recorded_ends:
+    #                             # if n_v in vertices_set:
+    #                             # recorded_ends.add((n_v, n_e))
+    #                             try:
+    #                                 this_formula -= get_formula(n_v, n_e, vertex_name, this_end, recorded_ends)
+    #                                 formulized = True
+    #                                 # if verbose:
+    #                                 #     if log_handler:
+    #                                 #         log_handler.info("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+    #                                 #                          vertex_name + ECHO_DIRECTION[this_end] + ": " +
+    #                                 #                          str(this_formula))
+    #                                 #     else:
+    #                                 #         sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+    #                                 #                          vertex_name + ECHO_DIRECTION[this_end] + ": " +
+    #                                 #                          str(this_formula)+"\n")
+    #                             except RecursionError:
+    #                                 if log_handler:
+    #                                     log_handler.warning("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+    #                                                         vertex_name + ECHO_DIRECTION[this_end] + " failed!")
+    #                                 else:
+    #                                     sys.stdout.write("formulating for: " + n_v + ECHO_DIRECTION[n_e] + "->" +
+    #                                                      vertex_name + ECHO_DIRECTION[this_end] + " failed!\n")
+    #                                 raise ProcessingGraphFailed("RecursionError!")
+    #                     if verbose:
+    #                         if log_handler:
+    #                             log_handler.info(
+    #                                 "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
+    #                                 str(this_formula))
+    #                         else:
+    #                             sys.stdout.write(
+    #                                 "formulating for: " + vertex_name + ECHO_DIRECTION[this_end] + ": " +
+    #                                 str(this_formula) + "\n")
+    #                     if formulized:
+    #                         formulae.append(this_formula)
+    #                 # 2022-12-13 remove this restriction
+    #                 #            because we have a reduce_list_with_gcd for all graph component
+    #                 # elif broken_graph_allowed:
+    #                 #     # Extra limitation to force terminal vertex to have only one copy, to avoid over-estimation
+    #                 #     # Under-estimation would not be a problem here,
+    #                 #     # because the True-multiple-copy vertex would simply have no other connections,
+    #                 #     # or failed in the following estimation if it does
+    #                 #     formulae.append(vertex_to_symbols[vertex_name] - 1)
+    #
+    #     # add self-loop formulae
+    #     self_loop_v = set()
+    #     for vertex_name in vertices_list:
+    #         if self.vertex_info[vertex_name].is_self_loop():
+    #             self_loop_v.add(vertex_name)
+    #             if log_handler:
+    #                 log_handler.warning("Self-loop contig detected: Vertex_" + vertex_name)
+    #             pseudo_self_loop_str = "P" + vertex_name
+    #             if pseudo_self_loop_str not in extra_str_to_symbol_m1:
+    #                 extra_str_to_symbol_m1[pseudo_self_loop_str] = Symbol(pseudo_self_loop_str, integer=True)
+    #                 extra_symbol_to_str_m1[extra_str_to_symbol_m1[pseudo_self_loop_str]] = pseudo_self_loop_str
+    #             this_formula = vertex_to_symbols[vertex_name] - extra_str_to_symbol_m1[pseudo_self_loop_str]
+    #             extra_symbol_initial_values[extra_str_to_symbol_m1[pseudo_self_loop_str]] = \
+    #                 self.vertex_to_copy[vertex_name]
+    #             formulae.append(this_formula)
+    #             if verbose:
+    #                 if log_handler:
+    #                     log_handler.info(
+    #                         "formulating for: " + vertex_name + ECHO_DIRECTION[True] + ": " + str(this_formula))
+    #                 else:
+    #                     sys.stdout.write(
+    #                         "formulating for: " + vertex_name + ECHO_DIRECTION[True] + ": " + str(this_formula) + "\n")
+    #
+    #     # add following extra limitation
+    #     # set cov_sequential_repeat = x*near_by_cov, x is an integer
+    #     for vertex_name in vertices_list:
+    #         single_pair_in_the_trunk_path = self.is_sequential_repeat(vertex_name)
+    #         if single_pair_in_the_trunk_path:
+    #             (from_v, from_e), (to_v, to_e) = single_pair_in_the_trunk_path
+    #             # from_v and to_v are already in the "trunk path", if they are the same,
+    #             # the graph is like two circles sharing the same sequential repeat, no need to add this limitation
+    #             if from_v != to_v:
+    #                 new_str = "E" + str(len(extra_str_to_symbol_m1) + len(extra_str_to_symbol_m2))
+    #                 if vertex_name in self_loop_v:
+    #                     # self-loop vertex is allowed to have the multiplicity of 1
+    #                     extra_str_to_symbol_m1[new_str] = Symbol(new_str, integer=True)
+    #                     extra_symbol_to_str_m1[extra_str_to_symbol_m1[new_str]] = new_str
+    #                     this_formula = vertex_to_symbols[vertex_name] - \
+    #                                    vertex_to_symbols[from_v] * extra_str_to_symbol_m1[new_str]
+    #                     extra_symbol_initial_values[extra_str_to_symbol_m1[new_str]] = \
+    #                         round(self.vertex_to_float_copy[vertex_name] / self.vertex_to_float_copy[from_v])
+    #                 else:
+    #                     extra_str_to_symbol_m2[new_str] = Symbol(new_str, integer=True)
+    #                     extra_symbol_to_str_m2[extra_str_to_symbol_m2[new_str]] = new_str
+    #                     this_formula = vertex_to_symbols[vertex_name] - \
+    #                                    vertex_to_symbols[from_v] * extra_str_to_symbol_m2[new_str]
+    #                     extra_symbol_initial_values[extra_str_to_symbol_m2[new_str]] = \
+    #                         round(self.vertex_to_float_copy[vertex_name] / self.vertex_to_float_copy[from_v])
+    #                 formulae.append(this_formula)
+    #                 if verbose:
+    #                     if log_handler:
+    #                         log_handler.info("formulating for: " + vertex_name + ": " + str(this_formula))
+    #                     else:
+    #                         sys.stdout.write("formulating for: " + vertex_name + ": " + str(this_formula) + "\n")
+    #
+    #     all_v_symbols = list(symbols_to_vertex)
+    #     all_symbols = all_v_symbols + list(extra_symbol_to_str_m1) + list(extra_symbol_to_str_m2)
+    #     if verbose or debug:
+    #         if log_handler:
+    #             log_handler.info("formulae: " + str(formulae))
+    #         else:
+    #             sys.stdout.write("formulae: " + str(formulae) + "\n")
+    #     # solve the equations
+    #     copy_solution = solve(formulae, all_v_symbols)
+    #
+    #     copy_solution = copy_solution if copy_solution else {}
+    #     if type(copy_solution) == list:  # delete 0 containing set, even for self-loop vertex
+    #         go_solution = 0
+    #         while go_solution < len(copy_solution):
+    #             if 0 in set(copy_solution[go_solution].values()):
+    #                 del copy_solution[go_solution]
+    #             else:
+    #                 go_solution += 1
+    #     if not copy_solution:
+    #         raise ProcessingGraphFailed("Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (1)!")
+    #     elif type(copy_solution) == list:
+    #         if len(copy_solution) > 2:
+    #             raise ProcessingGraphFailed("Incomplete/Complicated " + target_name_for_log + " graph (2)!")
+    #         else:
+    #             copy_solution = copy_solution[0]
+    #
+    #     free_copy_variables = list()
+    #     for symbol_used in all_symbols:
+    #         if symbol_used not in copy_solution:
+    #             free_copy_variables.append(symbol_used)
+    #             copy_solution[symbol_used] = symbol_used
+    #     if verbose:
+    #         if log_handler:
+    #             log_handler.info("copy equations: " + str(copy_solution))
+    #             log_handler.info("free variables: " + str(free_copy_variables))
+    #         else:
+    #             sys.stdout.write("copy equations: " + str(copy_solution) + "\n")
+    #             sys.stdout.write("free variables: " + str(free_copy_variables) + "\n")
+    #
+    #     # """ minimizing equation-based copy's deviations from coverage-based copy values """
+    #     # least_square_expr = 0
+    #     # for symbol_used in all_v_symbols:
+    #     #     # least_square_expr += copy_solution[symbol_used]
+    #     #     this_vertex = symbols_to_vertex[symbol_used]
+    #     #     this_copy = self.vertex_to_float_copy[this_vertex]
+    #     #     least_square_expr += (copy_solution[symbol_used] - this_copy) ** 2  # * self.vertex_info[this_vertex]["len"]
+    #     # least_square_function = lambdify(args=free_copy_variables, expr=least_square_expr)
+    #
+    #     if free_copy_variables:
+    #         """ Maximize the likelihood of the multinomial distribution of kmers (kmer_cov * contig_len)"""
+    #         m = GEKKO(remote=False)
+    #         g_vars = m.Array(m.Var,
+    #                          len(free_copy_variables),
+    #                          lb=1,
+    #                          ub=int(4 * math.ceil(max(all_coverages) / min(all_coverages))),
+    #                          integer=True)
+    #         # initialize free variables
+    #         for go_sym, symbol_used in enumerate(free_copy_variables):
+    #             if symbol_used in symbols_to_vertex and symbols_to_vertex[symbol_used] in self.vertex_to_copy:
+    #                 g_vars[go_sym].value = self.vertex_to_copy[symbols_to_vertex[symbol_used]]
+    #             elif symbol_used in extra_symbol_initial_values:
+    #                 g_vars[go_sym].value = extra_symbol_initial_values[symbol_used]
+    #         replacements = [(symbol_used, Symbol("g_vars[" + str(go_sym) + "]"))
+    #                         for go_sym, symbol_used in enumerate(free_copy_variables)]
+    #         # account for the influence of the overlap
+    #         total_len = 0
+    #         multinomial_loglike_list = []
+    #         v_to_len = {}
+    #         v_to_copy = {}
+    #         v_to_real_len = {}
+    #         all_obs = []
+    #         if self.__uni_overlap:
+    #             for symbol_used in all_v_symbols:
+    #                 this_vertex = symbols_to_vertex[symbol_used]
+    #                 v_to_real_len[this_vertex] = self.vertex_info[this_vertex].len - self.__uni_overlap
+    #                 v_to_copy[this_vertex] = eval(str(copy_solution[symbol_used].subs(replacements)))
+    #                 v_to_len[this_vertex] = v_to_copy[this_vertex] * v_to_real_len[this_vertex]
+    #                 total_len += v_to_len[this_vertex]
+    #             for symbol_used in all_v_symbols:
+    #                 this_vertex = symbols_to_vertex[symbol_used]
+    #                 prob = v_to_len[this_vertex] / total_len
+    #                 obs = self.vertex_info[this_vertex].cov * v_to_real_len[this_vertex]
+    #                 multinomial_loglike_list.append(m.log(prob) * obs)
+    #                 all_obs.append(obs)
+    #                 if verbose:
+    #                     if log_handler:
+    #                         log_handler.info("   >" + this_vertex + "\t" + str(obs))  # + "\t" + str(prob)
+    #                     else:
+    #                         sys.stdout.write("   >" + this_vertex + "\t" + str(obs) + "\n")
+    #         else:
+    #             for symbol_used in all_v_symbols:
+    #                 this_vertex = symbols_to_vertex[symbol_used]
+    #                 overlaps = [_ovl
+    #                             for _strand in (True, False)
+    #                             for _next, _ovl in self.vertex_info[this_vertex].connections[_strand].items()]
+    #                 approximate_overlap = average_np_free(overlaps)
+    #                 v_to_real_len[this_vertex] = self.vertex_info[this_vertex].len - approximate_overlap
+    #                 v_to_copy[this_vertex] = eval(str(copy_solution[symbol_used].subs(replacements)))
+    #                 v_to_len[this_vertex] = v_to_copy[this_vertex] * v_to_real_len[this_vertex]
+    #                 total_len += v_to_len[this_vertex]
+    #             for symbol_used in all_v_symbols:
+    #                 this_vertex = symbols_to_vertex[symbol_used]
+    #                 prob = v_to_len[this_vertex] / total_len
+    #                 obs = self.vertex_info[this_vertex].cov * v_to_real_len[this_vertex]
+    #                 multinomial_loglike_list.append(m.log(prob) * obs)
+    #                 all_obs.append(obs)
+    #                 if verbose:
+    #                     if log_handler:
+    #                         log_handler.info("   >" + this_vertex + "\t" + str(obs))  # + "\t" + str(prob)
+    #                     else:
+    #                         sys.stdout.write("   >" + this_vertex + "\t" + str(obs) + "\n")
+    #         """extra arbitrary restriction to avoid over inflation of copies"""
+    #         sum_obs = sum(all_obs)
+    #         multinomial_loglike_list.append(-abs(sum_obs / expected_average_cov - total_len))
+    #         # """extra restriction to constraint the integer solution for dependant variables"""
+    #         # for symbol_used in all_v_symbols:
+    #         #     this_vertex = symbols_to_vertex[symbol_used]
+    #         #     multinomial_loglike_list.append(sum_obs * (v_to_copy[this_vertex] - int(v_to_copy[this_vertex])) ** 2)
+    #         """generate the expression"""
+    #         # multinomial_loglike_expr = m.sum(multinomial_loglike_list) will lead to No solution error
+    #         multinomial_loglike_expr = sum(multinomial_loglike_list)
+    #         exp_str_len = len(str(multinomial_loglike_expr))
+    #         if exp_str_len > 15000:  # not allowed by Gekko:APM
+    #             num_blocks = math.ceil(exp_str_len / 10000.)
+    #             block_size = math.ceil(len(multinomial_loglike_list) / float(num_blocks))
+    #             block_list = []
+    #             for g_b in range(num_blocks):
+    #                 block_list.append(sum(multinomial_loglike_list[g_b * block_size: (g_b + 1)* block_size]))
+    #             multinomial_loglike_expr = m.sum(block_list)
+    #         # for symbol_used in all_v_symbols:
+    #         #     this_vertex = symbols_to_vertex[symbol_used]
+    #         #     total_len += eval(str(copy_solution[symbol_used].subs(replacements))) * self.vertex_info[this_vertex].len
+    #         # multinomial_like_expr = 0
+    #         # for symbol_used in all_v_symbols:
+    #         #     this_vertex = symbols_to_vertex[symbol_used]
+    #         #     prob = eval(str(copy_solution[symbol_used].subs(replacements))) \
+    #         #            * self.vertex_info[this_vertex].len / total_len
+    #         #     obs = self.vertex_info[this_vertex].cov * self.vertex_info[this_vertex].len
+    #         #     multinomial_like_expr += m.log(prob) * obs
+    #         #     if verbose:
+    #         #         if log_handler:
+    #         #             log_handler.info("   >" + this_vertex + "\t" + str(obs))  # + "\t" + str(prob)
+    #         #         else:
+    #         #             sys.stdout.write("   >" + this_vertex + "\t" + str(obs) + "\n")
+    #
+    #         # multinomial_like_function = lambdify(args=free_copy_variables, expr=multinomial_like_expr)
+    #         m.Equations(constraint_min_function_for_gekko(g_vars))
+    #         m.Maximize(multinomial_loglike_expr)
+    #         # m.Minimize(least_square_function_v(g_vars))
+    #         # 1 for APOPT, 2 for BPOPT, 3 for IPOPT, 0 for all available solvers
+    #         # here only 1 and 3 are available
+    #         m.options.SOLVER = 1
+    #         # setting empirical options
+    #         # 5000 costs ~ 150 sec
+    #         if n_iterations is None:
+    #             n_high_copy = sum([math.log2(self.vertex_to_float_copy[_v])
+    #                                for _v in self.vertex_info if self.vertex_to_float_copy[_v] > 2])
+    #             n_iterations = 500 + int(len(self.vertex_info) * n_high_copy)
+    #         if verbose or debug:
+    #             log_handler.info("setting n_iterations=" + str(n_iterations))
+    #         m.solver_options = ['minlp_maximum_iterations ' + str(n_iterations),
+    #                             # minlp iterations with integer solution
+    #                             'minlp_max_iter_with_int_sol ' + str(n_iterations),
+    #                             # treat minlp as nlp
+    #                             'minlp_as_nlp 0',
+    #                             # nlp sub-problem max iterations
+    #                             'nlp_maximum_iterations ' + str(n_iterations),
+    #                             # 1 = depth first, 2 = breadth first
+    #                             'minlp_branch_method 2',
+    #                             # maximum deviation from whole number
+    #                             'minlp_integer_tol 1.0e-6',
+    #                             # covergence tolerance
+    #                             'minlp_gap_tol 1.0e-6']
+    #         if debug or verbose:
+    #             m.solve()
+    #         else:
+    #             m.solve(disp=False)
+    #         # print([x.value[0] for x in g_vars])
+    #         copy_results = list([x.value[0] for x in g_vars])
+    #
+    #         # # for safe running
+    #         # if len(free_copy_variables) > 10:
+    #         #     raise ProcessingGraphFailed("Free variable > 10 is not accepted yet!")
+    #         #
+    #         # if expected_average_cov ** len(free_copy_variables) < 5E6:
+    #         #     # sometimes, SLSQP ignores bounds and constraints
+    #         #     copy_results = minimize_brute_force(
+    #         #         func=least_square_function_v, range_list=[range(1, expected_average_cov + 1)] * len(free_copy_variables),
+    #         #         constraint_list=({'type': 'ineq', 'fun': constraint_min_function_for_customized_brute},
+    #         #                          {'type': 'eq', 'fun': constraint_int_function},
+    #         #                          {'type': 'ineq', 'fun': constraint_max_function}),
+    #         #         display_p=verbose)
+    #         # else:
+    #         #     constraints = ({'type': 'ineq', 'fun': constraint_min_function},
+    #         #                    {'type': 'eq', 'fun': constraint_int_function},
+    #         #                    {'type': 'ineq', 'fun': constraint_max_function})
+    #         #     copy_results = set()
+    #         #     best_fun = inf
+    #         #     opt = {'disp': verbose, "maxiter": 100}
+    #         #     for initial_copy in range(expected_average_cov * 2 + 1):
+    #         #         if initial_copy < expected_average_cov:
+    #         #             initials = np.array([initial_copy + 1] * len(free_copy_variables))
+    #         #         elif initial_copy < expected_average_cov * 2:
+    #         #             initials = np.array([random.randint(1, expected_average_cov)] * len(free_copy_variables))
+    #         #         else:
+    #         #             initials = np.array([self.vertex_to_copy.get(symbols_to_vertex.get(symb, False), 2)
+    #         #                                  for symb in free_copy_variables])
+    #         #         bounds = [(1, expected_average_cov) for foo in range(len(free_copy_variables))]
+    #         #         try:
+    #         #             copy_result = optimize.minimize(fun=least_square_function_v, x0=initials, jac=False,
+    #         #                                             method='SLSQP', bounds=bounds, constraints=constraints, options=opt)
+    #         #         except Exception:
+    #         #             continue
+    #         #         if copy_result.fun < best_fun:
+    #         #             best_fun = round(copy_result.fun, 2)
+    #         #             copy_results = {tuple(copy_result.x)}
+    #         #         elif copy_result.fun == best_fun:
+    #         #             copy_results.add(tuple(copy_result.x))
+    #         #         else:
+    #         #             pass
+    #         #     if debug or verbose:
+    #         #         if log_handler:
+    #         #             log_handler.info("Best function value: " + str(best_fun))
+    #         #         else:
+    #         #             sys.stdout.write("Best function value: " + str(best_fun) + "\n")
+    #         if verbose or debug:
+    #             if log_handler:
+    #                 log_handler.info("Copy results: " + str(copy_results))
+    #             else:
+    #                 sys.stdout.write("Copy results: " + str(copy_results) + "\n")
+    #         # if len(copy_results) == 1:
+    #         #     copy_results = list(copy_results)
+    #         # elif len(copy_results) > 1:
+    #         #     # draftly sort results by freedom vertices_set
+    #         #     copy_results = sorted(copy_results, key=lambda
+    #         #         x: sum([(x[go_sym] - self.vertex_to_float_copy[symbols_to_vertex[symb_used]]) ** 2
+    #         #                 for go_sym, symb_used in enumerate(free_copy_variables)
+    #         #                 if symb_used in symbols_to_vertex]))
+    #         # else:
+    #         #     raise ProcessingGraphFailed("Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (3)!")
+    #     else:
+    #         copy_results = []
+    #
+    #     # if return_new_graphs:
+    #     # """ produce all possible vertex copy combinations """
+    #     final_results = []
+    #     all_copy_sets = set()
+    #     # maybe no more multiple results since 2022-12 gekko update
+    #     for go_res, copy_result in enumerate([copy_results]):
+    #         free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
+    #                                     for i, this_copy in enumerate(copy_result)}
+    #
+    #         """ simplify copy values """
+    #         # 2020-02-22 added to avoid multiplicities res such as: [4, 8, 4]
+    #         # 2022-12-15 add cluster info to simplify by graph components when the graph is broken
+    #         all_copies = []
+    #         v_to_cid = {}
+    #         for go_id, this_symbol in enumerate(all_v_symbols):
+    #             vertex_name = symbols_to_vertex[this_symbol]
+    #             v_to_cid[vertex_name] = go_id
+    #             this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
+    #             if this_copy <= 0:
+    #                 raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
+    #             all_copies.append(this_copy)
+    #         if len(self.vertex_clusters) == 1:
+    #             if len(all_copies) == 0:
+    #                 raise ProcessingGraphFailed(
+    #                     "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
+    #             elif len(all_copies) == 1:
+    #                 all_copies = [1]
+    #             elif min(all_copies) == 1:
+    #                 pass
+    #             else:
+    #                 new_all_copies = reduce_list_with_gcd(all_copies)
+    #                 if verbose and new_all_copies != all_copies:
+    #                     if log_handler:
+    #                         log_handler.info("Estimated copies: " + str(all_copies))
+    #                         log_handler.info("Reduced copies: " + str(new_all_copies))
+    #                     else:
+    #                         sys.stdout.write("Estimated copies: " + str(all_copies) + "\n")
+    #                         sys.stdout.write("Reduced copies: " + str(new_all_copies) + "\n")
+    #                 all_copies = new_all_copies
+    #         else:
+    #             for v_cluster in self.vertex_clusters:
+    #                 ids = [v_to_cid[_v] for _v in v_cluster]
+    #                 component_copies = [all_copies[_id] for _id in ids]
+    #                 if len(component_copies) == 0:
+    #                     raise ProcessingGraphFailed(
+    #                         "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
+    #                 elif len(component_copies) == 1:
+    #                     component_copies = [1]
+    #                 elif min(component_copies) == 1:
+    #                     pass
+    #                 else:
+    #                     new_comp_copies = reduce_list_with_gcd(component_copies)
+    #                     if verbose and new_comp_copies != component_copies:
+    #                         if log_handler:
+    #                             log_handler.info("Estimated copies: " + str(component_copies))
+    #                             log_handler.info("Reduced copies: " + str(new_comp_copies))
+    #                         else:
+    #                             sys.stdout.write("Estimated copies: " + str(component_copies) + "\n")
+    #                             sys.stdout.write("Reduced copies: " + str(new_comp_copies) + "\n")
+    #                     component_copies = new_comp_copies
+    #                 for sequential_id, _id in enumerate(ids):
+    #                     all_copies[_id] = component_copies[sequential_id]
+    #
+    #         all_copies = tuple(all_copies)
+    #         if all_copies not in all_copy_sets:
+    #             all_copy_sets.add(all_copies)
+    #         else:
+    #             continue
+    #
+    #         """ record new copy values """
+    #         final_results.append({"graph": deepcopy(self)})
+    #         for go_s, this_symbol in enumerate(all_v_symbols):
+    #             vertex_name = symbols_to_vertex[this_symbol]
+    #             if vertex_name in final_results[go_res]["graph"].vertex_to_copy:
+    #                 old_copy = final_results[go_res]["graph"].vertex_to_copy[vertex_name]
+    #                 final_results[go_res]["graph"].copy_to_vertex[old_copy].remove(vertex_name)
+    #                 if not final_results[go_res]["graph"].copy_to_vertex[old_copy]:
+    #                     del final_results[go_res]["graph"].copy_to_vertex[old_copy]
+    #             this_copy = all_copies[go_s]
+    #             final_results[go_res]["graph"].vertex_to_copy[vertex_name] = this_copy
+    #             if this_copy not in final_results[go_res]["graph"].copy_to_vertex:
+    #                 final_results[go_res]["graph"].copy_to_vertex[this_copy] = set()
+    #             final_results[go_res]["graph"].copy_to_vertex[this_copy].add(vertex_name)
+    #
+    #         """ re-estimate baseline depth """
+    #         total_product = 0.
+    #         total_len = 0
+    #         for vertex_name in vertices_list:
+    #             this_len = self.vertex_info[vertex_name].len \
+    #                        * final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)
+    #             this_cov = self.vertex_info[vertex_name].cov \
+    #                        / final_results[go_res]["graph"].vertex_to_copy.get(vertex_name, 1)
+    #             total_len += this_len
+    #             total_product += this_len * this_cov
+    #         final_results[go_res]["cov"] = total_product / total_len
+    #     return final_results
+    #     # else:
+    #     #     """ produce the first-ranked copy combination """
+    #     #     free_copy_variables_dict = {free_copy_variables[i]: int(this_copy)
+    #     #                                 for i, this_copy in enumerate(copy_results)}
+    #     #
+    #     #     """ simplify copy values """  # 2020-02-22 added to avoid multiplicities res such as: [4, 8, 4]
+    #     #     all_copies = []
+    #     #     for this_symbol in all_v_symbols:
+    #     #         vertex_name = symbols_to_vertex[this_symbol]
+    #     #         this_copy = int(copy_solution[this_symbol].evalf(subs=free_copy_variables_dict, chop=True))
+    #     #         if this_copy <= 0:
+    #     #             raise ProcessingGraphFailed("Cannot identify copy number of " + vertex_name + "!")
+    #     #         all_copies.append(this_copy)
+    #     #     if len(all_copies) == 0:
+    #     #         raise ProcessingGraphFailed(
+    #     #             "Incomplete/Complicated/Unsolvable " + target_name_for_log + " graph (4)!")
+    #     #     elif len(all_copies) == 1:
+    #     #         all_copies = [1]
+    #     #     elif min(all_copies) == 1:
+    #     #         pass
+    #     #     else:
+    #     #         new_all_copies = reduce_list_with_gcd(all_copies)
+    #     #         if verbose and new_all_copies != all_copies:
+    #     #             if log_handler:
+    #     #                 log_handler.info("Estimated copies: " + str(all_copies))
+    #     #                 log_handler.info("Reduced copies: " + str(new_all_copies))
+    #     #             else:
+    #     #                 sys.stdout.write("Estimated copies: " + str(all_copies) + "\n")
+    #     #                 sys.stdout.write("Reduced copies: " + str(new_all_copies) + "\n")
+    #     #         all_copies = new_all_copies
+    #     #
+    #     #     """ record new copy values """
+    #     #     for go_s, this_symbol in enumerate(all_v_symbols):
+    #     #         vertex_name = symbols_to_vertex[this_symbol]
+    #     #         if vertex_name in self.vertex_to_copy:
+    #     #             old_copy = self.vertex_to_copy[vertex_name]
+    #     #             self.copy_to_vertex[old_copy].remove(vertex_name)
+    #     #             if not self.copy_to_vertex[old_copy]:
+    #     #                 del self.copy_to_vertex[old_copy]
+    #     #         this_copy = all_copies[go_s]
+    #     #         self.vertex_to_copy[vertex_name] = this_copy
+    #     #         if this_copy not in self.copy_to_vertex:
+    #     #             self.copy_to_vertex[this_copy] = set()
+    #     #         self.copy_to_vertex[this_copy].add(vertex_name)
+    #     #
+    #     #     if debug or verbose:
+    #     #         """ re-estimate baseline depth """
+    #     #         total_product = 0.
+    #     #         total_len = 0
+    #     #         for vertex_name in vertices_list:
+    #     #             this_len = self.vertex_info[vertex_name].len \
+    #     #                        * self.vertex_to_copy.get(vertex_name, 1)
+    #     #             this_cov = self.vertex_info[vertex_name].cov / self.vertex_to_copy.get(vertex_name, 1)
+    #     #             total_len += this_len
+    #     #             total_product += this_len * this_cov
+    #     #         new_val = total_product / total_len
+    #     #         if log_handler:
+    #     #             log_handler.info("Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)))
+    #     #         else:
+    #     #             sys.stdout.write(
+    #     #                 "Average " + target_name_for_log + " kmer-coverage = " + str(round(new_val, 2)) + "\n")
 
     def estimate_copy_and_depth_precisely(self, expected_average_cov=None,  # broken_graph_allowed=False,
                                           verbose=False, log_handler=None, debug=False,
@@ -2402,10 +2402,17 @@ class Assembly(SimpleAssembly):
                             'minlp_integer_tol 1.0e-2',
                             # covergence tolerance
                             'minlp_gap_tol %.0e' % single_variations[0]]
-        if debug or verbose:
-            m.solve()
-        else:
-            m.solve(disp=False)
+        try:
+            if debug or verbose:
+                m.solve()
+            else:
+                m.solve(disp=False)
+        except Exception as e:
+            # TODO adjust parameters according to apm result, currently I do not know how to load apm result
+            if "Solution Not Found" in str(e):
+                raise ProcessingGraphFailed("Solution not found by apm for current graph!")
+            else:
+                raise e
         copy_results = list([x.value[0] for x in v_vars])
         if debug or verbose:
             for go_v, vertex_name in enumerate(vertices_list):
@@ -3504,9 +3511,9 @@ class Assembly(SimpleAssembly):
                     # 2.3. remove redundant tags that occur in parallel vertices
                     if verbose and log_handler:
                         log_handler.info("  negatizing parallel tags: " + locus_type + ":" + locus_name)
-                    single_locus_vs = {rec["vertex"]: go_r for go_r, rec in enumerate(single_locus_info)}
+                    v_to_sl_id = {rec["vertex"]: go_r for go_r, rec in enumerate(single_locus_info)}
                     parallel_vertices_list = self.detect_parallel_vertices(
-                        limited_vertices=list(single_locus_vs),
+                        limited_vertices=list(v_to_sl_id),
                         detect_neighbors=False)
                     if parallel_vertices_list:
                         rm_r_ids = set()
@@ -3516,15 +3523,15 @@ class Assembly(SimpleAssembly):
                             prl_vertices = sorted(
                                 prl_vertices_set,
                                 key=lambda x: (
-                                    -single_locus_info[single_locus_vs[x[0]]]["weight"],
+                                    -single_locus_info[v_to_sl_id[x[0]]]["weight"],
                                     -self.vertex_info[x[0]].cov))
                             up_v, up_e = prl_vertices[0]
-                            up_id = single_locus_vs[up_v]
+                            up_id = v_to_sl_id[up_v]
                             up_lb = labels[up_id]
                             up_sigma = gmm_scheme["parameters"][up_lb]["sigma"]
                             up_cov = self.vertex_info[up_v].cov
                             for de_name, de_end in prl_vertices[1:]:
-                                de_id = single_locus_vs[de_name]
+                                de_id = v_to_sl_id[de_name]
                                 de_lb = labels[de_id]
                                 de_sigma = gmm_scheme["parameters"][de_lb]["sigma"]
                                 de_cov = self.vertex_info[de_name].cov
@@ -3542,10 +3549,10 @@ class Assembly(SimpleAssembly):
                                              str([single_locus_info[_r]["vertex"] for _r in ne_r_ids]) +
                                              " de-weighted: " +
                                              str([single_locus_info[_r]["vertex"] for _r in rm_r_ids]))
-                        for rm_id in sorted(rm_r_ids, reverse=True):
-                            del single_locus_info[rm_id]
                         for go_r in ne_r_ids:
                             single_locus_info[go_r]["weight"] = -1 * abs(single_locus_info[go_r]["weight"])
+                        for rm_id in sorted(rm_r_ids, reverse=True):
+                            del single_locus_info[rm_id]
 
                     # 2.4 search for the linear tags maximize the total gene weight
                     if verbose and log_handler:

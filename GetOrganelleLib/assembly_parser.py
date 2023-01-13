@@ -4670,6 +4670,20 @@ class Assembly(SimpleAssembly):
                     _this_dbs = [mode]
                 _assembly.write_out_tags(_this_dbs, _selected_graph[:-3] + "csv")
 
+        def check_remaining_singleton():
+            if len(new_assembly.vertex_info) == 1:
+                the_only_v = list(new_assembly.vertex_info)[0]
+                if the_only_v in new_assembly.tagged_vertices[db_name]:
+                    if new_assembly.vertex_info[the_only_v].is_self_loop() or broken_graph_allowed:
+                        return True
+                    else:
+                        if verbose:
+                            raise ProcessingGraphFailed("Linear graph: " + the_only_v + "! # tags: " +
+                                                        str(new_assembly.vertex_info[the_only_v].other_attr.
+                                                            get("tags", {db_name: ""})[db_name]))
+                        else:
+                            raise ProcessingGraphFailed("Linear graph")
+
         if broken_graph_allowed and not meta:
             weight_factor = 10000.
 
@@ -4883,15 +4897,13 @@ class Assembly(SimpleAssembly):
                                 changed = True
 
                                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "e")
-                        if len(new_assembly.vertex_info) == 1 and \
-                                list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                        if check_remaining_singleton():
                             break
 
                     # merge vertices_set
                     new_assembly.merge_all_possible_vertices()
                     new_assembly.tag_in_between()
-                    if len(new_assembly.vertex_info) == 1 and \
-                            list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                    if check_remaining_singleton():
                         break
 
                     # no tip contigs allowed
@@ -4950,14 +4962,12 @@ class Assembly(SimpleAssembly):
                                             "removing terminal contigs: " + str(delete_those_vertices) + "\n")
                                 new_assembly.remove_vertex(delete_those_vertices)
                                 changed = True
-                            if len(new_assembly.vertex_info) == 1 and \
-                                    list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                            if check_remaining_singleton():
                                 break
 
                     # merge vertices_set
                     new_assembly.merge_all_possible_vertices()
-                    if len(new_assembly.vertex_info) == 1 and \
-                            list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                    if check_remaining_singleton():
                         break
                     new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
                         new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
@@ -4974,8 +4984,7 @@ class Assembly(SimpleAssembly):
                     write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "g")
 
                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "h")
-                if len(new_assembly.vertex_info) == 1 and \
-                        list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                if check_remaining_singleton():
                     pass
                 else:
                     new_assembly.processing_polymorphism(database_name=db_name,
@@ -4996,8 +5005,7 @@ class Assembly(SimpleAssembly):
                         verbose=verbose,
                         mode="all",
                         debug=debug)
-                    if len(new_assembly.vertex_info) == 1 and \
-                            list(new_assembly.vertex_info)[0] in new_assembly.tagged_vertices[db_name]:
+                    if check_remaining_singleton():
                         final_res_combinations = [{"graph": new_assembly, "cov": new_average_cov}]
                     else:
                         final_res_combinations = new_assembly.estimate_copy_and_depth_precisely(

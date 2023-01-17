@@ -16,7 +16,6 @@ import sys
 import os
 from copy import deepcopy
 from shutil import copyfile, rmtree
-
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import platform
 
@@ -359,13 +358,13 @@ def get_options(description, version):
             sys.exit()
         else:
             lib_versions_info.append("numpy " + np.__version__)
-        try:
-            import sympy
-        except ImportError:
-            log_handler.error("sympy is not available! Please install sympy!")
-            sys.exit()
-        else:
-            lib_versions_info.append("sympy " + sympy.__version__)
+        # try:
+        #     import sympy
+        # except ImportError:
+        #     log_handler.error("sympy is not available! Please install sympy!")
+        #     sys.exit()
+        # else:
+        #     lib_versions_info.append("sympy " + sympy.__version__)
         try:
             import gekko
         except ImportError:
@@ -506,13 +505,8 @@ def get_options(description, version):
                 log_handler.info("Options \"" + " ".join(remove_ops) +
                                  "\" taken/invalid for wrapped slim_graph.py, removed.")
                 options.slim_options = " ".join(slim_op_parts)
-        random.seed(options.random_seed)
-        try:
-            import numpy as np
-        except ImportError:
-            pass
-        else:
-            np.random.seed(options.random_seed)
+        # random.seed(options.random_seed)
+        # np.random.seed(options.random_seed)
         return options, log_handler
 
 
@@ -582,6 +576,29 @@ def slim_assembly_graph(organelle_types, in_custom, ex_custom, graph_in, graph_o
 def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_prefix, organelle_type, blast_db,
                              verbose, log_handler, expected_maximum_size, expected_minimum_size, no_slim, options):
     from GetOrganelleLib.assembly_parser import Assembly, ProcessingGraphFailed
+    import random
+    random.seed(options.random_seed)
+
+    # import numpy as np
+
+    # testing random effect
+    # import random as rd_standard
+    #
+    # np.random.seed(options.random_seed)
+    # class test_random:
+    #     def __init__(self):
+    #         rd_standard.seed(options.random_seed)
+    #         self.rd = rd_standard
+    #     def random(self):
+    #         print("random", self.rd.random())
+    #         return self.rd.random()
+    #     def choice(self, *vars, **kwargs):
+    #         print("choice", self.rd.random())
+    #         return self.rd.choice(*vars, **kwargs)
+    #     def choices(self, *vars, **kwargs):
+    #         print("choices", self.rd.random())
+    #         return self.rd.choices(*vars, **kwargs)
+    # random = test_random()
 
     def disentangle_assembly(assembly_obj, fastg_file, tab_file, output, weight_factor, log_dis, time_limit,
                              type_factor=3.,
@@ -622,7 +639,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                         max_gene_gap=250,
                         max_cov_diff=hard_c_t,  # contamination_depth?
                         verbose=verbose,
-                        log_handler=log_handler)
+                        log_handler=log_handler,
+                        random_obj=random)
                     if in_temp_graph:
                         if in_temp_graph.endswith(".gfa"):
                             this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"
@@ -656,7 +674,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                                                broken_graph_allowed=acyclic_allowed_in,
                                                                log_handler=log_in, verbose=verbose_in,
                                                                temp_graph=in_temp_graph,
-                                                               selected_graph=selected_graph)
+                                                               selected_graph=selected_graph,
+                                                               random_obj=random)
             if not target_results:
                 raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
@@ -859,7 +878,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         max_gene_gap=250,
         max_cov_diff=options.depth_factor,  # contamination_depth?
         verbose=verbose,
-        log_handler=log_handler)
+        log_handler=log_handler,
+        random_obj=random)
 
     # start
     timeout_flag = "'--disentangle-time-limit'"
@@ -952,7 +972,8 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                  tab_file=slim_out_csv, output=path_prefix,
                                  weight_factor=options.weight_factor, type_factor=options.type_factor,
                                  here_verbose=verbose, log_dis=log_handler,
-                                 hard_cov_threshold=options.depth_factor * 0.8,
+                                 hard_cov_threshold=options.depth_factor * 0.6,
+                                 # TODO the adjustment should be changed if it's RNA data
                                  contamination_depth=options.contamination_depth,
                                  contamination_similarity=options.contamination_similarity,
                                  degenerate=options.degenerate,

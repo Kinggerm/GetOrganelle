@@ -664,17 +664,17 @@ def get_options(description, version):
         lib_not_available = []
         lib_versions_info.append("GetOrganelleLib " + GetOrganelleLib.__version__)
         try:
-            import numpy
+            import numpy as np
         except ImportError:
             lib_not_available.append("numpy")
         else:
-            lib_versions_info.append("numpy " + numpy.__version__)
-        try:
-            import sympy
-        except ImportError:
-            lib_not_available.append("sympy")
-        else:
-            lib_versions_info.append("sympy " + sympy.__version__)
+            lib_versions_info.append("numpy " + np.__version__)
+        # try:
+        #     import sympy
+        # except ImportError:
+        #     lib_not_available.append("sympy")
+        # else:
+        #     lib_versions_info.append("sympy " + sympy.__version__)
         try:
             import gekko
         except ImportError:
@@ -1559,7 +1559,7 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
                     simulate_fq_simple(from_fasta_file=this_modified_graph,
                                        out_dir=seed_fq_files[go_t] + ".spades",
                                        out_name="get_org.assembly_graph.simulated.fq",
-                                       sim_read_jump_size=7, resume=resume)
+                                       sim_read_jump_size=7, resume=resume, random_obj=random)
                     closest_seed_f = os.path.join(seed_fq_files[go_t] + ".spades", "get_org.closest_seed.fasta")
                     seed_seq_list = SequenceList(seed_fs_files[go_t])
                     for seq_record in seed_seq_list:
@@ -3343,6 +3343,9 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                              expected_maximum_size, expected_minimum_size, do_spades_scaffolding, options):
 
     from GetOrganelleLib.assembly_parser import ProcessingGraphFailed, Assembly
+    random.seed(options.random_seed)
+    # import numpy as np
+    # np.random.seed(options.random_seed)
 
     def disentangle_assembly(assembly_obj, fastg_file, tab_file, output, weight_factor, log_dis, time_limit,
                              type_factor=3.,
@@ -3392,7 +3395,9 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         max_gene_gap=250,
                         max_cov_diff=hard_c_t,  # contamination_depth?
                         verbose=verbose,
-                        log_handler=log_handler)
+                        log_handler=log_handler,
+                        random_obj=random,
+                        np_rd_obj=np.random)
                     if in_temp_graph:
                         if in_temp_graph.endswith(".gfa"):
                             this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"
@@ -3417,7 +3422,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                            kmer_for_log=int(this_K[1:]),
                                                            log_handler=log_in, verbose=verbose_in,
                                                            temp_graph=in_temp_graph,
-                                                           selected_graph=o_p + ".graph.selected_graph.gfa")
+                                                           selected_graph=o_p + ".graph.selected_graph.gfa",
+                                                           random_obj=random)
             if not target_results:
                 raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
@@ -3636,7 +3642,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     max_gene_gap=250,
                     max_cov_diff=options.disentangle_depth_factor,  # contamination_depth?
                     verbose=verbose,
-                    log_handler=log_handler)
+                    log_handler=log_handler,
+                    random_obj=random)
                 file_to_assembly_obj[out_fastg] = assembly_graph_obj
                 disentangle_assembly(assembly_obj=assembly_graph_obj,
                                      fastg_file=out_fastg,
@@ -3753,7 +3760,8 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                  type_factor=options.disentangle_type_factor,
                                                  here_verbose=verbose,
                                                  log_dis=log_handler,
-                                                 hard_cov_threshold=options.disentangle_depth_factor * 0.8,
+                                                 hard_cov_threshold=options.disentangle_depth_factor * 0.6,
+                                                 # TODO the adjustment should be changed if it's RNA data
                                                  contamination_depth=options.contamination_depth,
                                                  contamination_similarity=options.contamination_similarity,
                                                  degenerate=options.degenerate,

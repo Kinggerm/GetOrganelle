@@ -51,16 +51,16 @@ else:
 #         install_dependencies.append("scipy==1.2.1")
 # else:
 #     sys.stdout.write("Existed module scipy " + str(scipy.__version__) + "\n")
-try:
-    import sympy
-    from sympy import Symbol, solve, lambdify, log
-except ImportError:
-    if MAJOR_VERSION == 3:
-        install_dependencies.append("sympy>=1.4")
-    else:
-        install_dependencies.append("sympy==1.4")
-else:
-    sys.stdout.write("Existed module sympy " + str(sympy.__version__) + "\n")
+# try:
+#     import sympy
+#     from sympy import Symbol, solve, lambdify, log
+# except ImportError:
+#     if MAJOR_VERSION == 3:
+#         install_dependencies.append("sympy>=1.4")
+#     else:
+#         install_dependencies.append("sympy==1.4")
+# else:
+#     sys.stdout.write("Existed module sympy " + str(sympy.__version__) + "\n")
 try:
     import requests
 except ImportError:

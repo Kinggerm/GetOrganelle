@@ -12,7 +12,7 @@ versions = [
             "2. separate temporary files from different rounds",
             "3. remove upper boundary for coverage-based filtering",
             "4. remove max multiplicity boundary",
-            "5. remove scipy: "
+            "5. remove scipy & sympy: "
             "   5.1. use gekko instead of scipy for multiplicity estimation, with initials and option for multinomial;"
             "   5.2. use custom norm_logpdf function instead of slow scipy.stats.norm.logpdf",
             "6. limit the number of paths before generating",
@@ -28,6 +28,7 @@ versions = [
             "13. add weight_factor to get_organelle_from_assembly.py",
             "14. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
             "15. skip clustering and other steps when len(vertex_info)==1",
+            "16. discard np.random, fix consistent issue, modify find_target_graph to generate contigs",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

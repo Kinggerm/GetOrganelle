@@ -120,8 +120,6 @@ def get_options(print_title):
             #     options.expected_max_size /= 2
             elif options.mode in ("embplant_nr", "animal_mt", "fungus_nr"):
                 options.expected_max_size /= 8
-        random.seed(options.random_seed)
-        np.random.seed(options.random_seed)
         return options, log_handler
 
 
@@ -132,6 +130,8 @@ def main():
                   " from slim_fastg.py-produced files (csv & fastg). " + \
                   "\n\n"
     options, log_handler = get_options(print_title)
+    random.seed(options.random_seed)
+    np.random.seed(options.random_seed)
 
     @set_time_limit(options.time_limit)
     def disentangle_circular_assembly(input_graph,
@@ -182,7 +182,8 @@ def main():
                                                          temp_graph=temp_graph,
                                                          broken_graph_allowed=acyclic_allowed,
                                                          verbose=verbose, log_handler=inner_logging,
-                                                         debug=debug)
+                                                         debug=debug,
+                                                         random_obj=random)
             time_c = time.time()
             if inner_logging:
                 inner_logging.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
@@ -316,7 +317,8 @@ def main():
             max_gene_gap=250,
             max_cov_diff=options.depth_factor,  # contamination_depth?
             verbose=options.verbose,
-            log_handler=log_handler)
+            log_handler=log_handler,
+            random_obj=random)
         time_2 = time.time()
         if log_handler:
             log_handler.info(">>> Parsing input fastg file finished: " + str(round(time_2 - time_1, 4)) + "s")

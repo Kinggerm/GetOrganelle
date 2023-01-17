@@ -2,7 +2,6 @@ import os
 import sys
 import math
 import re
-import random
 
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
@@ -1404,7 +1403,7 @@ def get_orf_lengths(sequence_string, threshold=200, which_frame=None,
 def simulate_fq_simple(
         from_fasta_file, out_dir, out_name=None, is_circular=False, sim_read_len=100, sim_read_jump_size=None,
         generate_paired=False, paired_insert_size=300, generate_spot_num=None, generate_depth=None,
-        resume=True):
+        resume=True, random_obj=None):
     """
     :param from_fasta_file:
     :param out_dir:
@@ -1414,12 +1413,14 @@ def simulate_fq_simple(
     :param sim_read_jump_size: int; mutually exclusive with generate_spot_num, generate_depth; randomly off
     :param generate_paired:
     :param paired_insert_size:
-    :param randomly:
     :param generate_spot_num: int; mutually exclusive with sim_read_jump_size, generate_depth; randomly on
     :param generate_depth: int; mutually exclusive with sim_read_jump_size, generate_spot_num; randomly on
     :param resume: continue
+    :param random_obj
     :return:
     """
+    if random_obj is None:
+        import random as random_obj
     if bool(sim_read_jump_size) + bool(generate_spot_num) + bool(generate_depth) == 0:
         raise Exception("One of sim_read_jump_size, generate_spot_num, generate_depth must be given!")
     elif bool(sim_read_jump_size) + bool(generate_spot_num) + bool(generate_depth) > 1:
@@ -1476,7 +1477,7 @@ def simulate_fq_simple(
                     cat_all_seqs.append(from_sequence)
                 cat_all_seqs = "".join(cat_all_seqs)
                 cat_all_seqs_rev = complementary_seq(cat_all_seqs)
-                chosen_start_ids = [random.choice(start_ids) for foo in range(generate_spot_num)]
+                chosen_start_ids = [random_obj.choice(start_ids) for foo in range(generate_spot_num)]
                 with open(to_fq_files[0] + ".Temp", "w") as output_handler_1:
                     with open(to_fq_files[1] + ".Temp", "w") as output_handler_2:
                         for go_base in chosen_start_ids:
@@ -1521,7 +1522,7 @@ def simulate_fq_simple(
                     accumulated_len += len(from_sequence)
                     cat_all_seqs.append(from_sequence)
                 cat_all_seqs = "".join(cat_all_seqs)
-                chosen_start_ids = [random.choice(start_ids) for foo in range(generate_spot_num)]
+                chosen_start_ids = [random_obj.choice(start_ids) for foo in range(generate_spot_num)]
                 with open(to_fq_files[0] + ".Temp", "w") as output_handler:
                     for go_base in chosen_start_ids:
                         output_handler.write("".join(["@", str(count_read), "\n",

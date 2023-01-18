@@ -632,6 +632,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
                                                                  log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
                 else:
+                    log_handler.info("Re-loading labels along " + slim_out_fg)
                     input_graph.parse_tab_file(
                         tab_f,
                         database_name=in_db_n,
@@ -870,7 +871,9 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     #         return []
     # else:
     # only parsing the assembly obj and tab file once
+    log_handler.info("Parsing " + slim_out_fg)
     assembly_graph_obj = Assembly(slim_out_fg)
+    log_handler.info("Loading and cleaning labels along " + slim_out_fg)
     assembly_graph_obj.parse_tab_file(
         slim_out_csv,
         database_name=blast_db,

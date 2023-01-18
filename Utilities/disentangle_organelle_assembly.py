@@ -310,6 +310,10 @@ def main():
         else:
             sys.stdout.write("Parsing " + options.fastg_file + " ..\n")
         assembly_graph_obj = Assembly(options.fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
+        if log_handler:
+            log_handler.info(">>> Loading and cleaning labels along " + options.fastg_file)
+        else:
+            sys.stdout.write("Loading and cleaning labels along " + options.fastg_file + "\n")
         assembly_graph_obj.parse_tab_file(
             options.tab_file,
             database_name=options.mode,

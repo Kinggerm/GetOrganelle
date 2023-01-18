@@ -49,17 +49,20 @@ def norm_logpdf(numpy_array, mu, sigma):
     return log(1/(sqrt(2*pi)*abs(sigma)))-u*u/2
 
 
-def weighted_gmm_with_em_aic(data_array,
-                             data_weights=None,
-                             minimum_cluster=1,
-                             maximum_cluster=5,
-                             min_sigma_factor=1E-5,
-                             cluster_limited=None,
-                             cluster_bans=None,
-                             log_handler=None,
-                             verbose_log=False,
-                             random_obj=None):
+def weighted_clustering_with_em_aic(data_array,
+                                    data_weights=None,
+                                    minimum_cluster=1,
+                                    maximum_cluster=5,
+                                    min_sigma_factor=1E-5,
+                                    cluster_limited=None,
+                                    cluster_bans=None,
+                                    log_handler=None,
+                                    verbose_log=False,
+                                    random_obj=None):
     """
+    The current implementation is using a categorical distribution,
+        with assignment of data exclusively to specific components.
+
     :param data_array:
     :param data_weights:
     :param minimum_cluster:
@@ -87,7 +90,10 @@ def weighted_gmm_with_em_aic(data_array,
             points = dat_arr[lbs == go_to_cl]
             weights = dat_w[lbs == go_to_cl]
             if len(points):
-                total_loglike += sum(norm_logpdf(points, pr["mu"], pr["sigma"]) * weights + log(pr["percent"]))
+                # total_loglike += sum(norm_logpdf(points, pr["mu"], pr["sigma"]) * weights)
+                # total_loglike += sum(norm_logpdf(points, pr["mu"], pr["sigma"]) * weights + log(pr["percent"]))
+                # total_loglike += sum(norm_logpdf(points, pr["mu"], pr["sigma"]) * weights + log(pr["percent"]))
+                total_loglike += sum((norm_logpdf(points, pr["mu"], pr["sigma"]) + log(pr["percent"])) * weights)
         return total_loglike
 
     def revise_labels_according_to_constraints(_raw_lbs, _fixed, loglike_table=None):
@@ -106,6 +112,8 @@ def weighted_gmm_with_em_aic(data_array,
                             this_label = val_increasing_order.index(order_id)
                             if this_label in _fixed[_dat_id]:
                                 _new_labels[_dat_id] = this_label
+                                # v1.8.0-pre6 fix a bug
+                                break
             else:
                 # _new_labels[_dat_id] = _raw_lbs[_dat_id]
                 pass
@@ -120,14 +128,17 @@ def weighted_gmm_with_em_aic(data_array,
         else:
             # the parameter set of the first cluster
             # timex = time.time()
-            loglike_res = norm_logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) * dat_w + \
-                          log(parameters[0]["percent"])
-            # print("log percent", log(parameters[0]["percent"]))
+            # loglike_res = norm_logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) * dat_w
+            # loglike_res = norm_logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) * dat_w + \
+            #               log(parameters[0]["percent"])
+            loglike_res = (norm_logpdf(dat_arr, parameters[0]["mu"], parameters[0]["sigma"]) +
+                           log(parameters[0]["percent"])) * dat_w
             # the parameter set of the rest cluster
             for pr in parameters[1:]:
                 loglike_res = np.vstack(
-                    (loglike_res, norm_logpdf(dat_arr, pr["mu"], pr["sigma"]) * dat_w + log(pr["percent"])))
-                # print("log percent", log(pr["percent"]))
+                    # (loglike_res, norm_logpdf(dat_arr, pr["mu"], pr["sigma"]) * dat_w))
+                    # (loglike_res, norm_logpdf(dat_arr, pr["mu"], pr["sigma"]) * dat_w + log(pr["percent"])))
+                    (loglike_res, (norm_logpdf(dat_arr, pr["mu"], pr["sigma"]) + log(pr["percent"])) * dat_w))
             # print(loglike_res)
             # pdf_time[0] += time.time() - timex
             # assign labels
@@ -294,7 +305,6 @@ def weighted_gmm_with_em_aic(data_array,
         average_weights = float(sum(data_weights)) / data_len
         # normalized
         data_weights = np.array([raw_w / average_weights for raw_w in data_weights])
-    # print("data weights", data_weights)
 
     results = []
     # adjust the min and max number of clusters according to constraints
@@ -342,14 +352,23 @@ def weighted_gmm_with_em_aic(data_array,
         else:
             this_limit = {}
         # initialization
-        # labels = np_rd_obj.choice(total_cluster_num, int(data_len))
-        # TODO: each cluster has to have at least one occurrence, which will be complicated combined with this_limit
-        min_occurrences = list(range(total_cluster_num))
-        random_obj.shuffle(min_occurrences)
-        labels = np.array(min_occurrences +
-                          random_obj.choices(range(total_cluster_num), k=int(data_len) - total_cluster_num))
-        labels = revise_labels_according_to_constraints(labels, this_limit)
+        # # labels = np_rd_obj.choice(total_cluster_num, int(data_len))
+        # # TODO: each cluster has to have at least one occurrence, which will be complicated combined with this_limit
+        # min_occurrences = list(range(total_cluster_num))
+        # random_obj.shuffle(min_occurrences)
+        # labels = np.array(min_occurrences +
+        #                   random_obj.choices(range(total_cluster_num), k=int(data_len) - total_cluster_num))
+        # labels = revise_labels_according_to_constraints(labels, this_limit)
+        # using decreasing order rather than random @2023-01-18, to create more reasonable initial parameter set
+        extra_for_first_lb = int(data_len) % total_cluster_num
+        each_len = (int(data_len) - extra_for_first_lb) // total_cluster_num
+        cov_decreasing_order = np.flip(data_array.argsort())
+        labels = np.zeros(int(data_len), dtype=np.int8)
+        for go_l, go_d in enumerate(range(extra_for_first_lb, int(data_len), each_len)):
+            labels[cov_decreasing_order[go_d: go_d + each_len]] = go_l
+        # initialize the parameters
         norm_parameters = updating_parameter(data_array, data_weights, labels,
+                                             # [{"mu": 0, "sigma": 1}
                                              [{"mu": 0, "sigma": 1, "percent": total_cluster_num/data_len}
                                               for foo in range(total_cluster_num)])
         if log_handler and verbose_log:
@@ -386,9 +405,6 @@ def weighted_gmm_with_em_aic(data_array,
             # update
             prev_loglike = this_loglike
             norm_parameters = updated_parameters
-            # print(count_iterations)
-            # print(labels)
-            # print(this_loglike, best_loglike)
             if this_loglike > best_loglike:
                 best_parameter = updated_parameters
                 best_loglike = this_loglike

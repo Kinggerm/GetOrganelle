@@ -3388,6 +3388,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                                  log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
                 else:
+                    log_handler.info("Re-loading labels along " + slim_out_fg)
                     input_graph.parse_tab_file(
                         tab_f,
                         database_name=in_db_n,
@@ -3634,7 +3635,9 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 #     main_spades_folder = os.path.split(kmer_dir)[0]
                 #     os.system("cp " + out_fastg + " " + main_spades_folder)
                 #     os.system("cp " + out_csv + " " + main_spades_folder)
+                log_handler.info("Parsing " + out_fastg)
                 assembly_graph_obj = Assembly(out_fastg)
+                log_handler.info("Loading and cleaning labels along " + out_fastg)
                 assembly_graph_obj.parse_tab_file(
                     out_csv,
                     database_name=blast_db,

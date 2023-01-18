@@ -3501,7 +3501,7 @@ class Assembly(SimpleAssembly):
                                          "; weights: " + str(v_weights))
                     # timex = time.time()
                     # most time consuming step
-                    gmm_scheme = weighted_gmm_with_em_aic(
+                    gmm_scheme = weighted_clustering_with_em_aic(
                         data_array=coverages,
                         data_weights=v_weights,
                         maximum_cluster=5,
@@ -3669,10 +3669,12 @@ class Assembly(SimpleAssembly):
     def _get_tagged_merged_paths(self, tagged_vs):
         raw_tagged = set(tagged_vs)
         vs_to_merge = OrderedDict([(_v, True) for _v in tagged_vs])
+        vs_used = set()
         # print("merging tagged_vs: " + str(raw_tagged))
         merged_paths = []
         while vs_to_merge:
             check_v, foo = vs_to_merge.popitem()
+            vs_used.add(check_v)
             # print(check_v, foo)
             extend_e = True
             this_path = [(check_v, extend_e)]
@@ -3688,7 +3690,7 @@ class Assembly(SimpleAssembly):
                     back_con_tagged = [(_v, _e) for _v, _e in back_con if _v in raw_tagged]
                     # print("back_con_tagged", back_con_tagged)
                     # if there is only one possible merging way, and the next is not equal to the previous one
-                    if back_con_tagged == [(this_v, this_e)] and this_v != next_v:
+                    if back_con_tagged == [(this_v, this_e)] and next_v not in vs_used:
                         # extra criteria to avoid generating chimeric path when the main path has a small gap
                         # if there are non tagged connections, check if there is coverage similarity between candidate
                         # contigs before merging
@@ -3734,6 +3736,7 @@ class Assembly(SimpleAssembly):
                         if extra_match:
                             this_path.append((next_v, not next_e))
                             del vs_to_merge[next_v]
+                            vs_used.add(next_v)
                             continue
                 if extend_e:
                     this_path = [(_v, not _e) for _v, _e in this_path[::-1]]
@@ -4108,7 +4111,9 @@ class Assembly(SimpleAssembly):
         merged = self.merge_all_possible_vertices()
         if merged:
             changed = True
-            self.estimate_copy_and_depth_by_cov(self.tagged_vertices[database_n],
+            tagged_vs = [_v for _v in self.tagged_vertices[database_n]
+                         if self.vertex_info[_v].other_attr.get("weight", {}).get(database_n, -1) > 0]
+            self.estimate_copy_and_depth_by_cov(tagged_vs,
                                                 min_sigma=min_sigma_factor,
                                                 debug=debug, log_handler=log_handler,
                                                 verbose=verbose, mode=database_n)
@@ -4172,20 +4177,20 @@ class Assembly(SimpleAssembly):
                 log_handler.info("Set cluster reset to: " + str(set_cluster))
         # print(min_cluster)
         try:
-            gmm_scheme = weighted_gmm_with_em_aic(coverages, data_weights=cover_weights,
-                                                  minimum_cluster=min_cluster, maximum_cluster=6,
-                                                  cluster_limited=set_cluster, cluster_bans=ban_cluster,
-                                                  min_sigma_factor=min_sigma_factor,
-                                                  log_handler=log_handler, verbose_log=verbose,
-                                                  random_obj=random_obj)
+            gmm_scheme = weighted_clustering_with_em_aic(coverages, data_weights=cover_weights,
+                                                         minimum_cluster=min_cluster, maximum_cluster=6,
+                                                         cluster_limited=set_cluster, cluster_bans=ban_cluster,
+                                                         min_sigma_factor=min_sigma_factor,
+                                                         log_handler=log_handler, verbose_log=verbose,
+                                                         random_obj=random_obj)
         except ValueError as e:
             if "Solution Not Found" in str(e):
                 # just calculate the mu and sigma using the single component model
-                gmm_scheme = weighted_gmm_with_em_aic(coverages, data_weights=cover_weights,
-                                                      minimum_cluster=1, maximum_cluster=1,
-                                                      min_sigma_factor=min_sigma_factor,
-                                                      log_handler=log_handler, verbose_log=verbose,
-                                                      random_obj=random_obj)
+                gmm_scheme = weighted_clustering_with_em_aic(coverages, data_weights=cover_weights,
+                                                             minimum_cluster=1, maximum_cluster=1,
+                                                             min_sigma_factor=min_sigma_factor,
+                                                             log_handler=log_handler, verbose_log=verbose,
+                                                             random_obj=random_obj)
             else:
                 raise e
         cluster_num = gmm_scheme["cluster_num"]
@@ -4215,6 +4220,7 @@ class Assembly(SimpleAssembly):
                              for lb in selected_label_type}
             selected_label_type.sort(key=lambda x: -label_weights[x])
             remained_label_type = {selected_label_type[0]}
+            # add minor weights if qualified
             for candidate_lb_type in selected_label_type[1:]:
                 if label_weights[candidate_lb_type] * weight_factor >= selected_label_type[0]:
                     remained_label_type.add(candidate_lb_type)
@@ -4228,6 +4234,16 @@ class Assembly(SimpleAssembly):
                         if abs(can_mu - parameters[remained_l]["mu"]) < 2 * parameters[remained_l]["sigma"]:
                             extra_kept.add(candidate_lb_type)
                             break
+                        # does not help - 2023-01-17
+                        # if database_n == "embplant_mt":
+                        #     if abs(can_mu - parameters[remained_l]["mu"]) < 2 * parameters[remained_l]["sigma"]:
+                        #         extra_kept.add(candidate_lb_type)
+                        #         break
+                        # else:
+                        #     # all contigs with larger coverages will be kept
+                        #     if parameters[remained_l]["mu"] - can_mu < 2 * parameters[remained_l]["sigma"]:
+                        #         extra_kept.add(candidate_lb_type)
+                        #         break
             remained_label_type |= extra_kept
         else:
             remained_label_type = {selected_label_type[0]}
@@ -4264,13 +4280,22 @@ class Assembly(SimpleAssembly):
         #             check_ex += 1
 
         candidate_dropping_label_type = {l_t: inf for l_t in set(range(cluster_num)) - remained_label_type}
-        for lab_tp in candidate_dropping_label_type:
+        for lab_tp in list(candidate_dropping_label_type):
             check_mu = parameters[lab_tp]["mu"]
             check_sigma = parameters[lab_tp]["sigma"]
             for remained_l in remained_label_type:
                 rem_mu = parameters[remained_l]["mu"]
                 rem_sigma = parameters[remained_l]["sigma"]
                 this_dist = abs(rem_mu - check_mu) - 2 * (check_sigma + rem_sigma)
+                # does not help - 2023-01-17
+                # if database_n == "embplant_mt":
+                #     this_dist = abs(rem_mu - check_mu) - 2 * (check_sigma + rem_sigma)
+                # else:
+                #     if rem_mu - check_mu < rem_sigma:
+                #         del candidate_dropping_label_type[lab_tp]
+                #         break
+                #     else:
+                #         this_dist = rem_mu - check_mu - 2 * (check_sigma + rem_sigma)
                 candidate_dropping_label_type[lab_tp] = min(candidate_dropping_label_type[lab_tp], this_dist)
         dropping_type = sorted(candidate_dropping_label_type, key=lambda x: -candidate_dropping_label_type[x])
         drop_num = max(len(set_kinds) - 1, drop_num)
@@ -4517,8 +4542,10 @@ class Assembly(SimpleAssembly):
                                 degenerate=False, degenerate_depth=1.5, degenerate_similarity=0.98, warning_count=4,
                                 only_keep_max_cov=False, verbose=False, debug=False, log_handler=None):
         if average_depth is None:
+            tagged_vs = [_v for _v in self.tagged_vertices[database_name]
+                         if self.vertex_info[_v].other_attr.get("weight", {}).get(database_name, -1) > 0]
             average_depth, ave_std = self.estimate_copy_and_depth_by_cov(
-                self.tagged_vertices[database_name], debug=debug, log_handler=log_handler,
+                tagged_vs, debug=debug, log_handler=log_handler,
                 verbose=verbose, mode=database_name)
         else:
             average_depth = float(average_depth)
@@ -4935,8 +4962,11 @@ class Assembly(SimpleAssembly):
                         delete_those_vertices = set()
                         # parameters = []
                         this_del = False
+                        tagged_vs = [_v for _v in new_assembly.tagged_vertices[db_name]
+                                     if new_assembly.vertex_info[_v].other_attr.get("weight", {}).get(db_name, -1) > 0]
                         new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                            new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
+                            tagged_vs,
+                            min_sigma=min_sigma_factor,
                             debug=debug, log_handler=log_handler,
                             verbose=verbose, mode=mode)
                         while first_round or delete_those_vertices or this_del:
@@ -4983,8 +5013,12 @@ class Assembly(SimpleAssembly):
                                                           sorted(new_assembly.tagged_vertices[db_name])]) + "\n")
                             if this_del and temp_graph:
                                 write_temp_out(new_assembly, db_name, temp_graph, temp_csv, "b")
+                            tagged_vs = \
+                                [_v for _v in new_assembly.tagged_vertices[db_name]
+                                 if new_assembly.vertex_info[_v].other_attr.get("weight", {}).get(db_name, -1) > 0]
                             new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                                new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
+                                tagged_vs,
+                                min_sigma=min_sigma_factor,
                                 debug=debug, log_handler=log_handler,
                                 verbose=verbose, mode=mode)
                             first_round = False
@@ -5163,8 +5197,11 @@ class Assembly(SimpleAssembly):
                     new_assembly.merge_all_possible_vertices()
                     if check_remaining_singleton():
                         break
+                    tagged_vs = [_v for _v in new_assembly.tagged_vertices[db_name]
+                                 if new_assembly.vertex_info[_v].other_attr.get("weight", {}).get(db_name, -1) > 0]
                     new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
-                        new_assembly.tagged_vertices[db_name], min_sigma=min_sigma_factor,
+                        tagged_vs,
+                        min_sigma=min_sigma_factor,
                         debug=debug, log_handler=log_handler,
                         verbose=verbose, mode=mode)
                     new_assembly.processing_polymorphism(database_name=db_name,
@@ -5425,7 +5462,25 @@ class Assembly(SimpleAssembly):
                                                  "unacceptable, continue dropping suspicious vertices_set ..."
                                                  .format(min_single_copy_percent))
                         if broken_graph_allowed:
-                            return gen_contigs_with_no_connections()
+                            tagged_vs = \
+                                [_v for _v in new_assembly.tagged_vertices[db_name]
+                                 if new_assembly.vertex_info[_v].other_attr.get("weight", {}).get(db_name, -1) > 0]
+                            new_ave_cov, ave_std = new_assembly.estimate_copy_and_depth_by_cov(
+                                tagged_vs,
+                                min_sigma=min_sigma_factor,
+                                debug=debug, log_handler=log_handler,
+                                verbose=verbose, mode=mode)
+                            del_vs = []
+                            for vertex_name in new_assembly.vertex_info:
+                                if new_ave_cov - new_assembly.vertex_info[vertex_name].cov > 2 * ave_std or \
+                                        new_ave_cov > 3 * new_assembly.vertex_info[vertex_name].cov:
+                                    del_vs.append(vertex_name)
+                            if del_vs:
+                                new_assembly.remove_vertex(del_vs)
+                                is_reasonable_res = False
+                                continue
+                            else:
+                                return gen_contigs_with_no_connections()
                         else:
                             data_contains_outlier = True
                             is_reasonable_res = False

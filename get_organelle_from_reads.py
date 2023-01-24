@@ -3973,13 +3973,22 @@ def main():
                     else:
                         target_fq = os.path.join(out_base, str(file_id + 1) + "-" +
                                                  os.path.basename(read_file))
-                        if os.path.realpath(target_fq) == os.path.realpath(os.path.join(os.getcwd(), read_file)):
+                        if os.path.exists(target_fq) and os.path.islink(target_fq):
+                            if os.path.realpath(target_fq) != os.path.realpath(os.path.join(os.getcwd(), read_file)):
+                                log_handler.error("Existed symlink (%s -> %s) does not link to the input file (%s)!" %
+                                                  (target_fq,
+                                                   os.path.realpath(target_fq),
+                                                   os.path.realpath(os.path.join(os.getcwd(), read_file))))
+                                exit()
+                        elif os.path.realpath(target_fq) == os.path.realpath(os.path.join(os.getcwd(), read_file)):
                             log_handler.error("Do not put original reads file(s) in the output directory!")
                             exit()
                         if not (os.path.exists(target_fq) and resume):
                             if all_read_nums[file_id] > READ_LINE_TO_INF:
                                 # os.system("cp " + read_file + " " + target_fq + ".Temp")
                                 # os.system("mv " + target_fq + ".Temp " + target_fq)
+                                if os.path.exists(target_fq):
+                                    os.remove(target_fq)
                                 os.system("ln -s " + os.path.abspath(read_file) + " " + target_fq)
                             else:
                                 os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +

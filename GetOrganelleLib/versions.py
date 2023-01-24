@@ -6,7 +6,7 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.8.0.0-pre3",
+        "number": "1.8.0.0-pre4",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",

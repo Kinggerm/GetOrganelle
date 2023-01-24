@@ -29,6 +29,7 @@ versions = [
             "14. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
             "15. skip clustering and other steps when len(vertex_info)==1",
             "16. discard np.random, fix consistent issue, modify find_target_graph to generate contigs",
+            "17. create soft link instead of copying the original read file(s) into the working directory",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

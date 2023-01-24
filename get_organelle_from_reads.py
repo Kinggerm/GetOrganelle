@@ -3978,8 +3978,9 @@ def main():
                             exit()
                         if not (os.path.exists(target_fq) and resume):
                             if all_read_nums[file_id] > READ_LINE_TO_INF:
-                                os.system("cp " + read_file + " " + target_fq + ".Temp")
-                                os.system("mv " + target_fq + ".Temp " + target_fq)
+                                # os.system("cp " + read_file + " " + target_fq + ".Temp")
+                                # os.system("mv " + target_fq + ".Temp " + target_fq)
+                                os.system("ln -s " + os.path.abspath(read_file) + " " + target_fq)
                             else:
                                 os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +
                                           read_file + " > " + target_fq + ".Temp")

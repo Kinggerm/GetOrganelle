@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import re
+from multiprocessing import Pool, Manager
 
 major_version, minor_version = sys.version_info[:2]
 if major_version == 2 and minor_version >= 7:
@@ -1189,35 +1190,120 @@ def split_seq_by_quality_pattern(sequence, quality_str, low_quality_pattern, min
     return tuple(seq_list)
 
 
-def fq_simple_generator(fq_dir_list, go_to_line=1, split_pattern=None, min_sub_seq=0, max_n_reads=float("inf")):
+def fq_handler_re_seek(fq_handler,
+                       fq_file,
+                       seek_soft_start=None,
+                       seek_soft_end=None):
+    if seek_soft_start is not None:
+        seek_start = fq_handler.seek(seek_soft_start)
+        if seek_soft_end is None:
+            seek_soft_end = os.path.getsize(fq_file)
+        line_str = fq_handler.readline()
+        while line_str:
+            if line_str.startswith("@"):
+                break
+            else:
+                seek_start = fq_handler.tell()
+                if seek_start >= seek_soft_end:
+                    break
+                line_str = fq_handler.readline()
+        fq_handler.seek(seek_start)
+    return fq_handler
+
+
+def fq_simple_generator(fq_dir_list,
+                        go_to_line=1,
+                        split_pattern=None,
+                        min_sub_seq=0,
+                        max_n_reads=float("inf"),
+                        seek_soft_start=None,
+                        seek_soft_end=None):
+    """
+    :param fq_dir_list:
+    :param go_to_line:
+    :param split_pattern:
+    :param min_sub_seq:
+    :param max_n_reads:
+    :param seek_soft_start: starts by the start of the head line after seek_soft_start
+    :param seek_soft_end: ends by the end of the quality line after seek_soft_end
+    :return:
+    """
     if not ((type(fq_dir_list) is list) or (type(fq_dir_list) is tuple)):
         fq_dir_list = [fq_dir_list]
+
     max_n_lines = 4 * max_n_reads
-    if split_pattern and len(split_pattern) > 2:
-        for fq_dir in fq_dir_list:
-            count = 0
-            with open(fq_dir, 'r') as fq_handler:
-                seq_line = fq_handler.readline()
-                while seq_line:
-                    if count % 4 == go_to_line:
-                        fq_handler.readline()
-                        quality_str = fq_handler.readline()[:-1]
-                        count += 2
-                        yield split_seq_by_quality_pattern(seq_line[:-1], quality_str, split_pattern, min_sub_seq)
-                    count += 1
-                    if count >= max_n_lines:
-                        break
+    if seek_soft_end is None:
+        if split_pattern and len(split_pattern) > 2:
+            for fq_dir in fq_dir_list:
+                count = 0
+                with open(fq_dir, 'r') as fq_handler:
+                    fq_handler = fq_handler_re_seek(fq_handler=fq_handler, fq_file=fq_dir,
+                                                    seek_soft_start=seek_soft_start)
                     seq_line = fq_handler.readline()
+                    while seq_line:
+                        if count % 4 == go_to_line:
+                            fq_handler.readline()
+                            quality_str = fq_handler.readline()[:-1]
+                            count += 2
+                            yield split_seq_by_quality_pattern(seq_line[:-1], quality_str, split_pattern, min_sub_seq)
+                        count += 1
+                        if count >= max_n_lines:
+                            break
+                        seq_line = fq_handler.readline()
+        else:
+            for fq_dir in fq_dir_list:
+                count = 0
+                with open(fq_dir, 'r') as fq_handler:
+                    fq_handler = fq_handler_re_seek(fq_handler=fq_handler, fq_file=fq_dir,
+                                                    seek_soft_start=seek_soft_start)
+                    for fq_line in fq_handler:
+                        if count % 4 == go_to_line:
+                            yield fq_line[:-1]
+                        if count >= max_n_lines:
+                            break
+                        count += 1
     else:
-        for fq_dir in fq_dir_list:
-            count = 0
-            with open(fq_dir, 'r') as fq_handler:
-                for fq_line in fq_handler:
-                    if count % 4 == go_to_line:
-                        yield fq_line[:-1]
-                    if count >= max_n_lines:
-                        break
-                    count += 1
+        if split_pattern and len(split_pattern) > 2:
+            for fq_dir in fq_dir_list:
+                count = 0
+                with open(fq_dir, 'r') as fq_handler:
+                    fq_handler = fq_handler_re_seek(fq_handler=fq_handler, fq_file=fq_dir,
+                                                    seek_soft_start=seek_soft_start, seek_soft_end=seek_soft_end)
+                    if fq_handler.tell() >= seek_soft_end:
+                        continue
+                    seq_line = fq_handler.readline()
+                    while seq_line:
+                        if count % 4 == go_to_line:
+                            fq_handler.readline()
+                            quality_str = fq_handler.readline()[:-1]
+                            count += 2
+                            yield split_seq_by_quality_pattern(seq_line[:-1], quality_str, split_pattern, min_sub_seq)
+                            if fq_handler.tell() >= seek_soft_end:
+                                break
+                        count += 1
+                        if count >= max_n_lines:
+                            break
+                        seq_line = fq_handler.readline()
+        else:
+            for fq_dir in fq_dir_list:
+                count = 0
+                with open(fq_dir, 'r') as fq_handler:
+                    fq_handler = fq_handler_re_seek(fq_handler=fq_handler, fq_file=fq_dir,
+                                                    seek_soft_start=seek_soft_start, seek_soft_end=seek_soft_end)
+                    if fq_handler.tell() >= seek_soft_end:
+                        continue
+                    fq_line = fq_handler.readline()
+                    # for fq_line in fq_handler:
+                    # for loop will cause OSError: telling position disabled by next() call
+                    while fq_line:
+                        if count % 4 == go_to_line:
+                            yield fq_line[:-1]
+                            if fq_handler.tell() >= seek_soft_end:
+                                break
+                        if count >= max_n_lines:
+                            break
+                        count += 1
+                        fq_line = fq_handler.readline()
 
 
 def chop_seqs(seq_iter, word_size, mesh_size=1, previous_words=None):
@@ -1534,13 +1620,203 @@ def simulate_fq_simple(
             os.rename(to_fq_f + ".Temp", to_fq_f)
 
 
-def get_read_len_mean_max_count(fq_or_fq_files, maximum_n_reads, sampling_percent=1.):
+# def get_read_len_mean_max_count(fq_or_fq_files, maximum_n_reads, sampling_percent=1., n_process=1):
+#     if type(fq_or_fq_files) is str:
+#         fq_files = [fq_or_fq_files]
+#     else:
+#         fq_files = fq_or_fq_files
+#     if n_process > 1:
+#         return __get_read_len_mean_max_count_mp(fq_files=fq_files,
+#                                                 maximum_n_reads=maximum_n_reads,
+#                                                 sampling_percent=sampling_percent,
+#                                                 n_process=n_process)
+#     else:
+#         return __get_read_len_mean_max_count_single(fq_files=fq_files,
+#                                                     maximum_n_reads=maximum_n_reads,
+#                                                     sampling_percent=sampling_percent)
+#
+#
+# def __get_read_len_mean_max_count_mp(
+#         fq_files,
+#         maximum_n_reads,
+#         sampling_percent=1.,
+#         n_process=2):
+#
+#     def open_maximum_reads(_fq_f):
+#         if maximum_n_reads == float("inf"):
+#             for _go_l, _str_line in enumerate(open(_fq_f, "r")):
+#                 if _go_l % 4 == 1:
+#                     if _str_line:
+#                         yield _str_line
+#                     else:
+#                         break
+#         else:
+#             for _go_l, _str_line in zip(range(int(maximum_n_reads * 4)), open(_fq_f, "r")):
+#                 if _go_l % 4 == 1:
+#                     if _str_line:
+#                         yield _str_line
+#                     else:
+#                         break
+#     """ set up iter arguments """
+#     # arbitrary num of seqs
+#     block_size = int(5E6)
+#     """ set up variables shared by processes """
+#     manager = Manager()
+#     read_lengths = manager.list()
+#     all_counts = manager.dict()
+#     for fq_f in fq_files:
+#         all_counts[fq_f] = 0
+#     # lock = manager.Lock()
+#     """ set up the process pool """
+#     pool_obj = Pool(processes=n_process)
+#     jobs = []
+#     try:
+#         for fq_f in fq_files:
+#             seq_lines = [_str_line for _go_l, _str_line in zip(range(block_size), open_maximum_reads(_fq_f=fq_f))]
+#             while seq_lines:
+#                 arg_tuple = (seq_lines, fq_f, sampling_percent, read_lengths, all_counts,)
+#                 jobs.append(pool_obj.apply_async(__get_read_len_mean_max_count_worker, arg_tuple))
+#                 seq_lines = [_str_line for _go_l, _str_line in zip(range(block_size), open_maximum_reads(_fq_f=fq_f))]
+#                 print(arg_tuple[1:])
+#         pool_obj.close()
+#         print("pool closed")
+#         for go_j, job in enumerate(jobs):
+#             print("go_j get", go_j)
+#             job.get()
+#         pool_obj.join()
+#         # print("pool joined")
+#     except KeyboardInterrupt:
+#         pool_obj.terminate()
+#         raise KeyboardInterrupt
+#     return sum(read_lengths) / len(read_lengths), max(read_lengths), [all_counts[_fq_f] for _fq_f in fq_files]
+#
+#
+# def __get_read_len_mean_max_count_worker(seq_lines, fq_file, sampling_percent, read_lengths, all_counts):
+#     here_r_l = []
+#     if sampling_percent == 1:
+#         count_r = 0
+#         for seq in seq_lines:
+#             count_r += 1
+#             here_r_l.append(len(seq.strip("N")))
+#         all_counts[fq_file] += count_r
+#     else:
+#         sampling_percent = int(1 / sampling_percent)
+#         count_r = 0
+#         for seq in seq_lines:
+#             count_r += 1
+#             if count_r % sampling_percent == 0:
+#                 here_r_l.append(len(seq.strip("N")))
+#         all_counts[fq_file] += count_r
+#     read_lengths.extend(here_r_l)
+
+def get_read_len_mean_max_count(fq_or_fq_files, maximum_n_reads, sampling_percent=1., n_process=1):
     if type(fq_or_fq_files) is str:
-        fq_or_fq_files = [fq_or_fq_files]
+        fq_files = [fq_or_fq_files]
+    else:
+        fq_files = fq_or_fq_files
+    if n_process > 1:
+        """ giving up: processes always jump into D (uninterruptible sleep) """
+
+        # """ using seek: not working probably because of NFS locking """
+        # """ set up iter arguments """
+        # iter_args = [[[], [], []]]
+        # file_sizes = [os.path.getsize(_fq_f) for _fq_f in fq_files]
+        # # block size for each process
+        # block_size = max(int(1E9), math.ceil(sum(file_sizes) / n_process))
+        # accumulated_size = 0
+        # for go_f, fq_f in enumerate(fq_files):
+        #     start_seek = 0
+        #     while start_seek < file_sizes[go_f]:
+        #         end_seek = start_seek + block_size - accumulated_size
+        #         if end_seek > file_sizes[go_f]:
+        #             iter_args[-1][0].append(fq_f)
+        #             iter_args[-1][1].append(start_seek)
+        #             iter_args[-1][2].append(file_sizes[go_f])
+        #             accumulated_size += file_sizes[go_f] - start_seek
+        #             break
+        #         else:
+        #             iter_args[-1][0].append(fq_f)
+        #             iter_args[-1][1].append(start_seek)
+        #             iter_args[-1][2].append(end_seek)
+        #             accumulated_size = 0
+        #             iter_args.append([[], [], []])
+        #             start_seek = end_seek
+        # if not iter_args[-1][0]:
+        #     del iter_args[-1]
+        """ switch to one file one process """
+        iter_args = [[[fq_f_], [None], [None]] for fq_f_ in fq_files]
+        """ set up variables shared by processes """
+        manager = Manager()
+        read_lengths = manager.list()
+        all_counts = manager.dict()
+        for fq_f in fq_files:
+            all_counts[fq_f] = 0
+        # lock = manager.Lock()
+        """ set up the process pool """
+        pool_obj = Pool(processes=n_process)
+        jobs = []
+        try:
+            for file_args in iter_args:
+                arg_tuple = tuple(file_args + [maximum_n_reads, read_lengths, all_counts, sampling_percent])
+                print(arg_tuple)
+                jobs.append(pool_obj.apply_async(__get_read_len_mean_max_count_worker, arg_tuple))
+            print(len(iter_args))
+            pool_obj.close()
+            print("pool closed")
+            for go_j, job in enumerate(jobs):
+                print("go_j get", go_j)
+                job.get()
+            pool_obj.join()
+            # print("pool joined")
+        except KeyboardInterrupt:
+            pool_obj.terminate()
+            raise KeyboardInterrupt
+        return sum(read_lengths) / len(read_lengths), max(read_lengths), [all_counts[_fq_f] for _fq_f in fq_files]
+    else:
+        return __get_read_len_mean_max_count_single(fq_files=fq_files,
+                                                            maximum_n_reads=maximum_n_reads,
+                                                            sampling_percent=sampling_percent)
+
+def __get_read_len_mean_max_count_worker(
+        fq_files,
+        seek_soft_starts,
+        seek_soft_ends,
+        maximum_n_reads,
+        read_lengths,
+        all_counts,
+        sampling_percent=1.):
+    """ using seek: not working probably because of NFS locking """
+    here_r_l = []
+    if sampling_percent == 1:
+        for go_f, fq_file in enumerate(fq_files):
+            count_r = 0
+            for seq in fq_simple_generator(
+                    fq_file, seek_soft_start=seek_soft_starts[go_f], seek_soft_end=seek_soft_ends[go_f]):
+                count_r += 1
+                here_r_l.append(len(seq.strip("N")))
+                if count_r >= maximum_n_reads:
+                    break
+            all_counts[fq_file] += count_r
+    else:
+        sampling_percent = int(1 / sampling_percent)
+        for go_f, fq_file in enumerate(fq_files):
+            count_r = 0
+            for seq in fq_simple_generator(
+                    fq_file, seek_soft_start=seek_soft_starts[go_f], seek_soft_end=seek_soft_ends[go_f]):
+                count_r += 1
+                if count_r % sampling_percent == 0:
+                    here_r_l.append(len(seq.strip("N")))
+                if count_r >= maximum_n_reads:
+                    break
+            all_counts[fq_file] += count_r
+    read_lengths.extend(here_r_l)
+
+
+def __get_read_len_mean_max_count_single(fq_files, maximum_n_reads, sampling_percent=1.):
     read_lengths = []
     all_counts = []
     if sampling_percent == 1:
-        for fq_f in fq_or_fq_files:
+        for fq_f in fq_files:
             count_r = 0
             for seq in fq_simple_generator(fq_f):
                 count_r += 1
@@ -1550,7 +1826,7 @@ def get_read_len_mean_max_count(fq_or_fq_files, maximum_n_reads, sampling_percen
             all_counts.append(count_r)
     else:
         sampling_percent = int(1 / sampling_percent)
-        for fq_f in fq_or_fq_files:
+        for fq_f in fq_files:
             count_r = 0
             for seq in fq_simple_generator(fq_f):
                 count_r += 1

@@ -1136,7 +1136,8 @@ def estimate_maximum_n_reads_using_mapping(
             coverages_2 = [pos for ref in coverage_info for pos in coverage_info[ref] if pos > 0]
             base_cov_values = get_cover_range(coverages_2, guessing_percent=BASE_COV_SAMPLING_PERCENT)
             mean_read_len, max_read_len, all_read_nums = \
-                get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound)
+                get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound, n_process=1)
+                # get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound, n_process=threads)
             if executable(os.path.join(which_spades, "spades.py -h")) and \
                     executable(os.path.join(which_bowtie2, "bowtie2")):
                 try:
@@ -4006,8 +4007,9 @@ def main():
                     get_read_quality_info(original_fq_files, sampling_reads_for_quality, options.min_quality_score,
                                           log_handler, maximum_ignore_percent=options.maximum_ignore_percent)
                 log_handler.info("Counting read lengths ...")
-                mean_read_len, max_read_len, all_read_nums = get_read_len_mean_max_count(original_fq_files,
-                                                                                         options.maximum_n_reads)
+                mean_read_len, max_read_len, all_read_nums = get_read_len_mean_max_count(
+                    original_fq_files, options.maximum_n_reads, n_process=1)
+                    # original_fq_files, options.maximum_n_reads, n_process=options.threads)
                 log_handler.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " +
                                  str(max_read_len) + " bp.")
                 log_handler.info("Reads used = " + "+".join([str(sub_num) for sub_num in all_read_nums]))

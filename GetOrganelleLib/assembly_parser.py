@@ -4861,10 +4861,11 @@ class Assembly(SimpleAssembly):
                 # write out selected graph
                 log_handler.info("Output selected graph file " + str(_selected_graph))
                 _assembly.write_to_gfa(_selected_graph)
-                if mode in ("embplant_pt", "embplant_mt"):
+                # db_name can be different from the "mode" when the mode is anonym
+                if db_name in ("embplant_pt", "embplant_mt"):
                     _this_dbs = ["embplant_pt", "embplant_mt"]
                 else:
-                    _this_dbs = [mode]
+                    _this_dbs = [db_name]
                 _assembly.write_out_tags(_this_dbs, _selected_graph[:-3] + "csv")
 
         def check_remaining_singleton():

@@ -1824,6 +1824,337 @@ def make_read_index(original_fq_files, direction_according_to_user_input, all_re
         else:
             log_handler.info("indices for fastq existed!")
             len_indices = len([x for x in open(temp2_clusters_dir[1], 'r')])
+    elif resume and os.path.exists(temp1_contig_dir[1]) and not rm_duplicates:
+        if index_in_memory:
+            log_handler.info("Reading existed indices for fastq ...")
+            #
+            if keep_seq_parts:
+                forward_reverse_reads = [x.strip().split("\t") for x in open(temp1_contig_dir[1], 'r')]
+                cancel_seq_parts = True if max([len(x) for x in forward_reverse_reads]) == 1 else False
+            else:
+                forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'r')]
+
+        # lengths = []
+        use_user_direction = False
+        for id_file, file_name in enumerate(original_fq_files):
+            file_in = open(file_name, "r")
+            count_this_read_n = 0
+            line = file_in.readline()
+            # if anti seed input, name & direction should be recognized
+            if anti_seed:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        # parsing name & direction
+                        if use_user_direction:
+                            this_name = line[1:].strip()
+                            direction = direction_according_to_user_input[id_file]
+                        else:
+                            try:
+                                if ' ' in line:
+                                    this_head = line[1:].split(' ')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                elif '#' in line:
+                                    this_head = line[1:].split('#')
+                                    this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
+                                elif line[-3] == "/" and line[-2].isdigit():  # 2019-04-22 added
+                                    this_name, direction = line[1:-3], int(line[-2])
+                                elif line[1:].strip().isdigit():
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                                else:
+                                    log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                            except (ValueError, IndexError):
+                                log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                log_handler.info("Using user-defined read directions. ")
+                                use_user_direction = True
+                                this_name = line[1:].strip()
+                                direction = direction_according_to_user_input[id_file]
+                        if (this_name, direction) in anti_lines:
+                            line_count += 4
+                            for i in range(4):
+                                line = file_in.readline()
+                            continue
+                        this_seq = file_in.readline().strip()
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                        line_clusters.append([line_count])
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            else:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        this_seq = file_in.readline().strip()
+
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                        line_clusters.append([line_count])
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            line = file_in.readline()
+            file_in.close()
+            if line:
+                log_handler.info("For " + file_name + ", only top " + str(int(all_read_limits[id_file])) +
+                                 " reads are used in downstream analysis.")
+        if this_process:
+            memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + " G, "
+        else:
+            memory_usage = ''
+
+        del name_to_line
+
+        if not index_in_memory:
+            # dump line clusters
+            len_indices = len(line_clusters)
+            temp2_indices_file_out = open(temp2_clusters_dir[0], 'w')
+            for this_index in range(len_indices):
+                temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
+                temp2_indices_file_out.write('\n')
+            temp2_indices_file_out.close()
+            os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
+
+        del seq_duplicates
+        len_indices = len(line_clusters)
+        log_handler.info(memory_usage + str(len_indices) + " reads")
+    elif resume and os.path.exists(temp1_contig_dir[1]):
+        # lengths = []
+        use_user_direction = False
+        for id_file, file_name in enumerate(original_fq_files):
+            file_in = open(file_name, "r")
+            count_this_read_n = 0
+            line = file_in.readline()
+            # if anti seed input, name & direction should be recognized
+            if anti_seed:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        # parsing name & direction
+                        if use_user_direction:
+                            this_name = line[1:].strip()
+                            direction = direction_according_to_user_input[id_file]
+                        else:
+                            try:
+                                if ' ' in line:
+                                    this_head = line[1:].split(' ')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                elif '#' in line:
+                                    this_head = line[1:].split('#')
+                                    this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
+                                elif line[-3] == "/" and line[-2].isdigit():  # 2019-04-22 added
+                                    this_name, direction = line[1:-3], int(line[-2])
+                                elif line[1:].strip().isdigit():
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                                else:
+                                    log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                            except (ValueError, IndexError):
+                                log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                log_handler.info("Using user-defined read directions. ")
+                                use_user_direction = True
+                                this_name = line[1:].strip()
+                                direction = direction_according_to_user_input[id_file]
+
+                        if (this_name, direction) in anti_lines:
+                            line_count += 4
+                            for i in range(4):
+                                line = file_in.readline()
+                            continue
+                        this_seq = file_in.readline().strip()
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+
+                            if keep_seq_parts:
+                                if cancel_seq_parts and len(this_seq) > 1:
+                                    cancel_seq_parts = False
+                                this_c_seq = complementary_seqs(this_seq)
+                                # lengths.extend([len(seq_part) for seq_part in this_seq])
+                            else:
+                                this_seq = this_seq[0]
+                                this_c_seq = complementary_seq(this_seq)
+                                # lengths.append(len(this_seq))
+                        else:
+                            this_c_seq = complementary_seq(this_seq)
+                            # lengths.append(len(this_seq))
+                        if this_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_seq]].append(line_count)
+                        elif this_c_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                        else:
+                            if index_in_memory:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                            seq_duplicates[this_seq] = this_index
+                            line_clusters.append([line_count])
+                            this_index += 1
+                        if len(seq_duplicates) > rm_duplicates:
+                            seq_duplicates = {}
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            else:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        this_seq = file_in.readline().strip()
+
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                            if keep_seq_parts:
+                                if cancel_seq_parts and len(this_seq) > 1:
+                                    cancel_seq_parts = False
+                                this_c_seq = complementary_seqs(this_seq)
+                                # lengths.extend([len(seq_part) for seq_part in this_seq])
+                            else:
+                                this_seq = this_seq[0]
+                                this_c_seq = complementary_seq(this_seq)
+                                # lengths.append(len(this_seq))
+                        else:
+                            this_c_seq = complementary_seq(this_seq)
+                            # lengths.append(len(this_seq))
+                        if this_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_seq]].append(line_count)
+                        elif this_c_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                        else:
+                            if index_in_memory:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                            seq_duplicates[this_seq] = this_index
+                            line_clusters.append([line_count])
+                            this_index += 1
+                        if len(seq_duplicates) > rm_duplicates:
+                            seq_duplicates = {}
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            line = file_in.readline()
+            file_in.close()
+            if line:
+                log_handler.info("For " + file_name + ", only top " + str(int(all_read_limits[id_file])) +
+                                 " reads are used in downstream analysis.")
+        if this_process:
+            memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + " G, "
+        else:
+            memory_usage = ''
+
+        del name_to_line
+
+        if not index_in_memory:
+            # dump line clusters
+            len_indices = len(line_clusters)
+            temp2_indices_file_out = open(temp2_clusters_dir[0], 'w')
+            for this_index in range(len_indices):
+                temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
+                temp2_indices_file_out.write('\n')
+            temp2_indices_file_out.close()
+            os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
+
+        del seq_duplicates
+        len_indices = len(line_clusters)
+        if len_indices == 0 and line_count // 4 > 0:
+            log_handler.error("No qualified reads found!")
+            log_handler.error("Word size (" + str(word_size) + ") CANNOT be larger than your "
+                              "post-trimmed maximum read length!")
+            exit()
+        log_handler.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
     else:
         if not index_in_memory:
             temp1_contig_out = open(temp1_contig_dir[0], 'w')

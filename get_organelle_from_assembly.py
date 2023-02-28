@@ -1098,7 +1098,8 @@ def main():
                 exit()
             else:
                 if os.path.getsize(slimmed_graph_file) == 0:
-                    return "Slimming " + processed_graph_file + " finished with no target organelle contigs found!"
+                    raise Exception(
+                        "Slimming " + processed_graph_file + " finished with no target organelle contigs found!")
                 log_handler.info("Slimming assembly graph finished.\n")
 
         organelle_type_prefix = []

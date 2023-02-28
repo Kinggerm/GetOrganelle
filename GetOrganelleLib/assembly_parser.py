@@ -771,7 +771,7 @@ class Assembly(SimpleAssembly):
 
     def update_vertex_clusters(self):
         """
-        faster than original v1.7.7.0 update_vertex_clusters algorithm. 2022-12-18.
+        faster than original update_vertex_clusters algorithm.
         """
         self.vertex_clusters = []
         candidate_vs = set(self.vertex_info)
@@ -4413,7 +4413,9 @@ class Assembly(SimpleAssembly):
                     changed = False
                     for (this_v, this_e), quota_len in sorted(explorers.items()):
                         # if there's any this_v active: quota_len>0 AND (not_recorded OR recorded_changed))
-                        if quota_len > 0 and quota_len != best_explored_record.get((this_v, this_e), None):
+                        # TODO: test new code
+                        # if quota_len > 0 and quota_len != best_explored_record.get((this_v, this_e), None):
+                        if quota_len > 0 and quota_len > best_explored_record.get((this_v, this_e), 0):
                             changed = True
                             best_explored_record[(this_v, this_e)] = quota_len
                             # for this_direction in (True, False):

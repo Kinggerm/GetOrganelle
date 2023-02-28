@@ -6,7 +6,7 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.8.0.0-pre4",
+        "number": "1.8.0.0-pre5",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",
@@ -30,6 +30,10 @@ versions = [
             "15. skip clustering and other steps when len(vertex_info)==1",
             "16. discard np.random, fix consistent issue, modify find_target_graph to generate contigs",
             "17. create soft link instead of copying the original read file(s) into the working directory",
+            "18. get_organelle_from_reads.py.make_read_index(): "
+            "    on --continue and temp.indices.1 existed, separate conditions for speeding up ",
+            "19. Assembly.reduce_to_graph: minor changes",
+            "20. get_organelle_from_assembly.py: raise exception on empty graphs",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

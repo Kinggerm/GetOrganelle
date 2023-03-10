@@ -846,6 +846,7 @@ class Assembly(SimpleAssembly):
             for this_end, connected_dict in list(self.vertex_info[vertex_name].connections.items()):
                 for next_v, next_e in list(connected_dict):
                     del self.vertex_info[next_v].connections[next_e][(vertex_name, this_end)]
+        for vertex_name in vertices:
             del self.vertex_info[vertex_name]
             for tag in self.tagged_vertices:
                 if vertex_name in self.tagged_vertices[tag]:

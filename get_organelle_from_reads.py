@@ -3729,8 +3729,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         max_cov_diff=hard_c_t,  # contamination_depth?
                         verbose=verbose,
                         log_handler=log_handler,
-                        random_obj=random,
-                        np_rd_obj=np.random)
+                        random_obj=random)
                     if in_temp_graph:
                         if in_temp_graph.endswith(".gfa"):
                             this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"

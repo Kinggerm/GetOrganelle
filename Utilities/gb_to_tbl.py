@@ -1,6 +1,7 @@
 #! /usr/bin/env python
+__author__ = 'Jianjun Jin'
+
 import os
-import time
 import sys
 from platform import system
 if system() == "Windows":
@@ -24,7 +25,9 @@ from glob import glob
 
 
 def get_options(description=""):
-    usage = "Usage: gb_to_tbl.py gb_files"
+    usage = "This is a GetOrganelle script for converting genbank format to tbl format, \n" \
+            "which can be further used to submit through Banklt (https://www.ncbi.nlm.nih.gov/WebSub/)\n" \
+            "Usage: gb_to_tbl.py gb_files"
     parser = OptionParser(description=description, usage=usage)
     parser.add_option("-o", dest="output",
                       help="Output. Default: along with the original file.")

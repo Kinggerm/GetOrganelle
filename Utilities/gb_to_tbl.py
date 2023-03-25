@@ -30,7 +30,7 @@ def get_options(description=""):
             "Usage: gb_to_tbl.py gb_files"
     parser = OptionParser(description=description, usage=usage)
     parser.add_option("-o", dest="output",
-                      help="Output. Default: along with the original file.")
+                      help="Output directory. Default: along with the original file.")
     parser.add_option("-t", dest="gene_types", default="CDS,tRNA,rRNA,gene,repeat_region,source",
                       help="Annotation type taken as gene. Set 'all' to report all types. Default: %default")
     parser.add_option("-q", dest="qualifiers", default="gene,product,note,standard_name,rpt_type",

@@ -34,6 +34,7 @@ versions = [
             "    on --continue and temp.indices.1 existed, separate conditions for speeding up ",
             "19. Assembly.reduce_to_graph: minor changes",
             "20. get_organelle_from_assembly.py: raise exception on empty graphs",
+            "21. add gb_to_tbl.py for common format conversion",
         ],
         "time": "2023-01-03 10:00 UTC-5"
     },

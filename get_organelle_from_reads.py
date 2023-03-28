@@ -3720,7 +3720,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                                  log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
                 else:
-                    log_handler.info("Re-loading labels along " + slim_out_fg)
+                    log_handler.info("Re-loading labels along " + out_fastg)
                     input_graph.parse_tab_file(
                         tab_f,
                         database_name=in_db_n,

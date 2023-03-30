@@ -74,6 +74,7 @@ class SequenceList(object):
             self.read_fasta(input_fasta_file)
             if indexed:
                 for go_s, seq in enumerate(self.sequences):
+                    assert seq.label not in self.__dict
                     self.__dict[seq.label] = go_s
 
     def __len__(self):

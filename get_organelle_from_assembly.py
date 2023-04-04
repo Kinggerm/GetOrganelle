@@ -281,7 +281,8 @@ def get_options(description, version):
                 sys.stdout.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
-                                 "\nInstall it by: get_organelle_config.py -a " + this_sub_organelle +
+                                  "These two types must be used together!\n" * int(bool(extra_type)) +
+                                 "\nInstall it(them) by: get_organelle_config.py -a " + this_sub_organelle +
                                  "," * int(bool(extra_type)) + extra_type +
                                  "\nor\nInstall all types by: get_organelle_config.py -a all\n")
                 exit()

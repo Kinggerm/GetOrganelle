@@ -712,7 +712,7 @@ class LogInfo:
                                 if "circular genome" in detail_record:
                                     this_circular = "yes"
                         elif " - WARNING: " in line and line[:4].isdigit():
-                            if "Degenerate base(s) used!" in line:
+                            if "Ambiguous base(s) used!" in line:
                                 this_degenerate = "yes"
                     if "circular" in this_record:
                         this_record["circular"] += " & " + this_circular

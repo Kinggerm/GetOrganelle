@@ -6,7 +6,7 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.8.0.0-pre6",
+        "number": "1.8.0.0-pre7",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",
@@ -35,8 +35,9 @@ versions = [
             "19. Assembly.reduce_to_graph: minor changes",
             "20. get_organelle_from_assembly.py: raise exception on empty graphs",
             "21. add gb_to_tbl.py for common format conversion; add biopython as the dependency",
+            "22. fix a bug: summary_get_organelle_output.py does not recognize degenerate/ambiguous bases (issue 279)",
         ],
-        "time": "2023-01-03 10:00 UTC-5"
+        "time": "2023-07-04 9:00 UTC-5"
     },
     {
         "number": "1.7.7.0",

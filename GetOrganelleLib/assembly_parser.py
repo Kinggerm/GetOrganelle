@@ -1120,7 +1120,8 @@ class Assembly(SimpleAssembly):
                                     self.tagged_vertices[db_n].remove(next_vertex)
                         self.remove_vertex([this_vertex, next_vertex], update_cluster=False)
                         break
-        self.update_vertex_clusters()
+        if merged:
+            self.update_vertex_clusters()
         return merged
 
     def estimate_copy_and_depth_by_cov(self, limited_vertices=None, given_average_cov=None, mode="embplant_pt",

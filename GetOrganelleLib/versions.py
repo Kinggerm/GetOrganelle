@@ -6,7 +6,7 @@ def get_versions():
 
 versions = [
     {
-        "number": "1.8.0.0-pre7",
+        "number": "1.8.0.0-pre8",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",
             "2. separate temporary files from different rounds",
@@ -25,19 +25,22 @@ versions = [
             "10. using negative tag weights to better differentiate target and non-target but similar neighbors",
             "11. change the default of depth_factor because the baseline is now set to be average rather than the max",
             "12. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
-            "13. add weight_factor to get_organelle_from_assembly.py",
-            "14. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
-            "15. skip clustering and other steps when len(vertex_info)==1",
-            "16. discard np.random, fix consistent issue, modify find_target_graph to generate contigs",
-            "17. create soft link instead of copying the original read file(s) into the working directory",
-            "18. get_organelle_from_reads.py.make_read_index(): "
+            "13. slim_graph.py:  1. rm_contigs: < depth_cutoff -> >= depth_cutoff. "
+            "                    2. add contig_min_hit_percent (add associated func to seq_parser.py). "
+            "                    3. allow no depth_cutoff (depth_cutoff==-1). ",
+            "14. add weight_factor to get_organelle_from_assembly.py",
+            "15. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
+            "16. skip clustering and other steps when len(vertex_info)==1",
+            "17. discard np.random, fix consistent issue, modify find_target_graph to generate contigs",
+            "18. create soft link instead of copying the original read file(s) into the working directory",
+            "19. get_organelle_from_reads.py.make_read_index(): "
             "    on --continue and temp.indices.1 existed, separate conditions for speeding up ",
-            "19. Assembly.reduce_to_graph: minor changes",
-            "20. get_organelle_from_assembly.py: raise exception on empty graphs",
-            "21. add gb_to_tbl.py for common format conversion; add biopython as the dependency",
-            "22. fix a bug: summary_get_organelle_output.py does not recognize degenerate/ambiguous bases (issue 279)",
+            "20. Assembly.reduce_to_graph: minor changes",
+            "21. get_organelle_from_assembly.py: raise exception on empty graphs",
+            "22. add gb_to_tbl.py for common format conversion; add biopython as the dependency",
+            "23. fix a bug: summary_get_organelle_output.py does not recognize degenerate/ambiguous bases (issue 279)",
         ],
-        "time": "2023-07-04 9:00 UTC-5"
+        "time": "2023-08-18 10:00 UTC+8"
     },
     {
         "number": "1.7.7.0",

@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.pipe_control_func import *
+from GetOrganelleLib.seq_parser import get_fasta_lengths
 import math
 import copy
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
@@ -119,7 +120,8 @@ def get_options(print_title):
                              "rather than both.")
     parser.add_argument("--depth-cutoff", dest="depth_cutoff", default=10000.0, type=float,
                         help="After detection for target coverage, those beyond certain times (depth cutoff) of the"
-                             " detected coverage would be excluded. Default: %(default)s")
+                             " detected coverage would be excluded. Use -1 to disable this process. "
+                             "Default: %(default)s")
     parser.add_argument("--min-depth", dest="min_depth", default=0., type=float,
                         help="Input a float or integer number. Filter fastg file by a minimum depth. Default: %(default)s.")
     parser.add_argument("--max-depth", dest="max_depth", default=inf, type=float,
@@ -141,9 +143,16 @@ def get_options(print_title):
     parser.add_argument("-o", "--out-dir", dest="out_dir",
                         help="By default the output would be along with the input fastg file. "
                              "But you could assign a new directory with this option.")
+    parser.add_argument("--perc-hit", "--contig-min-hit-percent", dest="contig_min_hit_percent", default=0.,
+                        help="[0.0, 1.0], "
+                             "For each database, if the hits in a contig covers less than contig_min_hit_percent, "
+                             "these hits will be discarded, biologically meaning that "
+                             "contig does not represent that database. "
+                             "This is useful to exclude true organelle contigs from the assembled genome "
+                             "without removing the nu-pt or nu-mt. Default: %(default)s")
     parser.add_argument("-e", "--evalue", dest="evalue", default=1e-25, type=float,
                         help="blastn evalue threshold. Default: %(default)s")
-    parser.add_argument("--percent", "--perc-identity", dest="percent_identity", default=None, type=float,
+    parser.add_argument("--perc-identity", dest="percent_identity", default=None, type=float,
                         help="blastn percent identity threshold. Default unset.")
     parser.add_argument("--blast-options", dest="blast_options", default="",
                         help="other blastn options. e.g. --blast-options \"-word_size 13\".")
@@ -405,6 +414,8 @@ def get_options(print_title):
             os.mkdir(log_output_dir)
         assert not (options.out_base and options.prefix), "\"--out-base\" conflicts with \"--prefix\"!"
         assert not (options.out_base and len(options.assemblies) > 1), "\"--out-base\" conflicts with multiple input files!"
+        assert options.depth_cutoff > 0 or options.depth_cutoff == -1
+        assert 0. <= options.contig_min_hit_percent <= 1.
         if options.out_base:
             # Replace illegal characters for blastn
             options.out_base = os.path.basename(options.out_base.replace("'", "_"))
@@ -483,11 +494,30 @@ def blast_and_call_names(
         index_files,
         out_file,
         threads,
+        contig_min_hit_percent=0.,
         e_value=1e-25,
         percent_identity=None,
         other_options="",
         which_blast="",
         log_handler=None):
+    """
+    :param fasta_file:
+    :param index_files:
+    :param out_file:
+    :param threads:
+    :param contig_min_hit_percent: float
+        For each database,
+        if the hits in a contig covers less than contig_min_hit_percent, these hits will be discarded,
+        biologically meaning that contig does not represent the database.
+        This is useful to exclude true organelle contigs from the assembled genome without removing the nu-pt or nu-mt.
+    :param e_value:
+    :param percent_identity:
+    :param other_options:
+    :param which_blast:
+    :param log_handler:
+    :return:
+    """
+    assert 0 <= contig_min_hit_percent < 1
     names = {}
     if index_files:
         time0 = time.time()
@@ -549,6 +579,34 @@ def blast_and_call_names(
                 log_handler.info("Parsing blast result finished.")
             else:
                 sys.stdout.write('Parsing blast result cost: '+str(round(time.time()-time1, 2)) + "\n")
+        if contig_min_hit_percent > 0:
+            query_lengths = get_fasta_lengths(fasta_file, blast_form_seq_name=True)
+            for query in sorted(names):
+                for this_database in sorted(names[query]):
+                    # ranges are the ordered non overlapping ranges in the contig
+                    # used to calculate the hit percentage of the contig
+                    ranges = []
+                    for hit, q_info in names[query][this_database].items():  # mix q_info from different hits
+                        for q_min, q_max, q_score in q_info:
+                            # each time, try to insert (q_min, q_max) into ranges
+                            i = 0
+                            while i < len(ranges):
+                                this_min, this_max = ranges[i]
+                                if q_max < this_min:
+                                    break
+                                elif q_min > this_max:
+                                    i += 1
+                                    continue
+                                else:  # overlap, then merge
+                                    q_min = min(q_min, this_min)
+                                    q_max = max(q_max, this_max)
+                                    del ranges[i]
+                            ranges.insert(i, [q_min, q_max])
+                    hit_cover = float(sum([q_max_ - q_min_ + 1 for q_min_, q_max_ in ranges]))
+                    if hit_cover / query_lengths[query] < contig_min_hit_percent:
+                        del names[query][this_database]
+                if not names[query]:
+                    del names[query]
     return names
 
 
@@ -733,10 +791,10 @@ def reduce_matrix(in_names, ex_names, seq_matrix, assembly_graph, max_slim_exten
     time0 = time.time()
     # candidate_short_to_2fulls = {}
     if assembly_graph:
-        if aver_in_dep:
+        if depth_cutoff != -1 and aver_in_dep:
             rm_contigs = [this_v.v_name
                           for this_v in assembly_graph
-                          if 2 ** abs(math.log(this_v.cov / aver_in_dep, 2)) < depth_cutoff]
+                          if 2 ** abs(math.log(this_v.cov / aver_in_dep, 2)) >= depth_cutoff]
             if verbose:
                 if log_handler:
                     log_handler.info("Depth-cutoff-based removing(" + str(len(rm_contigs)) + "): " + str(rm_contigs))
@@ -1040,11 +1098,13 @@ def main():
                 # structure: names[query][this_database][label] = [(q_min, q_max, q_score)]
                 in_names = blast_and_call_names(fasta_file=blast_fas, index_files=include_indices,
                                                 out_file=blast_fas+'.blast_in', threads=options.threads,
+                                                contig_min_hit_percent=options.contig_min_hit_percent,
                                                 e_value=options.evalue, percent_identity=options.percent_identity,
                                                 other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
                 ex_names = blast_and_call_names(fasta_file=blast_fas, index_files=exclude_indices,
                                                 out_file=blast_fas+'.blast_ex', threads=options.threads,
+                                                contig_min_hit_percent=options.contig_min_hit_percent,
                                                 e_value=options.evalue, percent_identity=options.percent_identity,
                                                 other_options=options.blast_options,
                                                 which_blast=options.which_blast, log_handler=log_handler)
@@ -1055,7 +1115,7 @@ def main():
                     else:
                         sys.stdout.write("in_names(" + str(len(in_names)) + "): " + str(sorted(in_names)) + "\n")
                         sys.stdout.write("ex_names(" + str(len(ex_names)) + "): " + str(sorted(ex_names)) + "\n")
-                if bool(include_indices) or bool(exclude_indices):
+                if options.depth_cutoff != -1 and (bool(include_indices) or bool(exclude_indices)):
                     in_names_r, ex_names_r, aver_dep = modify_in_ex_according_to_depth(
                         in_names=in_names, ex_names=ex_names, significant=options.significant,
                         assembly_graph=this_assembly, depth_cutoff=options.depth_cutoff, log_handler=log_handler)

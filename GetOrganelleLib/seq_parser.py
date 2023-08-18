@@ -177,6 +177,43 @@ class SeqKmerIndexer(object):
             yield i, self.__getitem__(i)
 
 
+def get_fasta_lengths(
+        file_path: str,
+        blast_form_seq_name: bool = False) -> dict:
+    # initialize an empty dictionary to store the sequence lengths
+    seq_lengths = {}
+
+    # open the fasta file for reading
+    with open(file_path, "r") as input_handler:
+        # initialize variables to keep track of the current sequence name and length
+        seq_name = None
+        seq_len = 0
+        # iterate over each line in the file
+        for line in input_handler:
+            # if the line starts with '>', it indicates a new sequence
+            if line.startswith(">"):
+                # if we have a previous sequence, store its length in the dictionary
+                if seq_name:
+                    seq_lengths[seq_name] = seq_len
+                if blast_form_seq_name:
+                    # get the new sequence name by splitting the line and taking the first element
+                    seq_name = line.split()[0][1:]
+                else:
+                    seq_name = line.strip()[1:]
+                # reset the sequence length to 0
+                seq_len = 0
+            else:
+                # if the line does not start with '>', it is part of the current sequence
+                # add the length of the line to the current sequence length
+                seq_len += len(line.strip())
+        # If we have a final sequence, store its length in the dictionary
+        if seq_name:
+            seq_lengths[seq_name] = seq_len
+
+    # Return the dictionary containing the sequence lengths
+    return seq_lengths
+
+
 def read_fasta(fasta_dir):
     names = []
     seqs = []

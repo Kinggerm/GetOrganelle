@@ -16,8 +16,6 @@ sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
 import GetOrganelleLib
 from GetOrganelleLib.versions import get_versions
 from GetOrganelleLib.pipe_control_func import *
-from GetOrganelleLib.seq_parser import get_fasta_lengths, SequenceList
-from GetOrganelleLib.assembly_parser import Assembly
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
 import math
 import copy
@@ -520,6 +518,7 @@ def blast_and_call_names(
     :return:
     """
     assert 0 <= contig_min_hit_percent < 1
+    from GetOrganelleLib.seq_parser import get_fasta_lengths
     names = {}
     if index_files:
         time0 = time.time()
@@ -991,6 +990,8 @@ def main():
                   "from assembly graph file (*.fastg/*.fasta) by blast\n" \
                   "\n"
     options, assemblies, log_handler = get_options(print_title)
+    from GetOrganelleLib.assembly_parser import Assembly
+    from GetOrganelleLib.seq_parser import SequenceList
     log_output_dir = options.out_dir if options.out_dir else os.path.split(assemblies[0])[0]
     log_output_name = str((options.prefix + options.out_base + ".") * int(bool(options.out_base))) + "slim."
     try:

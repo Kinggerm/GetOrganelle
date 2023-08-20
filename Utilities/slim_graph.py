@@ -96,9 +96,9 @@ def get_options(print_title):
                              "\nplant_mt->embplant_mt; plant_nr->embplant_nr")
     parser.add_argument("--no-hits", dest="treat_no_hits", default="ex_no_con",
                         help="Provide treatment for non-hitting contigs.\t"
-                             "\nex_no_con \t keep those connect with hitting-include contigs. (Default)"
-                             "\nex_no_hit \t exclude all."
-                             "\nkeep_all \t keep all")
+                             "\nDefault: ex_no_con: keep those connect with hitting-include contigs. "
+                             "\nex_no_hit: exclude all. "
+                             "\nkeep_all: keep all.")
     parser.add_argument("--max-slim-extending-len", dest="max_slim_extending_len",
                         default=MAX_SLIM_EXTENDING_LENS["anonym"],
                         type=float,
@@ -143,7 +143,7 @@ def get_options(print_title):
     parser.add_argument("-o", "--out-dir", dest="out_dir",
                         help="By default the output would be along with the input fastg file. "
                              "But you could assign a new directory with this option.")
-    parser.add_argument("--perc-hit", "--contig-min-hit-percent", dest="contig_min_hit_percent", default=0.,
+    parser.add_argument("--perc-hit", "--contig-min-hit-percent", dest="contig_min_hit_percent", default=0., type=float,
                         help="[0.0, 1.0], "
                              "For each database, if the hits in a contig covers less than contig_min_hit_percent, "
                              "these hits will be discarded, biologically meaning that "
@@ -251,7 +251,8 @@ def get_options(print_title):
                                  'one of them should be assigned priority!\n')
                 exit()
             if ex_chosen == 1 and in_chosen == 0 and (options.treat_no_hits in ["ex_no_con", "ex_no_hit"]):
-                sys.stdout.write('\n\nOption Error: no contigs survive according to you choice!\n')
+                sys.stdout.write(
+                    "\n\nOption Error: no contigs survive according to you choice! Use \'--no-hits keep_all\'\n")
                 exit()
             if options.include_priority:
                 include_priority_str = str(options.include_priority)

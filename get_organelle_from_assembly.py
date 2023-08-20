@@ -873,7 +873,7 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
     # else:
     # only parsing the assembly obj and tab file once
     log_handler.info("Parsing " + slim_out_fg)
-    assembly_graph_obj = Assembly(slim_out_fg)
+    assembly_graph_obj = Assembly(slim_out_fg, log_handler=log_handler)
     log_handler.info("Loading and cleaning labels along " + slim_out_fg)
     assembly_graph_obj.parse_tab_file(
         slim_out_csv,
@@ -1059,7 +1059,8 @@ def main():
             raise Exception("Input assembly graph file must have name suffix '.gfa' or '.fastg'.")
         processed_graph_file = os.path.join(options.output_base, options.prefix + "initial_assembly_graph." + in_postfix)
         if options.max_depth != inf or options.min_depth != 0.:
-            this_graph = Assembly(options.input_graph, max_cov=options.max_depth, min_cov=options.min_depth)
+            this_graph = Assembly(
+                options.input_graph, max_cov=options.max_depth, min_cov=options.min_depth, log_handler=log_handler)
             if in_postfix.endswith("gfa"):
                 this_graph.write_to_gfa(out_file=processed_graph_file, check_postfix=False)
             else:

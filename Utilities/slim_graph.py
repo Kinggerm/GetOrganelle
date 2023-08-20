@@ -1050,7 +1050,8 @@ def main():
             this_assembly = Assembly()
             this_matrix = None
             if is_graph:
-                this_assembly = Assembly(graph_file=fas_file, min_cov=options.min_depth, max_cov=options.max_depth)
+                this_assembly = Assembly(
+                    graph_file=fas_file, min_cov=options.min_depth, max_cov=options.max_depth, log_handler=log_handler)
                 if options.verbose_log:
                     if log_handler:
                         log_handler.info("Vertices(" + str(len(this_assembly.vertex_info)) + "): " +

@@ -255,7 +255,7 @@ class ConsensusHistory(object):
 
 
 class SimpleAssembly(object):
-    def __init__(self, graph_file=None, min_cov=0., max_cov=inf):
+    def __init__(self, graph_file=None, min_cov=0., max_cov=inf, log_handler=None):
         """
         :param graph_file:
         :param min_cov:
@@ -266,7 +266,7 @@ class SimpleAssembly(object):
         self.__uni_overlap = None
         if graph_file:
             if graph_file.endswith(".gfa"):
-                self.parse_gfa(graph_file, min_cov=min_cov, max_cov=max_cov)
+                self.parse_gfa(graph_file, min_cov=min_cov, max_cov=max_cov, log_handler=log_handler)
             else:
                 self.parse_fastg(graph_file, min_cov=min_cov, max_cov=max_cov)
 
@@ -290,7 +290,7 @@ class SimpleAssembly(object):
         for vertex in sorted(self.vertex_info):
             yield self.vertex_info[vertex]
 
-    def parse_gfa(self, gfa_file, default_cov=1., min_cov=0., max_cov=inf):
+    def parse_gfa(self, gfa_file, default_cov=1., min_cov=0., max_cov=inf, log_handler=None):
         with open(gfa_file) as gfa_open:
             kmer_values = set()
             line = gfa_open.readline()
@@ -319,14 +319,19 @@ class SimpleAssembly(object):
                             # skip RC/FC
                             if element[0].upper() == "LN":
                                 seq_len_tag = int(element[-1])
+                                check_positive_value(seq_len_tag, "LN", log_handler=log_handler)
                             elif element[0].upper() == "KC":
                                 kmer_count = int(element[-1])
+                                check_positive_value(kmer_count, "KC", log_handler=log_handler)
                             elif element[0].upper() == "RC":  # took read counts as kmer counts
                                 kmer_count = int(element[-1])
+                                check_positive_value(kmer_count, "RC", log_handler=log_handler)
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])
+                                check_positive_value(seq_depth_tag, "DP", log_handler=log_handler)
                             elif element[0].upper() == "RD":  # took read depth as seq_depth_tag counts
                                 seq_depth_tag = int(element[-1])
+                                check_positive_value(seq_depth_tag, "RD", log_handler=log_handler)
                             elif element[0].upper() == "SH":
                                 sh_256_val = ":".join(element[2:])
                             elif element[0].upper() == "UR":
@@ -405,12 +410,16 @@ class SimpleAssembly(object):
                             # skip RC/FC
                             if element[0].upper() == "KC":
                                 kmer_count = int(element[-1])
+                                check_positive_value(kmer_count, "KC", log_handler=log_handler)
                             elif element[0].upper() == "RC":  # took read counts as kmer counts
                                 kmer_count = int(element[-1])
+                                check_positive_value(kmer_count, "RC", log_handler=log_handler)
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])
+                                check_positive_value(seq_depth_tag, "DP", log_handler=log_handler)
                             elif element[0].upper() == "RD":  # took read depth as seq_depth_tag counts
                                 seq_depth_tag = int(element[-1])
+                                check_positive_value(seq_depth_tag, "RD", log_handler=log_handler)
                             elif element[0].upper() == "SH":
                                 sh_256_val = ":".join(element[2:])
                             elif element[0].upper() == "UR":
@@ -621,13 +630,13 @@ class SimpleAssembly(object):
 
 
 class Assembly(SimpleAssembly):
-    def __init__(self, graph_file=None, min_cov=0., max_cov=inf, uni_overlap=None):
+    def __init__(self, graph_file=None, min_cov=0., max_cov=inf, uni_overlap=None, log_handler=None):
         """
         :param graph_file:
         :param min_cov:
         :param max_cov:
         """
-        super(Assembly, self).__init__(graph_file=graph_file, min_cov=min_cov, max_cov=max_cov)
+        super(Assembly, self).__init__(graph_file=graph_file, min_cov=min_cov, max_cov=max_cov, log_handler=log_handler)
         if uni_overlap:
             self.__uni_overlap = uni_overlap
         else:
@@ -648,9 +657,9 @@ class Assembly(SimpleAssembly):
     #     else:
     #         return int(self.__uni_overlap)
 
-    def new_graph_with_vertex_reseeded(self, start_from=1):
+    def new_graph_with_vertex_reseeded(self, start_from=1, log_handler=None):
         those_vertices = sorted(self.vertex_info)
-        new_graph = Assembly(uni_overlap=self.__uni_overlap)
+        new_graph = Assembly(uni_overlap=self.__uni_overlap, log_handler=log_handler)
         name_trans = {those_vertices[go - start_from]: str(go)
                       for go in range(start_from, start_from + len(those_vertices))}
         for old_name in those_vertices:
@@ -6808,3 +6817,18 @@ def get_graph_coverages_range_simple(fasta_matrix, drop_low_percent=0.10, drop_h
         cov_mean, cov_std = 0., 0.
         coverages = [0.]
     return max(cov_mean - cov_std, min(coverages)), cov_mean, min(cov_mean + cov_std, max(coverages))
+
+
+def check_positive_value(value, flag, log_handler):
+    if value < 0:
+        if log_handler is None:
+            sys.stdout.write(
+                "Warning: illegitimate " + flag + " value " + str(value) + " adjusted to " + str(-value) + "!\n")
+        else:
+            log_handler.warning("illegitimate " + flag + " value " + str(value) + " adjusted to " + str(-value) + "!")
+        return -value
+    elif value == 0:
+        raise ValueError("illegitimate " + flag + " value " + str(value) + "!")
+    else:
+        return value
+

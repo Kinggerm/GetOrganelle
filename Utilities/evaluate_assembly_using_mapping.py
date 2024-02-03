@@ -13,7 +13,11 @@ from GetOrganelleLib.sam_parser import *
 from GetOrganelleLib.statistical_func import *
 from GetOrganelleLib.versions import get_versions
 PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
-from sympy import Interval
+try:
+    from sympy import Interval
+except ImportError:
+    print("please install sympy to execute this script, e.g. using: pip install sympy")
+    sys.exit()
 import sys
 import platform
 SYSTEM_NAME = ""

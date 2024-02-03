@@ -712,7 +712,7 @@ class LogInfo:
                                 if "circular genome" in detail_record:
                                     this_circular = "yes"
                         elif " - WARNING: " in line and line[:4].isdigit():
-                            if "Degenerate base(s) used!" in line:
+                            if "Ambiguous base(s) used!" in line:
                                 this_degenerate = "yes"
                     if "circular" in this_record:
                         this_record["circular"] += " & " + this_circular
@@ -982,6 +982,52 @@ def get_static_html_context(remote_url, try_times=5, timeout=10, verbose=False, 
         time.sleep(1)
         count += 1
     return {"status": False, "info": "unknown", "content": ""}
+
+
+def log_target_res(final_res_combinations_inside,
+                   log_handler=None,
+                   read_len_for_log=None,
+                   kmer_for_log=None,
+                   universal_overlap=False,
+                   mode="",):
+    echo_graph_id = int(bool(len(final_res_combinations_inside) - 1))
+    for go_res, final_res_one in enumerate(final_res_combinations_inside):
+        this_graph = final_res_one["graph"]
+        this_k_cov = round(final_res_one["cov"], 3)
+        if read_len_for_log and kmer_for_log:
+            this_b_cov = round(this_k_cov * read_len_for_log / (read_len_for_log - kmer_for_log + 1), 3)
+        else:
+            this_b_cov = None
+        if log_handler:
+            if echo_graph_id:
+                log_handler.info("Graph " + str(go_res + 1))
+            for vertex_set in sorted(this_graph.vertex_clusters):
+                copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
+                if copies_in_a_set != {1}:
+                    for in_vertex_name in sorted(vertex_set):
+                        log_handler.info("Vertex_" + in_vertex_name + " #copy = " +
+                                         str(this_graph.vertex_to_copy.get(in_vertex_name, 1)))
+            cov_str = " kmer-coverage" if universal_overlap else " coverage"
+            log_handler.info("Average " + mode + cov_str +
+                             ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov)
+            if this_b_cov:
+                log_handler.info("Average " + mode + " base-coverage" +
+                                 ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_b_cov)
+        else:
+            if echo_graph_id:
+                sys.stdout.write("Graph " + str(go_res + 1) + "\n")
+            for vertex_set in sorted(this_graph.vertex_clusters):
+                copies_in_a_set = {this_graph.vertex_to_copy[v_name] for v_name in vertex_set}
+                if copies_in_a_set != {1}:
+                    for in_vertex_name in sorted(vertex_set):
+                        sys.stdout.write("Vertex_" + in_vertex_name + " #copy = " +
+                                         str(this_graph.vertex_to_copy.get(in_vertex_name, 1)) + "\n")
+            cov_str = " kmer-coverage" if universal_overlap else " coverage"
+            sys.stdout.write("Average " + mode + cov_str +
+                             ("(" + str(go_res + 1) + ")") * echo_graph_id + " = " + "%.1f" % this_k_cov + "\n")
+            if this_b_cov:
+                sys.stdout.write("Average " + mode + " base-coverage" + ("(" + str(go_res + 1) + ")") *
+                                 echo_graph_id + " = " + "%.1f" % this_b_cov + "\n")
 
 
 def download_file_with_progress(remote_url, output_file, log_handler=None, allow_empty=False,

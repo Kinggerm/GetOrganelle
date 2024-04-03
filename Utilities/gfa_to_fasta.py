@@ -33,7 +33,7 @@ def main():
         if type(2/1) == float:
             gfa_file = input('Please input gfa file:').strip()
         else:
-            gfa_file = raw_input('Please input gfa file:').strip()
+            gfa_file = raw_input('Please input gfa file:').strip() # type: ignore
         if gfa_file.strip():
             write_fasta(gfa_file +'.fasta', read_gfa_as_fasta(gfa_file), False)
 

@@ -317,10 +317,10 @@ def main():
     except KeyError as e:
         if str(e).strip("'") == options.mode:
             log_handler.error(options.mode + " not found in " + str(options.tab_file) + "!")
-            log_handler.error("Disentangling failed!")
+            log_handler.error("Disentangling unsuccessful!")
         else:
             log_handler.exception(str(e))
-            log_handler.error("Disentangling failed!")
+            log_handler.error("Disentangling unsuccessful!")
             if not options.acyclic_allowed:
                 log_handler.info("You might try again with '--linear' to export contig(s) "
                                  "instead of circular genome.")
@@ -329,7 +329,7 @@ def main():
             log_handler.info("Please open an issue at https://github.com/Kinggerm/GetOrganelle/issues if you find bugs!\n")
     except Exception as e:
         log_handler.exception(str(e))
-        log_handler.error("Disentangling failed!")
+        log_handler.error("Disentangling unsuccessful!")
         if not options.acyclic_allowed:
             log_handler.info("You might try again with '--linear' to export contig(s) "
                              "instead of circular genome.")

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 # coding:utf8
 
 from argparse import ArgumentParser
@@ -29,7 +29,7 @@ GO_DEP_PATH = os.path.realpath(os.path.join(GO_LIB_PATH, "..", "GetOrganelleDep"
 
 try:
     # python2 UnicodeDecodeError ±
-    reload(sys)
+    reload(sys) # type: ignore
     sys.setdefaultencoding('utf8')
 except NameError:
     pass

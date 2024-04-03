@@ -1,5 +1,5 @@
 try:
-    from scipy import stats, inf, log
+    from scipy import stats
 except ImportError:
     class stats:
         class norm:
@@ -7,6 +7,15 @@ except ImportError:
                 raise ImportError("Failed in 'from scipy import stats, inf, log'!")
     inf = float("inf")
     from math import log
+try:
+    from scipy import inf, log
+except ImportError:
+    try:
+        from numpy import inf, log
+    except ImportError:
+        inf = float("inf")
+        from math import log
+
 from copy import deepcopy
 try:
     import numpy as np

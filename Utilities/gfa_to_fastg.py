@@ -21,7 +21,7 @@ def main():
         if type(2/1) == float:
             gfa_file = input('Please input gfa file:').strip()
         else:
-            gfa_file = raw_input('Please input gfa file:').strip()
+            gfa_file = raw_input('Please input gfa file:').strip() # type: ignore
         PATH_OF_THIS_SCRIPT = os.path.split(os.path.realpath(__file__))[0]
         sys.path.insert(0, os.path.join(PATH_OF_THIS_SCRIPT, ".."))
         from GetOrganelleLib.assembly_parser import Assembly

@@ -6,6 +6,16 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.7.7.1",
+        "features": [
+            "1. fix a import bug of 'from scipy import stat, log, inf' issue (issue #132 #315)",
+            "2. fix a ZeroDivisionError bug when the estimated coverage is 0 (issue #311)",
+            "3. Disentangling failed -> Disentangling unsuccessful to avoid panic (issue #308)",
+            "4. fix a bug in parsing options when '-F anonym' is used (issue #319)",
+        ],
+        "time": "2024-04-03 17:05 UTC-5"
+    },
+    {
         "number": "1.7.7.0",
         "features": [
             "1. Assembly.merge_all_possible_nodes: fix a bug which will result in bad contig names",

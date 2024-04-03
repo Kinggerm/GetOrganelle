@@ -12,6 +12,7 @@ versions = [
             "2. fix a ZeroDivisionError bug when the estimated coverage is 0 (issue #311)",
             "3. Disentangling failed -> Disentangling unsuccessful to avoid panic (issue #308)",
             "4. fix a bug in parsing options when '-F anonym' is used (issue #319)",
+            "5. have max_multiplicity passed to no-slim case",
         ],
         "time": "2024-04-03 17:05 UTC-5"
     },

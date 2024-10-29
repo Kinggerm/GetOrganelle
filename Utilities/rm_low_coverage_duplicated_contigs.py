@@ -3,7 +3,7 @@ import sys
 from argparse import ArgumentParser
 import subprocess
 try:
-    import commands
+    import commands # type: ignore
 except:
     pass
 import os

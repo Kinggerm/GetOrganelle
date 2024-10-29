@@ -720,7 +720,7 @@ def get_options(description, version):
                 log_label_types.append("embplant_pt")
             log_handler.info("LABEL DB: " + single_line_db_versions(existing_label_db, log_label_types))
         # working directory
-        log_handler.info("WORKING DIR: " + os.getcwd())
+        log_handler.info("WORKING_DIR=" + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 
         # if options.run_spades:
@@ -876,11 +876,14 @@ def get_options(description, version):
                 elif sub_organelle_t in ("embplant_nr", "fungus_nr", "animal_mt"):
                     options.expected_max_size.append(int(raw_default_value / 10))
                 elif sub_organelle_t == "anonym":
-                    ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
-                    options.expected_max_size.append(10 * sum([len(this_seq) for this_seq in ref_seqs]))
-                    log_handler.info(
-                        "Setting '--expected-max-size " + ",".join([str(t_s) for t_s in options.expected_max_size]) +
-                        "' for estimating the word size value for anonym type.")
+                    if options.genes_fasta:
+                        ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
+                        options.expected_max_size.append(10 * sum([len(this_seq) for this_seq in ref_seqs]))
+                        log_handler.info(
+                            "Setting '--expected-max-size " + ",".join([str(t_s) for t_s in options.expected_max_size]) +
+                            "' for estimating the word size value for anonym type.")
+                    else:
+                        options.expected_max_size.append(inf)
         else:
             temp_val_len = len(str(options.expected_max_size).split(","))
             if temp_val_len != organelle_type_len:
@@ -1248,18 +1251,22 @@ def estimate_word_size(base_cov, base_cov_deviation, read_length, target_size, m
         echo_problem = True
     word_cov = max(min_word_cov, word_cov)
     word_cov = trans_word_cov(word_cov, base_cov, mean_error_rate / 2., read_length)
-    # 1. relationship between kmer coverage and base coverage, k_cov = base_cov * (read_len - k_len + 1) / read_len
-    estimated_word_size = int(read_length * (1 - word_cov / base_cov)) + 1
-    # print(estimated_word_size)
-    estimated_word_size = min(int(read_length * MAX_RATIO_RL_WS), max(min_word_size, estimated_word_size))
-    if echo_problem:
-        if log_handler:
-            log_handler.warning("Guessing that you are using too few data for assembling " + organelle_type + "!")
-            log_handler.warning("GetOrganelle is still trying ...")
-        else:
-            sys.stdout.write("Guessing that you are using too few data for assembling " + organelle_type + "!\n")
-            sys.stdout.write("GetOrganelle is still trying ...\n")
-    return int(round(estimated_word_size, 0))
+    if base_cov == 0:
+        log_handler.error("Word size estimation failed due to improper seed or too few input data!")
+        sys.exit()
+    else:
+        # 1. relationship between kmer coverage and base coverage, k_cov = base_cov * (read_len - k_len + 1) / read_len
+        estimated_word_size = int(read_length * (1 - word_cov / base_cov)) + 1
+        # print(estimated_word_size)
+        estimated_word_size = min(int(read_length * MAX_RATIO_RL_WS), max(min_word_size, estimated_word_size))
+        if echo_problem:
+            if log_handler:
+                log_handler.warning("Guessing that you are using too few data for assembling " + organelle_type + "!")
+                log_handler.warning("GetOrganelle is still trying ...")
+            else:
+                sys.stdout.write("Guessing that you are using too few data for assembling " + organelle_type + "!\n")
+                sys.stdout.write("GetOrganelle is still trying ...\n")
+        return int(round(estimated_word_size, 0))
 
 
 def calculate_word_size_according_to_ratio(word_size_ratio, mean_read_len, log_handler):
@@ -4009,11 +4016,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
             except RuntimeError as e:
                 if verbose:
                     log_handler.exception("")
-                log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+                log_handler.info("Disentangling unsuccessful: RuntimeError: " + str(e).strip())
             except TimeoutError:
                 log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
             except ProcessingGraphFailed as e:
-                log_handler.info("Disentangling failed: " + str(e).strip())
+                log_handler.info("Disentangling unsuccessful: " + str(e).strip())
             except Exception as e:
                 log_handler.exception("")
                 sys.exit()
@@ -4060,11 +4067,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 except RuntimeError as e:
                     if verbose:
                         log_handler.exception("")
-                    log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+                    log_handler.info("Disentangling unsuccessful: RuntimeError: " + str(e).strip())
                 except TimeoutError:
                     log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
                 except ProcessingGraphFailed as e:
-                    log_handler.info("Disentangling failed: " + str(e).strip())
+                    log_handler.info("Disentangling unsuccessful: " + str(e).strip())
                 except Exception as e:
                     log_handler.exception("")
                     sys.exit()
@@ -4113,11 +4120,11 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     except RuntimeError as e:
                         if verbose:
                             log_handler.exception("")
-                        log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+                        log_handler.info("Disentangling unsuccessful: RuntimeError: " + str(e).strip())
                     except TimeoutError:
                         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
                     except ProcessingGraphFailed as e:
-                        log_handler.info("Disentangling failed: " + str(e).strip())
+                        log_handler.info("Disentangling unsuccessful: " + str(e).strip())
                     except Exception as e:
                         raise e
                     else:

@@ -400,7 +400,7 @@ def get_options(description, version):
                 log_types.append("embplant_pt")
             log_handler.info("LABEL DB: " + single_line_db_versions(existing_label_db, log_types))
         # working directory
-        log_handler.info("WORKING DIR: " + os.getcwd())
+        log_handler.info("WORKING_DIR=" + os.getcwd())
         log_handler.info(" ".join(["\"" + arg + "\"" if " " in arg else arg for arg in sys.argv]) + "\n")
 
         assert is_valid_path(os.path.realpath(options.output_base)), \
@@ -454,10 +454,13 @@ def get_options(description, version):
                 elif sub_organelle_t in ("embplant_nr", "fungus_nr", "animal_mt"):
                     options.expected_max_size.append(int(raw_default_value / 10))
                 elif sub_organelle_t == "anonym":
-                    ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
-                    options.expected_max_size.append(10 * sum([len(this_seq) for this_seq in ref_seqs]))
-                    log_handler.info("Setting '--expected-max-size " + str(options.expected_max_size) +
-                                     "' for estimating the word size value for anonym type.")
+                    if options.genes_fasta:
+                        ref_seqs = read_fasta(options.genes_fasta[got_t])[1]
+                        options.expected_max_size.append(10 * sum([len(this_seq) for this_seq in ref_seqs]))
+                        log_handler.info("Setting '--expected-max-size " + str(options.expected_max_size) +
+                                        "' for estimating the word size value for anonym type.")
+                    else:
+                        options.expected_max_size.append(inf)
         else:
             temp_val_len = len(str(options.expected_max_size).split(","))
             if temp_val_len != organelle_type_len:
@@ -916,11 +919,11 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         if verbose:
             raise e
     except RuntimeError as e:
-        log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+        log_handler.info("Disentangling unsuccessful: RuntimeError: " + str(e).strip())
     except TimeoutError as e:
         log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
     except ProcessingGraphFailed as e:
-        log_handler.info("Disentangling failed: " + str(e).strip())
+        log_handler.info("Disentangling unsuccessful: " + str(e).strip())
     except Exception as e:
         log_handler.exception("")
         raise e
@@ -956,11 +959,11 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
             if verbose:
                 raise e
         except RuntimeError as e:
-            log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+            log_handler.info("Disentangling unsuccessful: RuntimeError: " + str(e).strip())
         except TimeoutError as e:
             log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
         except ProcessingGraphFailed as e:
-            log_handler.info("Disentangling failed: " + str(e).strip())
+            log_handler.info("Disentangling unsuccessful: " + str(e).strip())
         except Exception as e:
             log_handler.exception("")
             raise e
@@ -995,11 +998,11 @@ def extract_organelle_genome(out_base, slim_out_fg, slim_out_csv, organelle_pref
         except RuntimeError as e:
             if verbose:
                 log_handler.exception("")
-            log_handler.info("Disentangling failed: RuntimeError: " + str(e).strip())
+            log_handler.info("Disentangling unsuccessful: RuntimeError: " + str(e).strip())
         except TimeoutError as e:
             log_handler.info("Disentangling timeout. (see " + timeout_flag + " for more)")
         except ProcessingGraphFailed as e:
-            log_handler.info("Disentangling failed: " + str(e).strip())
+            log_handler.info("Disentangling unsuccessful: " + str(e).strip())
         except Exception as e:
             raise e
         else:

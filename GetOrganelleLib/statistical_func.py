@@ -8,6 +8,7 @@
 #     inf = float("inf")
 from math import log, inf, sqrt, pi
 from itertools import permutations
+
 from copy import deepcopy
 # add try except so that when statistical_func.py is called by other scripts, it will not prompt error immediately
 try:

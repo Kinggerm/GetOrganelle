@@ -7,7 +7,7 @@ import platform
 import subprocess
 try:
     # python2
-    import commands
+    import commands # type: ignore
 except:
     pass
 from argparse import ArgumentParser

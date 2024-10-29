@@ -6,7 +6,7 @@ import sys
 import subprocess
 try:
     # python2
-    import commands
+    import commands # type: ignore
 except:
     pass
 inf = float("inf")

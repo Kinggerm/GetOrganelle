@@ -30,8 +30,9 @@ def get_options(print_title):
                              "organelle genome), and would directly give up linear/broken graphs. Choose this option "
                              "to try for linear/broken cases.")
     parser.add_argument("--weight-f", dest="weight_factor", type=float, default=100.0,
-                        help="weight factor for excluding non-target contigs. Default:%(default)s")
-    parser.add_argument("--depth-f", dest="depth_factor", type=float, default=10.,
+                        help="weight factor for excluding isolated/terminal suspicious contigs with gene labels. "
+                             "Default:%(default)s")
+    parser.add_argument("--depth-f", dest="depth_factor", type=float, default=5.,
                         help="Depth factor for excluding non-target contigs. Default:%(default)s")
     parser.add_argument("--type-f", dest="type_factor", type=float, default=3.,
                         help="Type factor for identifying genome type tag. Default:%(default)s")
@@ -71,9 +72,9 @@ def get_options(print_title):
                         help="Minimum coverage for a contig to be included in disentangling. Default:%(default)s")
     parser.add_argument("--max-depth", dest="max_cov", type=float, default=inf,
                         help="Minimum coverage for a contig to be included in disentangling. Default:%(default)s")
-    parser.add_argument("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
-                        help="Maximum multiplicity of contigs for disentangling genome paths. "
-                             "Should be 1~12. Default:%(default)s")
+    # parser.add_argument("--max-multiplicity", dest="max_multiplicity", type=int, default=8,
+    #                     help="Maximum multiplicity of contigs for disentangling genome paths. "
+    #                          "Should be 1~12. Default:%(default)s")
     parser.add_argument("--prefix", dest="prefix", default="target",
                         help="Prefix of output files inside output directory. Default:%(default)s")
     parser.add_argument("--keep-temp", dest="keep_temp_graph", default=False, action="store_true",
@@ -104,7 +105,7 @@ def get_options(print_title):
         sys.stdout.write("Insufficient arguments!\n")
         sys.exit()
     else:
-        assert 12 >= options.max_multiplicity >= 1
+        # assert 12 >= options.max_multiplicity >= 1
         assert options.max_paths_num > 0
         if options.output_directory and not os.path.exists(options.output_directory):
             os.mkdir(options.output_directory)
@@ -119,8 +120,6 @@ def get_options(print_title):
             #     options.expected_max_size /= 2
             elif options.mode in ("embplant_nr", "animal_mt", "fungus_nr"):
                 options.expected_max_size /= 8
-        random.seed(options.random_seed)
-        np.random.seed(options.random_seed)
         return options, log_handler
 
 
@@ -131,37 +130,44 @@ def main():
                   " from slim_fastg.py-produced files (csv & fastg). " + \
                   "\n\n"
     options, log_handler = get_options(print_title)
+    random.seed(options.random_seed)
+    np.random.seed(options.random_seed)
 
     @set_time_limit(options.time_limit)
-    def disentangle_circular_assembly(fastg_file, tab_file, prefix, weight_factor, type_factor, mode="embplant_pt",
-                                      hard_cov_threshold=10., expected_max_size=inf, expected_min_size=0,
+    def disentangle_circular_assembly(input_graph,
+                                      # tab_file,
+                                      prefix,
+                                      weight_factor,
+                                      # type_factor,
+                                      mode="embplant_pt",
+                                      hard_cov_threshold=5., expected_max_size=inf, expected_min_size=0,
                                       contamination_depth=3., contamination_similarity=5.,
                                       degenerate=True, degenerate_depth=1.5, degenerate_similarity=1.5,
-                                      min_sigma_factor=0.1, max_copy_in=10, only_max_cov=True,
+                                      min_sigma_factor=0.1, only_max_cov=True,  # max_copy_in=10,
                                       keep_temp=False, acyclic_allowed=False,
                                       verbose=False, inner_logging=None, debug=False):
-        if options.resume and os.path.exists(prefix + ".graph1.selected_graph.gfa"):
-            pass
+        if options.resume and os.path.exists(prefix + ".graph1.path_sequence.gfa"):
             if inner_logging:
                 inner_logging.info(">>> Result graph existed!")
             else:
                 sys.stdout.write(">>> Result graph existed!\n")
         else:
-            time_a = time.time()
-            if inner_logging:
-                inner_logging.info(">>> Parsing " + fastg_file + " ..")
-            else:
-                sys.stdout.write("Parsing " + fastg_file + " ..\n")
-            input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
+            # time_a = time.time()
+            # if inner_logging:
+            #     inner_logging.info(">>> Parsing " + fastg_file + " ..")
+            # else:
+            #     sys.stdout.write("Parsing " + fastg_file + " ..\n")
+            # input_graph = Assembly(fastg_file, min_cov=options.min_cov, max_cov=options.max_cov)
             time_b = time.time()
-            if inner_logging:
-                inner_logging.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
-            else:
-                sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
+            # if inner_logging:
+            #     inner_logging.info(">>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s")
+            # else:
+            #     sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_b - time_a, 4)) + "s\n")
             temp_graph = prefix + ".temp.fastg" if keep_temp else None
-
-            copy_results = input_graph.find_target_graph(tab_file, database_name=mode, mode=mode,
-                                                         type_factor=type_factor,
+            selected_graph = prefix + ".graph.selected_graph.gfa"
+            copy_results = input_graph.find_target_graph(  # tab_file,
+                                                         db_name=mode, mode=mode,
+                                                         # type_factor=type_factor,
                                                          weight_factor=weight_factor,
                                                          hard_cov_threshold=hard_cov_threshold,
                                                          contamination_depth=contamination_depth,
@@ -170,13 +176,14 @@ def main():
                                                          degenerate_similarity=degenerate_similarity,
                                                          expected_max_size=expected_max_size,
                                                          expected_min_size=expected_min_size,
-                                                         max_contig_multiplicity=max_copy_in,
                                                          only_keep_max_cov=only_max_cov,
                                                          min_sigma_factor=min_sigma_factor,
+                                                         selected_graph=selected_graph,
                                                          temp_graph=temp_graph,
                                                          broken_graph_allowed=acyclic_allowed,
                                                          verbose=verbose, log_handler=inner_logging,
-                                                         debug=debug)
+                                                         debug=debug,
+                                                         random_obj=random)
             time_c = time.time()
             if inner_logging:
                 inner_logging.info(">>> Detecting target graph finished: " + str(round(time_c - time_b, 4)) + "s")
@@ -194,12 +201,14 @@ def main():
                     go_res += 1
                     broken_graph = copy_res["graph"]
                     count_path = 0
-
-                    these_paths = broken_graph.get_all_paths(mode=mode, log_handler=inner_logging)
+                    # use options.max_paths_num + 1 to trigger the warning
+                    these_paths = broken_graph.get_all_paths(mode=mode, log_handler=inner_logging,
+                                                             max_paths_num=options.max_paths_num + 1)
                     # reducing paths
                     if len(these_paths) > options.max_paths_num:
                         this_warn_str = "Only exporting " + str(options.max_paths_num) + " out of all " + \
-                                        str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)"
+                                        str(options.max_paths_num) + \
+                                        "+ possible paths. (see '--max-paths-num' to change it.)"
                         if inner_logging:
                             inner_logging.warning(this_warn_str)
                         else:
@@ -242,7 +251,7 @@ def main():
                         #     still_complete.append(False)
                         open(prefix + ".graph" + str(go_res) + other_tag + "." + str(count_path) +
                              ".path_sequence.fasta", "w").write("\n".join(all_contig_str))
-                    broken_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
+                    broken_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".path_sequence.gfa")
             else:
                 for go_res, copy_res in enumerate(copy_results):
                     go_res += 1
@@ -250,13 +259,16 @@ def main():
                     # should add making one-step-inversion pairs for paths,
                     # which would be used to identify existence of a certain isomer using mapping information
                     count_path = 0
-
+                    # use options.max_paths_num + 1 to trigger the warning
                     these_paths = idealized_graph.get_all_circular_paths(
-                        mode=mode, log_handler=inner_logging, reverse_start_direction_for_pt=options.reverse_lsc)
+                        mode=mode, log_handler=inner_logging, reverse_start_direction_for_pt=options.reverse_lsc,
+                        max_paths_num=options.max_paths_num + 1,
+                    )
                     # reducing paths
                     if len(these_paths) > options.max_paths_num:
                         this_warn_str = "Only exporting " + str(options.max_paths_num) + " out of all " + \
-                                        str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)"
+                                        str(options.max_paths_num) + \
+                                        "+ possible paths. (see '--max-paths-num' to change it.)"
                         if inner_logging:
                             inner_logging.warning(this_warn_str)
                         else:
@@ -282,7 +294,7 @@ def main():
                                 inner_logging.info(print_str)
                             else:
                                 sys.stdout.write(print_str + "\n")
-                    idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".selected_graph.gfa")
+                    idealized_graph.write_to_gfa(prefix + ".graph" + str(go_res) + ".path_sequence.gfa")
             if degenerate_base_used:
                 inner_logging.warning("Degenerate base(s) used!")
             time_d = time.time()
@@ -292,9 +304,35 @@ def main():
                 sys.stdout.write("\n\n>>> Solving and unfolding graph finished: " + str(round(time_d - time_c, 4)) + "s\n")
 
     try:
-        disentangle_circular_assembly(options.fastg_file, options.tab_file,
+        time_1 = time.time()
+        if log_handler:
+            log_handler.info(">>> Parsing " + options.fastg_file + " ..")
+        else:
+            sys.stdout.write("Parsing " + options.fastg_file + " ..\n")
+        assembly_graph_obj = Assembly(
+            options.fastg_file, min_cov=options.min_cov, max_cov=options.max_cov, log_handler=log_handler)
+        if log_handler:
+            log_handler.info(">>> Loading and cleaning labels along " + options.fastg_file)
+        else:
+            sys.stdout.write("Loading and cleaning labels along " + options.fastg_file + "\n")
+        assembly_graph_obj.parse_tab_file(
+            options.tab_file,
+            database_name=options.mode,
+            type_factor=options.type_factor,
+            max_gene_gap=250,
+            max_cov_diff=options.depth_factor,  # contamination_depth?
+            verbose=options.verbose,
+            log_handler=log_handler,
+            random_obj=random)
+        time_2 = time.time()
+        if log_handler:
+            log_handler.info(">>> Parsing input fastg file finished: " + str(round(time_2 - time_1, 4)) + "s")
+        else:
+            sys.stdout.write("\n>>> Parsing input fastg file finished: " + str(round(time_2 - time_1, 4)) + "s\n")
+        disentangle_circular_assembly(assembly_graph_obj,
+                                      # options.tab_file,
                                       os.path.join(options.output_directory, options.prefix),
-                                      type_factor=options.type_factor,
+                                      # type_factor=options.type_factor,
                                       mode=options.mode,
                                       weight_factor=options.weight_factor,
                                       hard_cov_threshold=options.depth_factor,
@@ -305,7 +343,7 @@ def main():
                                       expected_max_size=options.expected_max_size,
                                       expected_min_size=options.expected_min_size,
                                       min_sigma_factor=options.min_sigma_factor,
-                                      max_copy_in=options.max_multiplicity,
+                                      # max_copy_in=options.max_multiplicity,
                                       only_max_cov=options.only_keep_max_cov, acyclic_allowed=options.acyclic_allowed,
                                       keep_temp=options.keep_temp_graph,
                                       inner_logging=log_handler, verbose=options.verbose, debug=options.debug)

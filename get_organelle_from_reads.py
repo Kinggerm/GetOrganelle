@@ -316,8 +316,8 @@ def get_options(description, version):
                                          "with the same list length to organelle_type (followed by '-F'). "
                                          "This is optional for any organelle mentioned in '-F' but required for 'anonym'. "
                                          "By default, certain database(s) in " + str(LBL_DB_PATH) + " would be used "
-                                                                                                    "contingent on the organelle types chosen (-F). "
-                                                                                                    "The default value become invalid when '--genes' or '--ex-genes' is used.")
+                                         "contingent on the organelle types chosen (-F). "
+                                         "The default value become invalid when '--genes' or '--ex-genes' is used.")
         group_assembly.add_argument("--ex-genes", dest="exclude_genes",
                                     help="This is optional and Not suggested, since non-target contigs could contribute "
                                          "information for better downstream coverage-based clustering. "
@@ -327,10 +327,13 @@ def get_options(description, version):
                                          "Could be a list of databases split by comma(s) but "
                                          "NOT required to have the same list length to organelle_type (followed by '-F'). "
                                          "The default value will become invalid when '--genes' or '--ex-genes' is used.")
-        group_assembly.add_argument("--disentangle-df", dest="disentangle_depth_factor", default=10.0, type=float,
+        group_assembly.add_argument("--disentangle-df", dest="disentangle_depth_factor", default=5.0, type=float,
                                     help="Depth factor for differentiate genome type of contigs. "
                                          "The genome type of contigs are determined by blast. "
                                          "Default: %(default)s")
+        group_assembly.add_argument("--disentangle-tf", dest="disentangle_type_factor", type=float, default=3.,
+                                    help="Type factor for identifying contig type tag when multiple tags exist in one contig. "
+                                         "Default:%(default)s")
         group_assembly.add_argument("--contamination-depth", dest="contamination_depth", default=3., type=float,
                                     help="Depth factor for confirming contamination in parallel contigs. Default: %(default)s")
         group_assembly.add_argument("--contamination-similarity", dest="contamination_similarity", default=0.9,
@@ -528,7 +531,8 @@ def get_options(description, version):
                 sys.stderr.write("\n############################################################################"
                                  "\nERROR: default " + this_sub_organelle + "," * int(bool(extra_type)) + extra_type +
                                  " database not added yet!\n"
-                                 "\nInstall it by: get_organelle_config.py -a " + this_sub_organelle +
+                                 "These two types must be used together!\n" * int(bool(extra_type)) +
+                                 "\nInstall it(them) by: get_organelle_config.py -a " + this_sub_organelle +
                                  "," * int(bool(extra_type)) + extra_type +
                                  "\nor\nInstall all types by: get_organelle_config.py -a all\n")
                 exit()
@@ -661,23 +665,23 @@ def get_options(description, version):
         lib_not_available = []
         lib_versions_info.append("GetOrganelleLib " + GetOrganelleLib.__version__)
         try:
-            import numpy
+            import numpy as np
         except ImportError:
             lib_not_available.append("numpy")
         else:
-            lib_versions_info.append("numpy " + numpy.__version__)
+            lib_versions_info.append("numpy " + np.__version__)
+        # try:
+        #     import sympy
+        # except ImportError:
+        #     lib_not_available.append("sympy")
+        # else:
+        #     lib_versions_info.append("sympy " + sympy.__version__)
         try:
-            import sympy
+            import gekko
         except ImportError:
-            lib_not_available.append("sympy")
+            lib_not_available.append("gekko")
         else:
-            lib_versions_info.append("sympy " + sympy.__version__)
-        try:
-            import scipy
-        except ImportError:
-            lib_not_available.append("scipy")
-        else:
-            lib_versions_info.append("scipy " + scipy.__version__)
+            lib_versions_info.append("gekko " + gekko.__version__)
         try:
             import psutil
         except ImportError:
@@ -1136,7 +1140,8 @@ def estimate_maximum_n_reads_using_mapping(
             coverages_2 = [pos for ref in coverage_info for pos in coverage_info[ref] if pos > 0]
             base_cov_values = get_cover_range(coverages_2, guessing_percent=BASE_COV_SAMPLING_PERCENT)
             mean_read_len, max_read_len, all_read_nums = \
-                get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound)
+                get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound, n_process=1)
+                # get_read_len_mean_max_count(mapped_fq, maximum_n_reads_hard_bound, n_process=threads)
             if executable(os.path.join(which_spades, "spades.py -h")) and \
                     executable(os.path.join(which_bowtie2, "bowtie2")):
                 try:
@@ -1563,7 +1568,7 @@ def check_parameters(word_size, original_fq_files, seed_fs_files, seed_fq_files,
                     simulate_fq_simple(from_fasta_file=this_modified_graph,
                                        out_dir=seed_fq_files[go_t] + ".spades",
                                        out_name="get_org.assembly_graph.simulated.fq",
-                                       sim_read_jump_size=7, resume=resume)
+                                       sim_read_jump_size=7, resume=resume, random_obj=random)
                     closest_seed_f = os.path.join(seed_fq_files[go_t] + ".spades", "get_org.closest_seed.fasta")
                     seed_seq_list = SequenceList(seed_fs_files[go_t])
                     for seq_record in seed_seq_list:
@@ -1827,6 +1832,337 @@ def make_read_index(original_fq_files, direction_according_to_user_input, all_re
         else:
             log_handler.info("indices for fastq existed!")
             len_indices = len([x for x in open(temp2_clusters_dir[1], 'r')])
+    elif resume and os.path.exists(temp1_contig_dir[1]) and not rm_duplicates:
+        if index_in_memory:
+            log_handler.info("Reading existed indices for fastq ...")
+            #
+            if keep_seq_parts:
+                forward_reverse_reads = [x.strip().split("\t") for x in open(temp1_contig_dir[1], 'r')]
+                cancel_seq_parts = True if max([len(x) for x in forward_reverse_reads]) == 1 else False
+            else:
+                forward_reverse_reads = [x.strip() for x in open(temp1_contig_dir[1], 'r')]
+
+        # lengths = []
+        use_user_direction = False
+        for id_file, file_name in enumerate(original_fq_files):
+            file_in = open(file_name, "r")
+            count_this_read_n = 0
+            line = file_in.readline()
+            # if anti seed input, name & direction should be recognized
+            if anti_seed:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        # parsing name & direction
+                        if use_user_direction:
+                            this_name = line[1:].strip()
+                            direction = direction_according_to_user_input[id_file]
+                        else:
+                            try:
+                                if ' ' in line:
+                                    this_head = line[1:].split(' ')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                elif '#' in line:
+                                    this_head = line[1:].split('#')
+                                    this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
+                                elif line[-3] == "/" and line[-2].isdigit():  # 2019-04-22 added
+                                    this_name, direction = line[1:-3], int(line[-2])
+                                elif line[1:].strip().isdigit():
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                                else:
+                                    log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                            except (ValueError, IndexError):
+                                log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                log_handler.info("Using user-defined read directions. ")
+                                use_user_direction = True
+                                this_name = line[1:].strip()
+                                direction = direction_according_to_user_input[id_file]
+                        if (this_name, direction) in anti_lines:
+                            line_count += 4
+                            for i in range(4):
+                                line = file_in.readline()
+                            continue
+                        this_seq = file_in.readline().strip()
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                        line_clusters.append([line_count])
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            else:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        this_seq = file_in.readline().strip()
+
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                        line_clusters.append([line_count])
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            line = file_in.readline()
+            file_in.close()
+            if line:
+                log_handler.info("For " + file_name + ", only top " + str(int(all_read_limits[id_file])) +
+                                 " reads are used in downstream analysis.")
+        if this_process:
+            memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + " G, "
+        else:
+            memory_usage = ''
+
+        del name_to_line
+
+        if not index_in_memory:
+            # dump line clusters
+            len_indices = len(line_clusters)
+            temp2_indices_file_out = open(temp2_clusters_dir[0], 'w')
+            for this_index in range(len_indices):
+                temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
+                temp2_indices_file_out.write('\n')
+            temp2_indices_file_out.close()
+            os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
+
+        del seq_duplicates
+        len_indices = len(line_clusters)
+        log_handler.info(memory_usage + str(len_indices) + " reads")
+    elif resume and os.path.exists(temp1_contig_dir[1]):
+        # lengths = []
+        use_user_direction = False
+        for id_file, file_name in enumerate(original_fq_files):
+            file_in = open(file_name, "r")
+            count_this_read_n = 0
+            line = file_in.readline()
+            # if anti seed input, name & direction should be recognized
+            if anti_seed:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        # parsing name & direction
+                        if use_user_direction:
+                            this_name = line[1:].strip()
+                            direction = direction_according_to_user_input[id_file]
+                        else:
+                            try:
+                                if ' ' in line:
+                                    this_head = line[1:].split(' ')
+                                    this_name, direction = this_head[0], int(this_head[1][0])
+                                elif '#' in line:
+                                    this_head = line[1:].split('#')
+                                    this_name, direction = this_head[0], int(this_head[1].strip("/")[0])
+                                elif line[-3] == "/" and line[-2].isdigit():  # 2019-04-22 added
+                                    this_name, direction = line[1:-3], int(line[-2])
+                                elif line[1:].strip().isdigit():
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                                else:
+                                    log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                    log_handler.info("Using user-defined read directions. ")
+                                    use_user_direction = True
+                                    this_name = line[1:].strip()
+                                    direction = direction_according_to_user_input[id_file]
+                            except (ValueError, IndexError):
+                                log_handler.info('Unrecognized head: ' + file_name + ': ' + str(line.strip()))
+                                log_handler.info("Using user-defined read directions. ")
+                                use_user_direction = True
+                                this_name = line[1:].strip()
+                                direction = direction_according_to_user_input[id_file]
+
+                        if (this_name, direction) in anti_lines:
+                            line_count += 4
+                            for i in range(4):
+                                line = file_in.readline()
+                            continue
+                        this_seq = file_in.readline().strip()
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+
+                            if keep_seq_parts:
+                                if cancel_seq_parts and len(this_seq) > 1:
+                                    cancel_seq_parts = False
+                                this_c_seq = complementary_seqs(this_seq)
+                                # lengths.extend([len(seq_part) for seq_part in this_seq])
+                            else:
+                                this_seq = this_seq[0]
+                                this_c_seq = complementary_seq(this_seq)
+                                # lengths.append(len(this_seq))
+                        else:
+                            this_c_seq = complementary_seq(this_seq)
+                            # lengths.append(len(this_seq))
+                        if this_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_seq]].append(line_count)
+                        elif this_c_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                        else:
+                            if index_in_memory:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                            seq_duplicates[this_seq] = this_index
+                            line_clusters.append([line_count])
+                            this_index += 1
+                        if len(seq_duplicates) > rm_duplicates:
+                            seq_duplicates = {}
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            else:
+                while line and count_this_read_n < all_read_limits[id_file]:
+                    if line.startswith("@"):
+                        count_this_read_n += 1
+                        this_seq = file_in.readline().strip()
+
+                        # drop nonsense reads
+                        if len(this_seq) < word_size:
+                            line_count += 4
+                            for i in range(3):
+                                line = file_in.readline()
+                            continue
+
+                        file_in.readline()
+                        quality_str = file_in.readline()
+                        if do_split_low_quality:
+                            this_seq = split_seq_by_quality_pattern(this_seq, quality_str, low_quality, word_size)
+                            # drop nonsense reads
+                            if not this_seq:
+                                line_count += 4
+                                line = file_in.readline()
+                                continue
+                            if keep_seq_parts:
+                                if cancel_seq_parts and len(this_seq) > 1:
+                                    cancel_seq_parts = False
+                                this_c_seq = complementary_seqs(this_seq)
+                                # lengths.extend([len(seq_part) for seq_part in this_seq])
+                            else:
+                                this_seq = this_seq[0]
+                                this_c_seq = complementary_seq(this_seq)
+                                # lengths.append(len(this_seq))
+                        else:
+                            this_c_seq = complementary_seq(this_seq)
+                            # lengths.append(len(this_seq))
+                        if this_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_seq]].append(line_count)
+                        elif this_c_seq in seq_duplicates:
+                            line_clusters[seq_duplicates[this_c_seq]].append(line_count)
+                        else:
+                            if index_in_memory:
+                                forward_reverse_reads.append(this_seq)
+                                forward_reverse_reads.append(this_c_seq)
+                            seq_duplicates[this_seq] = this_index
+                            line_clusters.append([line_count])
+                            this_index += 1
+                        if len(seq_duplicates) > rm_duplicates:
+                            seq_duplicates = {}
+                    else:
+                        log_handler.error("Illegal fq format in line " + str(line_count) + ' ' + str(line))
+                        exit()
+                    if echo_step != inf and line_count % echo_step == 0:
+                        to_print = str("%s" % datetime.datetime.now())[:23].replace('.', ',') + " - INFO: " + str(
+                            (line_count + 4) // 4) + " reads"
+                        sys.stdout.write(to_print + '\b' * len(to_print))
+                        sys.stdout.flush()
+                    line_count += 4
+                    line = file_in.readline()
+            line = file_in.readline()
+            file_in.close()
+            if line:
+                log_handler.info("For " + file_name + ", only top " + str(int(all_read_limits[id_file])) +
+                                 " reads are used in downstream analysis.")
+        if this_process:
+            memory_usage = "Mem " + str(round(this_process.memory_info().rss / 1024.0 / 1024 / 1024, 3)) + " G, "
+        else:
+            memory_usage = ''
+
+        del name_to_line
+
+        if not index_in_memory:
+            # dump line clusters
+            len_indices = len(line_clusters)
+            temp2_indices_file_out = open(temp2_clusters_dir[0], 'w')
+            for this_index in range(len_indices):
+                temp2_indices_file_out.write('\t'.join([str(x) for x in line_clusters[this_index]]))
+                temp2_indices_file_out.write('\n')
+            temp2_indices_file_out.close()
+            os.rename(temp2_clusters_dir[0], temp2_clusters_dir[1])
+
+        del seq_duplicates
+        len_indices = len(line_clusters)
+        if len_indices == 0 and line_count // 4 > 0:
+            log_handler.error("No qualified reads found!")
+            log_handler.error("Word size (" + str(word_size) + ") CANNOT be larger than your "
+                              "post-trimmed maximum read length!")
+            exit()
+        log_handler.info(memory_usage + str(len_indices) + " candidates in all " + str(line_count // 4) + " reads")
     else:
         if not index_in_memory:
             temp1_contig_out = open(temp1_contig_dir[0], 'w')
@@ -3345,8 +3681,14 @@ def separate_fq_by_pair(out_base, prefix, verbose_log, log_handler):
 def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_fg, organelle_prefix,
                              organelle_type, blast_db, read_len_for_log, verbose, log_handler, basic_prefix,
                              expected_maximum_size, expected_minimum_size, do_spades_scaffolding, options):
+
     from GetOrganelleLib.assembly_parser import ProcessingGraphFailed, Assembly
-    def disentangle_assembly(fastg_file, tab_file, output, weight_factor, log_dis, time_limit, type_factor=3.,
+    random.seed(options.random_seed)
+    # import numpy as np
+    # np.random.seed(options.random_seed)
+
+    def disentangle_assembly(assembly_obj, fastg_file, tab_file, output, weight_factor, log_dis, time_limit,
+                             type_factor=3.,
                              mode="embplant_pt", blast_db_base="embplant_pt", contamination_depth=3.,
                              contamination_similarity=0.95, degenerate=True,
                              degenerate_depth=1.5, degenerate_similarity=0.98,
@@ -3355,7 +3697,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                              here_acyclic_allowed=False,
                              here_verbose=False, timeout_flag_str="'--disentangle-time-limit'", temp_graph=None):
         @set_time_limit(time_limit, flag_str=timeout_flag_str)
-        def disentangle_inside(fastg_f, tab_f, o_p, w_f, log_in, type_f=3., mode_in="embplant_pt",
+        def disentangle_inside(input_graph,
+                               fastg_f,
+                               tab_f,
+                               o_p,
+                               w_f,
+                               log_in,
+                               type_f=3.,
+                               mode_in="embplant_pt",
                                in_db_n="embplant_pt", c_d=3., c_s=0.95,
                                deg=True, deg_dep=1.5, deg_sim=0.98, hard_c_t=10., min_s_f=0.1, max_c_in=True,
                                max_s=inf, min_s=0, with_spades_scaffolds_in=False,
@@ -3371,7 +3720,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 log_in.info("Disentangling " + fastg_f + " as a/an " + in_db_n + "-insufficient graph ... ")
             else:
                 log_in.info("Disentangling " + fastg_f + " as a circular genome ... ")
-            input_graph = Assembly(fastg_f)
+            # input_graph = Assembly(fastg_f)
             if with_spades_scaffolds_in:
                 if not input_graph.add_gap_nodes_with_spades_res(os.path.join(spades_output, "scaffolds.fasta"),
                                                                  os.path.join(spades_output, "scaffolds.paths"),
@@ -3379,14 +3728,26 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                                  log_handler=log_handler):
                     raise ProcessingGraphFailed("No new connections.")
                 else:
+                    log_handler.info("Re-loading labels along " + out_fastg)
+                    input_graph.parse_tab_file(
+                        tab_f,
+                        database_name=in_db_n,
+                        type_factor=type_f,
+                        max_gene_gap=250,
+                        max_cov_diff=hard_c_t,  # contamination_depth?
+                        verbose=verbose,
+                        log_handler=log_handler,
+                        random_obj=random)
                     if in_temp_graph:
                         if in_temp_graph.endswith(".gfa"):
                             this_tmp_graph = in_temp_graph[:-4] + ".scaffolds.gfa"
                         else:
                             this_tmp_graph = in_temp_graph + ".scaffolds.gfa"
                         input_graph.write_to_gfa(this_tmp_graph)
-            target_results = input_graph.find_target_graph(tab_f,
-                                                           mode=mode_in, database_name=in_db_n, type_factor=type_f,
+            target_results = input_graph.find_target_graph(  # tab_f,
+                                                           mode=mode_in,
+                                                           db_name=in_db_n,
+                                                           # type_factor=type_f,
                                                            hard_cov_threshold=hard_c_t,
                                                            contamination_depth=c_d,
                                                            contamination_similarity=c_s,
@@ -3400,7 +3761,9 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                            read_len_for_log=read_len_for_log,
                                                            kmer_for_log=int(this_K[1:]),
                                                            log_handler=log_in, verbose=verbose_in,
-                                                           temp_graph=in_temp_graph)
+                                                           temp_graph=in_temp_graph,
+                                                           selected_graph=o_p + ".graph.selected_graph.gfa",
+                                                           random_obj=random)
             if not target_results:
                 raise ProcessingGraphFailed("No target graph detected!")
             if len(target_results) > 1:
@@ -3416,11 +3779,14 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     go_res += 1
                     broken_graph = res["graph"]
                     count_path = 0
-                    these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in)
+                    # use options.max_paths_num + 1 to trigger the warning
+                    these_paths = broken_graph.get_all_paths(mode=mode_in, log_handler=log_in,
+                                                             max_paths_num=options.max_paths_num + 1)
                     # reducing paths
                     if len(these_paths) > options.max_paths_num:
                         log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
-                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                                       str(options.max_paths_num) +
+                                       "+ possible paths. (see '--max-paths-num' to change it.)")
                         these_paths = these_paths[:options.max_paths_num]
                     # exporting paths, reporting results
                     for this_paths, other_tag in these_paths:
@@ -3474,7 +3840,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         open(out_n, "w").write("\n".join(all_contig_str))
 
                     if set(still_complete[-len(these_paths):]) == {"complete"}:
-                        this_out_base = o_p + ".complete.graph" + str(go_res) + ".selected_graph."
+                        this_out_base = o_p + ".complete.graph" + str(go_res) + ".path_sequence."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(
@@ -3483,7 +3849,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     elif set(still_complete[-len(these_paths):]) == {"nearly-complete"}:
-                        this_out_base = o_p + ".nearly-complete.graph" + str(go_res) + ".selected_graph."
+                        this_out_base = o_p + ".nearly-complete.graph" + str(go_res) + ".path_sequence."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         image_produced = draw_assembly_graph_using_bandage(
@@ -3492,7 +3858,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                             assembly_graph_ob=broken_graph,
                             log_handler=log_handler, verbose_log=verbose_in, which_bandage=options.which_bandage)
                     else:
-                        this_out_base = o_p + ".contigs.graph" + str(go_res) + ".selected_graph."
+                        this_out_base = o_p + ".contigs.graph" + str(go_res) + ".path_sequence."
                         log_in.info("Writing GRAPH to " + this_out_base + "gfa")
                         broken_graph.write_to_gfa(this_out_base + "gfa")
                         # image_produced = draw_assembly_graph_using_bandage(
@@ -3513,13 +3879,15 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     go_res += 1
                     idealized_graph = res["graph"]
                     count_path = 0
-
+                    # use options.max_paths_num + 1 to trigger the warning
                     these_paths = idealized_graph.get_all_circular_paths(
-                        mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc)
+                        mode=mode_in, log_handler=log_in, reverse_start_direction_for_pt=options.reverse_lsc,
+                        max_paths_num=options.max_paths_num + 1)
                     # reducing paths
                     if len(these_paths) > options.max_paths_num:
                         log_in.warning("Only exporting " + str(options.max_paths_num) + " out of all " +
-                                       str(len(these_paths)) + " possible paths. (see '--max-paths-num' to change it.)")
+                                       str(options.max_paths_num) +
+                                       "+ possible paths. (see '--max-paths-num' to change it.)")
                         these_paths = these_paths[:options.max_paths_num]
 
                     # exporting paths, reporting results
@@ -3542,7 +3910,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                         ":".join([str(len_val) for len_val in ir_stats[:3]]))
                         log_in.info(
                             "Writing PATH" + str(count_path) + " of " + status_str + " " + mode_in + " to " + out_n)
-                    temp_base_out = o_p + "." + status_str + ".graph" + str(go_res) + ".selected_graph."
+                    temp_base_out = o_p + "." + status_str + ".graph" + str(go_res) + ".path_sequence."
                     log_in.info("Writing GRAPH to " + temp_base_out + "gfa")
                     idealized_graph.write_to_gfa(temp_base_out + "gfa")
                     image_produced = draw_assembly_graph_using_bandage(
@@ -3570,8 +3938,10 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                 " using Bandage to confirm the final result.")
             log_in.info("Writing output finished.")
 
-        disentangle_inside(fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
-                           type_f=type_factor, mode_in=mode, in_db_n=blast_db_base,
+        disentangle_inside(input_graph=deepcopy(assembly_obj),
+                           fastg_f=fastg_file, tab_f=tab_file, o_p=output, w_f=weight_factor, log_in=log_dis,
+                           type_f=type_factor,
+                           mode_in=mode, in_db_n=blast_db_base,
                            c_d=contamination_depth, c_s=contamination_similarity,
                            deg=degenerate, deg_dep=degenerate_depth, deg_sim=degenerate_similarity,
                            hard_c_t=hard_cov_threshold, min_s_f=min_sigma_factor, max_c_in=here_only_max_c,
@@ -3591,32 +3961,52 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
     timeout_flag = "'--disentangle-time-limit'"
     export_succeeded = False
     path_prefix = os.path.join(out_base, organelle_prefix)
-    graph_temp_file = path_prefix + ".temp.gfa" if options.keep_temp_files else None
+    graph_temp_file1 = path_prefix + "R1.temp.gfa" if options.keep_temp_files else None
+    file_to_assembly_obj = {}
     for go_k, kmer_dir in enumerate(kmer_dirs):
         out_fastg = slim_out_fg[go_k]
         if out_fastg and os.path.getsize(out_fastg):
             try:
                 """disentangle"""
-
                 out_csv = out_fastg[:-5] + "csv"
                 # if it is the first round (the largest kmer), copy the slimmed result to the main spades output
                 # if go_k == 0:
                 #     main_spades_folder = os.path.split(kmer_dir)[0]
                 #     os.system("cp " + out_fastg + " " + main_spades_folder)
                 #     os.system("cp " + out_csv + " " + main_spades_folder)
-                disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
-                                     mode=organelle_type, tab_file=out_csv, output=path_prefix,
-                                     weight_factor=100, hard_cov_threshold=options.disentangle_depth_factor,
+                log_handler.info("Parsing " + out_fastg)
+                assembly_graph_obj = Assembly(out_fastg, log_handler=log_handler)
+                log_handler.info("Loading and cleaning labels along " + out_fastg)
+                assembly_graph_obj.parse_tab_file(
+                    out_csv,
+                    database_name=blast_db,
+                    type_factor=options.disentangle_type_factor,
+                    max_gene_gap=250,
+                    max_cov_diff=options.disentangle_depth_factor,  # contamination_depth?
+                    verbose=verbose,
+                    log_handler=log_handler,
+                    random_obj=random)
+                file_to_assembly_obj[out_fastg] = assembly_graph_obj
+                disentangle_assembly(assembly_obj=assembly_graph_obj,
+                                     fastg_file=out_fastg,
+                                     blast_db_base=blast_db,
+                                     mode=organelle_type,
+                                     tab_file=out_csv,
+                                     output=path_prefix,
+                                     weight_factor=100,
+                                     type_factor=options.disentangle_type_factor,
+                                     hard_cov_threshold=options.disentangle_depth_factor,
                                      contamination_depth=options.contamination_depth,
                                      contamination_similarity=options.contamination_similarity,
-                                     degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
+                                     degenerate=options.degenerate,
+                                     degenerate_depth=options.degenerate_depth,
                                      degenerate_similarity=options.degenerate_similarity,
                                      expected_max_size=expected_maximum_size,
                                      expected_min_size=expected_minimum_size,
                                      here_only_max_c=True,
                                      here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                                      time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
-                                     temp_graph=graph_temp_file)
+                                     temp_graph=graph_temp_file1)
             except ImportError as e:
                 log_handler.error("Disentangling failed: " + str(e))
                 return False
@@ -3639,6 +4029,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 break
 
     if not export_succeeded and do_spades_scaffolding:
+        graph_temp_file1s = path_prefix + "R1S.temp.gfa" if options.keep_temp_files else None
         largest_k_graph_f_exist = bool(slim_out_fg[0])
         if kmer_dirs and largest_k_graph_f_exist:
             out_fastg = slim_out_fg[0]
@@ -3646,9 +4037,15 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                 try:
                     """disentangle"""
                     out_csv = out_fastg[:-5] + "csv"
-                    disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
-                                         mode=organelle_type, tab_file=out_csv, output=path_prefix,
-                                         weight_factor=100, hard_cov_threshold=options.disentangle_depth_factor,
+                    disentangle_assembly(assembly_obj=file_to_assembly_obj[out_fastg],
+                                         fastg_file=out_fastg,
+                                         blast_db_base=blast_db,
+                                         mode=organelle_type,
+                                         tab_file=out_csv,
+                                         output=path_prefix,
+                                         weight_factor=100,
+                                         type_factor=options.disentangle_type_factor,
+                                         hard_cov_threshold=options.disentangle_depth_factor,
                                          contamination_depth=options.contamination_depth,
                                          contamination_similarity=options.contamination_similarity,
                                          degenerate=options.degenerate, degenerate_depth=options.degenerate_depth,
@@ -3658,7 +4055,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                          here_only_max_c=True, with_spades_scaffolds=True,
                                          here_acyclic_allowed=False, here_verbose=verbose, log_dis=log_handler,
                                          time_limit=options.disentangle_time_limit, timeout_flag_str=timeout_flag,
-                                         temp_graph=graph_temp_file)
+                                         temp_graph=graph_temp_file1s)
                 except FileNotFoundError:
                     log_handler.warning("scaffolds.fasta and/or scaffolds.paths not found!")
                 except ImportError as e:
@@ -3682,6 +4079,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                     export_succeeded = True
 
     if not export_succeeded:
+        graph_temp_file2 = path_prefix + "R2.temp.gfa" if options.keep_temp_files else None
         largest_k_graph_f_exist = bool(slim_out_fg[0])
         if kmer_dirs and largest_k_graph_f_exist:
             for go_k, kmer_dir in enumerate(kmer_dirs):
@@ -3694,11 +4092,18 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                         if out_fastg_list:
                             out_fastg = out_fastg_list[0]
                             out_csv = out_fastg[:-5] + "csv"
-                            disentangle_assembly(fastg_file=out_fastg, blast_db_base=blast_db,
-                                                 mode=organelle_type, tab_file=out_csv,
-                                                 output=path_prefix, weight_factor=100, here_verbose=verbose,
+                            disentangle_assembly(assembly_obj=file_to_assembly_obj[out_fastg],
+                                                 fastg_file=out_fastg,
+                                                 blast_db_base=blast_db,
+                                                 mode=organelle_type,
+                                                 tab_file=out_csv,
+                                                 output=path_prefix,
+                                                 weight_factor=100,
+                                                 type_factor=options.disentangle_type_factor,
+                                                 here_verbose=verbose,
                                                  log_dis=log_handler,
-                                                 hard_cov_threshold=options.disentangle_depth_factor * 0.8,
+                                                 hard_cov_threshold=options.disentangle_depth_factor * 0.6,
+                                                 # TODO the adjustment should be changed if it's RNA data
                                                  contamination_depth=options.contamination_depth,
                                                  contamination_similarity=options.contamination_similarity,
                                                  degenerate=options.degenerate,
@@ -3708,7 +4113,7 @@ def extract_organelle_genome(out_base, spades_output, ignore_kmer_res, slim_out_
                                                  expected_min_size=expected_minimum_size,
                                                  here_only_max_c=True, here_acyclic_allowed=True,
                                                  time_limit=3600, timeout_flag_str=timeout_flag,
-                                                 temp_graph=graph_temp_file)
+                                                 temp_graph=graph_temp_file2)
                     except (ImportError, AttributeError) as e:
                         log_handler.error("Disentangling failed: " + str(e))
                         break
@@ -3907,13 +4312,23 @@ def main():
                     else:
                         target_fq = os.path.join(out_base, str(file_id + 1) + "-" +
                                                  os.path.basename(read_file))
-                        if os.path.realpath(target_fq) == os.path.realpath(os.path.join(os.getcwd(), read_file)):
+                        if os.path.exists(target_fq) and os.path.islink(target_fq):
+                            if os.path.realpath(target_fq) != os.path.realpath(os.path.join(os.getcwd(), read_file)):
+                                log_handler.error("Existed symlink (%s -> %s) does not link to the input file (%s)!" %
+                                                  (target_fq,
+                                                   os.path.realpath(target_fq),
+                                                   os.path.realpath(os.path.join(os.getcwd(), read_file))))
+                                exit()
+                        elif os.path.realpath(target_fq) == os.path.realpath(os.path.join(os.getcwd(), read_file)):
                             log_handler.error("Do not put original reads file(s) in the output directory!")
                             exit()
                         if not (os.path.exists(target_fq) and resume):
                             if all_read_nums[file_id] > READ_LINE_TO_INF:
-                                os.system("cp " + read_file + " " + target_fq + ".Temp")
-                                os.system("mv " + target_fq + ".Temp " + target_fq)
+                                # os.system("cp " + read_file + " " + target_fq + ".Temp")
+                                # os.system("mv " + target_fq + ".Temp " + target_fq)
+                                if os.path.exists(target_fq):
+                                    os.remove(target_fq)
+                                os.system("ln -s " + os.path.abspath(read_file) + " " + target_fq)
                             else:
                                 os.system("head -n " + str(int(4 * all_read_nums[file_id])) + " " +
                                           read_file + " > " + target_fq + ".Temp")
@@ -3930,8 +4345,9 @@ def main():
                     get_read_quality_info(original_fq_files, sampling_reads_for_quality, options.min_quality_score,
                                           log_handler, maximum_ignore_percent=options.maximum_ignore_percent)
                 log_handler.info("Counting read lengths ...")
-                mean_read_len, max_read_len, all_read_nums = get_read_len_mean_max_count(original_fq_files,
-                                                                                         options.maximum_n_reads)
+                mean_read_len, max_read_len, all_read_nums = get_read_len_mean_max_count(
+                    original_fq_files, options.maximum_n_reads, n_process=1)
+                    # original_fq_files, options.maximum_n_reads, n_process=options.threads)
                 log_handler.info("Mean = " + str(round(mean_read_len, 1)) + " bp, maximum = " +
                                  str(max_read_len) + " bp.")
                 log_handler.info("Reads used = " + "+".join([str(sub_num) for sub_num in all_read_nums]))
@@ -4151,7 +4567,7 @@ def main():
                     for go_t, sub_organelle_type in enumerate(options.organelle_type):
                         og_prefix = options.prefix + organelle_type_prefix[go_t]
                         graph_existed = bool([gfa_f for gfa_f in os.listdir(out_base)
-                                              if gfa_f.startswith(og_prefix) and gfa_f.endswith(".selected_graph.gfa")])
+                                              if gfa_f.startswith(og_prefix) and gfa_f.endswith(".path_sequence.gfa")])
                         fasta_existed = bool([fas_f for fas_f in os.listdir(out_base)
                                               if fas_f.startswith(og_prefix) and fas_f.endswith(".path_sequence.fasta")])
                         if resume and graph_existed and fasta_existed:

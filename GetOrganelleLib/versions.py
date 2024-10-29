@@ -6,6 +6,44 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.8.0.0",
+        "features": [
+            "1. remove redundant disentangling for get_organelle_from_assembly.py",
+            "2. separate temporary files from different rounds",
+            "3. remove upper boundary for coverage-based filtering",
+            "4. remove max multiplicity boundary",
+            "5. remove scipy & sympy: "
+            "   5.1. use gekko instead of scipy for multiplicity estimation, with initials and option for multinomial;"
+            "   5.2. use custom norm_logpdf function instead of slow scipy.stats.norm.logpdf",
+            "6. limit the number of paths before generating",
+            "7. log copy info for --no-slim",
+            "8. statistical_func.py: fix a bug"
+            "   random.choice(np.array([0])) triggers IndexError: Cannot choose from an empty sequence",
+            "9. assembly.parse_tab_file: "
+            "   only keep one vertex labeled for each gene tags -> "
+            "   gene tags can occur in multiple vertices that are linearly continuous;",
+            "10. using negative tag weights to better differentiate target and non-target but similar neighbors",
+            "11. change the default of depth_factor because the baseline is now set to be average rather than the max",
+            "12. slim_graph.generate_baits_offsets: fix a bug generating wrong offsets: min -> max",
+            "13. slim_graph.py:  1. rm_contigs: < depth_cutoff -> >= depth_cutoff. "
+            "                    2. add contig_min_hit_percent (add associated func to seq_parser.py). "
+            "                    3. allow no depth_cutoff (depth_cutoff==-1). ",
+            "14. add weight_factor to get_organelle_from_assembly.py",
+            "15. parsing the same graph_file and tab_file only once before multiple disentanglement trials",
+            "16. skip clustering and other steps when len(vertex_info)==1",
+            "17. discard np.random, fix consistent issue, modify find_target_graph to generate contigs",
+            "18. create soft link instead of copying the original read file(s) into the working directory",
+            "19. get_organelle_from_reads.py.make_read_index(): "
+            "    on --continue and temp.indices.1 existed, separate conditions for speeding up ",
+            "20. Assembly.reduce_to_graph: minor changes",
+            "21. get_organelle_from_assembly.py: raise exception on empty graphs",
+            "22. add gb_to_tbl.py for common format conversion; add biopython as the dependency",
+            "23. fix a bug: summary_get_organelle_output.py does not recognize degenerate/ambiguous bases (issue 279)",
+            "24. automatic converting negative coverage to positive and report it (probably Bandage output issue)",
+        ],
+        "time": "2023-08-20 16:00 UTC+8"
+    },
+    {
         "number": "1.7.7.1",
         "features": [
             "1. fix a import bug of 'from scipy import stat, log, inf' issue (issue #132 #315)",
@@ -423,7 +461,7 @@ versions = [
          "2. get_organelle_from_assembly.py: fix a bug on parsing gfa file with long seq head names; "
          "   --keep-temp fixed; fix a bug with '-h'; ",
          "3. Utilities/slim_fastg.py: --no-merge -> --merge; disable merge by default",
-         "4. GetOrganelleLib/assembly_parser.py: fix a bug with generating new vertices, "
+         "4. GetOrganelleLib/assembly_parser.py: fix a bug with generating new vertices_set, "
          "   as well as merge_all_possible_contigs; export plastome-LSC direction according to convention based on "
          "   accumulated orf lengths (the conventional reverse direction has more accumulated orf lengths), which "
          "   makes users easier to use; remove processing_polymorphism() before filter_by_coverage() to better "
@@ -569,7 +607,7 @@ versions = [
      "features": [
          "1.get_organelle_reads.py: fix a bug with --continue & --prefix when LogInfo() added; ",
          "2.assembly_parser.py & statistical_func.py: "
-         "if single copy vertex percentage is < 50%, continue dropping suspicious vertices",
+         "if single copy vertex percentage is < 50%, continue dropping suspicious vertices_set",
          "3.pip_control_func.py: for --prefix",
      ]},
     {"number": "1.4.3a",
@@ -611,7 +649,7 @@ versions = [
     {"number": "1.4.1",
      "features": [
          "1.assembly_parser.py: Assembly.export_path() and Assembly.merge_all_possible_vertices():"
-         " name of merged vertices optimized",
+         " name of merged vertices_set optimized",
          "2.README: PATH configuration",
          "3.mk_batch_for_iteratively_mapping_assembling.py: -t threads",
          "4.get_organelle_reads.py --fast mode modified",
@@ -716,7 +754,7 @@ versions = [
      ]},
     {"number": "1.2.0b",
      "features": [
-         "1.Assembly.parse_fastg(): (more robust) Add connection information to both of the related vertices"
+         "1.Assembly.parse_fastg(): (more robust) Add connection information to both of the related vertices_set"
          " even it is only mentioned once;",
          "2.Assembly.is_sequential_repeat(): fix a bug that leak in the reverse direction;",
          "3.add depth_factor to the main script;",

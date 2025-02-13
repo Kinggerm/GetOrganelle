@@ -6,6 +6,12 @@ def get_versions():
 
 versions = [
     {
+        "number": "1.8.0.1",
+        "features": [
+            "1. fix a compatibility issue in assembly_parser.py",
+        ],
+    },
+    {
         "number": "1.8.0.0",
         "features": [
             "1. remove redundant disentangling for get_organelle_from_assembly.py",

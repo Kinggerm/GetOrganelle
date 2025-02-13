@@ -324,7 +324,10 @@ class SimpleAssembly(object):
                                 kmer_count = int(element[-1])
                                 check_positive_value(kmer_count, "KC", log_handler=log_handler)
                             elif element[0].upper() == "RC":  # took read counts as kmer counts
-                                kmer_count = int(element[-1])
+                                try:
+                                    kmer_count = int(element[-1])
+                                except ValueError:
+                                    kmer_count = float(element[-1])  # in case of float from some assemblers
                                 check_positive_value(kmer_count, "RC", log_handler=log_handler)
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])
@@ -412,7 +415,10 @@ class SimpleAssembly(object):
                                 kmer_count = int(element[-1])
                                 check_positive_value(kmer_count, "KC", log_handler=log_handler)
                             elif element[0].upper() == "RC":  # took read counts as kmer counts
-                                kmer_count = int(element[-1])
+                                try:
+                                    kmer_count = int(element[-1])
+                                except ValueError:
+                                    kmer_count = float(element[-1])  # in case of float from some assemblers
                                 check_positive_value(kmer_count, "RC", log_handler=log_handler)
                             elif element[0].upper() == "DP":
                                 seq_depth_tag = float(element[-1])

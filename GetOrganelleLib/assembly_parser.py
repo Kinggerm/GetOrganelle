@@ -302,7 +302,9 @@ class SimpleAssembly(object):
                     if element_tag == "VN":
                         gfa_version_number = element_description
             gfa_open.seek(0)
-            if gfa_version_number == "1.0":
+            if gfa_version_number == "1.0" or gfa_version_number == "1.2":
+                if gfa_version_number == "1.2":
+                    log_handler.warning("Processing GFA version 1.2 as GFA 1.0")
                 for line in gfa_open:
                     if line.startswith("S\t"):
                         elements = line.strip().split("\t")
